@@ -1,0 +1,8 @@
+jwt:
+  secret-key: ${JWT_SECRET_KEY}
+  access-token-ttl: 1800000
+  refresh-token-ttl: 604800000
+
+logging:
+  level:
+    com.devticket: INFO
