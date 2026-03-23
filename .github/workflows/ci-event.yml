@@ -29,6 +29,8 @@ jobs:
 
       - name: 4. Gradle Test
         run: ./gradlew :devticket-event:test
+        env:
+          SPRING_PROFILES_ACTIVE: test
 
       - name: 5. Gradle Build
         run: ./gradlew :devticket-event:build -x test
