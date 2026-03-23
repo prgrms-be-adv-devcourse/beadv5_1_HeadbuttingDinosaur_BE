@@ -1,0 +1,14 @@
+spring:
+  application:
+    name: devticket-log
+  profiles:
+    active: local
+
+server:
+  port: 8086
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs
