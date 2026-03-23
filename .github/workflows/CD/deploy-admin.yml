@@ -57,7 +57,7 @@ jobs:
             docker pull $IMAGE_URL
             docker stop devticket-admin || true
             docker rm devticket-admin || true
-            docker run -d --name devticket-admin -p 8087:8087 --restart always \
+            docker run -d --name devticket-admin -p 8087:8080 --restart always \
               -e SPRING_DATASOURCE_URL='${{ secrets.DB_URL }}' \
               -e SPRING_DATASOURCE_USERNAME='${{ secrets.DB_USERNAME }}' \
               -e SPRING_DATASOURCE_PASSWORD='${{ secrets.DB_PASSWORD }}' \
