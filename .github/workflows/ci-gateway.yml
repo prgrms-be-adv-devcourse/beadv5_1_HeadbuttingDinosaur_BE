@@ -28,8 +28,9 @@ jobs:
         run: chmod +x apigateway/gradlew
 
       - name: 4. Gradle Test
-        run: cd apigateway && ./gradlew test
+        run: ./gradlew :devticket-gateway:test
         env:
           SPRING_PROFILES_ACTIVE: test
+
       - name: 5. Gradle Build
-        run: cd apigateway && ./gradlew build -x test
+        run: ./gradlew :devticket-gateway:build -x test
