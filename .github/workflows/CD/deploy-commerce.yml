@@ -57,7 +57,8 @@ jobs:
             docker pull $IMAGE_URL
             docker stop devticket-commerce || true
             docker rm devticket-commerce || true
-            docker run -d --name devticket-commerce -p 8083:8080 --restart always \
+            docker run -d --name devticket-commerce -p 8083:8083 --restart always \
+              -e SPRING_PROFILES_ACTIVE=prod \
               -e SPRING_DATASOURCE_URL='${{ secrets.DB_URL }}' \
               -e SPRING_DATASOURCE_USERNAME='${{ secrets.DB_USERNAME }}' \
               -e SPRING_DATASOURCE_PASSWORD='${{ secrets.DB_PASSWORD }}' \

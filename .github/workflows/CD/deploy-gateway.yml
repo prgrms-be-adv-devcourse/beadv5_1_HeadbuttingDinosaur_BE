@@ -85,6 +85,7 @@ jobs:
               --name devticket-gateway \
               -p 8080:8080 \
               --restart always \
+              -e SPRING_PROFILES_ACTIVE=prod \
               -e SPRING_DATASOURCE_URL='${{ secrets.DB_URL }}' \
               -e SPRING_DATASOURCE_USERNAME='${{ secrets.DB_USERNAME }}' \
               -e SPRING_DATASOURCE_PASSWORD='${{ secrets.DB_PASSWORD }}' \
