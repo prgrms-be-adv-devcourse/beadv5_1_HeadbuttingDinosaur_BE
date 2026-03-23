@@ -3,6 +3,46 @@ spring:
     name: devticket-gateway
   profiles:
     active: local
+  cloud:
+    gateway:
+      routes:
+        - id: member-service
+          uri: http://localhost:8081
+          predicates:
+            - Path=/api/members/**, /api/auth/**, /api/mypage/**
+
+        - id: event-service
+          uri: http://localhost:8082
+          predicates:
+            - Path=/api/events/**, /api/seller/**
+
+        - id: commerce-service
+          uri: http://localhost:8083
+          predicates:
+            - Path=/api/carts/**, /api/orders/**, /api/tickets/**
+
+        - id: payment-service
+          uri: http://localhost:8084
+          predicates:
+            - Path=/api/payments/**, /api/wallets/**, /api/refunds/**
+
+        - id: settlement-service
+          uri: http://localhost:8085
+          predicates:
+            - Path=/api/settlements/**
+
+        - id: log-service
+          uri: http://localhost:8086
+          predicates:
+            - Path=/api/logs/**
+
+        - id: admin-service
+          uri: http://localhost:8087
+          predicates:
+            - Path=/api/admin/**
+
+      default-filters:
+        - DedupeResponseHeader=Access-Control-Allow-Origin
 
 server:
   port: 8080
@@ -11,4 +51,4 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
   api-docs:
-    path: /v3/api-docs
+    path: /v1/api-docs
