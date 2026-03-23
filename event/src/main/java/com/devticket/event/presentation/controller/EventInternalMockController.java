@@ -9,7 +9,6 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/internal/events")
-@Profile("mock")
 @Tag(name = "Event Internal API", description = "Commerce, Payment, Settlement 서비스 연동용 내부 API (Mock)")
 public class EventInternalMockController {
 
