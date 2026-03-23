@@ -11,6 +11,16 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/internal/wallets")
 public class MockWalletController {
 
+    public static class MockWalletBalanceResponse {
+        public Long userId;
+        public Integer balance;
+
+        public MockWalletBalanceResponse(Long userId, Integer balance) {
+            this.userId = userId;
+            this.balance = balance;
+        }
+    }
+
     @GetMapping("/{userId}/balance")
     public MockWalletBalanceResponse getWalletBalance(@PathVariable Long userId) {
         return new MockWalletBalanceResponse(
