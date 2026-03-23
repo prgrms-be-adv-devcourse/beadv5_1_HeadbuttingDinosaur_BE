@@ -28,9 +28,9 @@ jobs:
         run: chmod +x gradlew
 
       - name: 4. Gradle Test
-        run: ./gradlew :devticket-payment:test
+        run: ./gradlew :payment:test
         env:
           SPRING_PROFILES_ACTIVE: test
 
       - name: 5. Gradle Build
-        run: ./gradlew :devticket-payment:build -x test
+        run: ./gradlew :payment:build -x test
