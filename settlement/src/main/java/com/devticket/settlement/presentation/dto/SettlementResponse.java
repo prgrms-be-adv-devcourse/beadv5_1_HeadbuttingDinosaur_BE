@@ -1,5 +1,7 @@
 package com.devticket.settlement.presentation.dto;
 
+import com.devticket.settlement.domain.model.SettlementStatus;
+
 import io.swagger.v3.oas.annotations.media.Schema;
 
 public record SettlementResponse(
@@ -26,7 +28,7 @@ public record SettlementResponse(
     Long finalSettlementAmount,
 
     @Schema(description = "정산 상태", example = "COMPLETED")
-    String status,
+    SettlementStatus status,
 
     @Schema(description = "정산 완료 시각", example = "2024-03-16T10:00:00")
     String settledAt
