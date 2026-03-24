@@ -45,6 +45,10 @@ dependencies {
     // Actuator
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
 
+    // Rate Limiting (Bucket4j + Caffeine 인메모리)
+    implementation 'com.bucket4j:bucket4j_jdk17-core:8.17.0'
+    implementation 'com.github.ben-manes.caffeine:caffeine'
+
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
 

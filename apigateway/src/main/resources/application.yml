@@ -74,3 +74,19 @@ springdoc:
     path: /swagger-ui.html
   api-docs:
     path: /v1/api-docs
+
+# Rate Limiting
+gateway:
+  rate-limit:
+    default-capacity: 100
+    default-refill-tokens: 50
+    default-refill-duration: 1s
+    routes:
+      - path-pattern: /api/orders/**
+        capacity: 20
+        refill-tokens: 10
+        refill-duration: 1s
+      - path-pattern: /api/payments/**
+        capacity: 20
+        refill-tokens: 10
+        refill-duration: 1s
