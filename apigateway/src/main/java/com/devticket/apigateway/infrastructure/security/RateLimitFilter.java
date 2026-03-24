@@ -2,6 +2,7 @@ package com.devticket.apigateway.infrastructure.security;
 
 import com.devticket.apigateway.infrastructure.config.RateLimitConfig;
 import com.devticket.apigateway.infrastructure.config.RateLimitConfig.RouteRateLimit;
+import com.devticket.apigateway.infrastructure.exception.GatewayErrorCode;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.ConsumptionProbe;
