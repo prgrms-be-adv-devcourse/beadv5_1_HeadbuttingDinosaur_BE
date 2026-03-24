@@ -6,3 +6,15 @@ jwt:
 logging:
   level:
     com.devticket: INFO
+
+# 운영 환경 Swagger 비활성화
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+management:
+  endpoint:
+    health:
+      show-details: never
