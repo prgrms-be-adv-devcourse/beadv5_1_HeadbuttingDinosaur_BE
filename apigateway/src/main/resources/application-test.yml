@@ -1,4 +1,4 @@
 jwt:
-  secret-key: test-jwt-secret-key
+  secret-key: test-jwt-secret-key-devticket-2025-must-be-256-bits
   access-token-ttl: 1800000
   refresh-token-ttl: 604800000
