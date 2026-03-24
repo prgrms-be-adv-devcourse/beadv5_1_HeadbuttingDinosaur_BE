@@ -1,5 +1,6 @@
 package com.devticket.settlement.presentation.controller;
 
+import com.devticket.settlement.domain.model.SettlementStatus;
 import com.devticket.settlement.presentation.dto.SettlementResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -40,7 +41,7 @@ public class SettlementController {
                 50_000L,
                 100_000L,
                 850_000L,
-                "COMPLETED",
+                SettlementStatus.COMPLETED,
                 "2024-03-16T10:00:00"
             )
         ));
