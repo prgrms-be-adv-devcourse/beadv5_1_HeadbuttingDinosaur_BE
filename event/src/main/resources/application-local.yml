@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/devticket
+    url: jdbc:postgresql://localhost:5433/devticket?currentSchema=event
     username: devticket
     password: devticket
     driver-class-name: org.postgresql.Driver
@@ -10,10 +10,11 @@ spring:
     show-sql: true
     properties:
       hibernate:
+        default_schema: event
         format_sql: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: localhost:9093
     consumer:
       group-id: devticket-event
       auto-offset-reset: earliest
