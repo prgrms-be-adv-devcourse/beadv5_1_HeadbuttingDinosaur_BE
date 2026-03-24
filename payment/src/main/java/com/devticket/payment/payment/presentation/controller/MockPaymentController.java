@@ -1,7 +1,6 @@
-package com.devticket.payment.presentation.controller.mock;
+package com.devticket.payment.payment.presentation.controller;
 
 import java.time.LocalDateTime;
-import org.springframework.context.annotation.Profile;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
