@@ -2,3 +2,10 @@ jwt:
   secret-key: test-jwt-secret-key-devticket-2025-must-be-256-bits
   access-token-ttl: 1800000
   refresh-token-ttl: 604800000
+
+gateway:
+  rate-limit:
+    default-capacity: 100
+    default-refill-tokens: 50
+    default-refill-duration: 1s
+    routes: [ ]
