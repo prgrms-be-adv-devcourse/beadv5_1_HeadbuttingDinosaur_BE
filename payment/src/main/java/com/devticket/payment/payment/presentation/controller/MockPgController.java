@@ -1,6 +1,5 @@
-package com.devticket.payment.presentation.controller.mock;
+package com.devticket.payment.payment.presentation.controller;
 
-import org.springframework.context.annotation.Profile;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;

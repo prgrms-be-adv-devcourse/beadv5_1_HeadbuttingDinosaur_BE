@@ -1,4 +1,4 @@
-package com.devticket.payment.infrastructure.config;
+package com.devticket.payment.common.config;
 
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
