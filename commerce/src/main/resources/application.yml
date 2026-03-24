@@ -2,7 +2,7 @@ spring:
   application:
     name: devticket-commerce
   profiles:
-    active: local
+    active: test
 
 server:
   port: 8083

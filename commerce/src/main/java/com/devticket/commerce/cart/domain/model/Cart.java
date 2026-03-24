@@ -1,37 +1,38 @@
 package com.devticket.commerce.cart.domain.model;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.util.UUID;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 //장바구니 소유자
+@Entity
+@Builder
+@Getter
+@Table(name = "\"cart\"", schema = "commerce")
 // JPA 엔티티를 위한 기본생성자 필수
-//@NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(name = "\"cart\"", schema = "public")
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+// 전체 생성자는 내부에서만 사용
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
 public class Cart {
 
+    @Id
     @Schema(description = "장바구니 소유자 ID : User PK")
     private UUID userId;
 
-    //---JPA엔티티를 위한 기본생성자---------------------
-    private Cart(UUID userId) {
-
-    }
-
     //----정적팩토리 메서드 ----------------------------
     //create
-//    public static Cart create(UUID userId) {
-//        Cart newCart = new Cart();
-//        newCart.userId = userId;
-//        return newCart;
-//    }
-    //---도메인 비즈니스 메서드--------------------------
-
-    private void validateUserId(UUID userId) {
-        if (userId == null) {
-            throw new IllegalArgumentException("장바구니 소유자 ID는 필수입니다.");
-        }
+    public static Cart create(UUID userId) {
+        return new Cart(userId);
     }
+
+    //---도메인 비즈니스 메서드--------------------------
 
 
 }

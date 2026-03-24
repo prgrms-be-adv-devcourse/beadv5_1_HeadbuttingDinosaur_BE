@@ -1,5 +1,7 @@
-package com.devticket.commerce.cart.domain.model;
+package com.devticket.commerce.order.domain.model;
 
+import com.devticket.commerce.cart.domain.enums.OrderStatus;
+import com.devticket.commerce.cart.domain.enums.PaymentMethod;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -12,7 +14,7 @@ import lombok.Getter;
 
 @Entity
 @Getter
-@Table(name = "order", schema = "public")
+@Table(name = "order", schema = "commerce")
 public class Order {
 
     @Id
@@ -37,14 +39,5 @@ public class Order {
 
     @Column(name = "ordered_at", nullable = false, updatable = false)
     private LocalDateTime orderedAt;
-
-
-    public enum PaymentMethod {
-        WALLET, PG
-    }
-
-    public enum OrderStatus {
-        CREATED, PAYMENT_PENDING, PAID, CANCELLED, REFUND_PENDING, REFUNDED, FAILED
-    }
 
 }
