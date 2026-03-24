@@ -1,4 +1,4 @@
-package com.devticket.commerce.presentation.dto.res;
+package com.devticket.commerce.cart.presentation.dto.res;
 
 import java.util.List;
 

@@ -1,7 +1,7 @@
-package com.devticket.commerce.presentation.controller;
+package com.devticket.commerce.cart.presentation.controller;
 
-import com.devticket.commerce.presentation.dto.req.CartItemQuantityRequest;
-import com.devticket.commerce.presentation.dto.res.CartItemQuantiryResponse;
+import com.devticket.commerce.cart.presentation.dto.req.CartItemQuantityRequest;
+import com.devticket.commerce.cart.presentation.dto.res.CartItemQuantiryResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
