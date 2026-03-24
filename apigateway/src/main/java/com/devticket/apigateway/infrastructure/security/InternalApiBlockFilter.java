@@ -18,6 +18,9 @@ import reactor.core.publisher.Mono;
 public class InternalApiBlockFilter implements GlobalFilter, Ordered {
 
     private final GatewayAuthenticationEntryPoint entryPoint;
+
+    // TODO: 성능 최적화 시 AntPathMatcher → PathPatternParser 전환 검토
+    // WebFlux 기반 Gateway에서는 PathPattern이 더 효율적
     private final AntPathMatcher pathMatcher = new AntPathMatcher();
 
     @Override
