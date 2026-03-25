@@ -1,6 +1,7 @@
 package com.devticket.commerce.cart.domain.model;
 
 import com.devticket.commerce.cart.domain.exception.CartErrorCode;
+import com.devticket.commerce.common.entity.BaseEntity;
 import com.devticket.commerce.common.exception.BusinessException;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.persistence.Column;
@@ -8,31 +9,30 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
-import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.experimental.SuperBuilder;
 
 @Entity
 @Getter
-@Builder
+@SuperBuilder
 @Table(name = "cart_item", schema = "commerce")
 // JPA 엔티티를 위한 기본생성자 필수
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 // 전체 생성자는 내부에서만 사용
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
-public class CartItem {
+public class CartItem extends BaseEntity {
 
     @Id
     @Column(name = "cart_id")
     @Schema(description = "장바구니 항목")
-    private UUID cartId;
+    private Long cartId;
 
     @Column(name = "event_id", nullable = false)
     @Schema(description = "상품 ID : Event PK")
-    private UUID eventId;
+    private Long eventId;
 
     @Column(nullable = false)
     @Schema(description = "수량")
@@ -44,7 +44,7 @@ public class CartItem {
 
     //---- 정적 팩토리 메서드 ------------------
     //객체 생성
-    public static CartItem create(UUID cartId, UUID eventId, int quantity, boolean purchasable,
+    public static CartItem create(Long cartId, Long eventId, int quantity, boolean purchasable,
         int maxQuantityPerUser) {
 
         // 상품 구매가능 상태 검증
@@ -72,17 +72,19 @@ public class CartItem {
     }
 
     //---도메인 비즈니스 로직----------------------
-    // 장바구니 아이템의 수량변경
-    public void updateQuantity(int newQuantity, int maxQuantityPerUser) {
-        //최소 수량검증 (수량은 1개 이상이어야 함)
-        if (newQuantity < 1) {
+    // 장바구니 수량관련 정책 검증
+    private static void validateQuantityRange(int quantity, int maxQuantityPerUser) {
+        if (quantity < 1) {
             throw new BusinessException(CartErrorCode.INVALID_QUANTITY);
         }
-
-        //인당 최대 구매수량 검증
-        if (newQuantity > maxQuantityPerUser) {
+        if (quantity > maxQuantityPerUser) {
             throw new BusinessException(CartErrorCode.EXCEED_MAX_PURCHASE);
         }
+    }
+
+    // 장바구니 아이템의 수량변경
+    public void updateQuantity(int newQuantity, int maxQuantityPerUser) {
+        validateQuantityRange(newQuantity, maxQuantityPerUser);
         this.quantity = newQuantity;
     }
 
@@ -90,5 +92,5 @@ public class CartItem {
     public void addQuantity(int additionalQuantity, int maxQuantityPerUser) {
         updateQuantity(this.quantity + additionalQuantity, maxQuantityPerUser);
     }
-
+    
 }
