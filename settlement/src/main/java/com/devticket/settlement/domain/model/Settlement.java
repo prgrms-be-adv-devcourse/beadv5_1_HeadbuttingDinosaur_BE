@@ -1,8 +1,5 @@
 package com.devticket.settlement.domain.model;
 
-import java.time.LocalDateTime;
-import java.util.UUID;
-
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -11,11 +8,11 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-
+import java.time.LocalDateTime;
+import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.NoArgsConstructor;
-
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 
@@ -71,8 +68,7 @@ public class Settlement {
     private LocalDateTime deletedAt;
 
 
-
-//    빌더
+    //    빌더
     @Builder
     public Settlement(Long id, UUID settlementId, UUID sellerId, LocalDateTime periodStartAt, LocalDateTime periodEndAt,
         Integer totalSalesAmount, Integer totalRefundAmount, Integer totalFeeAmount, Integer finalSettlementAmount,
@@ -89,7 +85,7 @@ public class Settlement {
         this.status = (status != null) ? status : SettlementStatus.PENDING;
     }
 
-//    getter
+    //    getter
     public Long getId() {
         return id;
     }
