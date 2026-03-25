@@ -7,6 +7,6 @@ import com.devticket.settlement.domain.model.Settlement;
 
 public interface SettlementRepository {
 
-    List<Settlement> findBySellerId(UUID sellerId);
+    List<Settlement> findBySellerId(Long sellerId);
 
 }

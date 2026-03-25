@@ -7,6 +7,6 @@ import com.devticket.settlement.presentation.dto.SettlementResponse;
 
 public interface SettlementService {
 
-    List<SettlementResponse> getSellerSettlements(UUID sellerId);
+    List<SettlementResponse> getSellerSettlements(Long sellerId);
 
 }

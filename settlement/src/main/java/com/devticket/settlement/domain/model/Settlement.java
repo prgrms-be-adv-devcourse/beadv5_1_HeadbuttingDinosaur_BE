@@ -2,42 +2,83 @@ package com.devticket.settlement.domain.model;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
-import lombok.Builder;
 
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+
+import lombok.AccessLevel;
+import lombok.Builder;
+import lombok.NoArgsConstructor;
+
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+
+@Entity
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Table(name = "settlement")
 public class Settlement {
 
-    private UUID id;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "settlement_id", nullable = false, unique = true)
+    private UUID settlementId;
+
+    @Column(name = "seller_id", nullable = false)
     private UUID sellerId;
+
+    @Column(name = "period_start_at", nullable = false)
     private LocalDateTime periodStartAt;
+
+    @Column(name = "period_end_at", nullable = false)
     private LocalDateTime periodEndAt;
+
+    @Column(name = "total_sales_amount", nullable = false)
     private Integer totalSalesAmount;
+
+    @Column(name = "total_refund_amount", nullable = false)
     private Integer totalRefundAmount;
+
+    @Column(name = "total_fee_amount", nullable = false)
     private Integer totalFeeAmount;
+
+    @Column(name = "final_settlement_amount", nullable = false)
     private Integer finalSettlementAmount;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
     private SettlementStatus status;
+
+    @Column(name = "settled_at")
     private LocalDateTime settledAt;
-    
-    
-    // 기본 생성자
-    public Settlement() {
 
-    }
+    @CreatedDate
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
 
-    // Builder
+    @LastModifiedDate
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
+
+
+//    빌더
     @Builder
-    private Settlement(
-        UUID id,
-        UUID sellerId,
-        LocalDateTime periodStartAt,
-        LocalDateTime periodEndAt,
-        Integer totalSalesAmount,
-        Integer totalRefundAmount,
-        Integer totalFeeAmount,
-        Integer finalSettlementAmount,
-        SettlementStatus status,
-        LocalDateTime settledAt
-    ) {
+    public Settlement(Long id, UUID settlementId, UUID sellerId, LocalDateTime periodStartAt, LocalDateTime periodEndAt,
+        Integer totalSalesAmount, Integer totalRefundAmount, Integer totalFeeAmount, Integer finalSettlementAmount,
+        SettlementStatus status) {
         this.id = id;
+        this.settlementId = (settlementId != null) ? settlementId : UUID.randomUUID();
         this.sellerId = sellerId;
         this.periodStartAt = periodStartAt;
         this.periodEndAt = periodEndAt;
@@ -45,69 +86,16 @@ public class Settlement {
         this.totalRefundAmount = totalRefundAmount;
         this.totalFeeAmount = totalFeeAmount;
         this.finalSettlementAmount = finalSettlementAmount;
-        this.status = status;
-        this.settledAt = settledAt;
+        this.status = (status != null) ? status : SettlementStatus.PENDING;
     }
 
-    // ==============================
-    // 생성 (Factory Method)
-    // ==============================
-    // 1. 생성
-    public static Settlement create(
-        UUID sellerId,
-        LocalDateTime periodStartAt,
-        LocalDateTime periodEndAt,
-        Integer totalSalesAmount,
-        Integer totalRefundAmount,
-        Integer totalFeeAmount
-    ){
-        return Settlement.builder()
-            .id(UUID.randomUUID())
-            .sellerId(sellerId)
-            .periodStartAt(periodStartAt)
-            .periodEndAt(periodEndAt)
-            .totalSalesAmount(totalSalesAmount)
-            .totalRefundAmount(totalRefundAmount)
-            .totalFeeAmount(totalFeeAmount)
-            .finalSettlementAmount(
-                totalSalesAmount - totalRefundAmount - totalFeeAmount
-            )
-            .status(SettlementStatus.PENDING)
-            .settledAt(null)
-            .build();
-    }
-
-    // 2.
-
-    // ==============================
-    // 상태 변경 (비즈니스 로직)
-    // ==============================
-    // 1. 정상 완료
-    public void complete(LocalDateTime settledAt){
-        if(!isPending()){
-            throw new IllegalStateException("이미 처리된 정산입니다.");
-        }
-        this.status = SettlementStatus.COMPLETED;
-        this.settledAt = settledAt;
-    }
-
-    public void fail(){
-        if(!isPending()){
-            throw new IllegalStateException("이미 처리된 정산입니다.");
-        }
-        this.status = SettlementStatus.FAILED;
-    }
-
-    // ==============================
-    // 비즈니스 조회 로직
-    // ==============================
-    public boolean isPending(){
-        return this.status == SettlementStatus.PENDING;
-    }
-
-    // Getter
-    public UUID getId() {
+//    getter
+    public Long getId() {
         return id;
+    }
+
+    public UUID getSettlementId() {
+        return settlementId;
     }
 
     public UUID getSellerId() {
@@ -145,5 +133,18 @@ public class Settlement {
     public LocalDateTime getSettledAt() {
         return settledAt;
     }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public LocalDateTime getDeletedAt() {
+        return deletedAt;
+    }
+
 }
 
