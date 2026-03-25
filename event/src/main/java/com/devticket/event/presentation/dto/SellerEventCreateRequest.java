@@ -1,6 +1,6 @@
 package com.devticket.event.presentation.dto;
 
-import com.devticket.event.domain.model.EventCategory;
+import com.devticket.event.domain.enums.EventCategory;
 import jakarta.validation.constraints.*;
 import java.time.LocalDateTime;
 import java.util.List;

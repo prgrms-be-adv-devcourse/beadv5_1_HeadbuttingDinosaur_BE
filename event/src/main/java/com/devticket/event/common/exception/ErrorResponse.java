@@ -1,6 +1,5 @@
-package com.devticket.event.presentation.dto;
+package com.devticket.event.common.exception;
 
-import com.devticket.event.domain.exception.ErrorCode;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;

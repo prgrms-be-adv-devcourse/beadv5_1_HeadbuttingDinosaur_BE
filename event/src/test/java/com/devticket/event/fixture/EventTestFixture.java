@@ -1,6 +1,6 @@
 package com.devticket.event.fixture;
 
-import com.devticket.event.domain.model.EventCategory;
+import com.devticket.event.domain.enums.EventCategory;
 import com.devticket.event.presentation.dto.SellerEventCreateRequest;
 
 import java.time.LocalDateTime;

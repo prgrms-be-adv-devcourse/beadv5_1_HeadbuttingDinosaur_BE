@@ -1,4 +1,4 @@
-package com.devticket.event.infrastructure.config;
+package com.devticket.event.common.config;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.jpa.repository.config.EnableJpaAuditing;

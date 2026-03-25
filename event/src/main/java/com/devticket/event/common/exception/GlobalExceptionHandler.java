@@ -1,6 +1,5 @@
-package com.devticket.event.domain.exception;
+package com.devticket.event.common.exception;
 
-import com.devticket.event.presentation.dto.ErrorResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

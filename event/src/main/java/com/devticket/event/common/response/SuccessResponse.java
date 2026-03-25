@@ -1,4 +1,4 @@
-package com.devticket.support.response;
+package com.devticket.event.common.response;
 
 import lombok.Getter;
 

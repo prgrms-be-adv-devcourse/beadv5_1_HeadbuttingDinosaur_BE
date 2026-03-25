@@ -1,4 +1,4 @@
-package com.devticket.event.domain.exception;
+package com.devticket.event.common.exception;
 
 import lombok.Getter;
 

@@ -1,11 +1,12 @@
 package com.devticket.event.domain.exception;
 
+import com.devticket.event.common.exception.ErrorCode;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
 @Getter
 @RequiredArgsConstructor
-public enum EventErrorCode implements ErrorCode{
+public enum EventErrorCode implements ErrorCode {
 
     EVENT_NOT_FOUND(404, "EVENT_001", "존재하지 않는 이벤트입니다."),
     INVALID_PRICE(400, "EVENT_003", "이벤트 가격은 0원 이상 9,999,999원 이하여야 합니다."),

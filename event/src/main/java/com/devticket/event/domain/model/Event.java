@@ -1,6 +1,8 @@
 package com.devticket.event.domain.model;
 
-import com.devticket.event.domain.common.BaseEntity;
+import com.devticket.event.common.entity.BaseEntity;
+import com.devticket.event.domain.enums.EventCategory;
+import com.devticket.event.domain.enums.EventStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
