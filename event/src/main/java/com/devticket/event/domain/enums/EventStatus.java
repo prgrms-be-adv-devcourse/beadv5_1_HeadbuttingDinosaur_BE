@@ -1,4 +1,4 @@
-package com.devticket.event.domain.model;
+package com.devticket.event.domain.enums;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;

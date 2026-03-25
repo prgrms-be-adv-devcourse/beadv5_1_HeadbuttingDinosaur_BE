@@ -1,4 +1,4 @@
-package com.devticket.event.domain.common;
+package com.devticket.event.common.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.EntityListeners;

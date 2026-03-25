@@ -1,9 +1,9 @@
 package com.devticket.event.application;
 
-import com.devticket.event.domain.exception.BusinessException;
+import com.devticket.event.common.exception.BusinessException;
 import com.devticket.event.domain.exception.EventErrorCode;
 import com.devticket.event.domain.model.Event;
-import com.devticket.event.domain.model.EventStatus;
+import com.devticket.event.domain.enums.EventStatus;
 import com.devticket.event.infrastructure.persistence.EventRepository;
 import com.devticket.event.presentation.dto.SellerEventCreateRequest;
 import lombok.RequiredArgsConstructor;

@@ -3,7 +3,7 @@ package com.devticket.event.presentation.controller;
 import com.devticket.event.application.EventService;
 import com.devticket.event.presentation.dto.SellerEventCreateRequest;
 import com.devticket.event.presentation.dto.SellerEventCreateResponse;
-import com.devticket.support.response.SuccessResponse;
+import com.devticket.event.common.response.SuccessResponse;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
