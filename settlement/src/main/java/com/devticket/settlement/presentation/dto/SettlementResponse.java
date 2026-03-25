@@ -1,11 +1,16 @@
 package com.devticket.settlement.presentation.dto;
 
+import com.devticket.settlement.domain.model.Settlement;
+import com.devticket.settlement.domain.model.SettlementStatus;
+
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.time.format.DateTimeFormatter;
+import java.util.UUID;
 
 public record SettlementResponse(
 
     @Schema(description = "정산서 ID", example = "501")
-    Long settlementId,
+    UUID settlementId,
 
     @Schema(description = "정산 시작일", example = "2024-03-01")
     String periodStart,
@@ -14,20 +19,24 @@ public record SettlementResponse(
     String periodEnd,
 
     @Schema(description = "총 판매 금액", example = "1000000")
-    Long totalSalesAmount,
+    Integer totalSalesAmount,
 
     @Schema(description = "총 환불 금액", example = "50000")
-    Long totalRefundAmount,
+    Integer totalRefundAmount,
 
     @Schema(description = "총 수수료", example = "100000")
-    Long totalFeeAmount,
+    Integer totalFeeAmount,
 
     @Schema(description = "최종 정산 금액", example = "850000")
-    Long finalSettlementAmount,
+    Integer finalSettlementAmount,
 
     @Schema(description = "정산 상태", example = "COMPLETED")
-    String status,
+    SettlementStatus status,
 
     @Schema(description = "정산 완료 시각", example = "2024-03-16T10:00:00")
     String settledAt
-) {}
+) {
+
+
+
+}
