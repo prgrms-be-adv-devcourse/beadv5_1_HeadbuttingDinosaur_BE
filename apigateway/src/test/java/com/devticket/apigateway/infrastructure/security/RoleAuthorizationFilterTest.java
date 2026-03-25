@@ -165,12 +165,13 @@ class RoleAuthorizationFilterTest {
             });
     }
 
+    // 권한 부족 테스트는 유효한 토큰 + 잘못된 role로 해야 함
     @Test
-    void role_없이_seller_경로_접근시_403() {
-        // JWT 필터 설정 실수로 공개 경로가 된 상황 가정
-        // role 헤더 없이 seller 경로에 도달하면 차단
+    void USER가_seller_API_접근시_403() {
+        String token = JwtTestHelper.createValidToken("1", "user@test.com", "USER");
         webTestClient.get()
-            .uri("/api/seller/events")
+            .uri("/api/seller/events/1")
+            .header("Authorization", "Bearer " + token)
             .exchange()
             .expectStatus().isForbidden()
             .expectBody()
@@ -178,9 +179,11 @@ class RoleAuthorizationFilterTest {
     }
 
     @Test
-    void role_없이_admin_경로_접근시_403() {
+    void USER가_admin_API_접근시_403() {
+        String token = JwtTestHelper.createValidToken("1", "user@test.com", "USER");
         webTestClient.get()
             .uri("/api/admin/users")
+            .header("Authorization", "Bearer " + token)
             .exchange()
             .expectStatus().isForbidden()
             .expectBody()
