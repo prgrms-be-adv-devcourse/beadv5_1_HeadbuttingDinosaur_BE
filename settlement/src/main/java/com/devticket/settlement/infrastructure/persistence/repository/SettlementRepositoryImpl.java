@@ -1,10 +1,10 @@
 package com.devticket.settlement.infrastructure.persistence.repository;
 
 import com.devticket.settlement.domain.model.Settlement;
-import com.devticket.settlement.domain.model.SettlementItem;
 import com.devticket.settlement.domain.repository.SettlementRepository;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
@@ -22,10 +22,11 @@ public class SettlementRepositoryImpl implements SettlementRepository {
         return settlementJpaRepository.findBySellerId(sellerId);
     }
 
-    // 정산 아이디 -> settlement_item 조회
+    // settlement_id -> 정산 단건 조회
     @Override
-    public Optional<SettlementItem> findById(Long id) {
-        return settlementItemJpaRepository.findById(id);
+    public Optional<Settlement> findBySettlementId(UUID settlementId) {
+        return settlementJpaRepository.findBySettlementId(settlementId);
     }
+
 
 }

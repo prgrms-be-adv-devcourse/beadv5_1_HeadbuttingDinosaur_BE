@@ -1,11 +1,12 @@
 package com.devticket.settlement.infrastructure.persistence.repository;
 
 import com.devticket.settlement.domain.model.SettlementItem;
-import java.util.Optional;
+import java.util.List;
+import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-public interface SettlementItemJpaRepository extends JpaRepository<SettlementItem, Long> {
+public interface SettlementItemJpaRepository extends JpaRepository<SettlementItem, UUID> {
 
-    Optional<SettlementItem> findById(Long id);
+    List<SettlementItem> findBySettlementId(UUID settlementId);
 
 }
