@@ -6,8 +6,8 @@ import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.Ordered;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.server.PathContainer;
 import org.springframework.stereotype.Component;
-import org.springframework.util.AntPathMatcher;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
@@ -15,16 +15,11 @@ import reactor.core.publisher.Mono;
 @Profile("prod")
 public class SwaggerAccessFilter implements GlobalFilter, Ordered {
 
-    private final AntPathMatcher pathMatcher = new AntPathMatcher();
-
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
-        String path = exchange.getRequest().getURI().getPath();
+        PathContainer pathContainer = exchange.getRequest().getPath().pathWithinApplication();
 
-        boolean isSwaggerPath = RoutePolicy.SWAGGER_PATHS.stream()
-            .anyMatch(pattern -> pathMatcher.match(pattern, path));
-
-        if (isSwaggerPath) {
+        if (RoutePolicy.matchesAny(RoutePolicy.SWAGGER_PATTERNS, pathContainer)) {
             exchange.getResponse().setStatusCode(HttpStatus.NOT_FOUND);
             return exchange.getResponse().setComplete();
         }

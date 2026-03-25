@@ -5,22 +5,20 @@ import com.devticket.apigateway.infrastructure.exception.GatewayErrorCode;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.server.PathContainer;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
-import org.springframework.util.AntPathMatcher;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
 
     private static final String BEARER_PREFIX = "Bearer ";
@@ -30,15 +28,20 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
 
     private final JwtTokenProvider jwtTokenProvider;
     private final GatewayAuthenticationEntryPoint entryPoint;
-    private final AntPathMatcher pathMatcher = new AntPathMatcher();
+
+    public JwtAuthenticationFilter(JwtTokenProvider jwtTokenProvider,
+        GatewayAuthenticationEntryPoint entryPoint) {
+        this.jwtTokenProvider = jwtTokenProvider;
+        this.entryPoint = entryPoint;
+    }
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         ServerHttpRequest request = exchange.getRequest();
-        String path = request.getURI().getPath();
+        PathContainer pathContainer = request.getPath().pathWithinApplication();
         HttpMethod method = request.getMethod();
 
-        if (isPublicPath(path, method)) {
+        if (isPublicPath(pathContainer, method)) {
             ServerHttpRequest cleaned = removeUserHeaders(request);
             return chain.filter(exchange.mutate().request(cleaned).build());
         }
@@ -46,7 +49,7 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
         String authHeader = request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
 
         if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
-            log.debug("Authorization 헤더 누락 또는 Bearer 형식 아님: path={}", path);
+            log.debug("Authorization 헤더 누락 또는 Bearer 형식 아님: path={}", pathContainer.value());
             return entryPoint.writeErrorResponse(
                 exchange.getResponse(), GatewayErrorCode.AUTHENTICATION_REQUIRED);
         }
@@ -57,11 +60,11 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
         try {
             claims = jwtTokenProvider.parseClaims(token);
         } catch (ExpiredJwtException e) {
-            log.debug("토큰 만료: path={}", path);
+            log.debug("토큰 만료: path={}", pathContainer.value());
             return entryPoint.writeErrorResponse(
                 exchange.getResponse(), GatewayErrorCode.TOKEN_EXPIRED);
         } catch (JwtException e) {
-            log.debug("유효하지 않은 토큰: path={}, reason={}", path, e.getMessage());
+            log.debug("유효하지 않은 토큰: path={}, reason={}", pathContainer.value(), e.getMessage());
             return entryPoint.writeErrorResponse(
                 exchange.getResponse(), GatewayErrorCode.INVALID_TOKEN);
         }
@@ -95,42 +98,23 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
         return Ordered.HIGHEST_PRECEDENCE + 1;
     }
 
-
-    private boolean isPublicPath(String path, HttpMethod method) {
-
-        for (String pattern : RoutePolicy.AUTH_PUBLIC_PATHS) {
-            if (pathMatcher.match(pattern, path)) {
-                return true;
-            }
+    private boolean isPublicPath(PathContainer path, HttpMethod method) {
+        if (RoutePolicy.matchesAny(RoutePolicy.AUTH_PUBLIC_PATTERNS, path)) {
+            return true;
         }
-
-        if (HttpMethod.GET.equals(method)) {
-            for (String pattern : RoutePolicy.PUBLIC_GET_ONLY_PATHS) {
-                if (pathMatcher.match(pattern, path)) {
-                    return true;
-                }
-            }
+        if (HttpMethod.GET.equals(method)
+            && RoutePolicy.matchesAny(RoutePolicy.PUBLIC_GET_ONLY_PATTERNS, path)) {
+            return true;
         }
-
-        for (String pattern : RoutePolicy.SWAGGER_PATHS) {
-            if (pathMatcher.match(pattern, path)) {
-                return true;
-            }
+        if (RoutePolicy.matchesAny(RoutePolicy.SWAGGER_PATTERNS, path)) {
+            return true;
         }
-        for (String pattern : RoutePolicy.ACTUATOR_PUBLIC_PATHS) {
-            if (pathMatcher.match(pattern, path)) {
-                return true;
-            }
+        if (RoutePolicy.matchesAny(RoutePolicy.ACTUATOR_PUBLIC_PATTERNS, path)) {
+            return true;
         }
-        for (String pattern : RoutePolicy.HEALTH_PATHS) {
-            if (pathMatcher.match(pattern, path)) {
-                return true;
-            }
-        }
-
-        return false;
+        return RoutePolicy.matchesAny(RoutePolicy.HEALTH_PATTERNS, path);
     }
-    
+
     private ServerHttpRequest removeUserHeaders(ServerHttpRequest request) {
         return request.mutate()
             .headers(headers -> {
