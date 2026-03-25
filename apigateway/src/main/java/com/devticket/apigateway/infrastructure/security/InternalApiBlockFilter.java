@@ -2,37 +2,32 @@ package com.devticket.apigateway.infrastructure.security;
 
 import com.devticket.apigateway.infrastructure.config.RoutePolicy;
 import com.devticket.apigateway.infrastructure.exception.GatewayErrorCode;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cloud.gateway.filter.GatewayFilterChain;
-import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
+import org.springframework.http.server.PathContainer;
 import org.springframework.stereotype.Component;
-import org.springframework.util.AntPathMatcher;
 import org.springframework.web.server.ServerWebExchange;
+import org.springframework.web.server.WebFilter;
+import org.springframework.web.server.WebFilterChain;
 import reactor.core.publisher.Mono;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
-public class InternalApiBlockFilter implements GlobalFilter, Ordered {
+public class InternalApiBlockFilter implements WebFilter, Ordered {
 
     private final GatewayAuthenticationEntryPoint entryPoint;
 
-    // TODO: 성능 최적화 시 AntPathMatcher → PathPatternParser 전환 검토
-    // WebFlux 기반 Gateway에서는 PathPattern이 더 효율적
-    private final AntPathMatcher pathMatcher = new AntPathMatcher();
+    public InternalApiBlockFilter(GatewayAuthenticationEntryPoint entryPoint) {
+        this.entryPoint = entryPoint;
+    }
 
     @Override
-    public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
-        String path = exchange.getRequest().getURI().getPath();
+    public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
+        PathContainer pathContainer = exchange.getRequest().getPath().pathWithinApplication();
 
-        boolean isInternalPath = RoutePolicy.INTERNAL_PATHS.stream()
-            .anyMatch(pattern -> pathMatcher.match(pattern, path));
-
-        if (isInternalPath) {
+        if (RoutePolicy.matchesAny(RoutePolicy.INTERNAL_PATTERNS, pathContainer)) {
             log.warn("Internal API 외부 접근 차단: path={}, remoteAddr={}",
-                path, exchange.getRequest().getRemoteAddress());
+                pathContainer.value(), exchange.getRequest().getRemoteAddress());
             return entryPoint.writeErrorResponse(
                 exchange.getResponse(), GatewayErrorCode.ACCESS_DENIED);
         }
@@ -45,3 +40,4 @@ public class InternalApiBlockFilter implements GlobalFilter, Ordered {
         return Ordered.HIGHEST_PRECEDENCE;
     }
 }
+

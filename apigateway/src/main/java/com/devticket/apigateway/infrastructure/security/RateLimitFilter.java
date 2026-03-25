@@ -39,7 +39,6 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
         String clientIp = resolveClientIp(exchange);
         String path = exchange.getRequest().getURI().getPath();
 
-        // 경로별 매칭된 정책 또는 글로벌 기본 정책으로 버킷 생성
         String bucketKey = clientIp + ":" + resolvePolicyKey(path);
         Bucket bucket = buckets.computeIfAbsent(bucketKey, k -> createBucket(path));
 
@@ -52,7 +51,6 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
             return chain.filter(exchange);
         }
 
-        // Rate Limit 초과
         log.warn("Rate limit 초과: clientIp={}, path={}, retryAfterNanos={}",
             clientIp, path, probe.getNanosToWaitForRefill());
 
@@ -62,16 +60,12 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
             exchange.getResponse(), GatewayErrorCode.RATE_LIMIT_EXCEEDED);
     }
 
-    /**
-     * 인증/인가 필터 이후에 실행됩니다. 인증되지 않은 요청은 이미 401/403으로 거부된 상태이므로 Rate Limit은 인증된 요청에만 적용됩니다.
-     */
     @Override
     public int getOrder() {
         return Ordered.HIGHEST_PRECEDENCE + 10;
     }
 
     private Bucket createBucket(String path) {
-        // 경로별 개별 정책 확인
         for (RouteRateLimit route : config.getRoutes()) {
             if (pathMatcher.match(route.getPathPattern(), path)) {
                 return Bucket.builder()
@@ -83,7 +77,6 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
             }
         }
 
-        // 글로벌 기본 정책
         return Bucket.builder()
             .addLimit(Bandwidth.builder()
                 .capacity(config.getDefaultCapacity())
@@ -103,7 +96,6 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
     }
 
     private String resolveClientIp(ServerWebExchange exchange) {
-        // X-Forwarded-For 헤더 우선 (프록시/로드밸런서 뒤에 있을 경우)
         String xForwardedFor = exchange.getRequest().getHeaders().getFirst("X-Forwarded-For");
         if (xForwardedFor != null && !xForwardedFor.isBlank()) {
             return xForwardedFor.split(",")[0].trim();
