@@ -1,4 +1,4 @@
-package com.devticket.commerce.infa.config;
+package com.devticket.commerce.common.config;
 
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
