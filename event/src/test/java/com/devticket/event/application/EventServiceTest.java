@@ -9,13 +9,11 @@ import static org.mockito.Mockito.when;
 import com.devticket.event.domain.exception.BusinessException;
 import com.devticket.event.domain.exception.EventErrorCode;
 import com.devticket.event.domain.model.Event;
-import com.devticket.event.domain.model.EventCategory;
+import com.devticket.event.fixture.EventTestFixture;
 import com.devticket.event.infrastructure.persistence.EventRepository;
 import com.devticket.event.presentation.dto.SellerEventCreateRequest;
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.UUID;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -32,12 +30,11 @@ class EventServiceTest {
     private EventService eventService;
 
     @Test
-    @DisplayName("이벤트 생성 성공 - 조건을 만족하면 정상적으로 UUID를 반환한다")
-    void createEvent_Success() {
+    void 정상적인_조건일_경우_이벤트가_성공적으로_생성되고_UUID를_반환한다() {
         // given
         Long sellerId = 1L;
         LocalDateTime now = LocalDateTime.now();
-        SellerEventCreateRequest request = createMockRequest(
+        SellerEventCreateRequest request = EventTestFixture.createEventRequest(
             now.plusDays(4), now.plusDays(10), now.plusDays(15), 100, 4
         );
 
@@ -58,33 +55,48 @@ class EventServiceTest {
     }
 
     @Test
-    @DisplayName("이벤트 생성 실패 - 판매 시작일이 등록 시점 기준 3일 이내면 예외가 발생한다")
-    void createEvent_Fail_RegistrationTimeExceeded() {
+    void 판매시작일이_등록시점_기준_3일_이내면_예외가_발생한다() {
         // given
         Long sellerId = 1L;
         LocalDateTime now = LocalDateTime.now();
-        // 당장 내일(1일 뒤)부터 판매 시작하도록 설정 (오류 유발)
-        SellerEventCreateRequest request = createMockRequest(
+        SellerEventCreateRequest request = EventTestFixture.createEventRequest(
             now.plusDays(1), now.plusDays(10), now.plusDays(15), 100, 4
         );
 
         // when & then
-        // 프로젝트 구조에 맞게 BusinessException으로 검증 (또는 구조에 따라 EventException)
         assertThatThrownBy(() -> eventService.createEvent(sellerId, request))
             .isInstanceOf(BusinessException.class)
             .hasMessageContaining(EventErrorCode.REGISTRATION_TIME_EXCEEDED.getMessage());
     }
 
-    // 헬퍼 메서드 (테스트용 객체 생성)
-    private SellerEventCreateRequest createMockRequest(
-        LocalDateTime saleStart, LocalDateTime saleEnd, LocalDateTime eventDate,
-        int totalQty, int maxQty) {
-        return new SellerEventCreateRequest(
-            "Spring Boot 3.x 심화 밋업", "설명", "강남역",
-            eventDate, saleStart, saleEnd,
-            50000, totalQty, maxQty, EventCategory.MEETUP,
-            List.of(UUID.randomUUID(), UUID.randomUUID()), // ERD v3: UUID 리스트
-            List.of("url1")
+    @Test
+    void 인당_최대구매수량이_총수량보다_크면_예외가_발생한다() {
+        // given
+        Long sellerId = 1L;
+        LocalDateTime now = LocalDateTime.now();
+        SellerEventCreateRequest request = EventTestFixture.createEventRequest(
+            now.plusDays(4), now.plusDays(10), now.plusDays(15), 10, 20
         );
+
+        // when & then
+        assertThatThrownBy(() -> eventService.createEvent(sellerId, request))
+            .isInstanceOf(BusinessException.class)
+            .hasMessageContaining(EventErrorCode.MAX_QUANTITY_EXCEEDED.getMessage());
+    }
+
+    @Test
+    void 행사일이_판매종료일보다_빠르면_예외가_발생한다() {
+        // given
+        Long sellerId = 1L;
+        LocalDateTime now = LocalDateTime.now();
+        // 행사일(plusDays(5))이 판매종료일(plusDays(10))보다 빠른 모순된 상황
+        SellerEventCreateRequest request = EventTestFixture.createEventRequest(
+            now.plusDays(4), now.plusDays(10), now.plusDays(5), 100, 4
+        );
+
+        // when & then
+        assertThatThrownBy(() -> eventService.createEvent(sellerId, request))
+            .isInstanceOf(BusinessException.class)
+            .hasMessageContaining(EventErrorCode.INVALID_EVENT_DATE.getMessage());
     }
 }

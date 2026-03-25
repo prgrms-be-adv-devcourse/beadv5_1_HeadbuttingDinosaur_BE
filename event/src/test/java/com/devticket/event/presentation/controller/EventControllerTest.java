@@ -9,19 +9,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.devticket.event.application.EventService;
-import com.devticket.event.domain.model.EventCategory;
+import com.devticket.event.fixture.EventTestFixture;
 import com.devticket.event.presentation.dto.SellerEventCreateRequest;
-import tools.jackson.databind.json.JsonMapper;
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.UUID;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import tools.jackson.databind.json.JsonMapper;
 
 @WebMvcTest(EventController.class)
 class EventControllerTest {
@@ -36,18 +34,13 @@ class EventControllerTest {
     private EventService eventService;
 
     @Test
-    @DisplayName("POST /api/v1/events - 이벤트 생성 API 호출 성공")
-    void createEventApi_Success() throws Exception {
+    void 정상적인_요청시_201_응답과_UUID를_반환한다() throws Exception {
         // given
         Long sellerId = 1L;
         UUID expectedEventId = UUID.randomUUID();
         LocalDateTime now = LocalDateTime.now();
-
-        SellerEventCreateRequest request = new SellerEventCreateRequest(
-            "테스트 밋업", "설명", "강남역",
-            now.plusDays(15), now.plusDays(4), now.plusDays(10),
-            50000, 100, 4, EventCategory.MEETUP,
-            List.of(UUID.randomUUID()), List.of("url1")
+        SellerEventCreateRequest request = EventTestFixture.createEventRequest(
+            now.plusDays(4), now.plusDays(10), now.plusDays(15), 100, 4
         );
 
         when(eventService.createEvent(eq(sellerId), any(SellerEventCreateRequest.class)))
@@ -61,5 +54,42 @@ class EventControllerTest {
             .andDo(print())
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.data.eventId").value(expectedEventId.toString()));
+    }
+
+    @Test
+    void X_User_Id_헤더가_누락되면_400_응답을_반환한다() throws Exception {
+        // given
+        LocalDateTime now = LocalDateTime.now();
+        SellerEventCreateRequest request = EventTestFixture.createEventRequest(
+            now.plusDays(4), now.plusDays(10), now.plusDays(15), 100, 4
+        );
+
+        // when & then (헤더를 세팅하지 않음)
+        mockMvc.perform(post("/api/v1/events")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+            .andDo(print())
+            .andExpect(status().isBadRequest()); // 헤더 누락 에러 확인
+    }
+
+    @Test
+    void DTO_필수값이_누락되거나_형식에_맞지않으면_400_응답을_반환한다() throws Exception {
+        // given
+        // 수량이 음수이거나 필수 문자열이 비어있는 비정상적인 DTO 생성
+        SellerEventCreateRequest badRequest = new SellerEventCreateRequest(
+            "", // 제목 누락 (@NotBlank 실패 유도)
+            "설명", "강남역",
+            LocalDateTime.now(), LocalDateTime.now(), LocalDateTime.now(),
+            -5000, // 가격 음수 (@Positive 실패 유도)
+            100, 4, null, null, null
+        );
+
+        // when & then
+        mockMvc.perform(post("/api/v1/events")
+                .header("X-User-Id", "1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(badRequest)))
+            .andDo(print())
+            .andExpect(status().isBadRequest()); // @Valid 에 의한 400 반환 확인
     }
 }
