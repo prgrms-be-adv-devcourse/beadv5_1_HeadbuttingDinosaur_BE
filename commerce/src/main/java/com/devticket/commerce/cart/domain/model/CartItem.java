@@ -42,24 +42,32 @@ public class CartItem {
     @Schema(description = "장바구니에 담은 시각, 사용자행동 Log용 필드")
     private LocalDateTime addedAt;
 
-    @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt;
-
-    @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
-
     //---- 정적 팩토리 메서드 ------------------
     //객체 생성
-    public static CartItem create(UUID cartId, UUID eventId, int quantity) {
-        LocalDateTime now = LocalDateTime.now();
+    public static CartItem create(UUID cartId, UUID eventId, int quantity, boolean purchasable,
+        int maxQuantityPerUser) {
 
+        // 상품 구매가능 상태 검증
+        if (!purchasable) {
+            throw new BusinessException(CartErrorCode.EVENT_ENDED);
+        }
+
+        // 수량 정책 검증 (최소 1개)
+        if (quantity < 1) {
+            throw new BusinessException(CartErrorCode.INVALID_QUANTITY);
+        }
+
+        // 인당 최대 구매 수량 제한 검증
+        if (quantity > maxQuantityPerUser) {
+            throw new BusinessException(CartErrorCode.EXCEED_MAX_PURCHASE);
+        }
+
+        LocalDateTime now = LocalDateTime.now();
         return CartItem.builder()
             .cartId(cartId)
             .eventId(eventId)
             .quantity(quantity)
             .addedAt(now)
-            .createdAt(now)
-            .updatedAt(now)
             .build();
     }
 
@@ -76,7 +84,6 @@ public class CartItem {
             throw new BusinessException(CartErrorCode.EXCEED_MAX_PURCHASE);
         }
         this.quantity = newQuantity;
-        this.updatedAt = LocalDateTime.now();
     }
 
     // 장바구니에 이미 있는 상품을 또 담을 때 사용.
