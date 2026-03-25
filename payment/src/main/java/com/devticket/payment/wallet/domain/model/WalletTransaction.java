@@ -29,6 +29,9 @@ public class WalletTransaction extends BaseEntity {
     @Column(name = "wallet_transaction_id", nullable = false, unique = true)
     private UUID walletTransactionId;
 
+    @Column(name = "user_id", nullable = false)
+    private Long userId;
+
     @Column(name = "wallet_id", nullable = false)
     private Long walletId;
 
@@ -56,6 +59,7 @@ public class WalletTransaction extends BaseEntity {
 
     public static WalletTransaction createCharge(
         Long walletId,
+        Long userId,
         String transactionKey,
         Integer amount,
         Integer balanceAfter
@@ -63,6 +67,7 @@ public class WalletTransaction extends BaseEntity {
         WalletTransaction walletTransaction = new WalletTransaction();
         walletTransaction.walletTransactionId = UUID.randomUUID();
         walletTransaction.walletId = walletId;
+        walletTransaction.userId = userId;
         walletTransaction.transactionKey = transactionKey;
         walletTransaction.type = WalletTransactionType.CHARGE;
         walletTransaction.amount = amount;
@@ -72,6 +77,7 @@ public class WalletTransaction extends BaseEntity {
 
     public static WalletTransaction createUse(
         Long walletId,
+        Long userId,
         String transactionKey,
         Integer amount,
         Integer balanceAfter,
@@ -80,6 +86,7 @@ public class WalletTransaction extends BaseEntity {
         WalletTransaction walletTransaction = new WalletTransaction();
         walletTransaction.walletTransactionId = UUID.randomUUID();
         walletTransaction.walletId = walletId;
+        walletTransaction.userId = userId;
         walletTransaction.transactionKey = transactionKey;
         walletTransaction.type = WalletTransactionType.USE;
         walletTransaction.amount = amount;
@@ -90,6 +97,7 @@ public class WalletTransaction extends BaseEntity {
 
     public static WalletTransaction createRefund(
         Long walletId,
+        Long userId,
         String transactionKey,
         Integer amount,
         Integer balanceAfter,
@@ -99,6 +107,7 @@ public class WalletTransaction extends BaseEntity {
         WalletTransaction walletTransaction = new WalletTransaction();
         walletTransaction.walletTransactionId = UUID.randomUUID();
         walletTransaction.walletId = walletId;
+        walletTransaction.userId = userId;
         walletTransaction.transactionKey = transactionKey;
         walletTransaction.type = WalletTransactionType.REFUND;
         walletTransaction.amount = amount;
@@ -110,6 +119,7 @@ public class WalletTransaction extends BaseEntity {
 
     public static WalletTransaction createWithdraw(
         Long walletId,
+        Long userId,
         String transactionKey,
         Integer amount,
         Integer balanceAfter
@@ -117,6 +127,7 @@ public class WalletTransaction extends BaseEntity {
         WalletTransaction walletTransaction = new WalletTransaction();
         walletTransaction.walletTransactionId = UUID.randomUUID();
         walletTransaction.walletId = walletId;
+        walletTransaction.userId = userId;
         walletTransaction.transactionKey = transactionKey;
         walletTransaction.type = WalletTransactionType.WITHDRAW;
         walletTransaction.amount = amount;

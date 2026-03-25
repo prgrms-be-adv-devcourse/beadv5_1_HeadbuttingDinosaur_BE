@@ -33,6 +33,9 @@ public class Payment extends BaseEntity {
     @Column(name = "order_id", nullable = false)
     private Long orderId;
 
+    @Column(name = "user_id", nullable = false)
+    private Long userId;
+
     @Column(name = "payment_key")
     private String paymentKey;
 
@@ -62,12 +65,14 @@ public class Payment extends BaseEntity {
 
     public static Payment create(
         Long orderId,
+        Long userId,
         PaymentMethod method,
         Integer amount
     ) {
         Payment payment = new Payment();
         payment.paymentId = UUID.randomUUID();
         payment.orderId = orderId;
+        payment.userId = userId;
         payment.paymentMethod = method;
         payment.amount = amount;
         payment.status = PaymentStatus.READY;

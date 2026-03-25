@@ -29,6 +29,9 @@ public class Refund extends BaseEntity {
     @Column(name = "refund_id", nullable = false, unique = true)
     private UUID refundId;
 
+    @Column(name = "user_id", nullable = false)
+    private Long userId;
+
     @Column(name = "order_id", nullable = false)
     private Long orderId;
 
@@ -61,6 +64,7 @@ public class Refund extends BaseEntity {
     public static Refund create(
         Long orderId,
         Long paymentId,
+        Long userId,
         Integer amount,
         Integer refundRate
     ) {
@@ -68,6 +72,7 @@ public class Refund extends BaseEntity {
         refund.refundId = UUID.randomUUID();
         refund.orderId = orderId;
         refund.paymentId = paymentId;
+        refund.userId = userId;
         refund.refundAmount = amount;
         refund.refundRate = refundRate;
         refund.status = RefundStatus.REQUESTED;
