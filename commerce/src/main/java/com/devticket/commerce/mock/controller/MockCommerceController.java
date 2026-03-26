@@ -1,9 +1,9 @@
-package com.devticket.commerce.presentation.controller;
+package com.devticket.commerce.mock.controller;
 
-import com.devticket.commerce.presentation.dto.res.InternalEventOrdersResponse;
-import com.devticket.commerce.presentation.dto.res.InternalOrderInfoResponse;
-import com.devticket.commerce.presentation.dto.res.InternalOrderItemsResponse;
-import com.devticket.commerce.presentation.dto.res.InternalSettlementDataResponse;
+import com.devticket.commerce.mock.controller.dto.InternalEventOrdersResponse;
+import com.devticket.commerce.mock.controller.dto.InternalOrderInfoResponse;
+import com.devticket.commerce.mock.controller.dto.InternalOrderItemsResponse;
+import com.devticket.commerce.mock.controller.dto.InternalSettlementDataResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @Tag(name = "Internal API - Event", description = "Commerce 내부 시스템 연동용 Mock API")
 @RequestMapping("/internal")
-public class MockInternalCommerceController {
+public class MockCommerceController {
 
     @GetMapping("/orders/{orderId}")
     public InternalOrderInfoResponse getOrderInfo(@PathVariable Long orderId) {

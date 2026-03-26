@@ -1,4 +1,4 @@
-package com.devticket.commerce.presentation.dto.res;
+package com.devticket.commerce.mock.controller.dto;
 
 public record InternalOrderInfoResponse(
     Long id,
@@ -9,6 +9,6 @@ public record InternalOrderInfoResponse(
     String status,
     String orderedAt
 ) {
-    
+
 
 }

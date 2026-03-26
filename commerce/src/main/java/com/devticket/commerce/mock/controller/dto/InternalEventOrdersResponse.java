@@ -1,4 +1,4 @@
-package com.devticket.commerce.presentation.dto.res;
+package com.devticket.commerce.mock.controller.dto;
 
 import java.util.List;
 
