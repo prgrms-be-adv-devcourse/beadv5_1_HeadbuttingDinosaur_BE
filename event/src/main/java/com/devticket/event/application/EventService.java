@@ -5,6 +5,7 @@ import com.devticket.event.domain.exception.EventErrorCode;
 import com.devticket.event.domain.model.Event;
 import com.devticket.event.domain.enums.EventStatus;
 import com.devticket.event.infrastructure.persistence.EventRepository;
+import com.devticket.event.presentation.dto.EventDetailResponse;
 import com.devticket.event.presentation.dto.SellerEventCreateRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -41,7 +42,7 @@ public class EventService {
 
         // 2. Event 엔티티 생성
         Event event = Event.builder()
-            .eventId(UUID.randomUUID()) // 👈 v3 반영: 외부 노출용 고유 UUID 직접 생성
+            .eventId(UUID.randomUUID())
             .sellerId(sellerId)
             .title(request.title())
             .description(request.description())
@@ -61,5 +62,14 @@ public class EventService {
         Event savedEvent = eventRepository.save(event);
 
         return savedEvent.getEventId();
+    }
+
+    @Transactional(readOnly = true)
+    public EventDetailResponse getEvent(UUID eventId) {
+
+        Event event = eventRepository.findByEventId(eventId)
+            .orElseThrow(() -> new BusinessException(EventErrorCode.EVENT_NOT_FOUND));
+
+        return EventDetailResponse.from(event);
     }
 }
