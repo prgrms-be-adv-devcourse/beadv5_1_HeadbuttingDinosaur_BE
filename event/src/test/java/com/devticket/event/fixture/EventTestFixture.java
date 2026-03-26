@@ -1,6 +1,8 @@
 package com.devticket.event.fixture;
 
 import com.devticket.event.domain.enums.EventCategory;
+import com.devticket.event.domain.model.Event;
+import com.devticket.event.presentation.dto.EventDetailResponse;
 import com.devticket.event.presentation.dto.SellerEventCreateRequest;
 
 import java.time.LocalDateTime;
@@ -19,6 +21,22 @@ public class EventTestFixture {
             50000, totalQty, maxQty, EventCategory.MEETUP,
             List.of(UUID.randomUUID(), UUID.randomUUID()),
             List.of("url1")
+        );
+    }
+
+    public static Event createEvent(Long sellerId) {
+        return Event.create(
+            sellerId, "상세 조회 테스트 밋업", "설명", "강남역",
+            LocalDateTime.now().plusDays(15), LocalDateTime.now().plusDays(4), LocalDateTime.now().plusDays(10),
+            50000, 100, 4, EventCategory.MEETUP
+        );
+    }
+
+    public static EventDetailResponse createEventDetailResponse(UUID eventId) {
+        return new EventDetailResponse(
+            eventId, "상세 조회 테스트 밋업", "설명", "강남역",
+            LocalDateTime.now().plusDays(15), LocalDateTime.now().plusDays(4), LocalDateTime.now().plusDays(10),
+            50000, 100, 4, EventCategory.MEETUP
         );
     }
 }
