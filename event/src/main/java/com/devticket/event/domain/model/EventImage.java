@@ -12,7 +12,6 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -21,8 +20,6 @@ import org.hibernate.annotations.SQLRestriction;
 
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@AllArgsConstructor(access = AccessLevel.PRIVATE)
-@Builder(access = AccessLevel.PRIVATE)
 @Entity
 @Table(name = "event_image")
 @SQLDelete(sql = "UPDATE event_image SET deleted_at = NOW() WHERE id = ?")
@@ -45,4 +42,19 @@ public class EventImage extends BaseEntity {
 
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
+
+    @Builder(access = AccessLevel.PRIVATE)
+    private EventImage(Event event, String imageUrl, Integer sortOrder) {
+        this.event = event;
+        this.imageUrl = imageUrl;
+        this.sortOrder = sortOrder;
+    }
+
+    public static EventImage of(Event event, String imageUrl, Integer sortOrder) {
+        return EventImage.builder()
+            .event(event)
+            .imageUrl(imageUrl)
+            .sortOrder(sortOrder)
+            .build();
+    }
 }

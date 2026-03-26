@@ -11,23 +11,18 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.time.LocalDateTime;
+import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.SQLRestriction;
 
-import java.time.LocalDateTime;
-import java.util.UUID;
-
-import lombok.*;
-
 @Entity
 @Table(name = "events")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@AllArgsConstructor(access = AccessLevel.PRIVATE)
-@Builder
 @SQLRestriction("deleted_at IS NULL") // Soft Delete: 조회 시 삭제된 데이터 제외
 public class Event extends BaseEntity {
 
@@ -78,6 +73,27 @@ public class Event extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private EventCategory category;
+
+    @Builder(access = AccessLevel.PRIVATE)
+    private Event(UUID eventId, Long sellerId, String title, String description, String location,
+        LocalDateTime eventDateTime, LocalDateTime saleStartAt, LocalDateTime saleEndAt,
+        Integer price, Integer totalQuantity, Integer maxQuantity, Integer remainingQuantity,
+        EventStatus status, EventCategory category) {
+        this.eventId = eventId;
+        this.sellerId = sellerId;
+        this.title = title;
+        this.description = description;
+        this.location = location;
+        this.eventDateTime = eventDateTime;
+        this.saleStartAt = saleStartAt;
+        this.saleEndAt = saleEndAt;
+        this.price = price;
+        this.totalQuantity = totalQuantity;
+        this.maxQuantity = maxQuantity;
+        this.remainingQuantity = remainingQuantity;
+        this.status = status;
+        this.category = category;
+    }
 
     public static Event create(
         Long sellerId, String title, String description, String location,

@@ -11,15 +11,12 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@AllArgsConstructor(access = AccessLevel.PRIVATE)
-@Builder(access = AccessLevel.PRIVATE)
 @Entity
 @Table(name = "event_tech_stack")
 public class EventTechStack extends BaseEntity {
@@ -34,5 +31,18 @@ public class EventTechStack extends BaseEntity {
 
     @Column(name = "tech_stack_id", nullable = false)
     private Long techStackId;
+
+    @Builder(access = AccessLevel.PRIVATE)
+    private EventTechStack(Event event, Long techStackId) {
+        this.event = event;
+        this.techStackId = techStackId;
+    }
+
+    public static EventTechStack of(Event event, Long techStackId) {
+        return EventTechStack.builder()
+            .event(event)
+            .techStackId(techStackId)
+            .build();
+    }
 
 }
