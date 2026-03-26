@@ -1,6 +1,7 @@
 package com.devticket.settlement.domain.model;
 
 
+import com.devticket.settlement.common.entity.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -13,7 +14,7 @@ import lombok.Getter;
 @Getter
 @Entity
 @Table(name = "settlement_item")
-public class SettlementItem {
+public class SettlementItem extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
