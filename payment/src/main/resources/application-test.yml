@@ -22,6 +22,6 @@ jwt:
   access-token-ttl: 1800000
   refresh-token-ttl: 604800000
 
-  internal:
-    commerce:
-      base-url: http://commerce-service:8083
+internal:
+  commerce:
+    base-url: http://commerce-service:8083
