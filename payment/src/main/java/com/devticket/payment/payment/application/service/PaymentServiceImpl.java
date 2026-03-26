@@ -72,16 +72,15 @@ public class PaymentServiceImpl implements PaymentService {
         Wallet wallet = walletRepository.findByUserId(userId)
             .orElseThrow(() -> new WalletException(WalletErrorCode.WALLET_NOT_FOUND));
 
-        //잔액 확인
-        if (wallet.getBalance() < order.totalAmount()) {
-            throw new WalletException(WalletErrorCode.INSUFFICIENT_BALANCE);
-        }
-
         String transactionKey = "WALLET:PAY:" + order.id();
 
         boolean exists = walletTransactionRepository.existsByTransactionKey(transactionKey);
         if (exists) {
             throw new PaymentException(PaymentErrorCode.ALREADY_PROCESSED_PAYMENT);
+        }
+
+        if (wallet.getBalance() < order.totalAmount()) {
+            throw new WalletException(WalletErrorCode.INSUFFICIENT_BALANCE);
         }
 
         //잔액 차감
