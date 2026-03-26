@@ -11,21 +11,22 @@ public class InternalMemberService {
 
     public InternalMemberInfoResponse getMemberInfo(Long userId) {
         // TODO: Phase 4에서 구현
-        throw new UnsupportedOperationException("Not implemented yet");
+        return new InternalMemberInfoResponse(userId, "stub@example.com",
+            "USER", "ACTIVE", "LOCAL");
     }
 
     public InternalMemberStatusResponse getMemberStatus(Long userId) {
         // TODO: Phase 4에서 구현
-        throw new UnsupportedOperationException("Not implemented yet");
+        return new InternalMemberStatusResponse(userId, "ACTIVE");
     }
 
     public InternalMemberRoleResponse getMemberRole(Long userId) {
         // TODO: Phase 4에서 구현
-        throw new UnsupportedOperationException("Not implemented yet");
+        return new InternalMemberRoleResponse(userId, "USER");
     }
 
     public InternalSellerInfoResponse getSellerInfo(Long userId) {
         // TODO: Phase 4에서 구현
-        throw new UnsupportedOperationException("Not implemented yet");
+        return new InternalSellerInfoResponse(userId, "stub-bank", "000-000-0000", "stub-holder");
     }
 }

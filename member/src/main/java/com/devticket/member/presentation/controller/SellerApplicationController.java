@@ -15,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -33,9 +34,8 @@ public class SellerApplicationController {
     })
     @PostMapping
     public ResponseEntity<SellerApplicationResponse> apply(
+        @RequestHeader("X-User-Id") Long userId,
         @Valid @RequestBody SellerApplicationRequest request) {
-        // TODO: JWT에서 userId 추출
-        Long userId = 0L;
         SellerApplicationResponse response = sellerApplicationService.apply(userId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
@@ -46,9 +46,8 @@ public class SellerApplicationController {
         @ApiResponse(responseCode = "404", description = "신청 내역 없음")
     })
     @GetMapping("/me")
-    public ResponseEntity<SellerApplicationStatusResponse> getMyApplication() {
-        // TODO: JWT에서 userId 추출
-        Long userId = 0L;
+    public ResponseEntity<SellerApplicationStatusResponse> getMyApplication(
+        @RequestHeader("X-User-Id") Long userId) {
         SellerApplicationStatusResponse response = sellerApplicationService.getMyApplication(userId);
         return ResponseEntity.ok(response);
     }

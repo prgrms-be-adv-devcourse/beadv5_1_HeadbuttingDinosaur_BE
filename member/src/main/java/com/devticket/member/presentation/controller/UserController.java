@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -40,9 +41,8 @@ public class UserController {
     })
     @PostMapping("/profile")
     public ResponseEntity<SignUpProfileResponse> createProfile(
+        @RequestHeader("X-User-Id") Long userId,
         @Valid @RequestBody SignUpProfileRequest request) {
-        // TODO: JWT에서 userId 추출 — Phase 4에서 구현
-        Long userId = 0L;
         SignUpProfileResponse response = userService.createProfile(userId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
@@ -53,9 +53,8 @@ public class UserController {
         @ApiResponse(responseCode = "404", description = "회원 없음")
     })
     @GetMapping("/me")
-    public ResponseEntity<GetProfileResponse> getProfile() {
-        // TODO: JWT에서 userId 추출
-        Long userId = 0L;
+    public ResponseEntity<GetProfileResponse> getProfile(
+        @RequestHeader("X-User-Id") Long userId) {
         GetProfileResponse response = userService.getProfile(userId);
         return ResponseEntity.ok(response);
     }
@@ -67,9 +66,8 @@ public class UserController {
     })
     @PatchMapping("/me")
     public ResponseEntity<UpdateProfileResponse> updateProfile(
+        @RequestHeader("X-User-Id") Long userId,
         @Valid @RequestBody UpdateProfileRequest request) {
-        // TODO: JWT에서 userId 추출
-        Long userId = 0L;
         UpdateProfileResponse response = userService.updateProfile(userId, request);
         return ResponseEntity.ok(response);
     }
@@ -81,9 +79,8 @@ public class UserController {
     })
     @PatchMapping("/me/password")
     public ResponseEntity<ChangePasswordResponse> changePassword(
+        @RequestHeader("X-User-Id") Long userId,
         @Valid @RequestBody ChangePasswordRequest request) {
-        // TODO: JWT에서 userId 추출
-        Long userId = 0L;
         ChangePasswordResponse response = userService.changePassword(userId, request);
         return ResponseEntity.ok(response);
     }
@@ -93,10 +90,10 @@ public class UserController {
         @ApiResponse(responseCode = "200", description = "탈퇴 성공")
     })
     @DeleteMapping("/me")
-    public ResponseEntity<WithdrawResponse> withdraw() {
-        // TODO: JWT에서 userId 추출
-        Long userId = 0L;
+    public ResponseEntity<WithdrawResponse> withdraw(
+        @RequestHeader("X-User-Id") Long userId) {
         WithdrawResponse response = userService.withdraw(userId);
         return ResponseEntity.ok(response);
     }
 }
+
