@@ -11,8 +11,10 @@ import com.devticket.event.domain.exception.EventErrorCode;
 import com.devticket.event.domain.model.Event;
 import com.devticket.event.fixture.EventTestFixture;
 import com.devticket.event.infrastructure.persistence.EventRepository;
+import com.devticket.event.presentation.dto.EventDetailResponse;
 import com.devticket.event.presentation.dto.SellerEventCreateRequest;
 import java.time.LocalDateTime;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,6 +30,8 @@ class EventServiceTest {
 
     @InjectMocks
     private EventService eventService;
+
+    // 이벤트 생성 테스트
 
     @Test
     void 정상적인_조건일_경우_이벤트가_성공적으로_생성되고_UUID를_반환한다() {
@@ -98,5 +102,38 @@ class EventServiceTest {
         assertThatThrownBy(() -> eventService.createEvent(sellerId, request))
             .isInstanceOf(BusinessException.class)
             .hasMessageContaining(EventErrorCode.INVALID_EVENT_DATE.getMessage());
+    }
+
+    // 이벤트 상세 조회 테스트
+
+    @Test
+    void 존재하는_이벤트_조회시_상세정보를_반환한다() {
+        // given
+        Long sellerId = 1L;
+
+        Event event = EventTestFixture.createEvent(sellerId);
+        UUID eventId = event.getEventId();
+
+        when(eventRepository.findByEventId(eventId)).thenReturn(Optional.of(event));
+
+        // when
+        EventDetailResponse response = eventService.getEvent(eventId);
+
+        // then
+        assertThat(response.eventId()).isEqualTo(eventId);
+        assertThat(response.title()).isEqualTo("상세 조회 테스트 밋업");
+        verify(eventRepository).findByEventId(eventId);
+    }
+
+    @Test
+    void 존재하지_않는_이벤트_조회시_예외가_발생한다() {
+        // given
+        UUID invalidEventId = UUID.randomUUID(); // 아무 UUID나 생성
+        when(eventRepository.findByEventId(invalidEventId)).thenReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> eventService.getEvent(invalidEventId))
+            .isInstanceOf(BusinessException.class)
+            .hasMessageContaining(EventErrorCode.EVENT_NOT_FOUND.getMessage());
     }
 }

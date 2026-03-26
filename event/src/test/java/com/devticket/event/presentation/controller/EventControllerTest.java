@@ -3,6 +3,7 @@ package com.devticket.event.presentation.controller;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -10,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.devticket.event.application.EventService;
 import com.devticket.event.fixture.EventTestFixture;
+import com.devticket.event.presentation.dto.EventDetailResponse;
 import com.devticket.event.presentation.dto.SellerEventCreateRequest;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -32,6 +34,8 @@ class EventControllerTest {
 
     @MockitoBean
     private EventService eventService;
+
+    // 이벤트 생성 테스트
 
     @Test
     void 정상적인_요청시_201_응답과_UUID를_반환한다() throws Exception {
@@ -91,5 +95,24 @@ class EventControllerTest {
                 .content(objectMapper.writeValueAsString(badRequest)))
             .andDo(print())
             .andExpect(status().isBadRequest()); // @Valid 에 의한 400 반환 확인
+    }
+
+    // 이벤트 상세 조회 테스트
+
+    @Test
+    void 이벤트_상세조회_성공시_200_응답을_반환한다() throws Exception {
+        // given
+        UUID eventId = UUID.randomUUID();
+        EventDetailResponse mockResponse = EventTestFixture.createEventDetailResponse(eventId);
+
+        when(eventService.getEvent(eventId)).thenReturn(mockResponse);
+
+        // when & then
+        mockMvc.perform(get("/api/v1/events/{eventId}", eventId)
+                .contentType(MediaType.APPLICATION_JSON))
+            .andDo(print())
+            .andExpect(status().isOk()) // 200 OK 검증
+            .andExpect(jsonPath("$.data.eventId").value(eventId.toString()))
+            .andExpect(jsonPath("$.data.title").value("상세 조회 테스트 밋업"));
     }
 }
