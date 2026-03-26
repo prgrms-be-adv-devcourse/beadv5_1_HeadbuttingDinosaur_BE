@@ -78,4 +78,27 @@ public class Event extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private EventCategory category;
+
+    public static Event create(
+        Long sellerId, String title, String description, String location,
+        LocalDateTime eventDateTime, LocalDateTime saleStartAt, LocalDateTime saleEndAt,
+        Integer price, Integer totalQuantity, Integer maxQuantity, EventCategory category
+    ) {
+        return Event.builder()
+            .eventId(UUID.randomUUID())
+            .sellerId(sellerId)
+            .title(title)
+            .description(description)
+            .location(location)
+            .eventDateTime(eventDateTime)
+            .saleStartAt(saleStartAt)
+            .saleEndAt(saleEndAt)
+            .price(price)
+            .totalQuantity(totalQuantity)
+            .maxQuantity(maxQuantity)
+            .remainingQuantity(totalQuantity)
+            .status(EventStatus.DRAFT)
+            .category(category)
+            .build();
+    }
 }
