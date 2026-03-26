@@ -25,3 +25,7 @@ logging:
   level:
     org.hibernate.SQL: DEBUG
     com.devticket: DEBUG
+
+external:
+  event-base-url: http://localhost:8083
+  payment-base-url: http://localhost:8083

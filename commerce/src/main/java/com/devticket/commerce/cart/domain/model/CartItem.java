@@ -44,22 +44,11 @@ public class CartItem extends BaseEntity {
 
     //---- 정적 팩토리 메서드 ------------------
     //객체 생성
-    public static CartItem create(Long cartId, Long eventId, int quantity, boolean purchasable,
-        int maxQuantityPerUser) {
-
-        // 상품 구매가능 상태 검증
-        if (!purchasable) {
-            throw new BusinessException(CartErrorCode.EVENT_ENDED);
-        }
+    public static CartItem create(Long cartId, Long eventId, int quantity) {
 
         // 수량 정책 검증 (최소 1개)
         if (quantity < 1) {
             throw new BusinessException(CartErrorCode.INVALID_QUANTITY);
-        }
-
-        // 인당 최대 구매 수량 제한 검증
-        if (quantity > maxQuantityPerUser) {
-            throw new BusinessException(CartErrorCode.EXCEED_MAX_PURCHASE);
         }
 
         LocalDateTime now = LocalDateTime.now();
@@ -73,24 +62,21 @@ public class CartItem extends BaseEntity {
 
     //---도메인 비즈니스 로직----------------------
     // 장바구니 수량관련 정책 검증
-    private static void validateQuantityRange(int quantity, int maxQuantityPerUser) {
+    private static void validateQuantityRange(int quantity) {
         if (quantity < 1) {
             throw new BusinessException(CartErrorCode.INVALID_QUANTITY);
-        }
-        if (quantity > maxQuantityPerUser) {
-            throw new BusinessException(CartErrorCode.EXCEED_MAX_PURCHASE);
         }
     }
 
     // 장바구니 아이템의 수량변경
-    public void updateQuantity(int newQuantity, int maxQuantityPerUser) {
-        validateQuantityRange(newQuantity, maxQuantityPerUser);
+    public void updateQuantity(int newQuantity) {
+        validateQuantityRange(newQuantity);
         this.quantity = newQuantity;
     }
 
     // 장바구니에 이미 있는 상품을 또 담을 때 사용.
-    public void addQuantity(int additionalQuantity, int maxQuantityPerUser) {
-        updateQuantity(this.quantity + additionalQuantity, maxQuantityPerUser);
+    public void addQuantity(int additionalQuantity) {
+        updateQuantity(this.quantity + additionalQuantity);
     }
-    
+
 }

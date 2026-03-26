@@ -5,8 +5,12 @@ import com.devticket.commerce.cart.domain.model.Cart;
 import com.devticket.commerce.cart.domain.model.CartItem;
 import com.devticket.commerce.cart.domain.repository.CartItemRepository;
 import com.devticket.commerce.cart.domain.repository.CartRepository;
+import com.devticket.commerce.cart.infrastructure.external.client.EventClient;
+import com.devticket.commerce.cart.infrastructure.external.client.dto.InternalPurchaseValidationResponse;
 import com.devticket.commerce.cart.presentation.dto.req.CartItemRequest;
 import com.devticket.commerce.cart.presentation.dto.res.CartItemResponse;
+import com.devticket.commerce.cart.presentation.dto.res.CartItemResponse.CartItemDetail;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -17,6 +21,7 @@ public class CartService implements CartUseCase {
 
     private final CartRepository cartRepository;
     private final CartItemRepository cartItemRepository;
+    private final EventClient eventClient;
 
     @Override
     public boolean finByUserId(Long userId) {
@@ -32,16 +37,15 @@ public class CartService implements CartUseCase {
                 return cartRepository.save(newCart);
             });
 
-        //내부api호출-> Event의 인당최대구매수량,구매가능상태값 가져오기.
-        //TODO : 내부api호출로 수정 필요;
-        int maxQuantityPerUser = 50;
-        boolean purchasable = true;
+        //Event api호출 : Event의 구매가능 상태 검증(인당최대구매수량,구매가능상태)
+        InternalPurchaseValidationResponse event = eventClient.getValidateEventStatus(request.eventId(), userId,
+            request.quantity());
 
         //CartItem 생성 또는 수량 합산
         CartItem cartItem = cartItemRepository.findByCartIdAndEventId(cart.getId(), request.eventId())
             .map(existingCartItem -> {
                 // 이미 있다면 기존 아이템의 수량을 업데이트
-                existingCartItem.addQuantity(request.quantity(), maxQuantityPerUser);
+                existingCartItem.addQuantity(request.quantity());
                 return existingCartItem;
             })
             .orElseGet(() -> {
@@ -49,19 +53,22 @@ public class CartService implements CartUseCase {
                 return CartItem.create(
                     cart.getId(),
                     request.eventId(),
-                    request.quantity(),
-                    purchasable,
-                    maxQuantityPerUser
+                    request.quantity()
                 );
             });
 
         CartItem savedItem = cartItemRepository.save(cartItem);
 
-        return new CartItemResponse(
+        int totalAmount = event.price() * savedItem.getQuantity();
+
+        CartItemResponse.CartItemDetail detail = new CartItemResponse.CartItemDetail(
             savedItem.getEventId().toString(),
-            "Event API결과값", // 실제로는 Event API 결과값 사용
-            15000,                    // 실제로는 Event API 결과값 사용
+            event.title(),
+            (long) event.price(),
             savedItem.getQuantity()
         );
+        List<CartItemDetail> detailList = List.of(detail);
+
+        return CartItemResponse.of(cart, detailList, totalAmount);
     }
 }
