@@ -1,5 +1,6 @@
 package com.devticket.event.domain.model;
 
+import com.devticket.event.common.entity.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -13,18 +14,20 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.SQLRestriction;
 
-import java.util.UUID;
-
-@Entity
-@Table(name = "event_image")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class EventImage {
+@Entity
+@Table(name = "event_image")
+@SQLDelete(sql = "UPDATE event_image SET deleted_at = NOW() WHERE id = ?")
+@SQLRestriction("deleted_at IS NULL")
+public class EventImage extends BaseEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "event_id", nullable = false)
@@ -36,10 +39,18 @@ public class EventImage {
     @Column(name = "sort_order", nullable = false)
     private Integer sortOrder;
 
-    @Builder
-    public EventImage(Event event, String imageUrl, Integer sortOrder) {
+    @Builder(access = AccessLevel.PRIVATE)
+    private EventImage(Event event, String imageUrl, Integer sortOrder) {
         this.event = event;
         this.imageUrl = imageUrl;
         this.sortOrder = sortOrder;
+    }
+
+    public static EventImage of(Event event, String imageUrl, Integer sortOrder) {
+        return EventImage.builder()
+            .event(event)
+            .imageUrl(imageUrl)
+            .sortOrder(sortOrder)
+            .build();
     }
 }
