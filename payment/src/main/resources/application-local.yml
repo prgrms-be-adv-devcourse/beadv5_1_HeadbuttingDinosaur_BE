@@ -31,3 +31,7 @@ logging:
   level:
     org.hibernate.SQL: DEBUG
     com.devticket: DEBUG
+
+internal:
+  commerce:
+    base-url: http://commerce-service:8083
