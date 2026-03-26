@@ -10,8 +10,10 @@ import com.devticket.settlement.presentation.dto.SettlementResponse;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @RequiredArgsConstructor
@@ -33,7 +35,7 @@ public class SettlementServiceImpl implements SettlementService {
     @Override
     public SellerSettlementDetailResponse getSellerSettlementDetail(Long sellerId, UUID settlementId) {
         Settlement settlement = settlementRepository.findBySettlementId(settlementId)
-            .orElseThrow(() -> new IllegalArgumentException("해당 정산 내역이 존재하지 않습니다."));
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "정산 없음"));
 
         validateSellerAccess(sellerId, settlement);
 
@@ -48,7 +50,7 @@ public class SettlementServiceImpl implements SettlementService {
     //    사용자 인가 확인 메서드
     private void validateSellerAccess(Long sellerId, Settlement settlement) {
         if (!sellerId.equals(settlement.getSellerId())) {
-            throw new IllegalArgumentException("해당 정산 조회 권한이 없습니다.");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "권한 없음");
         }
     }
 
