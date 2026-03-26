@@ -12,10 +12,10 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Builder;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.springframework.data.annotation.CreatedDate;
-import org.springframework.data.annotation.LastModifiedDate;
 
+@Getter
 @Entity
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "settlement")
@@ -56,14 +56,6 @@ public class Settlement {
     @Column(name = "settled_at")
     private LocalDateTime settledAt;
 
-    @CreatedDate
-    @Column(name = "created_at", updatable = false)
-    private LocalDateTime createdAt;
-
-    @LastModifiedDate
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
-
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
@@ -85,62 +77,6 @@ public class Settlement {
         this.status = (status != null) ? status : SettlementStatus.PENDING;
     }
 
-    //    getter
-    public Long getId() {
-        return id;
-    }
-
-    public UUID getSettlementId() {
-        return settlementId;
-    }
-
-    public Long getSellerId() {
-        return sellerId;
-    }
-
-    public LocalDateTime getPeriodStartAt() {
-        return periodStartAt;
-    }
-
-    public LocalDateTime getPeriodEndAt() {
-        return periodEndAt;
-    }
-
-    public Integer getTotalSalesAmount() {
-        return totalSalesAmount;
-    }
-
-    public Integer getTotalRefundAmount() {
-        return totalRefundAmount;
-    }
-
-    public Integer getTotalFeeAmount() {
-        return totalFeeAmount;
-    }
-
-    public Integer getFinalSettlementAmount() {
-        return finalSettlementAmount;
-    }
-
-    public SettlementStatus getStatus() {
-        return status;
-    }
-
-    public LocalDateTime getSettledAt() {
-        return settledAt;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public LocalDateTime getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public LocalDateTime getDeletedAt() {
-        return deletedAt;
-    }
 
 }
 
