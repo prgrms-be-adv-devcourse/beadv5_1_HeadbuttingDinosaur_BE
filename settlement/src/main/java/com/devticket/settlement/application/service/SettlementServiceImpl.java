@@ -1,5 +1,8 @@
 package com.devticket.settlement.application.service;
 
+import com.devticket.settlement.common.exception.BusinessException;
+import com.devticket.settlement.common.exception.CommonErrorCode;
+import com.devticket.settlement.domain.exception.SettlementErrorCode;
 import com.devticket.settlement.domain.model.Settlement;
 import com.devticket.settlement.domain.model.SettlementItem;
 import com.devticket.settlement.domain.repository.SettlementItemRepository;
@@ -10,10 +13,8 @@ import com.devticket.settlement.presentation.dto.SettlementResponse;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @RequiredArgsConstructor
@@ -26,16 +27,21 @@ public class SettlementServiceImpl implements SettlementService {
     // 정산 내역 목록 조회
     @Override
     public List<SettlementResponse> getSellerSettlements(Long sellerId) {
+        List<Settlement> settlements = settlementRepository.findBySellerId(sellerId);
+        if (settlements.isEmpty()) {
+            throw new BusinessException(SettlementErrorCode.SETTLEMENT_NOT_FOUND);
+        }
         return settlementRepository.findBySellerId(sellerId).stream()
             .map(this::toResponse)
             .toList();
     }
 
+
     // 정산 내역 상세 조회
     @Override
     public SellerSettlementDetailResponse getSellerSettlementDetail(Long sellerId, UUID settlementId) {
         Settlement settlement = settlementRepository.findBySettlementId(settlementId)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "정산 없음"));
+            .orElseThrow(() -> new BusinessException(SettlementErrorCode.SETTLEMENT_BAD_REQUEST));
 
         validateSellerAccess(sellerId, settlement);
 
@@ -43,14 +49,13 @@ public class SettlementServiceImpl implements SettlementService {
             settlement.getSettlementId());
 
         return toResponse(settlement, settlementItems);
-
     }
 
 
     //    사용자 인가 확인 메서드
     private void validateSellerAccess(Long sellerId, Settlement settlement) {
         if (!sellerId.equals(settlement.getSellerId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "권한 없음");
+            throw new BusinessException(CommonErrorCode.ACCESS_DENIED);
         }
     }
 
