@@ -74,6 +74,8 @@ public class JwtTokenProvider {
             log.warn("만료된 JWT 토큰입니다.");
         } catch (JwtException e) {
             log.warn("유효하지 않은 JWT 토큰입니다: {}", e.getMessage());
+        } catch (IllegalArgumentException e) {
+            log.warn("JWT 토큰이 비어있거나 잘못된 형식입니다.");
         }
         return false;
     }

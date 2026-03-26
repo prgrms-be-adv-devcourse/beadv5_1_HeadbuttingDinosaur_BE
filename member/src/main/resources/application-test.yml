@@ -5,6 +5,6 @@ spring:
       - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
 
 jwt:
-  secret-key: test-jwt-secret-key
+  secret-key: local-dev-jwt-secret-key-devticket-2026
   access-token-ttl: 1800000
   refresh-token-ttl: 604800000
