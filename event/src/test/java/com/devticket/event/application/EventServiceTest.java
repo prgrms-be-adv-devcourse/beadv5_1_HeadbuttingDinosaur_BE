@@ -21,6 +21,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class EventServiceTest {
@@ -43,11 +44,9 @@ class EventServiceTest {
         );
 
         UUID expectedUuid = UUID.randomUUID();
-        Event savedEvent = Event.builder()
-            .eventId(expectedUuid)
-            .sellerId(sellerId)
-            .build();
 
+        Event savedEvent = EventTestFixture.createEvent(sellerId);
+        ReflectionTestUtils.setField(savedEvent, "eventId", expectedUuid);
         when(eventRepository.save(any(Event.class))).thenReturn(savedEvent);
 
         // when

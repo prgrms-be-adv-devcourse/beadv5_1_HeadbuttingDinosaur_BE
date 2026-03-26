@@ -10,7 +10,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -39,9 +38,6 @@ public class EventImage extends BaseEntity {
 
     @Column(name = "sort_order", nullable = false)
     private Integer sortOrder;
-
-    @Column(name = "deleted_at")
-    private LocalDateTime deletedAt;
 
     @Builder(access = AccessLevel.PRIVATE)
     private EventImage(Event event, String imageUrl, Integer sortOrder) {
