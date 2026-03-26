@@ -1,6 +1,8 @@
 package com.devticket.commerce.cart.application.service;
 
 import com.devticket.commerce.cart.application.usecase.CartUseCase;
+import com.devticket.commerce.cart.domain.exception.CartErrorCode;
+import com.devticket.commerce.cart.domain.exception.EventErrorCode;
 import com.devticket.commerce.cart.domain.model.Cart;
 import com.devticket.commerce.cart.domain.model.CartItem;
 import com.devticket.commerce.cart.domain.repository.CartItemRepository;
@@ -9,12 +11,13 @@ import com.devticket.commerce.cart.infrastructure.external.client.EventClient;
 import com.devticket.commerce.cart.infrastructure.external.client.dto.InternalPurchaseValidationResponse;
 import com.devticket.commerce.cart.presentation.dto.req.CartItemRequest;
 import com.devticket.commerce.cart.presentation.dto.res.CartItemResponse;
-import com.devticket.commerce.cart.presentation.dto.res.CartItemResponse.CartItemDetail;
-import java.util.List;
+import com.devticket.commerce.common.exception.BusinessException;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class CartService implements CartUseCase {
@@ -23,52 +26,71 @@ public class CartService implements CartUseCase {
     private final CartItemRepository cartItemRepository;
     private final EventClient eventClient;
 
+    // =========================================================================
+    // Public Methods (Main Flow)
+    // =========================================================================
+
     @Override
     public boolean finByUserId(Long userId) {
         return cartRepository.findByUserId(userId).isPresent();
     }
 
     @Override
+    @Transactional
     public CartItemResponse save(Long userId, CartItemRequest request) {
-        //장바구니 유무 확인. 없으면 장바구니 생성
-        Cart cart = cartRepository.findByUserId(userId)
-            .orElseGet(() -> {
-                Cart newCart = Cart.create(userId);
-                return cartRepository.save(newCart);
-            });
+        //장바구니 확보
+        Cart cart = findOrCreateCart(userId);
 
-        //Event api호출 : Event의 구매가능 상태 검증(인당최대구매수량,구매가능상태)
+        //외부 API 호출 및 정책 검증 : Event서비스호출, 상품의 구매가능상태,구매가능 수량 등 검증
         InternalPurchaseValidationResponse event = eventClient.getValidateEventStatus(request.eventId(), userId,
             request.quantity());
+        handlePurchaseValidationError(event);
 
-        //CartItem 생성 또는 수량 합산
-        CartItem cartItem = cartItemRepository.findByCartIdAndEventId(cart.getId(), request.eventId())
-            .map(existingCartItem -> {
-                // 이미 있다면 기존 아이템의 수량을 업데이트
-                existingCartItem.addQuantity(request.quantity());
-                return existingCartItem;
+        //도메인 로직 : 장바구니 아이템 추가 또는 업데이트(이미 장바구니에 존재하는 상품을 또 담는 경우 수량변경)
+        CartItem savedItem = addOrUpdateCartItem(cart.getId(), request);
+
+        //응답데이터 구성
+        return CartItemResponse.of(cart, savedItem, event);
+    }
+
+    // =========================================================================
+    // Private Helpers (Logic & Validation)
+    // =========================================================================
+
+    private Cart findOrCreateCart(Long userId) {
+        return cartRepository.findByUserId(userId)
+            .orElseGet(() -> cartRepository.save(Cart.create(userId)));
+    }
+
+    private CartItem addOrUpdateCartItem(Long cartId, CartItemRequest request) {
+        return cartItemRepository.findByCartIdAndEventId(cartId, request.eventId())
+            .map(existingItem -> {
+                existingItem.addQuantity(request.quantity());
+                return existingItem;
             })
             .orElseGet(() -> {
-                // 없다면 새로운 CartItem 생성
-                return CartItem.create(
-                    cart.getId(),
-                    request.eventId(),
-                    request.quantity()
-                );
+                CartItem newItem = CartItem.create(cartId, request.eventId(), request.quantity());
+                return cartItemRepository.save(newItem);
             });
-
-        CartItem savedItem = cartItemRepository.save(cartItem);
-
-        int totalAmount = event.price() * savedItem.getQuantity();
-
-        CartItemResponse.CartItemDetail detail = new CartItemResponse.CartItemDetail(
-            savedItem.getEventId().toString(),
-            event.title(),
-            (long) event.price(),
-            savedItem.getQuantity()
-        );
-        List<CartItemDetail> detailList = List.of(detail);
-
-        return CartItemResponse.of(cart, detailList, totalAmount);
     }
+
+    // Event에서 반환된 reason값 기준 에러 처리
+    private void handlePurchaseValidationError(InternalPurchaseValidationResponse response) {
+        if (Boolean.TRUE.equals(response.purchasable())) {
+            return;
+        }
+
+        // Event 구매가능 상태별 예외처리
+        switch (response.reason()) {
+            case "SALE_ENDED" -> throw new BusinessException(CartErrorCode.EVENT_ENDED);
+            case "SOLD_OUT", "INSUFFICIENT_STOCK" -> throw new BusinessException(CartErrorCode.OUT_OF_STOCK);
+            case "EVENT_CANCELLED" -> throw new BusinessException(EventErrorCode.EVENT_ALREADY_CANCELLED);
+            case "MAX_PER_USER_EXCEEDED" -> throw new BusinessException(CartErrorCode.EXCEED_MAX_PURCHASE);
+            default -> {
+                log.warn("[CartService] Unknown validation reason from Event Service: {}", response.reason());
+                throw new BusinessException(EventErrorCode.INVALID_PURCHASE_REQUEST);
+            }
+        }
+    }
+
 }

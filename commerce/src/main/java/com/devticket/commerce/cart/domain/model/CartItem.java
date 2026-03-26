@@ -74,6 +74,11 @@ public class CartItem extends BaseEntity {
         this.quantity = newQuantity;
     }
 
+//    //내 수량과 외부 가격을 곱해 금액 계산
+//    public int calculateLineAmount(int price) {
+//        return price * this.quantity;
+//    }
+
     // 장바구니에 이미 있는 상품을 또 담을 때 사용.
     public void addQuantity(int additionalQuantity) {
         updateQuantity(this.quantity + additionalQuantity);
