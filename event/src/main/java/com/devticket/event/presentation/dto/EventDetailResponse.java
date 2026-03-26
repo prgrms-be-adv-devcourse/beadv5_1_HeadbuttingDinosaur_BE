@@ -18,10 +18,8 @@ public record EventDetailResponse(
     Integer totalQuantity,
     Integer maxQuantity,
     EventCategory category
-    // TODO: ERD에 따라 TechStack과 ImageUrl 리스트가 엔티티에 매핑되어 있다면
-    // List<UUID> techStackIds, List<String> imageUrls 필드를 추가해 주세요!
 ) {
-    // Entity를 DTO로 변환해주는 정적 팩토리 메서드 (포장지 역할)
+
     public static EventDetailResponse from(Event event) {
         return new EventDetailResponse(
             event.getEventId(),
