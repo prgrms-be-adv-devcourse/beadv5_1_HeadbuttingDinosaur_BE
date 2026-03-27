@@ -3,7 +3,6 @@ package com.devticket.member.presentation.dto.request;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.util.List;
-import java.util.UUID;
 
 public record UpdateProfileRequest(
     @Size(min = 2, max = 12, message = "닉네임은 2자 이상 12자 이하여야 합니다.")
@@ -14,7 +13,7 @@ public record UpdateProfileRequest(
 
     String profileImageUrl,
 
-    List<UUID> techStackIds,
+    List<Long> techStackIds,
 
     String bio
 ) {

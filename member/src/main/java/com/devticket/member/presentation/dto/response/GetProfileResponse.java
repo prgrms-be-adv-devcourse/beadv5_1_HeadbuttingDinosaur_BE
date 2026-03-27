@@ -18,14 +18,14 @@ public record GetProfileResponse(
     String providerType
 ) {
 
-    public record TechStackInfo(UUID techStackId, String name) {
+    public record TechStackInfo(Long techStackId, String name) {
 
     }
 
     public static GetProfileResponse from(User user, UserProfile profile,
         List<TechStack> techStacks) {
         List<TechStackInfo> techStackInfos = techStacks.stream()
-            .map(ts -> new TechStackInfo(ts.getTechStackId(), ts.getName()))
+            .map(ts -> new TechStackInfo(ts.getId(), ts.getName()))
             .toList();
 
         return new GetProfileResponse(
