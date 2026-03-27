@@ -72,7 +72,7 @@ public class PaymentServiceImpl implements PaymentService {
         Wallet wallet = walletRepository.findByUserId(userId)
             .orElseThrow(() -> new WalletException(WalletErrorCode.WALLET_NOT_FOUND));
 
-        String transactionKey = "WALLET:PAY:" + order.id();
+        String transactionKey = "WALLET:PAY:" + orderId;
 
         boolean exists = walletTransactionRepository.existsByTransactionKey(transactionKey);
         if (exists) {
