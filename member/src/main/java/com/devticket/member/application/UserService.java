@@ -35,7 +35,7 @@ public class UserService {
 
     public ChangePasswordResponse changePassword(Long userId, ChangePasswordRequest request) {
         // TODO: Phase 4에서 구현
-        return new ChangePasswordResponse();
+        return new ChangePasswordResponse(false);
     }
 
     public WithdrawResponse withdraw(Long userId) {

@@ -5,7 +5,6 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.util.List;
-import java.util.UUID;
 
 public record SignUpProfileRequest(
     @NotBlank(message = "닉네임은 필수입니다.")
@@ -16,7 +15,7 @@ public record SignUpProfileRequest(
     @NotNull(message = "포지션은 필수입니다.")
     String position,
 
-    List<UUID> techStackIds,
+    List<Long> techStackIds,
 
     String profileImageUrl,
 

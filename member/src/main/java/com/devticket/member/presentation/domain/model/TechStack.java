@@ -7,7 +7,6 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
-import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -20,10 +19,8 @@ public class TechStack {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
     @Column(name = "tech_stack_id", unique = true, nullable = false, updatable = false)
-    private UUID techStackId;
+    private Long id;
 
     @Column(nullable = false, length = 100)
     private String name;
