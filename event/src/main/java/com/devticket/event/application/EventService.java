@@ -24,7 +24,7 @@ public class EventService {
     private final EventRepository eventRepository;
 
     @Transactional
-    public SellerEventCreateResponse createEvent(Long sellerId, SellerEventCreateRequest request) {
+    public SellerEventCreateResponse createEvent(UUID sellerId, SellerEventCreateRequest request) {
 
         // 1. 비즈니스 정책 검증
         if (request.saleStartAt().isAfter(request.saleEndAt()) || request.saleStartAt().isEqual(request.saleEndAt())) {

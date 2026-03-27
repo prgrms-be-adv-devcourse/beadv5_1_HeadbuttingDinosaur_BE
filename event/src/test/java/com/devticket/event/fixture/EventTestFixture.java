@@ -29,7 +29,7 @@ public class EventTestFixture {
         );
     }
 
-    public static Event createEvent(Long sellerId) {
+    public static Event createEvent(UUID sellerId) {
         return Event.create(
             sellerId, "상세 조회 테스트 밋업", "설명", "강남역",
             LocalDateTime.now().plusDays(15), LocalDateTime.now().plusDays(4), LocalDateTime.now().plusDays(10),
@@ -47,7 +47,7 @@ public class EventTestFixture {
 
     // Page<Event>를 반환하는 모의(Mock) 객체 생성 메서드
     public static Page<Event> createEventPage() {
-        Event event = createEvent(1L);
+        Event event = createEvent(UUID.randomUUID());
         ReflectionTestUtils.setField(event, "eventId", UUID.randomUUID());
         ReflectionTestUtils.setField(event, "createdAt", LocalDateTime.now());
 

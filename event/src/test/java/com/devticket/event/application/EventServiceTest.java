@@ -51,7 +51,7 @@ class EventServiceTest {
     @Test
     void 정상적인_조건일_경우_이벤트가_성공적으로_생성되고_UUID를_반환한다() {
         // given
-        Long sellerId = 1L;
+        UUID sellerId = UUID.randomUUID();
         LocalDateTime now = LocalDateTime.now();
         SellerEventCreateRequest request = EventTestFixture.createEventRequest(
             now.plusDays(4), now.plusDays(10), now.plusDays(15), 100, 4
@@ -76,7 +76,7 @@ class EventServiceTest {
     @Test
     void 판매시작일이_등록시점_기준_3일_이내면_예외가_발생한다() {
         // given
-        Long sellerId = 1L;
+        UUID sellerId = UUID.randomUUID();
         LocalDateTime now = LocalDateTime.now();
         SellerEventCreateRequest request = EventTestFixture.createEventRequest(
             now.plusDays(1), now.plusDays(10), now.plusDays(15), 100, 4
@@ -91,7 +91,7 @@ class EventServiceTest {
     @Test
     void 인당_최대구매수량이_총수량보다_크면_예외가_발생한다() {
         // given
-        Long sellerId = 1L;
+        UUID sellerId = UUID.randomUUID();
         LocalDateTime now = LocalDateTime.now();
         SellerEventCreateRequest request = EventTestFixture.createEventRequest(
             now.plusDays(4), now.plusDays(10), now.plusDays(15), 10, 20
@@ -106,7 +106,7 @@ class EventServiceTest {
     @Test
     void 행사일이_판매종료일보다_빠르면_예외가_발생한다() {
         // given
-        Long sellerId = 1L;
+        UUID sellerId = UUID.randomUUID();
         LocalDateTime now = LocalDateTime.now();
         // 행사일(plusDays(5))이 판매종료일(plusDays(10))보다 빠른 모순된 상황
         SellerEventCreateRequest request = EventTestFixture.createEventRequest(
@@ -124,7 +124,7 @@ class EventServiceTest {
     @Test
     void 존재하는_이벤트_조회시_상세정보를_반환한다() {
         // given
-        Long sellerId = 1L;
+        UUID sellerId = UUID.randomUUID();
 
         Event event = EventTestFixture.createEvent(sellerId);
         UUID eventId = event.getEventId();

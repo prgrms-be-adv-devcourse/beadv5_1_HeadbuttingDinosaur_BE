@@ -38,7 +38,7 @@ public class Event extends BaseEntity {
     private UUID eventId;
 
     @Column(nullable = false)
-    private Long sellerId;
+    private UUID sellerId;
 
     @Column(nullable = false, length = 255)
     private String title;
@@ -82,7 +82,7 @@ public class Event extends BaseEntity {
     private List<EventTechStack> eventTechStacks = new ArrayList<>();
 
     @Builder(access = AccessLevel.PRIVATE)
-    private Event(UUID eventId, Long sellerId, String title, String description, String location,
+    private Event(UUID eventId, UUID sellerId, String title, String description, String location,
         LocalDateTime eventDateTime, LocalDateTime saleStartAt, LocalDateTime saleEndAt,
         Integer price, Integer totalQuantity, Integer maxQuantity, Integer remainingQuantity,
         EventStatus status, EventCategory category) {
@@ -103,7 +103,7 @@ public class Event extends BaseEntity {
     }
 
     public static Event create(
-        Long sellerId, String title, String description, String location,
+        UUID sellerId, String title, String description, String location,
         LocalDateTime eventDateTime, LocalDateTime saleStartAt, LocalDateTime saleEndAt,
         Integer price, Integer totalQuantity, Integer maxQuantity, EventCategory category
     ) {

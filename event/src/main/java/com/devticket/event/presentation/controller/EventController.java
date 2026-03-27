@@ -26,7 +26,7 @@ public class EventController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public SuccessResponse<SellerEventCreateResponse> createEvent(
-        @RequestHeader("X-User-Id") Long sellerId, // 내부 식별자는 Long 유지
+        @RequestHeader("X-User-Id") UUID sellerId,
         @Valid @RequestBody SellerEventCreateRequest request) {
 
         SellerEventCreateResponse response = eventService.createEvent(sellerId, request);
