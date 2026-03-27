@@ -15,7 +15,9 @@ import com.devticket.commerce.common.exception.BusinessException;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Slf4j
 @Service
@@ -25,6 +27,7 @@ public class CartService implements CartUseCase {
     private final CartRepository cartRepository;
     private final CartItemRepository cartItemRepository;
     private final EventClient eventClient;
+    private final TransactionTemplate transactionTemplate
 
     // =========================================================================
     // Public Methods (Main Flow)
@@ -36,21 +39,23 @@ public class CartService implements CartUseCase {
     }
 
     @Override
-    @Transactional
     public CartItemResponse save(Long userId, CartItemRequest request) {
-        //장바구니 확보
-        Cart cart = findOrCreateCart(userId);
-
         //외부 API 호출 및 정책 검증 : Event서비스호출, 상품의 구매가능상태,구매가능 수량 등 검증
         InternalPurchaseValidationResponse event = eventClient.getValidateEventStatus(request.eventId(), userId,
             request.quantity());
         handlePurchaseValidationError(event);
 
-        //도메인 로직 : 장바구니 아이템 추가 또는 업데이트(이미 장바구니에 존재하는 상품을 또 담는 경우 수량변경)
-        CartItem savedItem = addOrUpdateCartItem(cart.getId(), request);
+        //DB 작업 : 장바구니 확보와 장바구니에 아이템 담기 로직을 한개 트랜잭션 단위로 묶음.
+        //Cart와 CartItem -> 객체참조x, 연관관계 매핑 없이 식별자참조.
+        record SaveResult(Cart cart, CartItem cartItem) {}
+        SaveResult result = transactionTemplate.execute(status -> {
+            Cart cart = findOrCreateCart(userId);
+            CartItem item = addOrUpdateCartItem(cart.getId(), request);
+            return new SaveResult(cart, item);
+        });
 
         //응답데이터 구성
-        return CartItemResponse.of(cart, savedItem, event.title(), event.price());
+        return CartItemResponse.of(result.cart(), result.cartItem(), event.title(), event.price());
     }
 
     // =========================================================================
@@ -58,8 +63,18 @@ public class CartService implements CartUseCase {
     // =========================================================================
 
     private Cart findOrCreateCart(Long userId) {
-        return cartRepository.findByUserId(userId)
-            .orElseGet(() -> cartRepository.save(Cart.create(userId)));
+        // 동시성문제 고려하기
+        // 동일 사용자가 장바구니 담기 버튼 광클 -> 아직 존재하지 않는 데이터에 대해서는 Lock을 걸 대상이 없음
+        try {
+            return cartRepository.findByUserId(userId)
+                .orElseGet(() -> cartRepository.save(Cart.create(userId)));
+        }catch (DataIntegrityViolationException e){ // 동일사용자로 cart추가 생성요청시_데이터무결성 제약조건 위반
+            //이미 생성되어 있는 Cart를 조회해서 반환
+            return cartRepository.findByUserId(userId)
+                .orElseThrow(() -> new RuntimeException("장바구니 확보 실패"));
+
+        }
+
     }
 
     private CartItem addOrUpdateCartItem(Long cartId, CartItemRequest request) {
