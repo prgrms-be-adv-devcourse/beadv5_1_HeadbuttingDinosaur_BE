@@ -8,6 +8,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -32,12 +33,12 @@ public class Cart extends BaseEntity {
 
     @Column(name = "user_id", unique = true, nullable = false)
     @Schema(description = "장바구니 소유자 ID : User PK")
-    private Long userId;
+    private UUID userId;
 
 
     //----정적팩토리 메서드 ----------------------------
     //create
-    public static Cart create(Long userId) {
+    public static Cart create(UUID userId) {
         return Cart.builder()
             .userId(userId)
             .build();

@@ -5,6 +5,7 @@ import com.devticket.commerce.cart.presentation.dto.req.CartItemRequest;
 import com.devticket.commerce.cart.presentation.dto.res.CartItemResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -25,7 +26,7 @@ public class CartController {
     @PostMapping("/items")
     @Operation(description = "장바구니 담기")
     public ResponseEntity<CartItemResponse> addToCart(
-        @RequestHeader("X-User-Id") Long userId,
+        @RequestHeader("X-User-Id") UUID userId,
         @RequestBody CartItemRequest request
     ) {
         CartItemResponse response = cartUseCase.save(userId, request);

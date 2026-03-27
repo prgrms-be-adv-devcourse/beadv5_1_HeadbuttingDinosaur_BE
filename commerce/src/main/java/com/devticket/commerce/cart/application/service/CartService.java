@@ -12,6 +12,7 @@ import com.devticket.commerce.cart.infrastructure.external.client.dto.InternalPu
 import com.devticket.commerce.cart.presentation.dto.req.CartItemRequest;
 import com.devticket.commerce.cart.presentation.dto.res.CartItemResponse;
 import com.devticket.commerce.common.exception.BusinessException;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -33,12 +34,12 @@ public class CartService implements CartUseCase {
     // =========================================================================
 
     @Override
-    public boolean findByUserId(Long userId) {
+    public boolean findByUserId(UUID userId) {
         return cartRepository.findByUserId(userId).isPresent();
     }
 
     @Override
-    public CartItemResponse save(Long userId, CartItemRequest request) {
+    public CartItemResponse save(UUID userId, CartItemRequest request) {
         //외부 API 호출 및 정책 검증 : Event서비스호출, 상품의 구매가능상태,구매가능 수량 등 검증
         InternalPurchaseValidationResponse event = eventClient.getValidateEventStatus(request.eventId(), userId,
             request.quantity());
@@ -63,7 +64,7 @@ public class CartService implements CartUseCase {
     // Private Helpers (Logic & Validation)
     // =========================================================================
 
-    private Cart findOrCreateCart(Long userId) {
+    private Cart findOrCreateCart(UUID userId) {
         // 동시성문제 고려하기
         // 동일 사용자가 장바구니 담기 버튼 광클 -> 아직 존재하지 않는 데이터에 대해서는 Lock을 걸 대상이 없음
         try {
