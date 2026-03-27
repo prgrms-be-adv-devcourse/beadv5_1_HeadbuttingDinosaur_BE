@@ -2,6 +2,7 @@ package com.devticket.member.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.groups.Tuple.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -14,6 +15,7 @@ import com.devticket.member.common.exception.BusinessException;
 import com.devticket.member.presentation.domain.MemberErrorCode;
 import com.devticket.member.presentation.domain.Position;
 import com.devticket.member.presentation.domain.ProviderType;
+import com.devticket.member.presentation.domain.model.TechStack;
 import com.devticket.member.presentation.domain.model.User;
 import com.devticket.member.presentation.domain.model.UserProfile;
 import com.devticket.member.presentation.domain.model.UserTechStack;
@@ -149,21 +151,25 @@ class UserServiceTest {
             // given
             User user = new User("test@test.com", "$2a$10$hashedPassword");
             UserProfile profile = new UserProfile(1L, "닉네임", Position.BACKEND, null, "자기소개");
-            List<UserTechStack> userTechStacks = List.of(new UserTechStack(1L, 10L));
+
+            List<UserTechStack> userTechStacks = List.of(new UserTechStack(1L, 10L), new UserTechStack(1L, 20L));
+            List<TechStack> techStacks = List.of(TechStack.of(10L, "Spring"), TechStack.of(20L, "MySQL"));
 
             given(userRepository.findById(1L)).willReturn(Optional.of(user));
             given(userProfileRepository.findByUserId(anyLong())).willReturn(Optional.of(profile));
             given(userTechStackRepository.findByUserId(anyLong())).willReturn(userTechStacks);
-            given(techStackRepository.findAllById(anyList())).willReturn(List.of());
+            given(techStackRepository.findByIdIn(anyList())).willReturn(techStacks);
 
             // when
             GetProfileResponse response = userService.getProfile(1L);
 
             // then
-            assertThat(response).isNotNull();
-            assertThat(response.email()).isEqualTo("test@test.com");
-            assertThat(response.nickname()).isEqualTo("닉네임");
-            assertThat(response.position()).isEqualTo("BACKEND");
+            assertThat(response.techStacks())
+                .extracting(
+                    GetProfileResponse.TechStackInfo::techStackId,
+                    GetProfileResponse.TechStackInfo::name
+                )
+                .containsExactly(tuple(10L, "Spring"), tuple(20L, "MySQL"));
         }
     }
 

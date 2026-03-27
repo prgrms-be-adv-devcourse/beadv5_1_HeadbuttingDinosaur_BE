@@ -30,4 +30,12 @@ public class TechStack {
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    public static TechStack of(Long id, String name) {
+        TechStack ts = new TechStack();
+        ts.id = id;
+        ts.name = name;
+        ts.createdAt = LocalDateTime.now();
+        return ts;
+    }
 }
