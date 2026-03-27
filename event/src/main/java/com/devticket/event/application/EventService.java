@@ -5,6 +5,7 @@ import com.devticket.event.domain.exception.EventErrorCode;
 import com.devticket.event.domain.model.Event;
 import com.devticket.event.infrastructure.persistence.EventRepository;
 import com.devticket.event.presentation.dto.EventDetailResponse;
+import com.devticket.event.presentation.dto.EventListRequest;
 import com.devticket.event.presentation.dto.EventListResponse;
 import com.devticket.event.presentation.dto.SellerEventCreateRequest;
 import java.time.LocalDateTime;
@@ -72,9 +73,9 @@ public class EventService {
     }
 
     @Transactional(readOnly = true)
-    public EventListResponse getEventList(Pageable pageable) {
+    public EventListResponse getEventList(EventListRequest request, Pageable pageable) {
 
-        Page<Event> eventPage = eventRepository.findAll(pageable);
+        Page<Event> eventPage = eventRepository.searchEvents(request, pageable);
 
         return EventListResponse.of(eventPage);
     }

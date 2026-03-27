@@ -2,6 +2,7 @@ package com.devticket.event.presentation.controller;
 
 import com.devticket.event.application.EventService;
 import com.devticket.event.presentation.dto.EventDetailResponse;
+import com.devticket.event.presentation.dto.EventListRequest;
 import com.devticket.event.presentation.dto.EventListResponse;
 import com.devticket.event.presentation.dto.SellerEventCreateRequest;
 import com.devticket.event.presentation.dto.SellerEventCreateResponse;
@@ -44,10 +45,10 @@ public class EventController {
 
     @GetMapping
     public ResponseEntity<SuccessResponse<EventListResponse>> getEventList(
+        @ModelAttribute EventListRequest request,
         @PageableDefault(size = 20) Pageable pageable) {
 
-        EventListResponse response = eventService.getEventList(pageable);
-
+        EventListResponse response = eventService.getEventList(request, pageable);
         return ResponseEntity.ok(SuccessResponse.success(response));
     }
 
