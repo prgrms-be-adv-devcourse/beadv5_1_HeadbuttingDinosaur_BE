@@ -50,7 +50,7 @@ public class CartService implements CartUseCase {
         CartItem savedItem = addOrUpdateCartItem(cart.getId(), request);
 
         //응답데이터 구성
-        return CartItemResponse.of(cart, savedItem, event);
+        return CartItemResponse.of(cart, savedItem, event.title(), event.price());
     }
 
     // =========================================================================
@@ -78,6 +78,11 @@ public class CartService implements CartUseCase {
     private void handlePurchaseValidationError(InternalPurchaseValidationResponse response) {
         if (Boolean.TRUE.equals(response.purchasable())) {
             return;
+        }
+
+        //InternalPurchaseValidationResponse응답데이터 reason = null허용필드
+        if (response.reason() == null) {
+            throw new BusinessException(EventErrorCode.INVALID_PURCHASE_REQUEST);
         }
 
         // Event 구매가능 상태별 예외처리

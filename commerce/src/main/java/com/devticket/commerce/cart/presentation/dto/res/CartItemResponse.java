@@ -2,7 +2,6 @@ package com.devticket.commerce.cart.presentation.dto.res;
 
 import com.devticket.commerce.cart.domain.model.Cart;
 import com.devticket.commerce.cart.domain.model.CartItem;
-import com.devticket.commerce.cart.infrastructure.external.client.dto.InternalPurchaseValidationResponse;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import lombok.Builder;
@@ -25,15 +24,15 @@ public record CartItemResponse(
     }
 
     //엔티티 및 계산된 데이터를 DTO로 변환하는 정적 팩토리 메서드
-    public static CartItemResponse of(Cart cart, CartItem savedItem, InternalPurchaseValidationResponse event) {
+    public static CartItemResponse of(Cart cart, CartItem savedItem, String title, int price) {
         CartItemDetail detail = new CartItemDetail(
             savedItem.getEventId().toString(),
-            event.title(),
-            (long) event.price(),
+            title,
+            (long) price,
             savedItem.getQuantity()
         );
 
-        int totalAmount = event.price() * savedItem.getQuantity();
+        int totalAmount = price * savedItem.getQuantity();
 
         return CartItemResponse.builder()
             .cartId(String.valueOf(cart.getId()))
