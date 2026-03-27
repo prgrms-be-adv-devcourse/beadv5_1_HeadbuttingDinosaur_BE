@@ -10,12 +10,12 @@ import org.springframework.stereotype.Service;
 @Service
 public class SellerApplicationService {
 
-    public SellerApplicationResponse apply(Long userId, SellerApplicationRequest request) {
+    public SellerApplicationResponse apply(UUID userId, SellerApplicationRequest request) {
         // TODO: Phase 4에서 구현
         return new SellerApplicationResponse(UUID.randomUUID());
     }
 
-    public SellerApplicationStatusResponse getMyApplication(Long userId) {
+    public SellerApplicationStatusResponse getMyApplication(UUID userId) {
         // TODO: Phase 4에서 구현
         return new SellerApplicationStatusResponse("PENDING", LocalDateTime.now());
     }

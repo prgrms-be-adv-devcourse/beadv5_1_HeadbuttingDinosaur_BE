@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -31,7 +32,7 @@ public class InternalMemberController {
     })
     @GetMapping("/{userId}")
     public ResponseEntity<InternalMemberInfoResponse> getMemberInfo(
-        @PathVariable Long userId) {
+        @PathVariable UUID userId) {
         InternalMemberInfoResponse response = internalMemberService.getMemberInfo(userId);
         return ResponseEntity.ok(response);
     }
@@ -43,7 +44,7 @@ public class InternalMemberController {
     })
     @GetMapping("/{userId}/status")
     public ResponseEntity<InternalMemberStatusResponse> getMemberStatus(
-        @PathVariable Long userId) {
+        @PathVariable UUID userId) {
         InternalMemberStatusResponse response = internalMemberService.getMemberStatus(userId);
         return ResponseEntity.ok(response);
     }
@@ -55,7 +56,7 @@ public class InternalMemberController {
     })
     @GetMapping("/{userId}/role")
     public ResponseEntity<InternalMemberRoleResponse> getMemberRole(
-        @PathVariable Long userId) {
+        @PathVariable UUID userId) {
         InternalMemberRoleResponse response = internalMemberService.getMemberRole(userId);
         return ResponseEntity.ok(response);
     }
@@ -67,7 +68,7 @@ public class InternalMemberController {
     })
     @GetMapping("/{userId}/seller-info")
     public ResponseEntity<InternalSellerInfoResponse> getSellerInfo(
-        @PathVariable Long userId) {
+        @PathVariable UUID userId) {
         InternalSellerInfoResponse response = internalMemberService.getSellerInfo(userId);
         return ResponseEntity.ok(response);
     }

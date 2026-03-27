@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -34,7 +35,7 @@ public class SellerApplicationController {
     })
     @PostMapping
     public ResponseEntity<SellerApplicationResponse> apply(
-        @RequestHeader("X-User-Id") Long userId,
+        @RequestHeader("X-User-Id") UUID userId,
         @Valid @RequestBody SellerApplicationRequest request) {
         SellerApplicationResponse response = sellerApplicationService.apply(userId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
@@ -47,7 +48,7 @@ public class SellerApplicationController {
     })
     @GetMapping("/me")
     public ResponseEntity<SellerApplicationStatusResponse> getMyApplication(
-        @RequestHeader("X-User-Id") Long userId) {
+        @RequestHeader("X-User-Id") UUID userId) {
         SellerApplicationStatusResponse response = sellerApplicationService.getMyApplication(userId);
         return ResponseEntity.ok(response);
     }

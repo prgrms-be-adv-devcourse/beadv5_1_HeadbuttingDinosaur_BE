@@ -36,12 +36,12 @@ public class JwtTokenProvider {
         this.key = Keys.hmacShaKeyFor(secretKey.getBytes());
     }
 
-    public String createAccessToken(Long userId, String email, UserRole role, boolean profileCompleted) {
+    public String createAccessToken(UUID userId, String email, UserRole role, boolean profileCompleted) {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + accessTokenTtl);
 
         return Jwts.builder()
-            .subject(String.valueOf(userId))
+            .subject(userId.toString())
             .claim("email", email)
             .claim("role", role.name())
             .claim("profileCompleted", profileCompleted)
@@ -55,8 +55,8 @@ public class JwtTokenProvider {
         return UUID.randomUUID().toString();
     }
 
-    public Long getUserId(String token) {
-        return Long.parseLong(getClaims(token).getSubject());
+    public UUID getUserId(String token) {
+        return UUID.fromString(getClaims(token).getSubject());
     }
 
     public String getEmail(String token) {
