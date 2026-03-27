@@ -3,19 +3,26 @@ package com.devticket.event.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.devticket.event.common.exception.BusinessException;
+import com.devticket.event.domain.enums.EventCategory;
 import com.devticket.event.domain.enums.EventStatus;
 import com.devticket.event.domain.exception.EventErrorCode;
 import com.devticket.event.domain.model.Event;
 import com.devticket.event.fixture.EventTestFixture;
 import com.devticket.event.infrastructure.persistence.EventRepository;
 import com.devticket.event.presentation.dto.EventDetailResponse;
+import com.devticket.event.presentation.dto.EventListRequest;
+import com.devticket.event.presentation.dto.EventListResponse;
 import com.devticket.event.presentation.dto.SellerEventCreateRequest;
 import com.devticket.event.presentation.dto.SellerEventCreateResponse;
 import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -23,6 +30,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -138,5 +150,62 @@ class EventServiceTest {
         assertThatThrownBy(() -> eventService.getEvent(invalidEventId))
             .isInstanceOf(BusinessException.class)
             .hasMessageContaining(EventErrorCode.EVENT_NOT_FOUND.getMessage());
+    }
+
+    // 이벤트 목록 조회 및 검색 테스트
+
+    @Test
+    void 모든_검색_조건이_주어지면_파라미터를_분리하여_Repository를_호출한다() {
+        // given
+        EventListRequest request = new EventListRequest("스프링", EventCategory.MEETUP, List.of(1L, 2L));
+        Pageable pageable = PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Page<Event> mockPage = EventTestFixture.createEventPage();
+
+        given(eventRepository.searchEvents(
+            eq("스프링"), eq(EventCategory.MEETUP), eq(List.of(1L, 2L)), eq(pageable)
+        )).willReturn(mockPage);
+
+        // when
+        EventListResponse response = eventService.getEventList(request, pageable);
+
+        // then
+        assertThat(response.totalElements()).isEqualTo(mockPage.getTotalElements());
+        assertThat(response.content()).isNotEmpty();
+        verify(eventRepository).searchEvents("스프링", EventCategory.MEETUP, List.of(1L, 2L), pageable);
+    }
+
+    @Test
+    void 검색_조건이_모두_null일_경우_전체_이벤트를_조회한다() {
+        // given
+        EventListRequest request = new EventListRequest(null, null, null);
+        Pageable pageable = PageRequest.of(0, 20);
+
+        given(eventRepository.searchEvents(null, null, null, pageable))
+            .willReturn(EventTestFixture.createEventPage());
+
+        // when
+        EventListResponse response = eventService.getEventList(request, pageable);
+
+        // then
+        assertThat(response).isNotNull();
+        verify(eventRepository).searchEvents(null, null, null, pageable);
+    }
+
+    @Test
+    void 검색_결과가_없을_경우_빈_리스트를_정상적으로_반환한다() {
+        // given
+        EventListRequest request = new EventListRequest("절대검색안될키워드", null, null);
+        Pageable pageable = PageRequest.of(0, 20);
+        Page<Event> emptyPage = new PageImpl<>(Collections.emptyList(), pageable, 0);
+
+        given(eventRepository.searchEvents(eq("절대검색안될키워드"), eq(null), eq(null), eq(pageable)))
+            .willReturn(emptyPage);
+
+        // when
+        EventListResponse response = eventService.getEventList(request, pageable);
+
+        // then
+        assertThat(response.totalElements()).isZero();
+        assertThat(response.content()).isEmpty();
     }
 }
