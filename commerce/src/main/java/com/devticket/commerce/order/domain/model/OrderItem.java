@@ -14,6 +14,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
 
@@ -22,6 +23,7 @@ import lombok.experimental.SuperBuilder;
 @Table(name = "order_item", schema = "commerce")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
+@Getter
 public class OrderItem extends BaseEntity {
 
     @Id
@@ -80,7 +82,7 @@ public class OrderItem extends BaseEntity {
     public void updateQuantity(int newQuantity, int maxQuantity) {
         validateQuantity(newQuantity, maxQuantity);
         this.quantity = newQuantity;
-        this.subtotalAmount = calcSubtotalAmount(newQuantity);
+        this.subtotalAmount = calcSubtotalAmount(this.price, newQuantity);
     }
 
     //이이템의 수량 증감 + 수량이 변경되면 subtotalAmount 재계산
@@ -88,7 +90,7 @@ public class OrderItem extends BaseEntity {
         int finalQuantity = this.quantity + delta;
         validateQuantity(finalQuantity, maxQuantity);
         this.quantity = finalQuantity;
-        this.subtotalAmount = calcSubtotalAmount(quantity);
+        this.subtotalAmount = calcSubtotalAmount(this.price, quantity);
     }
 
     //--------------------
@@ -105,8 +107,8 @@ public class OrderItem extends BaseEntity {
     }
 
     //소계 합산
-    private int calcSubtotalAmount(int quntity) {
-        return this.price * quntity;
+    private int calcSubtotalAmount(int price, int quantity) {
+        return price * quantity;
     }
 }
 

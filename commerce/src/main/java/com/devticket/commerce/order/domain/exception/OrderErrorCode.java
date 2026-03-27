@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public enum OrderErrorCode implements ErrorCode {
 
+
     ORDER_NOT_FOUND(400, "ORDER_001", "존재하지 않는 주문입니다."),
     ALREADY_PAID_ORDER(400, "ORDER_002", "이미 결제 완료된 주문입니다."),
     ALREADY_CANCELLED_ORDER(400, "ORDER_003", "이미 취소된 주문입니다."),
@@ -18,7 +19,10 @@ public enum OrderErrorCode implements ErrorCode {
     CANNOT_COMPLETE_PAYMENT(400, "ORDER_008", "결제 완료 처리가 불가능한 주문 상태입니다."),
     CANNOT_CHANGE_TO_PENDING(400, "ORDER_009", "결제 대기 상태로 변경할 수 없는 주문입니다."),
     CANNOT_CHANGE_AMOUNT_AFTER_PAID(400, "ORDER_010", "결제가 완료된 주문은 수량을 변경할 수 없습니다."),
-    INVALID_QUANTITY(400, "ORDER_011", "유효하지 않은 주문 수량입니다.");
+    INVALID_QUANTITY(400, "ORDER_011", "유효하지 않은 주문 수량입니다."),
+    EMPTY_ORDER_ITEMS(400, "ORDER_012", "주문한 상품이 존재하지 않습니다."),
+    INVALID_TOTAL_AMOUNT(400, "ORDER_013", "총 주문 금액이 유효하지 않습니다.");
+
 
     private final int status;
     private final String code;

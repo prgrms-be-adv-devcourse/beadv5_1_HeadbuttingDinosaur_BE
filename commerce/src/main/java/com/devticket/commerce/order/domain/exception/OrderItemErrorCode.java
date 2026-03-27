@@ -9,7 +9,7 @@ import lombok.RequiredArgsConstructor;
 public enum OrderItemErrorCode implements ErrorCode {
 
     EXCEED_MAX_QUANTITY(400, "ORDER_ITEM_001", "주문 가능한 수량 범위를 벗어났습니다.");
-
+    
     private final int status;
     private final String code;
     private final String message;
