@@ -289,6 +289,20 @@ class AuthServiceTest {
         );
 
         @Test
+        void 유효하지_않은_Google_Token으로_소셜로그인시_실패() {
+            // given
+            SocialSignUpOrLoginRequest request = new SocialSignUpOrLoginRequest("GOOGLE", "invalid-token");
+            given(googleTokenVerifier.verify("invalid-token"))
+                .willThrow(new BusinessException(MemberErrorCode.LOGIN_FAILED));
+
+            // when & then
+            assertThatThrownBy(() -> authService.socialLogin(request))
+                .isInstanceOf(BusinessException.class);
+
+            verify(userRepository, never()).findByEmail(anyString());
+        }
+
+        @Test
         void 동일_이메일_LOCAL_계정_존재시_가입_거절() {
             // given
             SocialSignUpOrLoginRequest request = new SocialSignUpOrLoginRequest("GOOGLE", "google-id-token");
@@ -396,6 +410,23 @@ class AuthServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
                     .isEqualTo(MemberErrorCode.REFRESH_TOKEN_INVALID));
+        }
+
+        @Test
+        void 유효한_RefreshToken이지만_사용자를_찾을수_없으면_실패() {
+            // given
+            TokenRefreshRequest request = new TokenRefreshRequest("valid-refresh-token");
+            RefreshToken validToken = new RefreshToken(999L, "valid-refresh-token",
+                LocalDateTime.now().plusDays(7));
+            given(refreshTokenRepository.findByToken("valid-refresh-token"))
+                .willReturn(Optional.of(validToken));
+            given(userRepository.findById(999L)).willReturn(Optional.empty());
+
+            // when & then
+            assertThatThrownBy(() -> authService.reissue(request))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
+                    .isEqualTo(MemberErrorCode.MEMBER_NOT_FOUND));
         }
 
         @Test
