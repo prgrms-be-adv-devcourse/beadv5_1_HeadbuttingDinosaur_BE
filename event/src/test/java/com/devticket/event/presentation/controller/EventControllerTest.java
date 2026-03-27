@@ -10,9 +10,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.devticket.event.application.EventService;
+import com.devticket.event.domain.enums.EventStatus;
 import com.devticket.event.fixture.EventTestFixture;
 import com.devticket.event.presentation.dto.EventDetailResponse;
 import com.devticket.event.presentation.dto.SellerEventCreateRequest;
+import com.devticket.event.presentation.dto.SellerEventCreateResponse;
 import java.time.LocalDateTime;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -47,8 +49,14 @@ class EventControllerTest {
             now.plusDays(4), now.plusDays(10), now.plusDays(15), 100, 4
         );
 
+        SellerEventCreateResponse expectedResponse = new SellerEventCreateResponse(
+            expectedEventId,
+            EventStatus.DRAFT,
+            now
+        );
+
         when(eventService.createEvent(eq(sellerId), any(SellerEventCreateRequest.class)))
-            .thenReturn(expectedEventId);
+            .thenReturn(expectedResponse);
 
         // when & then
         mockMvc.perform(post("/api/v1/events")
@@ -57,7 +65,9 @@ class EventControllerTest {
                 .content(objectMapper.writeValueAsString(request)))
             .andDo(print())
             .andExpect(status().isCreated())
-            .andExpect(jsonPath("$.data.eventId").value(expectedEventId.toString()));
+            .andExpect(jsonPath("$.data.eventId").value(expectedEventId.toString()))
+            .andExpect(jsonPath("$.data.status").value("DRAFT"))
+            .andExpect(jsonPath("$.data.createdAt").exists());
     }
 
     @Test

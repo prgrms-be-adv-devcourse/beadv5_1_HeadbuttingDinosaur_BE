@@ -3,6 +3,7 @@ package com.devticket.event.domain.model;
 import com.devticket.event.common.entity.BaseEntity;
 import com.devticket.event.domain.enums.EventCategory;
 import com.devticket.event.domain.enums.EventStatus;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -10,8 +11,11 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -73,6 +77,9 @@ public class Event extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private EventCategory category;
+
+    @OneToMany(mappedBy = "event", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<EventTechStack> eventTechStacks = new ArrayList<>();
 
     @Builder(access = AccessLevel.PRIVATE)
     private Event(UUID eventId, Long sellerId, String title, String description, String location,
