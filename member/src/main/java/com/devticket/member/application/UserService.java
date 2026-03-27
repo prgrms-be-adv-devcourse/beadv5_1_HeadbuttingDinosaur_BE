@@ -22,6 +22,7 @@ import com.devticket.member.presentation.dto.response.SignUpProfileResponse;
 import com.devticket.member.presentation.dto.response.UpdateProfileResponse;
 import com.devticket.member.presentation.dto.response.WithdrawResponse;
 import java.util.List;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -42,8 +43,8 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
 
     @Transactional
-    public SignUpProfileResponse createProfile(Long userId, SignUpProfileRequest request) {
-        User user = findUserByIdOrThrow(userId);
+    public SignUpProfileResponse createProfile(UUID userId, SignUpProfileRequest request) {
+        User user = findUserByUuidOrThrow(userId);
         validateNicknameNotDuplicated(request.nickname());
 
         UserProfile profile = new UserProfile(
@@ -61,11 +62,11 @@ public class UserService {
         return SignUpProfileResponse.from(savedProfile);
     }
 
-    public GetProfileResponse getProfile(Long userId) {
-        User user = findUserByIdOrThrow(userId);
-        UserProfile profile = findProfileByUserIdOrThrow(userId);
+    public GetProfileResponse getProfile(UUID userId) {
+        User user = findUserByUuidOrThrow(userId);
+        UserProfile profile = findProfileByUserIdOrThrow(user.getId());
 
-        List<UserTechStack> userTechStacks = userTechStackRepository.findByUserId(userId);
+        List<UserTechStack> userTechStacks = userTechStackRepository.findByUserId(user.getId());
         List<Long> techStackIds = userTechStacks.stream()
             .map(UserTechStack::getTechStackId)
             .toList();
@@ -75,9 +76,9 @@ public class UserService {
     }
 
     @Transactional
-    public UpdateProfileResponse updateProfile(Long userId, UpdateProfileRequest request) {
-        findUserByIdOrThrow(userId);
-        UserProfile profile = findProfileByUserIdOrThrow(userId);
+    public UpdateProfileResponse updateProfile(UUID userId, UpdateProfileRequest request) {
+        User user = findUserByUuidOrThrow(userId);
+        UserProfile profile = findProfileByUserIdOrThrow(user.getId());
 
         if (request.nickname() != null && !request.nickname().equals(profile.getNickname())) {
             validateNicknameNotDuplicated(request.nickname());
@@ -90,18 +91,18 @@ public class UserService {
             request.bio() != null ? request.bio() : profile.getBio()
         );
 
-        userTechStackRepository.deleteByUserId(userId);
-        saveTechStacks(userId, request.techStackIds());
+        userTechStackRepository.deleteByUserId(user.getId());
+        saveTechStacks(user.getId(), request.techStackIds());
 
-        List<UserTechStack> updatedTechStacks = userTechStackRepository.findByUserId(userId);
+        List<UserTechStack> updatedTechStacks = userTechStackRepository.findByUserId(user.getId());
 
         log.info("프로필 수정 완료: userId={}", userId);
         return UpdateProfileResponse.from(profile, updatedTechStacks);
     }
 
     @Transactional
-    public ChangePasswordResponse changePassword(Long userId, ChangePasswordRequest request) {
-        User user = findUserByIdOrThrow(userId);
+    public ChangePasswordResponse changePassword(UUID userId, ChangePasswordRequest request) {
+        User user = findUserByUuidOrThrow(userId);
 
         validateLocalUser(user);
         validateCurrentPassword(request.currentPassword(), user.getPassword());
@@ -115,11 +116,11 @@ public class UserService {
     }
 
     @Transactional
-    public WithdrawResponse withdraw(Long userId) {
-        User user = findUserByIdOrThrow(userId);
+    public WithdrawResponse withdraw(UUID userId) {
+        User user = findUserByUuidOrThrow(userId);
 
         user.withdraw();
-        refreshTokenRepository.deleteAllByUserId(userId);
+        refreshTokenRepository.deleteAllByUserId(user.getId());
 
         log.info("회원 탈퇴 완료: userId={}", userId);
         return WithdrawResponse.from(user);
@@ -153,8 +154,8 @@ public class UserService {
 
     // ========== 조회 ==========
 
-    private User findUserByIdOrThrow(Long userId) {
-        return userRepository.findById(userId)
+    private User findUserByUuidOrThrow(UUID userId) {
+        return userRepository.findByUserId(userId)
             .orElseThrow(() -> new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND));
     }
 
@@ -166,11 +167,7 @@ public class UserService {
     // ========== 유틸 ==========
 
     private Position parsePosition(String position) {
-        try {
-            return Position.valueOf(position.toUpperCase());
-        } catch (IllegalArgumentException e) {
-            throw new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND);
-        }
+        return Position.valueOf(position.toUpperCase());
     }
 
     private void saveTechStacks(Long userId, List<Long> techStackIds) {

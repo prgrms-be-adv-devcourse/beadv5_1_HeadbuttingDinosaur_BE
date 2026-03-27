@@ -14,6 +14,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -41,7 +42,7 @@ public class UserController {
     })
     @PostMapping("/profile")
     public ResponseEntity<SignUpProfileResponse> createProfile(
-        @RequestHeader("X-User-Id") Long userId,
+        @RequestHeader("X-User-Id") UUID userId,
         @Valid @RequestBody SignUpProfileRequest request) {
         SignUpProfileResponse response = userService.createProfile(userId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
@@ -54,7 +55,7 @@ public class UserController {
     })
     @GetMapping("/me")
     public ResponseEntity<GetProfileResponse> getProfile(
-        @RequestHeader("X-User-Id") Long userId) {
+        @RequestHeader("X-User-Id") UUID userId) {
         GetProfileResponse response = userService.getProfile(userId);
         return ResponseEntity.ok(response);
     }
@@ -66,7 +67,7 @@ public class UserController {
     })
     @PatchMapping("/me")
     public ResponseEntity<UpdateProfileResponse> updateProfile(
-        @RequestHeader("X-User-Id") Long userId,
+        @RequestHeader("X-User-Id") UUID userId,
         @Valid @RequestBody UpdateProfileRequest request) {
         UpdateProfileResponse response = userService.updateProfile(userId, request);
         return ResponseEntity.ok(response);
@@ -79,7 +80,7 @@ public class UserController {
     })
     @PatchMapping("/me/password")
     public ResponseEntity<ChangePasswordResponse> changePassword(
-        @RequestHeader("X-User-Id") Long userId,
+        @RequestHeader("X-User-Id") UUID userId,
         @Valid @RequestBody ChangePasswordRequest request) {
         ChangePasswordResponse response = userService.changePassword(userId, request);
         return ResponseEntity.ok(response);
@@ -91,7 +92,7 @@ public class UserController {
     })
     @DeleteMapping("/me")
     public ResponseEntity<WithdrawResponse> withdraw(
-        @RequestHeader("X-User-Id") Long userId) {
+        @RequestHeader("X-User-Id") UUID userId) {
         WithdrawResponse response = userService.withdraw(userId);
         return ResponseEntity.ok(response);
     }

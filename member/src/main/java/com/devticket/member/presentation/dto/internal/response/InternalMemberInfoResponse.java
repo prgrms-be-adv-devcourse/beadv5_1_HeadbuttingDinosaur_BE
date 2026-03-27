@@ -1,9 +1,10 @@
 package com.devticket.member.presentation.dto.internal.response;
 
 import com.devticket.member.presentation.domain.model.User;
+import java.util.UUID;
 
 public record InternalMemberInfoResponse(
-    Long id,
+    UUID userId,
     String email,
     String role,
     String status,
@@ -12,7 +13,7 @@ public record InternalMemberInfoResponse(
 
     public static InternalMemberInfoResponse from(User user) {
         return new InternalMemberInfoResponse(
-            user.getId(),
+            user.getUserId(),
             user.getEmail(),
             user.getRole().name(),
             user.getStatus().name(),
@@ -20,3 +21,4 @@ public record InternalMemberInfoResponse(
         );
     }
 }
+

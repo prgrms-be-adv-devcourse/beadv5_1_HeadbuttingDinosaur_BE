@@ -72,7 +72,9 @@ public class AuthService {
         log.info("로그인 완료: email={}, profileCompleted={}", user.getEmail(), profileCompleted);
         return LoginResponse.from(user, accessToken, refreshToken, profileCompleted);
     }
-    
+
+    // TODO: 향후 소셜 가입 시 약관 동의 등 추가 요구사항 발생 시
+    //       소셜 회원가입 전용 엔드포인트 분리 검토 (POST /api/auth/social/google/signup)
     @Transactional
     public SocialSignUpOrLoginResponse socialLogin(SocialSignUpOrLoginRequest request) {
         ProviderType providerType = parseProviderType(request.providerType());
@@ -145,7 +147,7 @@ public class AuthService {
 
     private String issueAccessToken(User user, boolean profileCompleted) {
         return jwtTokenProvider.createAccessToken(
-            user.getId(), user.getEmail(), user.getRole(), profileCompleted);
+            user.getUserId(), user.getEmail(), user.getRole(), profileCompleted);
     }
 
     private String saveRefreshToken(Long userId) {
