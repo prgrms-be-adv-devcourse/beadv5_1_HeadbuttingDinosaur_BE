@@ -5,14 +5,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import com.devticket.member.common.exception.BusinessException;
 import com.devticket.member.infrastructure.jwt.JwtTokenProvider;
-import com.devticket.member.infrastructure.oauth.GoogleTokenVerifier;
-import com.devticket.member.infrastructure.oauth.dto.GoogleUserInfo;
+import com.devticket.member.infrastructure.oauth.OAuthUserInfoVerifierRouter;
+import com.devticket.member.infrastructure.oauth.dto.OAuthUserInfo;
 import com.devticket.member.presentation.domain.MemberErrorCode;
 import com.devticket.member.presentation.domain.Position;
 import com.devticket.member.presentation.domain.ProviderType;
@@ -65,7 +66,7 @@ class AuthServiceTest {
     private PasswordEncoder passwordEncoder;
 
     @Mock
-    private GoogleTokenVerifier googleTokenVerifier;
+    private OAuthUserInfoVerifierRouter oAuthVerifierRouter;
 
     private void stubJwtCreation() {
         given(jwtTokenProvider.createAccessToken(any(), anyString(), any(UserRole.class), anyBoolean()))
@@ -99,7 +100,6 @@ class AuthServiceTest {
         void 비밀번호와_비밀번호_확인_불일치시_회원가입_실패() {
             // given
             SignUpRequest request = new SignUpRequest("test@test.com", "password123!", "different123!");
-            given(userRepository.existsByEmail("test@test.com")).willReturn(false);
 
             // when & then
             assertThatThrownBy(() -> authService.signup(request))
@@ -142,7 +142,7 @@ class AuthServiceTest {
         }
 
         @Test
-        void 정상_가입시_응답에_userId가_포함된다() {
+        void 정상_가입시_응답에_userId와_토큰이_포함된다() {
             // given
             SignUpRequest request = new SignUpRequest("test@test.com", "password123!", "password123!");
             given(userRepository.existsByEmail("test@test.com")).willReturn(false);
@@ -156,6 +156,9 @@ class AuthServiceTest {
             // then
             assertThat(response).isNotNull();
             assertThat(response.userId()).isNotNull();
+            assertThat(response.accessToken()).isEqualTo("access-token");
+            assertThat(response.refreshToken()).isEqualTo("refresh-token");
+            assertThat(response.isProfileCompleted()).isFalse();
         }
     }
 
@@ -284,15 +287,15 @@ class AuthServiceTest {
     @DisplayName("소셜 로그인")
     class SocialLogin {
 
-        private final GoogleUserInfo googleUserInfo = new GoogleUserInfo(
+        private final OAuthUserInfo oAuthUserInfo = new OAuthUserInfo(
             "google@test.com", "구글유저", "google-provider-id-123"
         );
 
         @Test
-        void 유효하지_않은_Google_Token으로_소셜로그인시_실패() {
+        void 유효하지_않은_ID_Token으로_소셜로그인시_실패() {
             // given
             SocialSignUpOrLoginRequest request = new SocialSignUpOrLoginRequest("GOOGLE", "invalid-token");
-            given(googleTokenVerifier.verify("invalid-token"))
+            given(oAuthVerifierRouter.verify(eq(ProviderType.GOOGLE), eq("invalid-token")))
                 .willThrow(new BusinessException(MemberErrorCode.LOGIN_FAILED));
 
             // when & then
@@ -307,7 +310,8 @@ class AuthServiceTest {
             // given
             SocialSignUpOrLoginRequest request = new SocialSignUpOrLoginRequest("GOOGLE", "google-id-token");
             User localUser = new User("google@test.com", "$2a$10$hashedPassword");
-            given(googleTokenVerifier.verify("google-id-token")).willReturn(googleUserInfo);
+            given(oAuthVerifierRouter.verify(eq(ProviderType.GOOGLE), eq("google-id-token")))
+                .willReturn(oAuthUserInfo);
             given(userRepository.findByEmail("google@test.com")).willReturn(Optional.of(localUser));
 
             // when & then
@@ -323,7 +327,8 @@ class AuthServiceTest {
         void 신규_사용자_소셜_가입시_isNewUser_true_및_isProfileCompleted_false() {
             // given
             SocialSignUpOrLoginRequest request = new SocialSignUpOrLoginRequest("GOOGLE", "google-id-token");
-            given(googleTokenVerifier.verify("google-id-token")).willReturn(googleUserInfo);
+            given(oAuthVerifierRouter.verify(eq(ProviderType.GOOGLE), eq("google-id-token")))
+                .willReturn(oAuthUserInfo);
             given(userRepository.findByEmail("google@test.com")).willReturn(Optional.empty());
             given(userRepository.save(any(User.class))).willAnswer(invocation -> invocation.getArgument(0));
             given(userProfileRepository.findByUserId(any())).willReturn(Optional.empty());
@@ -344,7 +349,8 @@ class AuthServiceTest {
             // given
             SocialSignUpOrLoginRequest request = new SocialSignUpOrLoginRequest("GOOGLE", "google-id-token");
             User googleUser = new User("google@test.com", ProviderType.GOOGLE, "google-provider-id-123");
-            given(googleTokenVerifier.verify("google-id-token")).willReturn(googleUserInfo);
+            given(oAuthVerifierRouter.verify(eq(ProviderType.GOOGLE), eq("google-id-token")))
+                .willReturn(oAuthUserInfo);
             given(userRepository.findByEmail("google@test.com")).willReturn(Optional.of(googleUser));
             given(userProfileRepository.findByUserId(any())).willReturn(Optional.empty());
             stubJwtCreation();
@@ -363,7 +369,8 @@ class AuthServiceTest {
             SocialSignUpOrLoginRequest request = new SocialSignUpOrLoginRequest("GOOGLE", "google-id-token");
             User googleUser = new User("google@test.com", ProviderType.GOOGLE, "google-provider-id-123");
             UserProfile profile = new UserProfile(googleUser.getId(), "구글유저", Position.BACKEND, null, null);
-            given(googleTokenVerifier.verify("google-id-token")).willReturn(googleUserInfo);
+            given(oAuthVerifierRouter.verify(eq(ProviderType.GOOGLE), eq("google-id-token")))
+                .willReturn(oAuthUserInfo);
             given(userRepository.findByEmail("google@test.com")).willReturn(Optional.of(googleUser));
             given(userProfileRepository.findByUserId(any())).willReturn(Optional.of(profile));
             stubJwtCreation();

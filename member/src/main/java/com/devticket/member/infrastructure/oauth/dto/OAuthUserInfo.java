@@ -1,6 +1,6 @@
 package com.devticket.member.infrastructure.oauth.dto;
 
-public record GoogleUserInfo(
+public record OAuthUserInfo(
     String email,
     String name,
     String providerId
