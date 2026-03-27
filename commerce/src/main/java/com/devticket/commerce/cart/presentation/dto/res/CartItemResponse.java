@@ -14,30 +14,36 @@ public record CartItemResponse(
     long totalAmount
 ) {
 
-    public record CartItemDetail(
-        String eventId,
-        String eventTitle,
-        long price,
-        int quantity
-    ) {
+    public static CartItemResponse of(Cart cart, CartItem cartItem, String title, int price) {
 
-    }
+        CartItemDetail detail = CartItemDetail.of(cartItem, title, price);
 
-    //엔티티 및 계산된 데이터를 DTO로 변환하는 정적 팩토리 메서드
-    public static CartItemResponse of(Cart cart, CartItem savedItem, String title, int price) {
-        CartItemDetail detail = new CartItemDetail(
-            savedItem.getEventId().toString(),
-            title,
-            (long) price,
-            savedItem.getQuantity()
-        );
-
-        int totalAmount = price * savedItem.getQuantity();
+        int totalAmount = price * cartItem.getQuantity();
 
         return CartItemResponse.builder()
             .cartId(String.valueOf(cart.getId()))
             .items(List.of(detail))
             .totalAmount(totalAmount)
+            .build();
+    }
+}
+
+//CartItemResponse의 Inner Record
+@Builder
+record CartItemDetail(
+    Long eventId,
+    String eventTitle,
+    int price,
+    int quantity
+) {
+
+    //엔티티와 외부 정보를 조합하여 DTO로 변환하는 정적 팩토리 메서드
+    static CartItemDetail of(CartItem cartItem, String title, int price) {
+        return CartItemDetail.builder()
+            .eventId(cartItem.getEventId())
+            .eventTitle(title)
+            .price(price)
+            .quantity(cartItem.getQuantity())
             .build();
     }
 
