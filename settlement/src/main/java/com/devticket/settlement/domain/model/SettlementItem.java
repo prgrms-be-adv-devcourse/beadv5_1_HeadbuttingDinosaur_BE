@@ -9,8 +9,11 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.util.UUID;
+import lombok.Builder;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 
+@NoArgsConstructor
 @Getter
 @Entity
 @Table(name = "settlement_item")
@@ -40,5 +43,19 @@ public class SettlementItem extends BaseEntity {
 
     @Column(name = "settlement_amount", nullable = false)
     private Integer settlementAmount;
+
+
+    // 빌더 패턴
+    @Builder
+    public SettlementItem(UUID settlementId, Long orderItemId, Long eventId, Integer salesAmount, Integer refundAmount,
+        Integer feeAmount, Integer settlementAmount) {
+        this.settlementId = settlementId;
+        this.orderItemId = orderItemId;
+        this.eventId = eventId;
+        this.salesAmount = salesAmount;
+        this.refundAmount = refundAmount;
+        this.feeAmount = feeAmount;
+        this.settlementAmount = settlementAmount;
+    }
 
 }

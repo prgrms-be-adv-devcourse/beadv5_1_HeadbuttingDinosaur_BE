@@ -31,7 +31,7 @@ public class SettlementServiceImpl implements SettlementService {
         if (settlements.isEmpty()) {
             throw new BusinessException(SettlementErrorCode.SETTLEMENT_NOT_FOUND);
         }
-        return settlementRepository.findBySellerId(sellerId).stream()
+        return settlements.stream()
             .map(this::toResponse)
             .toList();
     }
