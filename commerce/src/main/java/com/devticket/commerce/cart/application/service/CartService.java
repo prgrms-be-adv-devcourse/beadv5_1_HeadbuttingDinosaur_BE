@@ -12,7 +12,6 @@ import com.devticket.commerce.cart.infrastructure.external.client.dto.InternalPu
 import com.devticket.commerce.cart.presentation.dto.req.CartItemRequest;
 import com.devticket.commerce.cart.presentation.dto.res.CartItemResponse;
 import com.devticket.commerce.common.exception.BusinessException;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -27,7 +26,7 @@ public class CartService implements CartUseCase {
     private final CartRepository cartRepository;
     private final CartItemRepository cartItemRepository;
     private final EventClient eventClient;
-    private final TransactionTemplate transactionTemplate
+    private final TransactionTemplate transactionTemplate;
 
     // =========================================================================
     // Public Methods (Main Flow)
@@ -47,7 +46,9 @@ public class CartService implements CartUseCase {
 
         //DB 작업 : 장바구니 확보와 장바구니에 아이템 담기 로직을 한개 트랜잭션 단위로 묶음.
         //Cart와 CartItem -> 객체참조x, 연관관계 매핑 없이 식별자참조.
-        record SaveResult(Cart cart, CartItem cartItem) {}
+        record SaveResult(Cart cart, CartItem cartItem) {
+
+        }
         SaveResult result = transactionTemplate.execute(status -> {
             Cart cart = findOrCreateCart(userId);
             CartItem item = addOrUpdateCartItem(cart.getId(), request);
@@ -68,7 +69,7 @@ public class CartService implements CartUseCase {
         try {
             return cartRepository.findByUserId(userId)
                 .orElseGet(() -> cartRepository.save(Cart.create(userId)));
-        }catch (DataIntegrityViolationException e){ // 동일사용자로 cart추가 생성요청시_데이터무결성 제약조건 위반
+        } catch (DataIntegrityViolationException e) { // 동일사용자로 cart추가 생성요청시_데이터무결성 제약조건 위반
             //이미 생성되어 있는 Cart를 조회해서 반환
             return cartRepository.findByUserId(userId)
                 .orElseThrow(() -> new RuntimeException("장바구니 확보 실패"));
