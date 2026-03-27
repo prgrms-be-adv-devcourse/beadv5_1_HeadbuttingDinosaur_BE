@@ -60,8 +60,12 @@ public class OrderItem extends BaseEntity {
         UUID userId,
         Long eventId,
         int price,
-        int quantity
+        int quantity,
+        int maxQuantity
     ) {
+        //maxQuantity값으로 제한수량을 초과하는 주문요청건 검증
+        validateQuantity(quantity, maxQuantity);
+
         int subtotalAmount = price * quantity;
 
         return OrderItem.builder()
@@ -95,7 +99,7 @@ public class OrderItem extends BaseEntity {
 
     //--------------------
     //아이템 수량 검증
-    private void validateQuantity(int quantity, int maxQuantity) {
+    private static void validateQuantity(int quantity, int maxQuantity) {
         //수량은 1이상
         if (quantity <= 0) {
             throw new BusinessException(OrderErrorCode.INVALID_QUANTITY);

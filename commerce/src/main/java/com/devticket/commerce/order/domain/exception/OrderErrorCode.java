@@ -9,7 +9,7 @@ import lombok.RequiredArgsConstructor;
 public enum OrderErrorCode implements ErrorCode {
 
 
-    ORDER_NOT_FOUND(400, "ORDER_001", "존재하지 않는 주문입니다."),
+    ORDER_NOT_FOUND(404, "ORDER_001", "존재하지 않는 주문입니다."),
     ALREADY_PAID_ORDER(400, "ORDER_002", "이미 결제 완료된 주문입니다."),
     ALREADY_CANCELLED_ORDER(400, "ORDER_003", "이미 취소된 주문입니다."),
     ORDER_FORBIDDEN(400, "ORDER_004", "해당 주문의 접근 권한이 없습니다."),
