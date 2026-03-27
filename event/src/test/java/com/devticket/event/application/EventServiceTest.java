@@ -7,12 +7,14 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.devticket.event.common.exception.BusinessException;
+import com.devticket.event.domain.enums.EventStatus;
 import com.devticket.event.domain.exception.EventErrorCode;
 import com.devticket.event.domain.model.Event;
 import com.devticket.event.fixture.EventTestFixture;
 import com.devticket.event.infrastructure.persistence.EventRepository;
 import com.devticket.event.presentation.dto.EventDetailResponse;
 import com.devticket.event.presentation.dto.SellerEventCreateRequest;
+import com.devticket.event.presentation.dto.SellerEventCreateResponse;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
@@ -50,10 +52,12 @@ class EventServiceTest {
         when(eventRepository.save(any(Event.class))).thenReturn(savedEvent);
 
         // when
-        UUID resultId = eventService.createEvent(sellerId, request);
+        SellerEventCreateResponse response = eventService.createEvent(sellerId, request);
 
         // then
-        assertThat(resultId).isEqualTo(expectedUuid);
+        assertThat(response.eventId()).isEqualTo(expectedUuid);
+        assertThat(response.status()).isEqualTo(EventStatus.DRAFT);
+
         verify(eventRepository).save(any(Event.class));
     }
 

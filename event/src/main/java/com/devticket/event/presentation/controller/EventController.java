@@ -29,9 +29,9 @@ public class EventController {
         @RequestHeader("X-User-Id") Long sellerId, // 내부 식별자는 Long 유지
         @Valid @RequestBody SellerEventCreateRequest request) {
 
-        UUID eventId = eventService.createEvent(sellerId, request);
+        SellerEventCreateResponse response = eventService.createEvent(sellerId, request);
 
-        return SuccessResponse.created(SellerEventCreateResponse.from(eventId));
+        return SuccessResponse.success(response);
     }
 
     @GetMapping("/{eventId}")

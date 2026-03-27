@@ -5,7 +5,6 @@ import static com.devticket.event.domain.model.QEventTechStack.eventTechStack;
 
 import com.devticket.event.domain.enums.EventCategory;
 import com.devticket.event.domain.model.Event;
-import com.devticket.event.presentation.dto.EventListRequest;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
@@ -23,16 +22,16 @@ public class EventRepositoryImpl implements EventRepositoryCustom {
     private final JPAQueryFactory queryFactory;
 
     @Override
-    public Page<Event> searchEvents(EventListRequest request, Pageable pageable) {
+    public Page<Event> searchEvents(String keyword, EventCategory category, List<Long> techStackIds, Pageable pageable) {
 
         // 1. 데이터 조회 쿼리 (기술 스택 필터링을 위한 JOIN 및 distinct 포함)
         List<Event> content = queryFactory
             .selectFrom(event)
             .leftJoin(event.eventTechStacks, eventTechStack) // Event 엔티티 내의 연관관계 필드명
             .where(
-                keywordContains(request.keyword()),
-                categoryEq(request.category()),
-                techStackIn(request.techStacks())
+                keywordContains(keyword),
+                categoryEq(category),
+                techStackIn(techStackIds)
             )
             .distinct()
             .offset(pageable.getOffset())
@@ -45,9 +44,9 @@ public class EventRepositoryImpl implements EventRepositoryCustom {
             .from(event)
             .leftJoin(event.eventTechStacks, eventTechStack)
             .where(
-                keywordContains(request.keyword()),
-                categoryEq(request.category()),
-                techStackIn(request.techStacks())
+                keywordContains(keyword),
+                categoryEq(category),
+                techStackIn(techStackIds)
             );
 
         // PageableExecutionUtils를 쓰면 필요할 때만 count 쿼리를 날려 성능이 최적화됩니다.
