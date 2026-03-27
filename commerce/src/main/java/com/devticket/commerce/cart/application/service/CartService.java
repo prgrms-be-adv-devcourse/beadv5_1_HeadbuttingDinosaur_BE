@@ -11,6 +11,7 @@ import com.devticket.commerce.cart.presentation.dto.req.CartItemRequest;
 import com.devticket.commerce.cart.presentation.dto.res.CartItemResponse;
 import com.devticket.commerce.cart.presentation.dto.res.CartItemResponse.CartItemDetail;
 import java.util.List;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -24,12 +25,12 @@ public class CartService implements CartUseCase {
     private final EventClient eventClient;
 
     @Override
-    public boolean finByUserId(Long userId) {
+    public boolean finByUserId(UUID userId) {
         return cartRepository.findByUserId(userId).isPresent();
     }
 
     @Override
-    public CartItemResponse save(Long userId, CartItemRequest request) {
+    public CartItemResponse save(UUID userId, CartItemRequest request) {
         //장바구니 유무 확인. 없으면 장바구니 생성
         Cart cart = cartRepository.findByUserId(userId)
             .orElseGet(() -> {
