@@ -31,7 +31,7 @@ public class CartService implements CartUseCase {
     // =========================================================================
 
     @Override
-    public boolean finByUserId(Long userId) {
+    public boolean findByUserId(Long userId) {
         return cartRepository.findByUserId(userId).isPresent();
     }
 
