@@ -51,7 +51,7 @@ class EventControllerTest {
     @Test
     void 정상적인_요청시_201_응답과_UUID를_반환한다() throws Exception {
         // given
-        Long sellerId = 1L;
+        UUID sellerId = UUID.randomUUID();
         UUID expectedEventId = UUID.randomUUID();
         LocalDateTime now = LocalDateTime.now();
         SellerEventCreateRequest request = EventTestFixture.createEventRequest(
@@ -107,9 +107,11 @@ class EventControllerTest {
             100, 4, null, null, null
         );
 
+        UUID sellerId = UUID.randomUUID();
+
         // when & then
         mockMvc.perform(post("/api/v1/events")
-                .header("X-User-Id", "1")
+                .header("X-User-Id", sellerId.toString())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(badRequest)))
             .andDo(print())
