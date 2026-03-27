@@ -21,11 +21,10 @@ public class EventClient {
 
     //장바구니 담기진행시 -> Event의 현재구매가능상태, 1인당 구매제한 수량 정보를 가져옵니다.
     public InternalPurchaseValidationResponse getValidateEventStatus(Long eventId, Long userId, Integer quantity) {
-
         try {
             log.info("[EventClient] Calling Internal API: eventId={}, userId={}", eventId, userId);
 
-            return restClient.get()
+            InternalPurchaseValidationResponse response = restClient.get()
                 .uri(uriBuilder -> uriBuilder
                     .path("/internal/events/{eventId}/validate-purchase")
                     .queryParam("userId", userId)
@@ -38,12 +37,17 @@ public class EventClient {
                 })
                 .body(InternalPurchaseValidationResponse.class);
 
+            return response;
+
+        } catch (BusinessException e) {
+            // 이미 정의된 비즈니스 예외는 그대로 던짐
+            throw e;
         } catch (Exception e) {
-            // 💡 여기서 에러의 진짜 원인(ConnectException, IllegalStateException 등)이 콘솔에 찍힙니다.
+            // 연결 실패, 타임아웃 등 시스템적 장애 처리
             log.error("[EventClient] Critical Error: ", e);
             throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
         }
-
-
     }
+
+
 }
