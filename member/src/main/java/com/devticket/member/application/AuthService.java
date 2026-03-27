@@ -34,7 +34,7 @@ public class AuthService {
 
     public LogoutResponse logout(String refreshToken) {
         // TODO: Phase 4에서 구현
-        return new LogoutResponse();
+        return new LogoutResponse(false);
     }
 
     public TokenRefreshResponse reissue(TokenRefreshRequest request) {
