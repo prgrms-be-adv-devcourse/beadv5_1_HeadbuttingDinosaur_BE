@@ -72,7 +72,7 @@ public class AuthService {
         log.info("로그인 완료: email={}, profileCompleted={}", user.getEmail(), profileCompleted);
         return LoginResponse.from(user, accessToken, refreshToken, profileCompleted);
     }
-
+    
     @Transactional
     public SocialSignUpOrLoginResponse socialLogin(SocialSignUpOrLoginRequest request) {
         ProviderType providerType = parseProviderType(request.providerType());
@@ -91,6 +91,7 @@ public class AuthService {
         validateRefreshTokenExpiry(refreshToken);
 
         User user = findUserByIdOrThrow(refreshToken.getUserId());
+        validateUserStatus(user);
 
         refreshTokenRepository.deleteByToken(request.refreshToken());
 
@@ -115,6 +116,7 @@ public class AuthService {
         if (user.getProviderType() == ProviderType.LOCAL) {
             throw new BusinessException(MemberErrorCode.SOCIAL_EMAIL_CONFLICT);
         }
+        validateUserStatus(user);
 
         boolean profileCompleted = isProfileCompleted(user.getId());
         String accessToken = issueAccessToken(user, profileCompleted);

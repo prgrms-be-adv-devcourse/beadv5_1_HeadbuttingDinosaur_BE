@@ -382,6 +382,40 @@ class AuthServiceTest {
             assertThat(response.isNewUser()).isFalse();
             assertThat(response.isProfileCompleted()).isTrue();
         }
+
+        @Test
+        void 정지된_소셜_계정으로_로그인시_실패() {
+            // given
+            SocialSignUpOrLoginRequest request = new SocialSignUpOrLoginRequest("GOOGLE", "google-id-token");
+            User googleUser = new User("google@test.com", ProviderType.GOOGLE, "google-provider-id-123");
+            googleUser.suspend();
+            given(oAuthVerifierRouter.verify(eq(ProviderType.GOOGLE), eq("google-id-token")))
+                .willReturn(oAuthUserInfo);
+            given(userRepository.findByEmail("google@test.com")).willReturn(Optional.of(googleUser));
+
+            // when & then
+            assertThatThrownBy(() -> authService.socialLogin(request))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
+                    .isEqualTo(MemberErrorCode.ACCOUNT_SUSPENDED));
+        }
+
+        @Test
+        void 탈퇴한_소셜_계정으로_로그인시_실패() {
+            // given
+            SocialSignUpOrLoginRequest request = new SocialSignUpOrLoginRequest("GOOGLE", "google-id-token");
+            User googleUser = new User("google@test.com", ProviderType.GOOGLE, "google-provider-id-123");
+            googleUser.withdraw();
+            given(oAuthVerifierRouter.verify(eq(ProviderType.GOOGLE), eq("google-id-token")))
+                .willReturn(oAuthUserInfo);
+            given(userRepository.findByEmail("google@test.com")).willReturn(Optional.of(googleUser));
+
+            // when & then
+            assertThatThrownBy(() -> authService.socialLogin(request))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
+                    .isEqualTo(MemberErrorCode.ACCOUNT_WITHDRAWN));
+        }
     }
 
     // ========== 토큰 재발급 ==========
@@ -434,6 +468,26 @@ class AuthServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
                     .isEqualTo(MemberErrorCode.MEMBER_NOT_FOUND));
+        }
+
+        @Test
+        void 정지된_계정의_RefreshToken으로_재발급시_실패() {
+            // given
+            TokenRefreshRequest request = new TokenRefreshRequest("valid-refresh-token");
+            RefreshToken validToken = new RefreshToken(1L, "valid-refresh-token",
+                LocalDateTime.now().plusDays(7));
+            User suspendedUser = new User("test@test.com", "$2a$10$hashedPassword");
+            suspendedUser.suspend();
+
+            given(refreshTokenRepository.findByToken("valid-refresh-token"))
+                .willReturn(Optional.of(validToken));
+            given(userRepository.findById(1L)).willReturn(Optional.of(suspendedUser));
+
+            // when & then
+            assertThatThrownBy(() -> authService.reissue(request))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
+                    .isEqualTo(MemberErrorCode.ACCOUNT_SUSPENDED));
         }
 
         @Test
