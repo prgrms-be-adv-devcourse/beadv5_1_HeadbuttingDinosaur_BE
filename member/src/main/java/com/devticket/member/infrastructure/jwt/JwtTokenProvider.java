@@ -36,7 +36,7 @@ public class JwtTokenProvider {
         this.key = Keys.hmacShaKeyFor(secretKey.getBytes());
     }
 
-    public String createAccessToken(Long userId, String email, UserRole role) {
+    public String createAccessToken(Long userId, String email, UserRole role, boolean profileCompleted) {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + accessTokenTtl);
 
@@ -44,6 +44,7 @@ public class JwtTokenProvider {
             .subject(String.valueOf(userId))
             .claim("email", email)
             .claim("role", role.name())
+            .claim("profileCompleted", profileCompleted)
             .issuedAt(now)
             .expiration(expiry)
             .signWith(key)
@@ -64,6 +65,10 @@ public class JwtTokenProvider {
 
     public String getRole(String token) {
         return getClaims(token).get("role", String.class);
+    }
+
+    public Boolean getProfileCompleted(String token) {
+        return getClaims(token).get("profileCompleted", Boolean.class);
     }
 
     public boolean validateToken(String token) {
