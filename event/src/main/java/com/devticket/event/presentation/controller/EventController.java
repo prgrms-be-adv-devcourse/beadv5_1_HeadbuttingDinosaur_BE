@@ -2,12 +2,15 @@ package com.devticket.event.presentation.controller;
 
 import com.devticket.event.application.EventService;
 import com.devticket.event.presentation.dto.EventDetailResponse;
+import com.devticket.event.presentation.dto.EventListResponse;
 import com.devticket.event.presentation.dto.SellerEventCreateRequest;
 import com.devticket.event.presentation.dto.SellerEventCreateResponse;
 import com.devticket.event.common.response.SuccessResponse;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -38,4 +41,14 @@ public class EventController {
 
         return ResponseEntity.ok(SuccessResponse.success(response));
     }
+
+    @GetMapping
+    public ResponseEntity<SuccessResponse<EventListResponse>> getEventList(
+        @PageableDefault(size = 20) Pageable pageable) {
+
+        EventListResponse response = eventService.getEventList(pageable);
+
+        return ResponseEntity.ok(SuccessResponse.success(response));
+    }
+
 }

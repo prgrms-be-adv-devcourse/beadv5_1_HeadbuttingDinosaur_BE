@@ -5,10 +5,13 @@ import com.devticket.event.domain.exception.EventErrorCode;
 import com.devticket.event.domain.model.Event;
 import com.devticket.event.infrastructure.persistence.EventRepository;
 import com.devticket.event.presentation.dto.EventDetailResponse;
+import com.devticket.event.presentation.dto.EventListResponse;
 import com.devticket.event.presentation.dto.SellerEventCreateRequest;
 import java.time.LocalDateTime;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -66,5 +69,13 @@ public class EventService {
             .orElseThrow(() -> new BusinessException(EventErrorCode.EVENT_NOT_FOUND));
 
         return EventDetailResponse.from(event);
+    }
+
+    @Transactional(readOnly = true)
+    public EventListResponse getEventList(Pageable pageable) {
+
+        Page<Event> eventPage = eventRepository.findAll(pageable);
+
+        return EventListResponse.of(eventPage);
     }
 }
