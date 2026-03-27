@@ -11,7 +11,13 @@ import com.devticket.commerce.cart.infrastructure.external.client.EventClient;
 import com.devticket.commerce.cart.infrastructure.external.client.dto.InternalPurchaseValidationResponse;
 import com.devticket.commerce.cart.presentation.dto.req.CartItemRequest;
 import com.devticket.commerce.cart.presentation.dto.res.CartItemResponse;
+<<<<<<< Updated upstream
 import com.devticket.commerce.common.exception.BusinessException;
+=======
+import com.devticket.commerce.cart.presentation.dto.res.CartItemResponse.CartItemDetail;
+import java.util.List;
+import java.util.UUID;
+>>>>>>> Stashed changes
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -33,13 +39,29 @@ public class CartService implements CartUseCase {
     // =========================================================================
 
     @Override
+<<<<<<< Updated upstream
     public boolean findByUserId(Long userId) {
+=======
+    public boolean finByUserId(UUID userId) {
+>>>>>>> Stashed changes
         return cartRepository.findByUserId(userId).isPresent();
     }
 
     @Override
+<<<<<<< Updated upstream
     public CartItemResponse save(Long userId, CartItemRequest request) {
         //외부 API 호출 및 정책 검증 : Event서비스호출, 상품의 구매가능상태,구매가능 수량 등 검증
+=======
+    public CartItemResponse save(UUID userId, CartItemRequest request) {
+        //장바구니 유무 확인. 없으면 장바구니 생성
+        Cart cart = cartRepository.findByUserId(userId)
+            .orElseGet(() -> {
+                Cart newCart = Cart.create(userId);
+                return cartRepository.save(newCart);
+            });
+
+        //Event api호출 : Event의 구매가능 상태 검증(인당최대구매수량,구매가능상태)
+>>>>>>> Stashed changes
         InternalPurchaseValidationResponse event = eventClient.getValidateEventStatus(request.eventId(), userId,
             request.quantity());
         handlePurchaseValidationError(event);
