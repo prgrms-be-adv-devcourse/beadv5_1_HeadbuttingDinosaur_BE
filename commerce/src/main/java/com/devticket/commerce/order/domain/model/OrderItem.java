@@ -111,7 +111,7 @@ public class OrderItem extends BaseEntity {
     }
 
     //소계 합산
-    private int calcSubtotalAmount(int price, int quantity) {
+    private static int calcSubtotalAmount(int price, int quantity) {
         return price * quantity;
     }
 }
