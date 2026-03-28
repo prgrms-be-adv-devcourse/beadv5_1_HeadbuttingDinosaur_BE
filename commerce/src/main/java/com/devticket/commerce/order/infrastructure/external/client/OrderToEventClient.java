@@ -13,11 +13,11 @@ import org.springframework.web.client.RestClient;
 
 @Slf4j
 @Component
-public class EventClient {
+public class OrderToEventClient {
 
     private final RestClient restClient;
 
-    public EventClient(@Qualifier("eventRestClient") RestClient restClient) {
+    public OrderToEventClient(@Qualifier("orderToEventRestClient") RestClient restClient) {
         this.restClient = restClient;
     }
 
