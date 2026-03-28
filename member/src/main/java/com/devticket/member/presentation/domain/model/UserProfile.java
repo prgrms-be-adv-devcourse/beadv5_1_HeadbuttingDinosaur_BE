@@ -28,7 +28,7 @@ public class UserProfile {
     @Column(name = "user_profile_id", unique = true, nullable = false, updatable = false)
     private UUID userProfileId;
 
-    @Column(name = "user_id", nullable = false)
+    @Column(name = "user_id", nullable = false, unique = true)
     private Long userId;
 
     @Column(nullable = false, unique = true, length = 12)
