@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -155,54 +156,64 @@ class EventServiceTest {
     // 이벤트 목록 조회 및 검색 테스트
 
     @Test
-    void 모든_검색_조건이_주어지면_파라미터를_분리하여_Repository를_호출한다() {
+    void 검색_조건이_주어지면_파라미터를_분해하여_Repository를_호출한다() {
         // given
-        EventListRequest request = new EventListRequest("스프링", EventCategory.MEETUP, List.of(1L, 2L));
+        EventListRequest request = new EventListRequest("스프링", EventCategory.MEETUP, List.of(1L, 2L), null, null);
         Pageable pageable = PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "createdAt"));
         Page<Event> mockPage = EventTestFixture.createEventPage();
 
+        // 서비스가 내부적으로 계산할 '일반 조회 허용 상태값 리스트'
+        List<EventStatus> publicStatuses = List.of(EventStatus.ON_SALE, EventStatus.SOLD_OUT, EventStatus.SALE_ENDED);
+
+        // DTO가 해체되어 각각의 파라미터로 전달됨을 검증
         given(eventRepository.searchEvents(
-            eq("스프링"), eq(EventCategory.MEETUP), eq(List.of(1L, 2L)), eq(pageable)
+            eq("스프링"), eq(EventCategory.MEETUP), eq(List.of(1L, 2L)), isNull(), eq(publicStatuses), eq(pageable)
         )).willReturn(mockPage);
 
-        // when
-        EventListResponse response = eventService.getEventList(request, pageable);
+        // when (currentUserId는 일반 조회이므로 null로 전달)
+        EventListResponse response = eventService.getEventList(request, null, pageable);
 
         // then
         assertThat(response.totalElements()).isEqualTo(mockPage.getTotalElements());
         assertThat(response.content()).isNotEmpty();
-        verify(eventRepository).searchEvents("스프링", EventCategory.MEETUP, List.of(1L, 2L), pageable);
+
+        // verify 역시 해체된 파라미터로 검증
+        verify(eventRepository).searchEvents(
+            "스프링", EventCategory.MEETUP, List.of(1L, 2L), null, publicStatuses, pageable
+        );
     }
 
     @Test
     void 검색_조건이_모두_null일_경우_전체_이벤트를_조회한다() {
         // given
-        EventListRequest request = new EventListRequest(null, null, null);
+        EventListRequest request = new EventListRequest(null, null, null, null, null);
         Pageable pageable = PageRequest.of(0, 20);
+        List<EventStatus> publicStatuses = List.of(EventStatus.ON_SALE, EventStatus.SOLD_OUT, EventStatus.SALE_ENDED);
 
-        given(eventRepository.searchEvents(null, null, null, pageable))
+        given(eventRepository.searchEvents(isNull(), isNull(), isNull(), isNull(), eq(publicStatuses), eq(pageable)))
             .willReturn(EventTestFixture.createEventPage());
 
         // when
-        EventListResponse response = eventService.getEventList(request, pageable);
+        EventListResponse response = eventService.getEventList(request, null, pageable);
 
         // then
         assertThat(response).isNotNull();
-        verify(eventRepository).searchEvents(null, null, null, pageable);
+        verify(eventRepository).searchEvents(null, null, null, null, publicStatuses, pageable);
     }
 
     @Test
     void 검색_결과가_없을_경우_빈_리스트를_정상적으로_반환한다() {
         // given
-        EventListRequest request = new EventListRequest("절대검색안될키워드", null, null);
+        EventListRequest request = new EventListRequest("절대검색안될키워드", null, null, null, null);
         Pageable pageable = PageRequest.of(0, 20);
         Page<Event> emptyPage = new PageImpl<>(Collections.emptyList(), pageable, 0);
+        List<EventStatus> publicStatuses = List.of(EventStatus.ON_SALE, EventStatus.SOLD_OUT, EventStatus.SALE_ENDED);
 
-        given(eventRepository.searchEvents(eq("절대검색안될키워드"), eq(null), eq(null), eq(pageable)))
+        given(eventRepository.searchEvents(eq("절대검색안될키워드"), isNull(), isNull(), isNull(), eq(publicStatuses), eq(pageable)))
             .willReturn(emptyPage);
 
         // when
-        EventListResponse response = eventService.getEventList(request, pageable);
+        EventListResponse response = eventService.getEventList(request, null, pageable);
 
         // then
         assertThat(response.totalElements()).isZero();

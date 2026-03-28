@@ -45,10 +45,11 @@ public class EventController {
 
     @GetMapping
     public ResponseEntity<SuccessResponse<EventListResponse>> getEventList(
+        @RequestHeader(value = "X-User-Id", required = false) UUID currentUserId,
         @ModelAttribute EventListRequest request,
         @PageableDefault(size = 20) Pageable pageable) {
 
-        EventListResponse response = eventService.getEventList(request, pageable);
+        EventListResponse response = eventService.getEventList(request, currentUserId, pageable);
         return ResponseEntity.ok(SuccessResponse.success(response));
     }
 

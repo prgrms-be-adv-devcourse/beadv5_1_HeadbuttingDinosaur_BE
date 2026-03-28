@@ -1,6 +1,7 @@
 package com.devticket.event.application;
 
 import com.devticket.event.common.exception.BusinessException;
+import com.devticket.event.domain.enums.EventStatus;
 import com.devticket.event.domain.exception.EventErrorCode;
 import com.devticket.event.domain.model.Event;
 import com.devticket.event.infrastructure.persistence.EventRepository;
@@ -10,6 +11,7 @@ import com.devticket.event.presentation.dto.EventListResponse;
 import com.devticket.event.presentation.dto.SellerEventCreateRequest;
 import com.devticket.event.presentation.dto.SellerEventCreateResponse;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -74,15 +76,43 @@ public class EventService {
     }
 
     @Transactional(readOnly = true)
-    public EventListResponse getEventList(EventListRequest request, Pageable pageable) {
+    public EventListResponse getEventList(EventListRequest request, UUID currentUserId, Pageable pageable) {
 
+        boolean isOwnEventRequest = request.sellerId() != null && request.sellerId().equals(currentUserId);
+
+        // 1. 권한 검증: 비공개 이벤트를 본인이 아닌 사람이 보려는지 차단
+        if (request.status() != null && !isPublicStatus(request.status()) && !isOwnEventRequest) {
+            throw new BusinessException(EventErrorCode.UNAUTHORIZED_SELLER);
+        }
+
+        // 2. 서비스에서 필터링할 '상태값 목록'을 명확히 계산
+        List<EventStatus> allowedStatuses = null;
+
+        if (request.status() != null) {
+            // 특정 상태를 요청한 경우
+            allowedStatuses = List.of(request.status());
+        } else if (!isOwnEventRequest) {
+            // 본인 조회가 아닌 일반 전체 검색인 경우 -> 대중에게 공개된 이벤트만 필터링하도록 지시
+            allowedStatuses = List.of(EventStatus.ON_SALE, EventStatus.SOLD_OUT, EventStatus.SALE_ENDED);
+        }
+        // isOwnEventRequest가 true이면서 status가 null인 경우는 본인의 모든 이벤트를 보는 것이므로 null 유지
+
+        // 3. Repository에 DTO 대신 해체된 파라미터 전달
         Page<Event> eventPage = eventRepository.searchEvents(
             request.keyword(),
             request.category(),
             request.techStacks(),
+            request.sellerId(),
+            allowedStatuses,
             pageable
         );
 
         return EventListResponse.of(eventPage);
+    }
+
+    private boolean isPublicStatus(EventStatus status) {
+        return status == EventStatus.ON_SALE ||
+            status == EventStatus.SOLD_OUT ||
+            status == EventStatus.SALE_ENDED;
     }
 }
