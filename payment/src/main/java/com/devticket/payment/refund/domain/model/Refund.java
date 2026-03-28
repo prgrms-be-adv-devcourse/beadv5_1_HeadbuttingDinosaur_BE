@@ -30,7 +30,7 @@ public class Refund extends BaseEntity {
     private UUID refundId;
 
     @Column(name = "user_id", nullable = false)
-    private Long userId;
+    private UUID userId;
 
     @Column(name = "order_id", nullable = false)
     private Long orderId;
@@ -64,7 +64,7 @@ public class Refund extends BaseEntity {
     public static Refund create(
         Long orderId,
         Long paymentId,
-        Long userId,
+        UUID userId,
         Integer amount,
         Integer refundRate
     ) {

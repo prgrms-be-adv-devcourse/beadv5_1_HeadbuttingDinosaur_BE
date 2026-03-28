@@ -36,7 +36,7 @@ public class PaymentServiceImpl implements PaymentService {
     //결제 준비
     @Override
     @Transactional
-    public PaymentReadyResponse readyPayment(Long userId, PaymentReadyRequest request) {
+    public PaymentReadyResponse readyPayment(UUID userId, PaymentReadyRequest request) {
         // 주문 조회 및 검증
         InternalOrderInfoResponse order = commerceInternalClient.getOrderInfo(request.orderId());
         validateOrderOwner(userId, order.userId());
@@ -72,7 +72,7 @@ public class PaymentServiceImpl implements PaymentService {
 
     //예치금 결제
     private PaymentReadyResponse processWalletPayment(
-        Long userId,
+        UUID userId,
         InternalOrderInfoResponse order,
         String orderId,
         Payment payment
@@ -118,7 +118,7 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     //올바른 사용자인지 확인
-    private void validateOrderOwner(Long requestUserId, Long orderUserId) {
+    private void validateOrderOwner(UUID requestUserId, UUID orderUserId) {
         if (!requestUserId.equals(orderUserId)) {
             throw new PaymentException(PaymentErrorCode.INVALID_PAYMENT_REQUEST);
         }

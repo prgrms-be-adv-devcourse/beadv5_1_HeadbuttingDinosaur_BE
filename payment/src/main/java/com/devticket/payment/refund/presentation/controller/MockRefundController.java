@@ -2,6 +2,7 @@ package com.devticket.payment.refund.presentation.controller;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -14,7 +15,7 @@ public class MockRefundController {
     public static class MockRefundDetailResponse {
         public Long refundId;
         public Long orderId;
-        public Long userId;
+        public UUID userId;
         public Long paymentId;
         public Integer refundAmount;
         public Integer refundRate;
@@ -22,7 +23,7 @@ public class MockRefundController {
         public LocalDateTime requestedAt;
         public LocalDateTime completedAt;
 
-        public MockRefundDetailResponse(Long refundId, Long orderId, Long userId,
+        public MockRefundDetailResponse(Long refundId, Long orderId, UUID userId,
             Long paymentId, Integer refundAmount,
             Integer refundRate, String status,
             LocalDateTime requestedAt, LocalDateTime completedAt) {
@@ -53,7 +54,7 @@ public class MockRefundController {
         MockRefundDetailResponse refund = new MockRefundDetailResponse(
             789L,
             130L,
-            55L,
+            UUID.fromString("550e8400-e29b-41d4-a716-446655440000"),
             460L,
             30000,
             100,

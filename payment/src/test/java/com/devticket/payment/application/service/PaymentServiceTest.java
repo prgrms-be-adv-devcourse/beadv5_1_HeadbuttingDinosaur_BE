@@ -54,20 +54,20 @@ class PaymentServiceTest {
     void setUp() {
         externalOrderId = "order-uuid-123";
 
-        orderInfo = new InternalOrderInfoResponse(
+    orderInfo =
+        new InternalOrderInfoResponse(
             123L,
-            42L,
+            UUID.fromString("550e8400-e29b-41d4-a716-446655440000"),
             "ORD-20250815-001",
             130000,
             "PAYMENT_PENDING",
-            LocalDateTime.of(2025, 8, 15, 14, 30).toString()
-        );
+            LocalDateTime.of(2025, 8, 15, 14, 30).toString());
     }
 
     @Test
     void 예치금_결제_준비_성공() {
         // given
-        Long userId = 42L;
+        UUID userId = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
         PaymentReadyRequest request = new PaymentReadyRequest(
             externalOrderId,
             PaymentMethod.WALLET
@@ -105,7 +105,7 @@ class PaymentServiceTest {
     @Test
     void 예치금_잔액이_부족하면_예외가_발생한다() {
         // given
-        Long userId = 42L;
+        UUID userId = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
         PaymentReadyRequest request = new PaymentReadyRequest(
             externalOrderId,
             PaymentMethod.WALLET
@@ -134,7 +134,7 @@ class PaymentServiceTest {
     @Test
     void PG_결제_준비_성공() {
         // given
-        Long userId = 42L;
+        UUID userId = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
         PaymentReadyRequest request = new PaymentReadyRequest(
             externalOrderId,
             PaymentMethod.PG
@@ -162,7 +162,7 @@ class PaymentServiceTest {
     @Test
     void 다른_사용자의_주문이면_예외가_발생한다() {
         // given
-        Long requestUserId = 99L;
+        UUID requestUserId = UUID.fromString("550e8400-e29b-41d4-a716-446655440001");
         PaymentReadyRequest request = new PaymentReadyRequest(
             externalOrderId,
             PaymentMethod.PG
@@ -179,7 +179,7 @@ class PaymentServiceTest {
     @Test
     void 이미_처리된_예치금_거래면_예외가_발생한다() {
         // given
-        Long userId = 42L;
+        UUID userId = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
         PaymentReadyRequest request = new PaymentReadyRequest(
             externalOrderId,
             PaymentMethod.WALLET
@@ -208,7 +208,7 @@ class PaymentServiceTest {
     @Test
     void 주문상태가_PAYMENT_PENDING이_아니면_예외가_발생한다() {
         // given
-        Long userId = 42L;
+        UUID userId = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
         PaymentReadyRequest request = new PaymentReadyRequest(
             externalOrderId,
             PaymentMethod.PG
@@ -216,7 +216,7 @@ class PaymentServiceTest {
 
         InternalOrderInfoResponse invalidOrder = new InternalOrderInfoResponse(
             123L,
-            42L,
+            UUID.fromString("550e8400-e29b-41d4-a716-446655440000"),
             "ORD-20250815-001",
             130000,
             "PAID",
