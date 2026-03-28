@@ -3,6 +3,7 @@ package com.devticket.event.presentation.controller;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -143,7 +144,8 @@ class EventControllerTest {
     void 파라미터_없이_목록_조회시_기본_페이징이_적용되어_성공_응답을_반환한다() throws Exception {
         // given
         EventListResponse mockResponse = EventTestFixture.createEventListResponse();
-        given(eventService.getEventList(any(EventListRequest.class), any(Pageable.class)))
+
+        given(eventService.getEventList(any(EventListRequest.class), isNull(), any(Pageable.class)))
             .willReturn(mockResponse);
 
         // when (API 호출)
@@ -153,30 +155,33 @@ class EventControllerTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value(200));
 
-        // then (ArgumentCaptor로 Service에 전달된 Pageable을 낚아채서 기본값 검증)
+        // then
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
 
-        // eventService.getEventList가 호출될 때 들어간 파라미터들을 캡처합니다.
-        verify(eventService).getEventList(any(EventListRequest.class), pageableCaptor.capture());
+        verify(eventService).getEventList(any(EventListRequest.class), isNull(), pageableCaptor.capture());
 
-        // 캡처한 Pageable 객체를 꺼내서 @PageableDefault(size = 20)이 잘 적용되었는지 확인
         Pageable capturedPageable = pageableCaptor.getValue();
-        assertThat(capturedPageable.getPageNumber()).isEqualTo(0); // 기본 페이지는 0
-        assertThat(capturedPageable.getPageSize()).isEqualTo(20);  // 우리가 설정한 기본 사이즈 20
+        assertThat(capturedPageable.getPageNumber()).isEqualTo(0);
+        assertThat(capturedPageable.getPageSize()).isEqualTo(20);
     }
 
     @Test
     void 모든_필터_및_정렬_조건이_주어지면_정상적으로_매핑하여_호출한다() throws Exception {
         // given
+        UUID testUserId = UUID.randomUUID();
         EventListResponse mockResponse = EventTestFixture.createEventListResponse();
-        given(eventService.getEventList(any(EventListRequest.class), any(Pageable.class)))
+
+        given(eventService.getEventList(any(EventListRequest.class), eq(testUserId), any(Pageable.class)))
             .willReturn(mockResponse);
 
-        // when (API 호출: 다양한 파라미터를 던집니다)
+        // when (API 호출: 새로 추가된 sellerId, status 파라미터와 X-User-Id 헤더까지 테스트)
         mockMvc.perform(get("/api/v1/events")
+                .header("X-User-Id", testUserId.toString())
                 .param("keyword", "스프링")
                 .param("category", "MEETUP")
                 .param("techStacks", "1", "2")
+                .param("sellerId", testUserId.toString())
+                .param("status", "DRAFT")
                 .param("page", "1")
                 .param("size", "10")
                 .param("sort", "price,desc")
@@ -184,25 +189,25 @@ class EventControllerTest {
             .andDo(print())
             .andExpect(status().isOk());
 
-        // then (DTO와 Pageable 모두 캡처하여 바인딩 검증)
+        // then (DTO와 Pageable 캡처)
         ArgumentCaptor<EventListRequest> requestCaptor = ArgumentCaptor.forClass(EventListRequest.class);
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
 
-        // Service 호출 시 전달된 두 개의 인자를 각각 캡처합니다.
-        verify(eventService).getEventList(requestCaptor.capture(), pageableCaptor.capture());
+        verify(eventService).getEventList(requestCaptor.capture(), eq(testUserId), pageableCaptor.capture());
 
-        // 1. DTO 바인딩 검증 (EventListRequest)
+        // 1. DTO 바인딩 검증
         EventListRequest capturedRequest = requestCaptor.getValue();
         assertThat(capturedRequest.keyword()).isEqualTo("스프링");
         assertThat(capturedRequest.category()).isEqualTo(EventCategory.MEETUP);
         assertThat(capturedRequest.techStacks()).containsExactly(1L, 2L);
+        assertThat(capturedRequest.sellerId()).isEqualTo(testUserId);
+        assertThat(capturedRequest.status()).isEqualTo(EventStatus.DRAFT);
 
-        // 2. 페이징 및 정렬 바인딩 검증 (Pageable)
+        // 2. 페이징 및 정렬 바인딩 검증
         Pageable capturedPageable = pageableCaptor.getValue();
         assertThat(capturedPageable.getPageNumber()).isEqualTo(1);
         assertThat(capturedPageable.getPageSize()).isEqualTo(10);
 
-        // Sort 객체에서 price 필드의 정렬 방향이 DESC인지 정확히 검증
         Sort.Order priceOrder = capturedPageable.getSort().getOrderFor("price");
         assertThat(priceOrder).isNotNull();
         assertThat(priceOrder.getDirection()).isEqualTo(Sort.Direction.DESC);
