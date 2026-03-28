@@ -11,6 +11,7 @@ import java.util.Base64;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -51,6 +52,10 @@ public class PgPaymentClient {
                 .body(request)
                 .retrieve()
                 .onStatus(HttpStatusCode::is4xxClientError, (req, res) -> {
+                    HttpStatusCode status = res.getStatusCode();
+                    if (status == HttpStatus.UNAUTHORIZED || status == HttpStatus.FORBIDDEN) {
+                        throw new PaymentException(PaymentErrorCode.PG_CONFIRM_FAILED);
+                    }
                     throw new PaymentException(PaymentErrorCode.INVALID_PAYMENT_REQUEST);
                 })
                 .onStatus(HttpStatusCode::is5xxServerError, (req, res) -> {
