@@ -222,4 +222,79 @@ class EventControllerTest {
             .andDo(print())
             .andExpect(status().isBadRequest());
     }
+
+    // 판매자 등록 이벤트 목록 조회 테스트
+
+    @Test
+    void 헤더없이_일반목록_조회_파라미터_전달() throws Exception {
+        // given
+        EventListResponse mockResponse = EventTestFixture.createEventListResponse();
+
+        // currentUserId 자리에 isNull() 매칭
+        when(eventService.getEventList(any(EventListRequest.class), isNull(), any(Pageable.class)))
+            .thenReturn(mockResponse);
+
+        // when & then
+        mockMvc.perform(get("/api/v1/events")
+                .param("keyword", "스프링")
+                .contentType(MediaType.APPLICATION_JSON))
+            .andDo(print())
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value(200));
+
+        // verify
+        ArgumentCaptor<EventListRequest> requestCaptor = ArgumentCaptor.forClass(EventListRequest.class);
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+
+        verify(eventService).getEventList(requestCaptor.capture(), isNull(), pageableCaptor.capture());
+
+        assertThat(requestCaptor.getValue().keyword()).isEqualTo("스프링");
+        assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(20); // @PageableDefault 기본값
+    }
+
+    @Test
+    void 판매자_본인이벤트_조회_파라미터_바인딩() throws Exception {
+        // given
+        UUID sellerId = UUID.randomUUID();
+        EventListResponse mockResponse = EventTestFixture.createEventListResponse();
+
+        // 헤더 값(sellerId)이 서비스의 두 번째 파라미터로 전달되는지 eq()로 매칭
+        when(eventService.getEventList(any(EventListRequest.class), eq(sellerId), any(Pageable.class)))
+            .thenReturn(mockResponse);
+
+        // when & then (새로 추가된 sellerId, status 포함한 통합 테스트)
+        mockMvc.perform(get("/api/v1/events")
+                .header("X-User-Id", sellerId.toString())
+                .param("sellerId", sellerId.toString())
+                .param("status", "DRAFT")
+                .param("category", "MEETUP")
+                .param("techStacks", "1", "2")
+                .param("page", "1")
+                .param("size", "10")
+                .param("sort", "price,desc")
+                .contentType(MediaType.APPLICATION_JSON))
+            .andDo(print())
+            .andExpect(status().isOk());
+
+        // verify
+        ArgumentCaptor<EventListRequest> requestCaptor = ArgumentCaptor.forClass(EventListRequest.class);
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+
+        verify(eventService).getEventList(requestCaptor.capture(), eq(sellerId), pageableCaptor.capture());
+
+        // 1. DTO 필드 검증
+        EventListRequest capturedRequest = requestCaptor.getValue();
+        assertThat(capturedRequest.sellerId()).isEqualTo(sellerId);
+        assertThat(capturedRequest.status()).isEqualTo(EventStatus.DRAFT);
+        assertThat(capturedRequest.category()).isEqualTo(EventCategory.MEETUP);
+        assertThat(capturedRequest.techStacks()).containsExactly(1L, 2L);
+
+        // 2. 페이징 및 정렬 검증
+        Pageable capturedPageable = pageableCaptor.getValue();
+        assertThat(capturedPageable.getPageNumber()).isEqualTo(1);
+        assertThat(capturedPageable.getPageSize()).isEqualTo(10);
+        assertThat(capturedPageable.getSort().getOrderFor("price").getDirection())
+            .isEqualTo(Sort.Direction.DESC);
+    }
+
 }
