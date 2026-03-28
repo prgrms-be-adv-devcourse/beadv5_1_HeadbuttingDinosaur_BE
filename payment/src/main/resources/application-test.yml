@@ -25,3 +25,8 @@ jwt:
 internal:
   commerce:
     base-url: http://commerce-service:8083
+
+pg:
+  toss:
+    base-url: https://api.tosspayments.com
+    secret-key: ${PG_SECRET_KEY:secret-key-dummy}
