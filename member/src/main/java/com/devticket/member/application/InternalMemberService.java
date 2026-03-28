@@ -1,33 +1,52 @@
 package com.devticket.member.application;
 
+import com.devticket.member.common.exception.BusinessException;
+import com.devticket.member.presentation.domain.MemberErrorCode;
+import com.devticket.member.presentation.domain.model.SellerApplication;
+import com.devticket.member.presentation.domain.model.User;
+import com.devticket.member.presentation.domain.repository.SellerApplicationRepository;
+import com.devticket.member.presentation.domain.repository.UserRepository;
 import com.devticket.member.presentation.dto.internal.response.InternalMemberInfoResponse;
 import com.devticket.member.presentation.dto.internal.response.InternalMemberRoleResponse;
 import com.devticket.member.presentation.dto.internal.response.InternalMemberStatusResponse;
 import com.devticket.member.presentation.dto.internal.response.InternalSellerInfoResponse;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class InternalMemberService {
 
+    private final UserRepository userRepository;
+    private final SellerApplicationRepository sellerApplicationRepository;
+
     public InternalMemberInfoResponse getMemberInfo(UUID userId) {
-        // TODO: Phase 4에서 구현
-        return new InternalMemberInfoResponse(userId, "stub@example.com",
-            "USER", "ACTIVE", "LOCAL");
+        User user = findUserByUuidOrThrow(userId);
+        return InternalMemberInfoResponse.from(user);
     }
 
     public InternalMemberStatusResponse getMemberStatus(UUID userId) {
-        // TODO: Phase 4에서 구현
-        return new InternalMemberStatusResponse(userId, "ACTIVE");
+        User user = findUserByUuidOrThrow(userId);
+        return InternalMemberStatusResponse.from(user);
     }
 
     public InternalMemberRoleResponse getMemberRole(UUID userId) {
-        // TODO: Phase 4에서 구현
-        return new InternalMemberRoleResponse(userId, "USER");
+        User user = findUserByUuidOrThrow(userId);
+        return InternalMemberRoleResponse.from(user);
     }
 
     public InternalSellerInfoResponse getSellerInfo(UUID userId) {
-        // TODO: Phase 4에서 구현
-        return new InternalSellerInfoResponse(userId, "stub-bank", "000-000-0000", "stub-holder");
+        User user = findUserByUuidOrThrow(userId);
+        SellerApplication application = sellerApplicationRepository.findTopByUserIdOrderByCreatedAtDesc(user.getId())
+            .orElseThrow(() -> new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND));
+        return InternalSellerInfoResponse.from(user, application);
+    }
+
+    private User findUserByUuidOrThrow(UUID userId) {
+        return userRepository.findByUserId(userId)
+            .orElseThrow(() -> new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND));
     }
 }

@@ -140,7 +140,7 @@ class InternalMemberServiceTest {
             // given
             User user = new User("test@test.com", "$2a$10$hashedPassword");
             given(userRepository.findByUserId(any(UUID.class))).willReturn(Optional.of(user));
-            given(sellerApplicationRepository.findByUserId(any())).willReturn(Optional.empty());
+            given(sellerApplicationRepository.findTopByUserIdOrderByCreatedAtDesc(any())).willReturn(Optional.empty());
 
             // when & then
             assertThatThrownBy(() -> internalMemberService.getSellerInfo(TEST_USER_UUID))
@@ -155,7 +155,8 @@ class InternalMemberServiceTest {
                 user.getId(), "국민은행", "123-456-789", "홍길동");
             application.approve();
             given(userRepository.findByUserId(any(UUID.class))).willReturn(Optional.of(user));
-            given(sellerApplicationRepository.findByUserId(any())).willReturn(Optional.of(application));
+            given(sellerApplicationRepository.findTopByUserIdOrderByCreatedAtDesc(any())).willReturn(
+                Optional.of(application));
 
             // when
             InternalSellerInfoResponse response = internalMemberService.getSellerInfo(TEST_USER_UUID);
