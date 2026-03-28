@@ -2,8 +2,8 @@ package com.devticket.commerce.order.infrastructure.external.client;
 
 import com.devticket.commerce.common.exception.BusinessException;
 import com.devticket.commerce.common.exception.CommonErrorCode;
-import com.devticket.commerce.mock.controller.dto.InternalStockAdjustmentRequest;
-import com.devticket.commerce.mock.controller.dto.InternalStockAdjustmentResponse;
+import com.devticket.commerce.order.infrastructure.external.client.dto.InternalStockAdjustmentRequest;
+import com.devticket.commerce.order.infrastructure.external.client.dto.InternalStockAdjustmentResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpStatusCode;

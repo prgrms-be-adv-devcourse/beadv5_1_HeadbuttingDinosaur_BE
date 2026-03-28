@@ -1,8 +1,8 @@
 package com.devticket.commerce.mock.controller;
 
 import com.devticket.commerce.cart.infrastructure.external.client.dto.InternalPurchaseValidationResponse;
-import com.devticket.commerce.mock.controller.dto.InternalStockAdjustmentRequest;
-import com.devticket.commerce.mock.controller.dto.InternalStockAdjustmentResponse;
+import com.devticket.commerce.order.infrastructure.external.client.dto.InternalStockAdjustmentRequest;
+import com.devticket.commerce.order.infrastructure.external.client.dto.InternalStockAdjustmentResponse;
 import java.util.UUID;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
