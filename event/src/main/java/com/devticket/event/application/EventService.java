@@ -1,6 +1,7 @@
 package com.devticket.event.application;
 
 import com.devticket.event.common.exception.BusinessException;
+import com.devticket.event.domain.enums.EventStatus;
 import com.devticket.event.domain.exception.EventErrorCode;
 import com.devticket.event.domain.model.Event;
 import com.devticket.event.infrastructure.persistence.EventRepository;
@@ -74,15 +75,25 @@ public class EventService {
     }
 
     @Transactional(readOnly = true)
-    public EventListResponse getEventList(EventListRequest request, Pageable pageable) {
+    public EventListResponse getEventList(EventListRequest request, UUID currentUserId, Pageable pageable) {
 
-        Page<Event> eventPage = eventRepository.searchEvents(
-            request.keyword(),
-            request.category(),
-            request.techStacks(),
-            pageable
-        );
+        // 1. 판매자 본인이 자신의 이벤트를 조회하는 요청인지 확인
+        boolean isOwnEventRequest = request.sellerId() != null && request.sellerId().equals(currentUserId);
+
+        // 2. 권한 검증: 비공개 상태를 조회하려는데 본인이 아니면 예외 발생
+        if (request.status() != null && !isPublicStatus(request.status()) && !isOwnEventRequest) {
+            throw new BusinessException(EventErrorCode.UNAUTHORIZED_SELLER);
+        }
+
+        // 3. 데이터베이스 조회 (본인 요청 여부를 QueryDSL로 넘김)
+        Page<Event> eventPage = eventRepository.searchEvents(request, isOwnEventRequest, pageable);
 
         return EventListResponse.of(eventPage);
+    }
+
+    private boolean isPublicStatus(EventStatus status) {
+        return status == EventStatus.ON_SALE ||
+            status == EventStatus.SOLD_OUT ||
+            status == EventStatus.SALE_ENDED;
     }
 }

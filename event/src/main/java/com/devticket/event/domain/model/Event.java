@@ -121,6 +121,7 @@ public class Event extends BaseEntity {
             .maxQuantity(maxQuantity)
             .remainingQuantity(totalQuantity)
             .status(EventStatus.DRAFT)
+//            .status(EventStatus.ON_SALE)
             .category(category)
             .build();
     }
