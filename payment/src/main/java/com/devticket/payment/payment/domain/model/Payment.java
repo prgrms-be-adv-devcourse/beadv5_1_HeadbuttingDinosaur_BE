@@ -34,7 +34,7 @@ public class Payment extends BaseEntity {
     private Long orderId;
 
     @Column(name = "user_id", nullable = false)
-    private Long userId;
+    private UUID userId;
 
     @Column(name = "payment_key")
     private String paymentKey;
@@ -65,7 +65,7 @@ public class Payment extends BaseEntity {
 
     public static Payment create(
         Long orderId,
-        Long userId,
+        UUID userId,
         PaymentMethod method,
         Integer amount
     ) {

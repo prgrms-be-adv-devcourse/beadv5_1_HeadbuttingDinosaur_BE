@@ -41,7 +41,7 @@ public class PaymentController {
     })
     @PostMapping("/ready")
     public ResponseEntity<PaymentReadyResponse> readyPayment(
-        @RequestHeader("X-User-Id") Long userId,
+        @RequestHeader("X-User-Id") UUID userId,
         @Valid @RequestBody PaymentReadyRequest request
     ) {
         PaymentReadyResponse response = paymentService.readyPayment(userId, request);

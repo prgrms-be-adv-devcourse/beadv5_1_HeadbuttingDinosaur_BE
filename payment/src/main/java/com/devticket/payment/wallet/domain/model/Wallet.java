@@ -27,7 +27,7 @@ public class Wallet extends BaseEntity {
     private UUID walletId;
 
     @Column(name = "user_id", nullable = false, unique = true)
-    private Long userId;
+    private UUID userId;
 
     @Column(nullable = false)
     private Integer balance;
@@ -39,7 +39,7 @@ public class Wallet extends BaseEntity {
         정적 팩토리 메서드
        ======================= */
 
-    public static Wallet create(Long userId) {
+    public static Wallet create(UUID userId) {
         Wallet wallet = new Wallet();
         wallet.walletId = UUID.randomUUID();
         wallet.userId = userId;

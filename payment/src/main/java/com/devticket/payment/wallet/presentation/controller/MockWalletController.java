@@ -1,5 +1,6 @@
 package com.devticket.payment.wallet.presentation.controller;
 
+import java.util.UUID;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -10,10 +11,10 @@ import org.springframework.web.bind.annotation.RestController;
 public class MockWalletController {
 
     public static class MockWalletBalanceResponse {
-        public Long userId;
+        public UUID userId;
         public Integer balance;
 
-        public MockWalletBalanceResponse(Long userId, Integer balance) {
+        public MockWalletBalanceResponse(UUID userId, Integer balance) {
             this.userId = userId;
             this.balance = balance;
         }
@@ -22,7 +23,7 @@ public class MockWalletController {
     @GetMapping("/{userId}/balance")
     public MockWalletBalanceResponse getWalletBalance(@PathVariable Long userId) {
         return new MockWalletBalanceResponse(
-            42L,
+            UUID.fromString("550e8400-e29b-41d4-a716-446655440000"),
             70000
         );
     }

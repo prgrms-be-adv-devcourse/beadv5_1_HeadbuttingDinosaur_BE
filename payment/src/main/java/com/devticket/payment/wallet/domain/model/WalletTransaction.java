@@ -30,7 +30,7 @@ public class WalletTransaction extends BaseEntity {
     private UUID walletTransactionId;
 
     @Column(name = "user_id", nullable = false)
-    private Long userId;
+    private UUID userId;
 
     @Column(name = "wallet_id", nullable = false)
     private Long walletId;
@@ -59,7 +59,7 @@ public class WalletTransaction extends BaseEntity {
 
     public static WalletTransaction createCharge(
         Long walletId,
-        Long userId,
+        UUID userId,
         String transactionKey,
         Integer amount,
         Integer balanceAfter
@@ -77,7 +77,7 @@ public class WalletTransaction extends BaseEntity {
 
     public static WalletTransaction createUse(
         Long walletId,
-        Long userId,
+        UUID userId,
         String transactionKey,
         Integer amount,
         Integer balanceAfter,
@@ -97,7 +97,7 @@ public class WalletTransaction extends BaseEntity {
 
     public static WalletTransaction createRefund(
         Long walletId,
-        Long userId,
+        UUID userId,
         String transactionKey,
         Integer amount,
         Integer balanceAfter,
@@ -119,7 +119,7 @@ public class WalletTransaction extends BaseEntity {
 
     public static WalletTransaction createWithdraw(
         Long walletId,
-        Long userId,
+        UUID userId,
         String transactionKey,
         Integer amount,
         Integer balanceAfter
