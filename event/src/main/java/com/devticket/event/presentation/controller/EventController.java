@@ -7,6 +7,7 @@ import com.devticket.event.presentation.dto.EventListResponse;
 import com.devticket.event.presentation.dto.SellerEventCreateRequest;
 import com.devticket.event.presentation.dto.SellerEventCreateResponse;
 import com.devticket.event.common.response.SuccessResponse;
+import com.devticket.event.presentation.dto.SellerEventSummaryResponse;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -52,5 +53,15 @@ public class EventController {
         EventListResponse response = eventService.getEventList(request, currentUserId, pageable);
         return ResponseEntity.ok(SuccessResponse.success(response));
     }
+
+    @GetMapping("/{eventId}/statistics")
+    public ResponseEntity<SuccessResponse<SellerEventSummaryResponse>> getEventSummary(
+        @RequestHeader("X-User-Id") UUID sellerId,
+        @PathVariable("eventId") UUID eventId) {
+
+        SellerEventSummaryResponse response = eventService.getEventSummary(sellerId, eventId);
+        return ResponseEntity.ok(SuccessResponse.success(response));
+    }
+
 
 }
