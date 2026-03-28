@@ -15,19 +15,21 @@ public record OrderResponse(
     UUID orderId,
     Long totalAmount,
     OrderStatus orderStatus,
-    List<OrderItems> orderItems,
+    List<OrderItemsResponse> orderItems,
     LocalDateTime createdAt
 ) {
 
-    public static OrderResponse of(Order order, OrderItem orderItem, String eventTitle) {
+    public static OrderResponse of(Order order, List<OrderItem> orderItems, String eventTitle) {
 
-        OrderItems orderItems = OrderItems.of(orderItem, eventTitle);
+        List<OrderItemsResponse> itemResponses = orderItems.stream()
+            .map(item -> OrderItemsResponse.of(item, eventTitle))
+            .toList();
 
         return OrderResponse.builder()
             .orderId(order.getOrderId())
-            .totalAmount(order.getTotalAmount())
+            .totalAmount((long) order.getTotalAmount())
             .orderStatus(order.getStatus())
-            .orderItems(List.of(orderItems))
+            .orderItems(itemResponses)
             .createdAt(order.getCreatedAt())
             .build();
     }
@@ -36,15 +38,15 @@ public record OrderResponse(
 
 //inner record
 @Builder
-record OrderItems(
+record OrderItemsResponse(
     Long eventId,
     String eventTitle,
     int quantity,
     int price
 ) {
 
-    static OrderItems of(OrderItem orderItem, String eventTitle) {
-        return OrderItems.builder()
+    static OrderItemsResponse of(OrderItem orderItem, String eventTitle) {
+        return OrderItemsResponse.builder()
             .eventId(orderItem.getEventId())
             .eventTitle(eventTitle)
             .quantity(orderItem.getQuantity())
