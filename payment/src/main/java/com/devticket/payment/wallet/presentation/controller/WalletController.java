@@ -38,7 +38,7 @@ public class WalletController {
     @Operation(summary = "예치금 충전 시작", description = "PG 결제를 통한 예치금 충전을 시작합니다.")
     @ApiResponse(responseCode = "200", description = "예치금 충전 시작 성공")
     @ApiResponse(responseCode = "400", description = "충전 금액이 올바르지 않습니다.")
-    @PostMapping("/wallet/charge")
+    @PostMapping("/charge")
     public ResponseEntity<WalletChargeResponse> charge(
         @RequestHeader("X-User-Id") UUID userId,
         @Valid @RequestBody WalletChargeRequest request) {
@@ -51,7 +51,7 @@ public class WalletController {
     @ApiResponse(responseCode = "200", description = "예치금 충전 승인 성공")
     @ApiResponse(responseCode = "400", description = "유효하지 않은 승인 요청입니다.")
     @ApiResponse(responseCode = "502", description = "PG 승인 처리에 실패했습니다.")
-    @PostMapping("/wallets/charge/confirm")
+    @PostMapping("/charge/confirm")
     public ResponseEntity<WalletChargeConfirmResponse> confirmCharge(
         @RequestHeader("X-User-Id") UUID userId,
         @Valid @RequestBody WalletChargeConfirmRequest request) {
@@ -63,7 +63,7 @@ public class WalletController {
     @Operation(summary = "예치금 잔액 조회", description = "본인 예치금 잔액을 조회합니다.")
     @ApiResponse(responseCode = "200", description = "예치금 잔액 조회 성공")
     @ApiResponse(responseCode = "404", description = "예치금 지갑을 찾을 수 없습니다.")
-    @GetMapping("/wallet")
+    @GetMapping()
     public ResponseEntity<WalletBalanceResponse> getBalance(
         @RequestHeader("X-User-Id") UUID userId) {
 
@@ -74,7 +74,7 @@ public class WalletController {
     @Operation(summary = "예치금 거래 내역 조회", description = "본인 예치금 거래 내역을 페이징 조회합니다.")
     @ApiResponse(responseCode = "200", description = "예치금 거래 내역 조회 성공")
     @ApiResponse(responseCode = "400", description = "페이지 파라미터가 올바르지 않습니다.")
-    @GetMapping("/wallet/transactions")
+    @GetMapping("/transactions")
     public ResponseEntity<WalletTransactionListResponse> getTransactions(
         @RequestHeader("X-User-Id") UUID userId,
         @RequestParam(defaultValue = "0") @Min(0) int page,
@@ -88,7 +88,7 @@ public class WalletController {
     @ApiResponse(responseCode = "200", description = "예치금 출금 요청 성공")
     @ApiResponse(responseCode = "400", description = "유효하지 않은 출금 요청입니다.")
     @ApiResponse(responseCode = "409", description = "예치금 잔액이 부족합니다.")
-    @PostMapping("/wallet/withdraw")
+    @PostMapping("/withdraw")
     public ResponseEntity<WalletWithdrawResponse> withdraw(
         @RequestHeader("X-User-Id") UUID userId,
         @Valid @RequestBody WalletWithdrawRequest request) {
