@@ -78,7 +78,7 @@ class SellerApplicationServiceTest {
             assertThatThrownBy(() -> sellerApplicationService.apply(TEST_USER_UUID, request))
                 .isInstanceOf(BusinessException.class)
                 .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
-                    .isEqualTo(MemberErrorCode.SELLER_APPLICATION_PENDING));
+                    .isEqualTo(MemberErrorCode.SELLER_APPLICATION_DUPLICATED));
 
             verify(sellerApplicationRepository, never()).save(any(SellerApplication.class));
         }
