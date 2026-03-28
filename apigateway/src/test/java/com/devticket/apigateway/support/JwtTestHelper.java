@@ -15,15 +15,20 @@ public class JwtTestHelper {
     /**
      * 유효한 토큰 생성.
      */
-    public static String createValidToken(String userId, String email, String role) {
+    public static String createValidTokenWithProfile(String userId, String email, String role, boolean profileCompleted) {
         return Jwts.builder()
             .subject(userId)
             .claim("email", email)
             .claim("role", role)
+            .claim("profileCompleted", profileCompleted)
             .issuedAt(new Date())
-            .expiration(new Date(System.currentTimeMillis() + 1800000))
+            .expiration(new Date(System.currentTimeMillis() + 1000 * 60 * 30))
             .signWith(SECRET_KEY)
             .compact();
+    }
+
+    public static String createValidToken(String userId, String email, String role) {
+        return createValidTokenWithProfile(userId, email, role, true);
     }
 
     /**

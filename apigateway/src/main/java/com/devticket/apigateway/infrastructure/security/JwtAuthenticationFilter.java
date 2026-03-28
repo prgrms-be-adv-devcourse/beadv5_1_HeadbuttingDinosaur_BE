@@ -25,6 +25,7 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
     private static final String HEADER_USER_ID = "X-User-Id";
     private static final String HEADER_USER_EMAIL = "X-User-Email";
     private static final String HEADER_USER_ROLE = "X-User-Role";
+    private static final String HEADER_PROFILE_COMPLETED = "X-Profile-Completed";
 
     private final JwtTokenProvider jwtTokenProvider;
     private final GatewayAuthenticationEntryPoint entryPoint;
@@ -79,14 +80,23 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
                 exchange.getResponse(), GatewayErrorCode.INVALID_TOKEN);
         }
 
+        boolean profileCompleted = Boolean.TRUE.equals(claims.get("profileCompleted", Boolean.class));
+        if (!profileCompleted && !isProfileExemptPath(pathContainer, method)) {
+            log.debug("프로필 미완성 사용자 차단: path={}", pathContainer.value());
+            return entryPoint.writeErrorResponse(
+                exchange.getResponse(), GatewayErrorCode.PROFILE_INCOMPLETE);
+        }
+
         ServerHttpRequest mutatedRequest = request.mutate()
             .headers(headers -> {
                 headers.remove(HEADER_USER_ID);
                 headers.remove(HEADER_USER_EMAIL);
                 headers.remove(HEADER_USER_ROLE);
+                headers.remove(HEADER_PROFILE_COMPLETED);
                 headers.add(HEADER_USER_ID, userId);
                 headers.add(HEADER_USER_EMAIL, email);
                 headers.add(HEADER_USER_ROLE, role);
+                headers.add(HEADER_PROFILE_COMPLETED, String.valueOf(profileCompleted));
             })
             .build();
 
@@ -115,12 +125,21 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
         return RoutePolicy.matchesAny(RoutePolicy.HEALTH_PATTERNS, path);
     }
 
+    private boolean isProfileExemptPath(PathContainer path, HttpMethod method) {
+        if (RoutePolicy.matchesAny(RoutePolicy.PROFILE_EXEMPT_PATTERNS, path)) {
+            return true;
+        }
+        return HttpMethod.POST.equals(method)
+            && RoutePolicy.matchesAny(RoutePolicy.PROFILE_EXEMPT_POST_PATTERNS, path);
+    }
+
     private ServerHttpRequest removeUserHeaders(ServerHttpRequest request) {
         return request.mutate()
             .headers(headers -> {
                 headers.remove(HEADER_USER_ID);
                 headers.remove(HEADER_USER_EMAIL);
                 headers.remove(HEADER_USER_ROLE);
+                headers.remove(HEADER_PROFILE_COMPLETED);
             })
             .build();
     }
