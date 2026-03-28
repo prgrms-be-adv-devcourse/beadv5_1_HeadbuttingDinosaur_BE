@@ -134,7 +134,7 @@ class SellerApplicationServiceTest {
             // given
             User user = new User("test@test.com", "$2a$10$hashedPassword");
             given(userRepository.findByUserId(any(UUID.class))).willReturn(Optional.of(user));
-            given(sellerApplicationRepository.findByUserId(any())).willReturn(Optional.empty());
+            given(sellerApplicationRepository.findTopByUserIdOrderByCreatedAtDesc(any())).willReturn(Optional.empty());
 
             // when & then
             assertThatThrownBy(() -> sellerApplicationService.getMyApplication(TEST_USER_UUID))
@@ -148,7 +148,8 @@ class SellerApplicationServiceTest {
             SellerApplication application = new SellerApplication(
                 user.getId(), "국민은행", "123-456-789", "홍길동");
             given(userRepository.findByUserId(any(UUID.class))).willReturn(Optional.of(user));
-            given(sellerApplicationRepository.findByUserId(any())).willReturn(Optional.of(application));
+            given(sellerApplicationRepository.findTopByUserIdOrderByCreatedAtDesc(any())).willReturn(
+                Optional.of(application));
 
             // when
             SellerApplicationStatusResponse response = sellerApplicationService.getMyApplication(TEST_USER_UUID);
