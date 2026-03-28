@@ -6,7 +6,6 @@ import static com.devticket.event.domain.model.QEventTechStack.eventTechStack;
 import com.devticket.event.domain.enums.EventCategory;
 import com.devticket.event.domain.enums.EventStatus;
 import com.devticket.event.domain.model.Event;
-import com.devticket.event.presentation.dto.EventListRequest;
 import com.querydsl.core.types.Order;
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.dsl.BooleanExpression;
@@ -28,47 +27,44 @@ public class EventRepositoryImpl implements EventRepositoryCustom {
 
     private final JPAQueryFactory queryFactory;
 
-    @Override
-    public Page<Event> searchEvents(EventListRequest request, boolean isOwnEventRequest, Pageable pageable) {
 
-        // 1. 기본 쿼리 시작 (불필요한 조인 제거)
+    @Override
+    public Page<Event> searchEvents(
+        String keyword, EventCategory category, List<Long> techStacks,
+        UUID sellerId, List<EventStatus> statuses, Pageable pageable) {
+
         JPAQuery<Event> query = queryFactory.selectFrom(event);
 
-        // 2. 기술 스택 필터가 있을 때만 동적으로 JOIN 추가
-        if (request.techStacks() != null && !request.techStacks().isEmpty()) {
+        if (techStacks != null && !techStacks.isEmpty()) {
             query.leftJoin(event.eventTechStacks, eventTechStack);
         }
 
-        // 3. 조건 및 페이징 적용
         List<Event> content = query
             .where(
-                keywordContains(request.keyword()),
-                categoryEq(request.category()),
-                techStackIn(request.techStacks()),
-                sellerEq(request.sellerId()),
-                statusEq(request.status()),
-                publicVisibilityEq(isOwnEventRequest, request.status()) // 권한 필터링
+                keywordContains(keyword),
+                categoryEq(category),
+                techStackIn(techStacks),
+                sellerEq(sellerId),
+                statusIn(statuses)
             )
-            .distinct() // 기술 스택 다중 선택 시 중복 방지
+            .distinct()
             .orderBy(getOrderSpecifiers(pageable))
             .offset(pageable.getOffset())
             .limit(pageable.getPageSize())
             .fetch();
 
-        // 4. 카운트 쿼리 (마찬가지로 동적 조인 적용)
         JPAQuery<Long> countQuery = queryFactory.select(event.countDistinct()).from(event);
 
-        if (request.techStacks() != null && !request.techStacks().isEmpty()) {
+        if (techStacks != null && !techStacks.isEmpty()) {
             countQuery.leftJoin(event.eventTechStacks, eventTechStack);
         }
 
         countQuery.where(
-            keywordContains(request.keyword()),
-            categoryEq(request.category()),
-            techStackIn(request.techStacks()),
-            sellerEq(request.sellerId()),
-            statusEq(request.status()),
-            publicVisibilityEq(isOwnEventRequest, request.status())
+            keywordContains(keyword),
+            categoryEq(category),
+            techStackIn(techStacks),
+            sellerEq(sellerId),
+            statusIn(statuses)
         );
 
         return PageableExecutionUtils.getPage(content, pageable, countQuery::fetchOne);
@@ -133,10 +129,11 @@ public class EventRepositoryImpl implements EventRepositoryCustom {
         return status != null ? event.status.eq(status) : null;
     }
 
-    // 비공개 이벤트 차단 방어 로직
-    private BooleanExpression publicVisibilityEq(boolean isOwnEventRequest, EventStatus requestedStatus) {
-        if (isOwnEventRequest || requestedStatus != null) return null;
-        return event.status.in(EventStatus.ON_SALE, EventStatus.SOLD_OUT, EventStatus.SALE_ENDED);
+    private BooleanExpression statusIn(List<EventStatus> statuses) {
+        if (statuses == null || statuses.isEmpty()) {
+            return null;
+        }
+        return event.status.in(statuses);
     }
 
 }

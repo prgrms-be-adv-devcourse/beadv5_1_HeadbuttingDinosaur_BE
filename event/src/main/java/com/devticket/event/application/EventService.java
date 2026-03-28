@@ -11,6 +11,7 @@ import com.devticket.event.presentation.dto.EventListResponse;
 import com.devticket.event.presentation.dto.SellerEventCreateRequest;
 import com.devticket.event.presentation.dto.SellerEventCreateResponse;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -77,16 +78,34 @@ public class EventService {
     @Transactional(readOnly = true)
     public EventListResponse getEventList(EventListRequest request, UUID currentUserId, Pageable pageable) {
 
-        // 1. 판매자 본인이 자신의 이벤트를 조회하는 요청인지 확인
         boolean isOwnEventRequest = request.sellerId() != null && request.sellerId().equals(currentUserId);
 
-        // 2. 권한 검증: 비공개 상태를 조회하려는데 본인이 아니면 예외 발생
+        // 1. 권한 검증: 비공개 이벤트를 본인이 아닌 사람이 보려는지 차단
         if (request.status() != null && !isPublicStatus(request.status()) && !isOwnEventRequest) {
             throw new BusinessException(EventErrorCode.UNAUTHORIZED_SELLER);
         }
 
-        // 3. 데이터베이스 조회 (본인 요청 여부를 QueryDSL로 넘김)
-        Page<Event> eventPage = eventRepository.searchEvents(request, isOwnEventRequest, pageable);
+        // 2. 서비스에서 필터링할 '상태값 목록'을 명확히 계산
+        List<EventStatus> allowedStatuses = null;
+
+        if (request.status() != null) {
+            // 특정 상태를 요청한 경우
+            allowedStatuses = List.of(request.status());
+        } else if (!isOwnEventRequest) {
+            // 본인 조회가 아닌 일반 전체 검색인 경우 -> 대중에게 공개된 이벤트만 필터링하도록 지시
+            allowedStatuses = List.of(EventStatus.ON_SALE, EventStatus.SOLD_OUT, EventStatus.SALE_ENDED);
+        }
+        // isOwnEventRequest가 true이면서 status가 null인 경우는 본인의 모든 이벤트를 보는 것이므로 null 유지
+
+        // 3. Repository에 DTO 대신 해체된 파라미터 전달
+        Page<Event> eventPage = eventRepository.searchEvents(
+            request.keyword(),
+            request.category(),
+            request.techStacks(),
+            request.sellerId(),
+            allowedStatuses,
+            pageable
+        );
 
         return EventListResponse.of(eventPage);
     }
