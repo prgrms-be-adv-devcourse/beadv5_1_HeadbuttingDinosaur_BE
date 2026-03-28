@@ -21,6 +21,15 @@ public final class RoutePolicy {
 
     private static final PathPatternParser PARSER = new PathPatternParser();
 
+    // 프로필 미완성 사용자도 접근 허용할 경로 (패턴)
+    public static final List<PathPattern> PROFILE_EXEMPT_PATTERNS = List.of(
+        new PathPatternParser().parse("/api/auth/**")
+    );
+
+    public static final List<PathPattern> PROFILE_EXEMPT_POST_PATTERNS = List.of(
+        new PathPatternParser().parse("/api/users/profile")
+    );
+
     // ──────────────────────────────────────────────
     // 인증 불필요 (비로그인 허용)
     // ──────────────────────────────────────────────

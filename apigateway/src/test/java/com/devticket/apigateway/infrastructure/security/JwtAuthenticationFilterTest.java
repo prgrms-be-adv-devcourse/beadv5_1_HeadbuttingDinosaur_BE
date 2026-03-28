@@ -53,6 +53,95 @@ class JwtAuthenticationFilterTest {
     }
 
     // ──────────────────────────────────────────────
+    // 프로필 미완성 사용자 차단 테스트
+    // ──────────────────────────────────────────────
+
+    @Test
+    void 프로필_미완성_사용자가_일반_API_요청시_403_COMMON_009() {
+        String token = JwtTestHelper.createValidTokenWithProfile("42", "user@test.com", "USER", false);
+
+        webTestClient.get()
+            .uri("/api/cart")
+            .header("Authorization", "Bearer " + token)
+            .exchange()
+            .expectStatus().isForbidden()
+            .expectBody()
+            .jsonPath("$.status").isEqualTo(403)
+            .jsonPath("$.code").isEqualTo("COMMON_010")
+            .jsonPath("$.message").isEqualTo("프로필 설정을 완료해야 서비스를 이용할 수 있습니다.")
+            .jsonPath("$.timestamp").exists();
+    }
+
+    @Test
+    void 프로필_미완성_사용자가_POST_api_users_profile_요청시_통과() {
+        String token = JwtTestHelper.createValidTokenWithProfile("42", "user@test.com", "USER", false);
+
+        webTestClient.post()
+            .uri("/api/users/profile")
+            .header("Authorization", "Bearer " + token)
+            .exchange()
+            .expectStatus().value(status -> {
+                assertThat(status).isNotEqualTo(401);
+                assertThat(status).isNotEqualTo(403);
+            });
+    }
+
+    @Test
+    void 프로필_미완성_사용자가_api_auth_요청시_통과() {
+        String token = JwtTestHelper.createValidTokenWithProfile("42", "user@test.com", "USER", false);
+
+        webTestClient.post()
+            .uri("/api/auth/logout")
+            .header("Authorization", "Bearer " + token)
+            .exchange()
+            .expectStatus().value(status -> {
+                assertThat(status).isNotEqualTo(401);
+                assertThat(status).isNotEqualTo(403);
+            });
+    }
+
+    @Test
+    void 프로필_완성_사용자는_모든_API_정상_통과() {
+        String token = JwtTestHelper.createValidTokenWithProfile("42", "user@test.com", "USER", true);
+
+        webTestClient.get()
+            .uri("/api/cart")
+            .header("Authorization", "Bearer " + token)
+            .exchange()
+            .expectStatus().value(status -> {
+                assertThat(status).isNotEqualTo(401);
+                assertThat(status).isNotEqualTo(403);
+            });
+    }
+
+    @Test
+    void 프로필_미완성_사용자가_orders_요청시_403_반환() {
+        String token = JwtTestHelper.createValidTokenWithProfile("42", "user@test.com", "USER", false);
+
+        webTestClient.get()
+            .uri("/api/orders")
+            .header("Authorization", "Bearer " + token)
+            .exchange()
+            .expectStatus().isForbidden()
+            .expectBody()
+            .jsonPath("$.code").isEqualTo("COMMON_010");
+    }
+
+    @Test
+    void 프로필_미완성_사용자가_GET_api_users_profile_은_차단() {
+        // POST만 허용, GET은 차단
+        String token = JwtTestHelper.createValidTokenWithProfile("42", "user@test.com", "USER", false);
+
+        webTestClient.get()
+            .uri("/api/users/profile")
+            .header("Authorization", "Bearer " + token)
+            .exchange()
+            .expectStatus().isForbidden()
+            .expectBody()
+            .jsonPath("$.code").isEqualTo("COMMON_010");
+    }
+
+    // ──────────────────────────────────────────────
     // 인증 실패 테스트
     // ──────────────────────────────────────────────
 
