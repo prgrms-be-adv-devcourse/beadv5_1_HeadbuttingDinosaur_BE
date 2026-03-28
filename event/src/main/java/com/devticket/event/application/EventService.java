@@ -10,6 +10,7 @@ import com.devticket.event.presentation.dto.EventListRequest;
 import com.devticket.event.presentation.dto.EventListResponse;
 import com.devticket.event.presentation.dto.SellerEventCreateRequest;
 import com.devticket.event.presentation.dto.SellerEventCreateResponse;
+import com.devticket.event.presentation.dto.SellerEventDetailResponse;
 import com.devticket.event.presentation.dto.SellerEventSummaryResponse;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -109,6 +110,19 @@ public class EventService {
         );
 
         return EventListResponse.of(eventPage);
+    }
+
+    @Transactional(readOnly = true)
+    public SellerEventDetailResponse getSellerEventDetail(UUID sellerId, UUID eventId) {
+
+        Event event = eventRepository.findWithDetailsByEventId(eventId)
+            .orElseThrow(() -> new BusinessException(EventErrorCode.EVENT_NOT_FOUND));
+
+        if (!event.getSellerId().equals(sellerId)) {
+            throw new BusinessException(EventErrorCode.UNAUTHORIZED_SELLER);
+        }
+
+        return SellerEventDetailResponse.from(event);
     }
 
     @Transactional(readOnly = true)

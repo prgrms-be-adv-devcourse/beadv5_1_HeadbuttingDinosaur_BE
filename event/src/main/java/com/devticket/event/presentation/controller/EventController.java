@@ -7,6 +7,7 @@ import com.devticket.event.presentation.dto.EventListResponse;
 import com.devticket.event.presentation.dto.SellerEventCreateRequest;
 import com.devticket.event.presentation.dto.SellerEventCreateResponse;
 import com.devticket.event.common.response.SuccessResponse;
+import com.devticket.event.presentation.dto.SellerEventDetailResponse;
 import com.devticket.event.presentation.dto.SellerEventSummaryResponse;
 import jakarta.validation.Valid;
 import java.util.UUID;
@@ -51,6 +52,15 @@ public class EventController {
         @PageableDefault(size = 20) Pageable pageable) {
 
         EventListResponse response = eventService.getEventList(request, currentUserId, pageable);
+        return ResponseEntity.ok(SuccessResponse.success(response));
+    }
+
+    @GetMapping("/seller/{eventId}")
+    public ResponseEntity<SuccessResponse<SellerEventDetailResponse>> getSellerEventDetail(
+        @RequestHeader("X-User-Id") UUID sellerId,
+        @PathVariable UUID eventId) {
+
+        SellerEventDetailResponse response = eventService.getSellerEventDetail(sellerId, eventId);
         return ResponseEntity.ok(SuccessResponse.success(response));
     }
 
