@@ -219,4 +219,109 @@ class EventServiceTest {
         assertThat(response.totalElements()).isZero();
         assertThat(response.content()).isEmpty();
     }
+
+    // 판매자 등록 이벤트 목록 조회 테스트
+
+    @Test
+    void 일반_조회시_공개된_상태의_이벤트만_조회조건으로_전달된다() {
+        // given
+        EventListRequest request = new EventListRequest("스프링", EventCategory.MEETUP, List.of(1L, 2L), null, null);
+        Pageable pageable = PageRequest.of(0, 20);
+        Page<Event> mockPage = EventTestFixture.createEventPage();
+
+        // 서비스 내부에서 계산될 공개 허용 상태값들
+        List<EventStatus> publicStatuses = List.of(EventStatus.ON_SALE, EventStatus.SOLD_OUT, EventStatus.SALE_ENDED);
+
+        // 파라미터가 해체되어 전달됨을 검증
+        when(eventRepository.searchEvents("스프링", EventCategory.MEETUP, List.of(1L, 2L), null, publicStatuses, pageable))
+            .thenReturn(mockPage);
+
+        // when (currentUserId가 null)
+        EventListResponse response = eventService.getEventList(request, null, pageable);
+
+        // then
+        assertThat(response.totalElements()).isEqualTo(mockPage.getTotalElements());
+        verify(eventRepository).searchEvents("스프링", EventCategory.MEETUP, List.of(1L, 2L), null, publicStatuses, pageable);
+    }
+
+    @Test
+    void 판매자_본인_전체조회시_상태제한없이_전달된다() {
+        // given
+        UUID sellerId = UUID.randomUUID();
+        EventListRequest request = new EventListRequest(null, null, null, sellerId, null);
+        Pageable pageable = PageRequest.of(0, 20);
+
+        when(eventRepository.searchEvents(null, null, null, sellerId, null, pageable))
+            .thenReturn(EventTestFixture.createEventPage());
+
+        // when (currentUserId와 request의 sellerId가 일치함)
+        EventListResponse response = eventService.getEventList(request, sellerId, pageable);
+
+        // then
+        assertThat(response).isNotNull();
+        verify(eventRepository).searchEvents(null, null, null, sellerId, null, pageable);
+    }
+
+    @Test
+    void 판매자_본인_특정상태_조회시_해당상태가_전달된다() {
+        // given
+        UUID sellerId = UUID.randomUUID();
+        EventListRequest request = new EventListRequest(null, null, null, sellerId, EventStatus.DRAFT);
+        Pageable pageable = PageRequest.of(0, 20);
+
+        when(eventRepository.searchEvents(null, null, null, sellerId, List.of(EventStatus.DRAFT), pageable))
+            .thenReturn(EventTestFixture.createEventPage());
+
+        // when
+        EventListResponse response = eventService.getEventList(request, sellerId, pageable);
+
+        // then
+        assertThat(response).isNotNull();
+        verify(eventRepository).searchEvents(null, null, null, sellerId, List.of(EventStatus.DRAFT), pageable);
+    }
+
+    @Test
+    void 타인_비공개_이벤트_조회시_권한예외_발생() {
+        // given
+        UUID sellerId = UUID.randomUUID();
+        UUID otherUserId = UUID.randomUUID(); // 다른 사용자 (타인)
+        EventListRequest request = new EventListRequest(null, null, null, sellerId, EventStatus.DRAFT);
+        Pageable pageable = PageRequest.of(0, 20);
+
+        // when & then
+        assertThatThrownBy(() -> eventService.getEventList(request, otherUserId, pageable))
+            .isInstanceOf(BusinessException.class)
+            .hasMessageContaining(EventErrorCode.UNAUTHORIZED_SELLER.getMessage());
+    }
+
+    @Test
+    void 비로그인_사용자_비공개_이벤트_조회시_권한예외_발생() {
+        // given
+        EventListRequest request = new EventListRequest(null, null, null, null, EventStatus.DRAFT);
+        Pageable pageable = PageRequest.of(0, 20);
+
+        // when & then (currentUserId에 null 전달)
+        assertThatThrownBy(() -> eventService.getEventList(request, null, pageable))
+            .isInstanceOf(BusinessException.class)
+            .hasMessageContaining(EventErrorCode.UNAUTHORIZED_SELLER.getMessage());
+    }
+
+    @Test
+    void 검색결과가_없을경우_빈_리스트반환() {
+        // given
+        EventListRequest request = new EventListRequest("없는키워드", null, null, null, null);
+        Pageable pageable = PageRequest.of(0, 20);
+        Page<Event> emptyPage = new PageImpl<>(Collections.emptyList(), pageable, 0);
+        List<EventStatus> publicStatuses = List.of(EventStatus.ON_SALE, EventStatus.SOLD_OUT, EventStatus.SALE_ENDED);
+
+        when(eventRepository.searchEvents("없는키워드", null, null, null, publicStatuses, pageable))
+            .thenReturn(emptyPage);
+
+        // when
+        EventListResponse response = eventService.getEventList(request, null, pageable);
+
+        // then
+        assertThat(response.totalElements()).isZero();
+        assertThat(response.content()).isEmpty();
+    }
 }
