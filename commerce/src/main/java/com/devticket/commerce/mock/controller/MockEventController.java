@@ -1,6 +1,7 @@
 package com.devticket.commerce.mock.controller;
 
 import com.devticket.commerce.cart.infrastructure.external.client.dto.InternalPurchaseValidationResponse;
+import java.util.UUID;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -17,7 +18,7 @@ public class MockEventController {
     @GetMapping("/{eventId}/validate-purchase")
     public InternalPurchaseValidationResponse mockValidatePurchase(
         @PathVariable Long eventId,
-        @RequestParam Long userId,
+        @RequestParam UUID userId,
         @RequestParam Integer quantity) {
 
         // 로컬 테스트를 위한 가짜(Mock) 응답 객체 생성
