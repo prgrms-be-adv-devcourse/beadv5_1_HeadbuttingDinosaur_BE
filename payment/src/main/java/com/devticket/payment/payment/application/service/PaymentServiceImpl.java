@@ -8,6 +8,8 @@ import com.devticket.payment.payment.domain.model.Payment;
 import com.devticket.payment.payment.domain.repository.PaymentRepository;
 import com.devticket.payment.payment.infrastructure.client.CommerceInternalClient;
 import com.devticket.payment.payment.infrastructure.client.dto.InternalOrderInfoResponse;
+import com.devticket.payment.payment.presentation.dto.PaymentConfirmRequest;
+import com.devticket.payment.payment.presentation.dto.PaymentConfirmResponse;
 import com.devticket.payment.payment.presentation.dto.PaymentReadyRequest;
 import com.devticket.payment.payment.presentation.dto.PaymentReadyResponse;
 import com.devticket.payment.wallet.domain.exception.WalletErrorCode;
@@ -16,6 +18,7 @@ import com.devticket.payment.wallet.domain.model.Wallet;
 import com.devticket.payment.wallet.domain.model.WalletTransaction;
 import com.devticket.payment.wallet.domain.repository.WalletRepository;
 import com.devticket.payment.wallet.domain.repository.WalletTransactionRepository;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -60,6 +63,11 @@ public class PaymentServiceImpl implements PaymentService {
             order.orderNumber(),
             order.status()
         );
+    }
+
+    @Override
+    public PaymentConfirmResponse confirmPgPayment(UUID userId, PaymentConfirmRequest request) {
+        return null;
     }
 
     //예치금 결제
