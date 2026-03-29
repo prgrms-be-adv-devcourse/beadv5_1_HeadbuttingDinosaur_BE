@@ -4,14 +4,19 @@ import com.devticket.event.common.exception.BusinessException;
 import com.devticket.event.domain.enums.EventStatus;
 import com.devticket.event.domain.exception.EventErrorCode;
 import com.devticket.event.domain.model.Event;
+import com.devticket.event.domain.model.EventTechStack;
 import com.devticket.event.infrastructure.persistence.EventRepository;
 import com.devticket.event.presentation.dto.EventDetailResponse;
 import com.devticket.event.presentation.dto.EventListRequest;
 import com.devticket.event.presentation.dto.EventListResponse;
 import com.devticket.event.presentation.dto.SellerEventCreateRequest;
 import com.devticket.event.presentation.dto.SellerEventCreateResponse;
+import com.devticket.event.presentation.dto.SellerEventDetailResponse;
+import com.devticket.event.presentation.dto.SellerEventSummaryResponse;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -63,7 +68,35 @@ public class EventService {
         // 3. 이벤트 저장
         Event savedEvent = eventRepository.save(event);
 
+        // 4. techStackIds 저장 로직
+        if (request.techStackIds() != null && !request.techStackIds().isEmpty()) {
+            for (Long techStackId : request.techStackIds()) {
+                String techStackName = getTechStackName(techStackId);
+                EventTechStack techStack = EventTechStack.of(savedEvent, techStackId, techStackName);
+                savedEvent.getEventTechStacks().add(techStack);
+            }
+            eventRepository.save(savedEvent);  // EventTechStack 반영을 위해 다시 저장
+        }
+
         return SellerEventCreateResponse.from(savedEvent);
+    }
+
+    /**
+     * TechStack ID를 실제 name으로 매핑 (더미 데이터)
+     * 향후 Member 서비스 API 호출로 교체 예정
+     */
+    private String getTechStackName(Long techStackId) {
+        Map<Long, String> TECH_STACK_NAMES = new HashMap<>();
+        TECH_STACK_NAMES.put(1L, "Spring");
+        TECH_STACK_NAMES.put(2L, "React");
+        TECH_STACK_NAMES.put(3L, "Vue");
+        TECH_STACK_NAMES.put(4L, "Django");
+        TECH_STACK_NAMES.put(5L, "FastAPI");
+        TECH_STACK_NAMES.put(6L, "Node.js");
+        TECH_STACK_NAMES.put(7L, "Python");
+        TECH_STACK_NAMES.put(8L, "Kotlin");
+
+        return TECH_STACK_NAMES.getOrDefault(techStackId, "Unknown");
     }
 
     @Transactional(readOnly = true)
@@ -108,6 +141,32 @@ public class EventService {
         );
 
         return EventListResponse.of(eventPage);
+    }
+
+    @Transactional(readOnly = true)
+    public SellerEventDetailResponse getSellerEventDetail(UUID sellerId, UUID eventId) {
+
+        Event event = eventRepository.findWithDetailsByEventId(eventId)
+            .orElseThrow(() -> new BusinessException(EventErrorCode.EVENT_NOT_FOUND));
+
+        if (!event.getSellerId().equals(sellerId)) {
+            throw new BusinessException(EventErrorCode.UNAUTHORIZED_SELLER);
+        }
+
+        return SellerEventDetailResponse.from(event);
+    }
+
+    @Transactional(readOnly = true)
+    public SellerEventSummaryResponse getEventSummary(UUID sellerId, UUID eventId) {
+
+        Event event = eventRepository.findByEventId(eventId)
+            .orElseThrow(() -> new BusinessException(EventErrorCode.EVENT_NOT_FOUND));
+
+        if (!event.getSellerId().equals(sellerId)) {
+            throw new BusinessException(EventErrorCode.UNAUTHORIZED_SELLER);
+        }
+
+        return SellerEventSummaryResponse.from(event);
     }
 
     private boolean isPublicStatus(EventStatus status) {

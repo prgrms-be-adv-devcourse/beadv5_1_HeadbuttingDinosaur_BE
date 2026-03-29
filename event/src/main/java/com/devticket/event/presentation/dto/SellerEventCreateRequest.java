@@ -45,7 +45,7 @@ public record SellerEventCreateRequest(
 
     @NotNull(message = "기술 스택은 1개 이상 선택해야 합니다.")
     @Size(min = 1, max = 5, message = "기술 스택은 1개에서 5개까지 선택 가능합니다.")
-    List<UUID> techStackIds,
+    List<Long> techStackIds,
 
     @Size(max = 2, message = "이미지는 최대 2장까지 업로드 가능합니다.")
     List<String> imageUrls

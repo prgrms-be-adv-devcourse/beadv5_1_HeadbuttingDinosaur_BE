@@ -81,6 +81,9 @@ public class Event extends BaseEntity {
     @OneToMany(mappedBy = "event", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<EventTechStack> eventTechStacks = new ArrayList<>();
 
+    @OneToMany(mappedBy = "event", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<EventImage> eventImages = new ArrayList<>();
+
     @Builder(access = AccessLevel.PRIVATE)
     private Event(UUID eventId, UUID sellerId, String title, String description, String location,
         LocalDateTime eventDateTime, LocalDateTime saleStartAt, LocalDateTime saleEndAt,

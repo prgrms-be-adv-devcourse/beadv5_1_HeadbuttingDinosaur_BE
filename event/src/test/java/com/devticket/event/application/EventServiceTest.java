@@ -2,10 +2,11 @@ package com.devticket.event.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -62,7 +63,8 @@ class EventServiceTest {
 
         Event savedEvent = EventTestFixture.createEvent(sellerId);
         ReflectionTestUtils.setField(savedEvent, "eventId", expectedUuid);
-        when(eventRepository.save(any(Event.class))).thenReturn(savedEvent);
+
+        when(eventRepository.save(argThat(event -> event != null))).thenReturn(savedEvent);
 
         // when
         SellerEventCreateResponse response = eventService.createEvent(sellerId, request);
@@ -71,7 +73,7 @@ class EventServiceTest {
         assertThat(response.eventId()).isEqualTo(expectedUuid);
         assertThat(response.status()).isEqualTo(EventStatus.DRAFT);
 
-        verify(eventRepository).save(any(Event.class));
+        verify(eventRepository, times(2)).save(argThat(event -> event != null));
     }
 
     @Test

@@ -32,16 +32,21 @@ public class EventTechStack extends BaseEntity {
     @Column(name = "tech_stack_id", nullable = false)
     private Long techStackId;
 
+    @Column(name = "tech_stack_name", nullable = false, length = 100)
+    private String techStackName;
+
     @Builder(access = AccessLevel.PRIVATE)
-    private EventTechStack(Event event, Long techStackId) {
+    private EventTechStack(Event event, Long techStackId, String techStackName) {
         this.event = event;
         this.techStackId = techStackId;
+        this.techStackName = techStackName;
     }
 
-    public static EventTechStack of(Event event, Long techStackId) {
+    public static EventTechStack of(Event event, Long techStackId, String techStackName) {
         return EventTechStack.builder()
             .event(event)
             .techStackId(techStackId)
+            .techStackName(techStackName)
             .build();
     }
 
