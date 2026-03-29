@@ -9,6 +9,8 @@ import com.devticket.event.presentation.dto.SellerEventCreateResponse;
 import com.devticket.event.common.response.SuccessResponse;
 import com.devticket.event.presentation.dto.SellerEventDetailResponse;
 import com.devticket.event.presentation.dto.SellerEventSummaryResponse;
+import com.devticket.event.presentation.dto.SellerEventUpdateRequest;
+import com.devticket.event.presentation.dto.SellerEventUpdateResponse;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -70,6 +72,16 @@ public class EventController {
         @PathVariable("eventId") UUID eventId) {
 
         SellerEventSummaryResponse response = eventService.getEventSummary(sellerId, eventId);
+        return ResponseEntity.ok(SuccessResponse.success(response));
+    }
+
+    @PatchMapping("/{eventId}")
+    public ResponseEntity<SuccessResponse<SellerEventUpdateResponse>> updateEvent(
+        @RequestHeader("X-User-Id") UUID sellerId,
+        @PathVariable("eventId") UUID eventId,
+        @RequestBody SellerEventUpdateRequest request) {
+
+        SellerEventUpdateResponse response = eventService.updateEvent(sellerId, eventId, request);
         return ResponseEntity.ok(SuccessResponse.success(response));
     }
 
