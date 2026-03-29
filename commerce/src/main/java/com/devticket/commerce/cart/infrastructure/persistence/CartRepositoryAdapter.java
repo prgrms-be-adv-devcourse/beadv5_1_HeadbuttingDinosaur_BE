@@ -11,7 +11,7 @@ import org.springframework.stereotype.Repository;
 @RequiredArgsConstructor
 public class CartRepositoryAdapter implements CartRepository {
 
-    public final CartJpaRepository cartJpaRepository;
+    private final CartJpaRepository cartJpaRepository;
 
     @Override
     public Optional<Cart> findByUserId(UUID userId) {

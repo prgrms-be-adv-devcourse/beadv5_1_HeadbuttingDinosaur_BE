@@ -1,8 +1,10 @@
 package com.devticket.commerce.mock.controller;
 
 import com.devticket.commerce.cart.infrastructure.external.client.dto.InternalPurchaseValidationResponse;
+import com.devticket.commerce.order.infrastructure.external.client.dto.InternalBulkStockAdjustmentRequest;
 import com.devticket.commerce.order.infrastructure.external.client.dto.InternalStockAdjustmentRequest;
 import com.devticket.commerce.order.infrastructure.external.client.dto.InternalStockAdjustmentResponse;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -45,7 +47,25 @@ public class MockEventController {
             eventId,
             true,
             100,
-            "이벤트 제목"
+            "이벤트 제목",
+            30000,
+            10
         );
+    }
+
+    @PatchMapping("/{eventId}/stock-adjustments")
+    public List<InternalStockAdjustmentResponse> mockBulkAdjustStock(
+        @RequestBody InternalBulkStockAdjustmentRequest request
+    ) {
+        return request.eventItems().stream()
+            .map(item -> new InternalStockAdjustmentResponse(
+                item.eventId(),
+                true,
+                100,
+                "이벤트 제목",
+                30000,
+                10
+            ))
+            .toList();
     }
 }

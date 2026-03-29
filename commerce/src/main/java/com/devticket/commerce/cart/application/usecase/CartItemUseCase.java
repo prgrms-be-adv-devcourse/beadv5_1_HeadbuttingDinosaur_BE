@@ -6,4 +6,5 @@ import com.devticket.commerce.cart.presentation.dto.res.CartItemResponse;
 public interface CartItemUseCase {
 
     CartItemResponse save(Long userId, CartItemRequest request);
+    
 }
