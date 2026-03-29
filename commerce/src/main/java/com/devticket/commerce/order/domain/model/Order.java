@@ -15,7 +15,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -65,7 +64,9 @@ public class Order extends BaseEntity {
 
     public static Order create(
         UUID userId,
-        List<OrderItem> items
+        int totalAmount
+        //List<OrderItem> items
+
     ) {
         LocalDateTime now = LocalDateTime.now();
 
@@ -74,24 +75,24 @@ public class Order extends BaseEntity {
         String uniqueSuffix = UUID.randomUUID().toString().substring(0, 8);
         String generatedOrderNumber = String.format("%s-%s", datePrefix, uniqueSuffix);
 
-        // 최소 주문 상품 존재 여부 확인
-        if (items == null || items.isEmpty()) {
-            throw new BusinessException(OrderErrorCode.EMPTY_ORDER_ITEMS);
-        }
+//        // 최소 주문 상품 존재 여부 확인
+//        if (items == null || items.isEmpty()) {
+//            throw new BusinessException(OrderErrorCode.EMPTY_ORDER_ITEMS);
+//        }
+//
+//        // OrderItem들의 subtotalAmount 합계
+//        int calculatedTotal = items.stream()
+//            .mapToInt(OrderItem::getSubtotalAmount)
+//            .sum();
 
-        // OrderItem들의 subtotalAmount 합계
-        int calculatedTotal = items.stream()
-            .mapToInt(OrderItem::getSubtotalAmount)
-            .sum();
-
-        validateTotalAmount(calculatedTotal);
+        validateTotalAmount(totalAmount);
 
         return Order.builder()
             .orderId(UUID.randomUUID())
             .userId(userId)
             .orderNumber(generatedOrderNumber)
             .paymentMethod(null)
-            .totalAmount(calculatedTotal)
+            .totalAmount(totalAmount)
             .status(OrderStatus.CREATED)
             .orderedAt(now)
             .deletedAt(null)

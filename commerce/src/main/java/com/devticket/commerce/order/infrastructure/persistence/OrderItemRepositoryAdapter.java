@@ -21,5 +21,7 @@ public class OrderItemRepositoryAdapter implements OrderItemRepository {
     @Override
     public List<OrderItem> findAllByOrderId(UUID orderId) {
         return orderItemJpaRepository.findAllByOrderId(orderId);
+    public List<OrderItem> saveAll(List<OrderItem> orderItems) {
+        return orderItemJpaRepository.saveAll(orderItems);
     }
 }

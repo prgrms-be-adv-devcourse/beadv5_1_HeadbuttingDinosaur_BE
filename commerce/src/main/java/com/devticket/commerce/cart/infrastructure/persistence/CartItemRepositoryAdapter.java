@@ -2,6 +2,7 @@ package com.devticket.commerce.cart.infrastructure.persistence;
 
 import com.devticket.commerce.cart.domain.model.CartItem;
 import com.devticket.commerce.cart.domain.repository.CartItemRepository;
+import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
@@ -10,7 +11,7 @@ import org.springframework.stereotype.Repository;
 @RequiredArgsConstructor
 public class CartItemRepositoryAdapter implements CartItemRepository {
 
-    public final CartItemJpaRepository cartItemJpaRepository;
+    private final CartItemJpaRepository cartItemJpaRepository;
 
     @Override
     public CartItem save(CartItem cartItem) {
@@ -18,7 +19,17 @@ public class CartItemRepositoryAdapter implements CartItemRepository {
     }
 
     @Override
+    public List<CartItem> findAllById(List<Long> cartItemIds) {
+        return cartItemJpaRepository.findAllById(cartItemIds);
+    }
+
+    @Override
     public Optional<CartItem> findByCartIdAndEventId(Long cartId, Long eventId) {
         return cartItemJpaRepository.findByCartIdAndEventId(cartId, eventId);
+    }
+
+    @Override
+    public void deleteAllInBatch(List<CartItem> cartItems) {
+        cartItemJpaRepository.deleteAllInBatch(cartItems);
     }
 }

@@ -9,4 +9,6 @@ public interface OrderItemRepository {
     OrderItem save(OrderItem OrderItem);
 
     List<OrderItem> findAllByOrderId(UUID orderId);
+    List<OrderItem> saveAll(List<OrderItem> orderItems);
+    
 }
