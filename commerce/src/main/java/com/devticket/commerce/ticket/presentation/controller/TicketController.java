@@ -24,9 +24,9 @@ public class TicketController {
 
     private final TicketUsecase ticketUsecase;
 
-    @PostMapping("/items")
-    @Operation(description = "장바구니 담기")
-    public ResponseEntity<TicketResponse> addToCart(
+    @PostMapping
+    @Operation(description = "티켓 발급")
+    public ResponseEntity<TicketResponse> createTickets(
         @RequestHeader("X-User-Id") UUID userId,
         @RequestBody TicketRequest request
     ) {
