@@ -1,10 +1,13 @@
 package com.devticket.event.fixture;
 
 import com.devticket.event.domain.enums.EventCategory;
+import com.devticket.event.domain.enums.EventStatus;
 import com.devticket.event.domain.model.Event;
 import com.devticket.event.presentation.dto.EventDetailResponse;
 import com.devticket.event.presentation.dto.EventListResponse;
 import com.devticket.event.presentation.dto.SellerEventCreateRequest;
+import com.devticket.event.presentation.dto.SellerEventDetailResponse;
+import com.devticket.event.presentation.dto.SellerEventSummaryResponse;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -58,5 +61,42 @@ public class EventTestFixture {
     // Controller 테스트용 EventListResponse 생성 메서드
     public static EventListResponse createEventListResponse() {
         return EventListResponse.of(createEventPage());
+    }
+
+    // 판매자 이벤트 상세 조회 응답 생성
+    public static SellerEventDetailResponse createSellerEventDetailResponse(UUID eventId) {
+        return new SellerEventDetailResponse(
+            eventId,
+            "상세 조회 테스트 밋업",
+            "설명",
+            "강남역",
+            LocalDateTime.now().plusDays(15),
+            LocalDateTime.now().plusDays(4),
+            LocalDateTime.now().plusDays(10),
+            50000,
+            100,
+            80,
+            4,
+            EventStatus.DRAFT,
+            EventCategory.MEETUP,
+            List.of(new SellerEventDetailResponse.TechStackInfo(1L, "Spring")),
+            List.of("url1"),
+            LocalDateTime.now(),
+            LocalDateTime.now()
+        );
+    }
+
+    // 판매자 이벤트 현황 조회 응답 생성
+    public static SellerEventSummaryResponse createSellerEventSummaryResponse(UUID eventId) {
+        return new SellerEventSummaryResponse(
+            eventId,
+            "상세 조회 테스트 밋업",
+            EventStatus.ON_SALE,
+            100,
+            20,
+            80,
+            LocalDateTime.now().plusDays(10),
+            LocalDateTime.now().plusDays(15)
+        );
     }
 }

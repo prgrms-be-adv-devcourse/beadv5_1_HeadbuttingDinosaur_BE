@@ -22,6 +22,8 @@ import com.devticket.event.presentation.dto.EventListRequest;
 import com.devticket.event.presentation.dto.EventListResponse;
 import com.devticket.event.presentation.dto.SellerEventCreateRequest;
 import com.devticket.event.presentation.dto.SellerEventCreateResponse;
+import com.devticket.event.presentation.dto.SellerEventDetailResponse;
+import com.devticket.event.presentation.dto.SellerEventSummaryResponse;
 import java.time.LocalDateTime;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -295,6 +297,76 @@ class EventControllerTest {
         assertThat(capturedPageable.getPageSize()).isEqualTo(10);
         assertThat(capturedPageable.getSort().getOrderFor("price").getDirection())
             .isEqualTo(Sort.Direction.DESC);
+    }
+
+    // 판매자 이벤트 상세 조회 테스트
+
+    @Test
+    void 판매자_이벤트_상세조회_성공시_200_응답과_상세정보를_반환한다() throws Exception {
+        // given
+        UUID sellerId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+        SellerEventDetailResponse mockResponse = EventTestFixture.createSellerEventDetailResponse(eventId);
+
+        when(eventService.getSellerEventDetail(eq(sellerId), eq(eventId))).thenReturn(mockResponse);
+
+        // when & then
+        mockMvc.perform(get("/api/v1/events/seller/{eventId}", eventId)
+                .header("X-User-Id", sellerId.toString())
+                .contentType(MediaType.APPLICATION_JSON))
+            .andDo(print())
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.eventId").value(eventId.toString()))
+            .andExpect(jsonPath("$.data.title").value("상세 조회 테스트 밋업"))
+            .andExpect(jsonPath("$.data.techStacks").isArray())
+            .andExpect(jsonPath("$.data.imageUrls").isArray());
+    }
+
+    @Test
+    void 판매자_이벤트_상세조회시_X_User_Id_헤더가_없으면_400_응답을_반환한다() throws Exception {
+        // given
+        UUID eventId = UUID.randomUUID();
+
+        // when & then (헤더 미포함)
+        mockMvc.perform(get("/api/v1/events/seller/{eventId}", eventId)
+                .contentType(MediaType.APPLICATION_JSON))
+            .andDo(print())
+            .andExpect(status().isBadRequest());
+    }
+
+    // 판매자 이벤트 현황 조회 테스트
+
+    @Test
+    void 판매자_이벤트_현황조회_성공시_200_응답과_현황정보를_반환한다() throws Exception {
+        // given
+        UUID sellerId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+        SellerEventSummaryResponse mockResponse = EventTestFixture.createSellerEventSummaryResponse(eventId);
+
+        when(eventService.getEventSummary(eq(sellerId), eq(eventId))).thenReturn(mockResponse);
+
+        // when & then
+        mockMvc.perform(get("/api/v1/events/{eventId}/statistics", eventId)
+                .header("X-User-Id", sellerId.toString())
+                .contentType(MediaType.APPLICATION_JSON))
+            .andDo(print())
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.eventId").value(eventId.toString()))
+            .andExpect(jsonPath("$.data.totalQuantity").value(100))
+            .andExpect(jsonPath("$.data.soldQuantity").value(20))
+            .andExpect(jsonPath("$.data.remainingQuantity").value(80));
+    }
+
+    @Test
+    void 판매자_이벤트_현황조회시_X_User_Id_헤더가_없으면_400_응답을_반환한다() throws Exception {
+        // given
+        UUID eventId = UUID.randomUUID();
+
+        // when & then (헤더 미포함)
+        mockMvc.perform(get("/api/v1/events/{eventId}/statistics", eventId)
+                .contentType(MediaType.APPLICATION_JSON))
+            .andDo(print())
+            .andExpect(status().isBadRequest());
     }
 
 }
