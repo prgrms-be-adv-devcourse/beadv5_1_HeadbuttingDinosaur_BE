@@ -6,6 +6,7 @@ import com.devticket.commerce.order.domain.model.OrderItem;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.Builder;
 
@@ -19,10 +20,13 @@ public record OrderResponse(
     LocalDateTime createdAt
 ) {
 
-    public static OrderResponse of(Order order, List<OrderItem> orderItems, String eventTitle) {
+    public static OrderResponse of(Order order, List<OrderItem> orderItems, Map<Long, String> eventTitles) {
 
         List<OrderItemsResponse> itemResponses = orderItems.stream()
-            .map(item -> OrderItemsResponse.of(item, eventTitle))
+            .map(item -> {
+                String title = eventTitles.getOrDefault(item.getEventId(), "알 수 없는 이벤트");
+                return OrderItemsResponse.of(item, title);
+            })
             .toList();
 
         return OrderResponse.builder()

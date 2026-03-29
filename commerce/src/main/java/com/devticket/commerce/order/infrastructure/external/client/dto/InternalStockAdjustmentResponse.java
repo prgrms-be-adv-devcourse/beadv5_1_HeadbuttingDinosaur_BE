@@ -4,7 +4,9 @@ public record InternalStockAdjustmentResponse(
     Long eventId,
     Boolean success,
     Integer remainingQuantity,
-    String eventTitle
+    String eventTitle,
+    Integer price,
+    Integer maxQuantity
 ) {
 
 }

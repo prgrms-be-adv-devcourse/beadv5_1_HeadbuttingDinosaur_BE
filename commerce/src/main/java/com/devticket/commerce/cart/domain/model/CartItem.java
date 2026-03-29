@@ -6,6 +6,8 @@ import com.devticket.commerce.common.exception.BusinessException;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
@@ -26,6 +28,9 @@ import lombok.experimental.SuperBuilder;
 public class CartItem extends BaseEntity {
 
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
     @Column(name = "cart_id")
     @Schema(description = "장바구니 항목")
     private Long cartId;

@@ -47,17 +47,14 @@ public class CartService implements CartUseCase {
 
         //DB 작업 : 장바구니 확보와 장바구니에 아이템 담기 로직을 한개 트랜잭션 단위로 묶음.
         //Cart와 CartItem -> 객체참조x, 연관관계 매핑 없이 식별자참조.
-        record SaveResult(Cart cart, CartItem cartItem) {
+        Cart cart = findOrCreateCart(userId);
 
-        }
-        SaveResult result = transactionTemplate.execute(status -> {
-            Cart cart = findOrCreateCart(userId);
-            CartItem item = addOrUpdateCartItem(cart.getId(), request);
-            return new SaveResult(cart, item);
-        });
+        CartItem cartItem = transactionTemplate.execute(status ->
+            addOrUpdateCartItem(cart.getId(), request)
+        );
 
         //응답데이터 구성
-        return CartItemResponse.of(result.cart(), result.cartItem(), event.title(), event.price());
+        return CartItemResponse.of(cart, cartItem, event.title(), event.price());
     }
 
     // =========================================================================
@@ -82,10 +79,12 @@ public class CartService implements CartUseCase {
     private CartItem addOrUpdateCartItem(Long cartId, CartItemRequest request) {
         return cartItemRepository.findByCartIdAndEventId(cartId, request.eventId())
             .map(existingItem -> {
+                log.info("[CartService] 기존 아이템 수량 추가: cartId={}, eventId={}", cartId, request.eventId());
                 existingItem.addQuantity(request.quantity());
-                return existingItem;
+                return cartItemRepository.save(existingItem);
             })
             .orElseGet(() -> {
+                log.info("[CartService] 신규 아이템 생성: cartId={}, eventId={}", cartId, request.eventId());
                 CartItem newItem = CartItem.create(cartId, request.eventId(), request.quantity());
                 return cartItemRepository.save(newItem);
             });
