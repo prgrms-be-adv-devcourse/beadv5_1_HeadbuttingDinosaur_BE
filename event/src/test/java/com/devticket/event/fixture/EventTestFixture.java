@@ -24,7 +24,7 @@ public class EventTestFixture {
             "Spring Boot 3.x 심화 밋업", "설명", "강남역",
             eventDate, saleStart, saleEnd,
             50000, totalQty, maxQty, EventCategory.MEETUP,
-            List.of(UUID.randomUUID(), UUID.randomUUID()),
+            List.of(1L, 2L),
             List.of("url1")
         );
     }
