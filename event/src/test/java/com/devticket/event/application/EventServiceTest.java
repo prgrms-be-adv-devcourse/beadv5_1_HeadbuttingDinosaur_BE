@@ -22,6 +22,8 @@ import com.devticket.event.presentation.dto.EventListRequest;
 import com.devticket.event.presentation.dto.EventListResponse;
 import com.devticket.event.presentation.dto.SellerEventCreateRequest;
 import com.devticket.event.presentation.dto.SellerEventCreateResponse;
+import com.devticket.event.presentation.dto.SellerEventDetailResponse;
+import com.devticket.event.presentation.dto.SellerEventSummaryResponse;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
@@ -325,5 +327,108 @@ class EventServiceTest {
         // then
         assertThat(response.totalElements()).isZero();
         assertThat(response.content()).isEmpty();
+    }
+
+    // 판매자 이벤트 상세 조회 테스트
+
+    @Test
+    void 판매자_본인_이벤트_상세조회_성공시_SellerEventDetailResponse를_반환한다() {
+        // given
+        UUID sellerId = UUID.randomUUID();
+        Event event = EventTestFixture.createEvent(sellerId);
+        UUID eventId = event.getEventId();
+
+        when(eventRepository.findWithDetailsByEventId(eventId)).thenReturn(Optional.of(event));
+
+        // when
+        SellerEventDetailResponse response = eventService.getSellerEventDetail(sellerId, eventId);
+
+        // then
+        assertThat(response.eventId()).isEqualTo(eventId);
+        assertThat(response.title()).isEqualTo("상세 조회 테스트 밋업");
+        verify(eventRepository).findWithDetailsByEventId(eventId);
+    }
+
+    @Test
+    void 판매자_이벤트_상세조회시_이벤트가_없으면_예외가_발생한다() {
+        // given
+        UUID sellerId = UUID.randomUUID();
+        UUID invalidEventId = UUID.randomUUID();
+
+        when(eventRepository.findWithDetailsByEventId(invalidEventId)).thenReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> eventService.getSellerEventDetail(sellerId, invalidEventId))
+            .isInstanceOf(BusinessException.class)
+            .hasMessageContaining(EventErrorCode.EVENT_NOT_FOUND.getMessage());
+    }
+
+    @Test
+    void 판매자_이벤트_상세조회시_본인_이벤트가_아니면_예외가_발생한다() {
+        // given
+        UUID sellerId = UUID.randomUUID();
+        UUID otherSellerId = UUID.randomUUID();
+        Event event = EventTestFixture.createEvent(otherSellerId);
+        UUID eventId = event.getEventId();
+
+        when(eventRepository.findWithDetailsByEventId(eventId)).thenReturn(Optional.of(event));
+
+        // when & then
+        assertThatThrownBy(() -> eventService.getSellerEventDetail(sellerId, eventId))
+            .isInstanceOf(BusinessException.class)
+            .hasMessageContaining(EventErrorCode.UNAUTHORIZED_SELLER.getMessage());
+    }
+
+    // 판매자 이벤트 현황 조회 테스트
+
+    @Test
+    void 판매자_본인_이벤트_현황조회_성공시_SellerEventSummaryResponse를_반환한다() {
+        // given
+        UUID sellerId = UUID.randomUUID();
+        Event event = EventTestFixture.createEvent(sellerId);
+        UUID eventId = event.getEventId();
+
+        when(eventRepository.findByEventId(eventId)).thenReturn(Optional.of(event));
+
+        // when
+        SellerEventSummaryResponse response = eventService.getEventSummary(sellerId, eventId);
+
+        // then
+        assertThat(response.eventId()).isEqualTo(eventId);
+        assertThat(response.title()).isEqualTo("상세 조회 테스트 밋업");
+        assertThat(response.totalQuantity()).isEqualTo(100);
+        assertThat(response.soldQuantity()).isZero();            // 새로 생성된 이벤트는 판매량 0
+        assertThat(response.remainingQuantity()).isEqualTo(100);
+        verify(eventRepository).findByEventId(eventId);
+    }
+
+    @Test
+    void 판매자_이벤트_현황조회시_이벤트가_없으면_예외가_발생한다() {
+        // given
+        UUID sellerId = UUID.randomUUID();
+        UUID invalidEventId = UUID.randomUUID();
+
+        when(eventRepository.findByEventId(invalidEventId)).thenReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> eventService.getEventSummary(sellerId, invalidEventId))
+            .isInstanceOf(BusinessException.class)
+            .hasMessageContaining(EventErrorCode.EVENT_NOT_FOUND.getMessage());
+    }
+
+    @Test
+    void 판매자_이벤트_현황조회시_본인_이벤트가_아니면_예외가_발생한다() {
+        // given
+        UUID sellerId = UUID.randomUUID();
+        UUID otherSellerId = UUID.randomUUID();
+        Event event = EventTestFixture.createEvent(otherSellerId);
+        UUID eventId = event.getEventId();
+
+        when(eventRepository.findByEventId(eventId)).thenReturn(Optional.of(event));
+
+        // when & then
+        assertThatThrownBy(() -> eventService.getEventSummary(sellerId, eventId))
+            .isInstanceOf(BusinessException.class)
+            .hasMessageContaining(EventErrorCode.UNAUTHORIZED_SELLER.getMessage());
     }
 }
