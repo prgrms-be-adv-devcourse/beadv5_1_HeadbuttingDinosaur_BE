@@ -212,6 +212,22 @@ public class EventService {
             throw new BusinessException(EventErrorCode.INVALID_REQUEST);
         }
 
+        // 가격 정책 검증
+        if (request.price() < 0 || request.price() > 9_999_999) {
+            throw new BusinessException(EventErrorCode.INVALID_PRICE);
+        }
+
+        // 수량 정책 검증
+        if (request.totalQuantity() < 5 || request.totalQuantity() > 9_999) {
+            throw new BusinessException(EventErrorCode.INVALID_QUANTITY);
+        }
+
+        // 총 수량 축소 시 기판매 수량 역전 방지
+        int soldQuantity = event.getTotalQuantity() - event.getRemainingQuantity();
+        if (request.totalQuantity() < soldQuantity) {
+            throw new BusinessException(EventErrorCode.TOTAL_QUANTITY_BELOW_SOLD);
+        }
+
         if (request.saleStartAt().isAfter(request.saleEndAt())
             || request.saleStartAt().isEqual(request.saleEndAt())) {
             throw new BusinessException(EventErrorCode.INVALID_SALE_PERIOD);
