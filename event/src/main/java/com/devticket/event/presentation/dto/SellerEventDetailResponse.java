@@ -33,7 +33,7 @@ public record SellerEventDetailResponse(
 
     public static SellerEventDetailResponse from(Event event) {
         List<TechStackInfo> techStacks = event.getEventTechStacks().stream()
-            .map(ts -> new TechStackInfo(ts.getTechStackId(), null))
+            .map(ts -> new TechStackInfo(ts.getTechStackId(), ts.getTechStackName()))
             .toList();
 
         List<String> imageUrls = event.getEventImages().stream()
