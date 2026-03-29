@@ -3,7 +3,10 @@ package com.devticket.commerce.order.application.service;
 import com.devticket.commerce.cart.domain.exception.EventErrorCode;
 import com.devticket.commerce.cart.domain.model.CartItem;
 import com.devticket.commerce.cart.domain.repository.CartItemRepository;
+import com.devticket.commerce.common.enums.OrderStatus;
 import com.devticket.commerce.common.exception.BusinessException;
+import com.devticket.commerce.mock.controller.dto.InternalOrderInfoResponse;
+import com.devticket.commerce.mock.controller.dto.InternalOrderItemsResponse;
 import com.devticket.commerce.order.application.usecase.OrderUsecase;
 import com.devticket.commerce.order.domain.exception.OrderErrorCode;
 import com.devticket.commerce.order.domain.model.Order;
@@ -14,16 +17,22 @@ import com.devticket.commerce.order.infrastructure.external.client.OrderToEventC
 import com.devticket.commerce.order.infrastructure.external.client.dto.InternalBulkStockAdjustmentRequest;
 import com.devticket.commerce.order.infrastructure.external.client.dto.InternalStockAdjustmentResponse;
 import com.devticket.commerce.order.presentation.dto.req.CartOrderRequest;
+import com.devticket.commerce.order.presentation.dto.res.InternalSettlementDataResponse;
 import com.devticket.commerce.order.presentation.dto.res.OrderResponse;
+import com.devticket.commerce.ticket.application.usecase.TicketUsecase;
+import com.devticket.commerce.ticket.presentation.dto.req.TicketRequest;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class OrderService implements OrderUsecase {
@@ -32,6 +41,7 @@ public class OrderService implements OrderUsecase {
     private final CartItemRepository cartItemRepository;
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
+    private final TicketUsecase ticketUsecase;
 
     // ==== Public Methods (Main Flow) ====================================
 
@@ -72,6 +82,143 @@ public class OrderService implements OrderUsecase {
             throw new BusinessException(OrderErrorCode.ORDER_CREATION_FAILED);
         }
     }
+
+    @Override
+    public InternalOrderInfoResponse getOrderInfo(Long id) {
+        Order order = orderRepository.findById(id)
+            .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
+        return InternalOrderInfoResponse.from(order);
+    }
+
+    @Override
+    public InternalOrderItemsResponse getOrderListForSettlement(Long id) {
+        List<OrderItem> orderItems = orderItemRepository.findAllByOrderId(id);
+        return InternalOrderItemsResponse.from(id, orderItems);
+    }
+
+    @Override
+    @Transactional
+    public void completeOrder(UUID orderId) {
+        //order조회
+        Order order = orderRepository.findByOrderId(orderId)
+            .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
+        //order상태값 변경
+        order.completePayment();
+        //Ticket발행
+        TicketRequest request = new TicketRequest(order.getId());
+        ticketUsecase.createTicket(request);
+    }
+
+    @Override
+    public InternalSettlementDataResponse getSettelmentData(UUID sellerId, String periodStart, String periodEnd) {
+        try {
+            log.info("[Settlement Debug] 시작 - sellerId: {}, period: {} ~ {}", sellerId, periodStart, periodEnd);
+
+            // 1. 날짜 변환
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+            LocalDateTime formattedPeriodStart = LocalDateTime.parse(periodStart + " 00:00:00", formatter);
+            LocalDateTime formattedPeriodEnd = LocalDateTime.parse(periodEnd + " 23:59:59", formatter);
+
+            // 2. 정산대상 OrderItem조회
+            List<OrderItem> orderItems = orderItemRepository.findSettlementItems(sellerId, formattedPeriodStart,
+                formattedPeriodEnd);
+            log.info("[Settlement Debug] 조회된 OrderItem 수: {}", orderItems.size());
+
+            if (orderItems.isEmpty()) {
+                log.warn("[Settlement Debug] 조회된 데이터가 없어 빈 응답을 반환합니다.");
+                return new InternalSettlementDataResponse(sellerId, formattedPeriodStart.toString(),
+                    formattedPeriodEnd.toString(), List.of());
+            }
+
+            // 3. OrderId 추출 및 Order 조회
+            List<Long> orderIds = orderItems.stream()
+                .map(OrderItem::getOrderId)
+                .distinct()
+                .toList();
+            log.info("[Settlement Debug] 추출된 중복 제거 Order PK 리스트: {}", orderIds);
+
+            List<Order> orders = orderRepository.findAllByIds(orderIds);
+            log.info("[Settlement Debug] DB에서 조회된 Order 엔티티 수: {}", orders.size());
+
+            // [주의] 여기서 중복 키 에러가 자주 발생하므로 안전하게 처리
+            Map<Long, Order> orderMap = orders.stream()
+                .collect(Collectors.toMap(
+                    Order::getId,
+                    order -> order,
+                    (existing, replacement) -> existing // 중복 시 기존값 유지
+                ));
+
+            // 4. eventId별로 그룹화
+            Map<Long, List<OrderItem>> itemsByEvent = orderItems.stream()
+                .collect(Collectors.groupingBy(OrderItem::getEventId));
+            log.info("[Settlement Debug] 그룹화된 Event 수: {}", itemsByEvent.size());
+
+            // 5. 데이터 집계
+            List<InternalSettlementDataResponse.EventSettlements> eventSettlements = itemsByEvent.entrySet().stream()
+                .map(entry -> {
+                    Long eventId = entry.getKey();
+                    List<OrderItem> itemList = entry.getValue();
+
+                    int totalSales = 0;
+                    int totalRefund = 0;
+                    int soldQty = 0;
+                    int refundQty = 0;
+
+                    for (OrderItem item : itemList) {
+                        Order order = orderMap.get(item.getOrderId());
+                        if (order == null) {
+                            log.warn("[Settlement Debug] Order를 찾을 수 없음 - orderId: {}", item.getOrderId());
+                            continue;
+                        }
+
+                        if (OrderStatus.PAID.equals(order.getStatus())) {
+                            totalSales += item.getPrice() * item.getQuantity();
+                            soldQty += item.getQuantity();
+                        } else if (OrderStatus.CANCELLED.equals(order.getStatus())) {
+                            totalRefund += item.getPrice() * item.getQuantity();
+                            refundQty += item.getQuantity();
+                        }
+                    }
+
+                    List<InternalSettlementDataResponse.EventSettlements.OrderItems> detailItems = itemList.stream()
+                        .map(i -> {
+                            // orderMap에서 해당 아이템의 주문 정보를 가져옵니다.
+                            Order itemOrder = orderMap.get(i.getOrderId());
+                            String orderStatus = (itemOrder != null) ? itemOrder.getStatus().name() : "UNKNOWN";
+
+                            return new InternalSettlementDataResponse.EventSettlements.OrderItems(
+                                i.getOrderItemId(),
+                                i.getEventId(),
+                                i.getPrice(),
+                                i.getQuantity(),
+                                i.getSubtotalAmount(),
+                                orderStatus
+                            );
+                        })
+                        .toList();
+
+                    return new InternalSettlementDataResponse.EventSettlements(
+                        eventId, totalSales, totalRefund, soldQty, refundQty, detailItems
+                    );
+                })
+                .toList();
+
+            log.info("[Settlement Debug] 최종 응답 구성 완료");
+            return new InternalSettlementDataResponse(
+                sellerId, formattedPeriodStart.toString(), formattedPeriodEnd.toString(), eventSettlements
+            );
+
+        } catch (Exception e) {
+            log.error("[Settlement Debug] 에러 발생 원인: ", e);
+            throw e;
+        }
+    }
+
+//    @Override
+//    public InternalEventOrdersResponse getOrdersByEvent(Long eventId, String status) {
+//        List<OrderItem> orderItems = orderItemRepository.findAllByEventId(eventId);
+//        return InternalEventOrdersResponse.from(eventId, orderItems);
+//    }
 
     // ==== Private Helpers (Logic & Validation) ==========================
 

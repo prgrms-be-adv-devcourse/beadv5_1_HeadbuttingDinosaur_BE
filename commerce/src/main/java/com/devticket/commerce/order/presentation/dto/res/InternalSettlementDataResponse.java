@@ -1,12 +1,13 @@
-package com.devticket.commerce.mock.controller.dto;
+package com.devticket.commerce.order.presentation.dto.res;
 
 import java.util.List;
+import java.util.UUID;
 
 public record InternalSettlementDataResponse(
-    Long sellerId,
+    UUID sellerId,
     String periodStart,
     String periodEnd,
-    List<InternalSettlementDataResponse.EventSettlements> eventSettlements
+    List<EventSettlements> eventSettlements
 ) {
 
     public record EventSettlements(
@@ -19,11 +20,12 @@ public record InternalSettlementDataResponse(
     ) {
 
         public record OrderItems(
-            Long orderItemId,
+            UUID orderItemId,
             Long eventId,
             Integer price,
             Integer quantity,
-            Integer subtotalAmount
+            Integer subtotalAmount,
+            String status
         ) {
 
         }
