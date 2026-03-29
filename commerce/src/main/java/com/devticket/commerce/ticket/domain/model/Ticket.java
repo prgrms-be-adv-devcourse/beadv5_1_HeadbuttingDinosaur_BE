@@ -35,7 +35,7 @@ public class Ticket extends BaseEntity {
     UUID ticketId;
 
     @Column(name = "order_item_id", nullable = false)
-    Long orderItemId;
+    UUID orderItemId;
 
     @Column(name = "user_id", nullable = false)
     UUID userId;
@@ -59,7 +59,7 @@ public class Ticket extends BaseEntity {
     //---- 정적 팩토리 메서드 ------------------------------
 
     public static Ticket create(
-        Long orderItemId,
+        UUID orderItemId,
         UUID userId,
         Long eventId
     ) {
