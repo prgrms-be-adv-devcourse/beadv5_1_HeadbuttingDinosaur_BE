@@ -2,6 +2,8 @@ package com.devticket.payment.payment.infrastructure.persistence;
 
 import com.devticket.payment.payment.domain.model.Payment;
 import com.devticket.payment.payment.domain.repository.PaymentRepository;
+import java.util.Optional;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
@@ -15,4 +17,7 @@ public class PaymentRepositoryImpl implements PaymentRepository {
     public Payment save(Payment payment) {
         return paymentJpaRepository.save(payment);
     }
+
+    @Override
+    public Optional<Payment> findByOrderId(Long orderId) { return paymentJpaRepository.findByOrderId(orderId); }
 }
