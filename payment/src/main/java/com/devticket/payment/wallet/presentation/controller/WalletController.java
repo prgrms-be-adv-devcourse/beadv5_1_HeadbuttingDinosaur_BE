@@ -41,9 +41,10 @@ public class WalletController {
     @PostMapping("/charge")
     public ResponseEntity<WalletChargeResponse> charge(
         @RequestHeader("X-User-Id") UUID userId,
+        @RequestHeader("Idempotency-Key") String idempotencyKey,
         @Valid @RequestBody WalletChargeRequest request) {
 
-        WalletChargeResponse response = walletService.charge(userId, request);
+        WalletChargeResponse response = walletService.charge(userId, request, idempotencyKey);
         return ResponseEntity.ok(response);
     }
 
