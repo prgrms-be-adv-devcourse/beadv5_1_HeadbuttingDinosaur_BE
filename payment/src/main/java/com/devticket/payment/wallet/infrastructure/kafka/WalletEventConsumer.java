@@ -6,6 +6,7 @@ import com.devticket.payment.wallet.application.event.EventCancelledEvent;
 import com.devticket.payment.wallet.application.event.RefundCompletedEvent;
 import com.devticket.payment.wallet.application.service.WalletService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,7 +35,7 @@ public class WalletEventConsumer {
     public void consumeRefundCompleted(ConsumerRecord<String, String> record, Acknowledgment ack) {
         String messageId = buildMessageId(record);
 
-        if (deduplicationService.isDuplicate(UUID.fromString(messageId))) {
+        if (deduplicationService.isDuplicate(toMessageUUID(messageId))) {
             log.info("[Consumer] 중복 메시지 스킵 — topic={}, offset={}", record.topic(), record.offset());
             ack.acknowledge();
             return;
@@ -53,7 +54,7 @@ public class WalletEventConsumer {
                 );
             }
 
-            deduplicationService.markProcessed(UUID.fromString(messageId));
+            deduplicationService.markProcessed(toMessageUUID(messageId));
             ack.acknowledge();
 
         } catch (Exception e) {
@@ -75,7 +76,7 @@ public class WalletEventConsumer {
     public void consumeEventCancelled(ConsumerRecord<String, String> record, Acknowledgment ack) {
         String messageId = buildMessageId(record);
 
-        if (deduplicationService.isDuplicate(UUID.fromString(messageId))) {
+        if (deduplicationService.isDuplicate(toMessageUUID(messageId))) {
             log.info("[Consumer] 중복 메시지 스킵 — topic={}, offset={}", record.topic(), record.offset());
             ack.acknowledge();
             return;
@@ -87,10 +88,14 @@ public class WalletEventConsumer {
             log.info("[Consumer] 이벤트 취소 수신 — eventId={}, cancelledBy={}",
                 event.getEventId(), event.getCancelledBy());
 
-            walletService.processBatchRefund(event.getEventId());
+            // TODO: Refund 모듈 완성 전까지 일괄 환불 미처리 — ACK하지 않고 예외로 DLT 보존
+            // Refund 모듈 완성 후 아래 주석 해제하고 이 예외 블록 제거
+            throw new UnsupportedOperationException(
+                "event.cancelled 일괄 환불 미구현 — Refund 모듈 완성 후 처리 예정. eventId=" + event.getEventId());
 
-            deduplicationService.markProcessed(UUID.fromString(messageId));
-            ack.acknowledge();
+            // walletService.processBatchRefund(event.getEventId());
+            // deduplicationService.markProcessed(toMessageUUID(messageId));
+            // ack.acknowledge();
 
         } catch (Exception e) {
             log.error("[Consumer] event.cancelled 처리 실패 — messageId={}, error={}",
@@ -101,5 +106,13 @@ public class WalletEventConsumer {
 
     private String buildMessageId(ConsumerRecord<String, String> record) {
         return record.topic() + ":" + record.partition() + ":" + record.offset();
+    }
+
+    /**
+     * topic:partition:offset 형식의 messageId를 결정적 UUID로 변환 MessageDeduplicationService가 UUID를 요구하므로 name-based UUID(v3)
+     * 사용
+     */
+    private UUID toMessageUUID(String messageId) {
+        return UUID.nameUUIDFromBytes(messageId.getBytes(StandardCharsets.UTF_8));
     }
 }
