@@ -75,7 +75,6 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     @Override
-    @Transactional
     public PaymentConfirmResponse confirmPgPayment(UUID userId, PaymentConfirmRequest request) {
         InternalOrderInfoResponse order = commerceInternalClient.getOrderInfo(request.orderId());
 
@@ -91,6 +90,7 @@ public class PaymentServiceImpl implements PaymentService {
 
         // 결제 승인 상태 반영
         payment.approve(result.paymentKey(), parseApprovedAt(result.approvedAt()));
+        paymentRepository.save(payment);
 
         // 주문 완료 처리 — 실패 시 PG 취소 후 보상
         try {
@@ -102,7 +102,6 @@ public class PaymentServiceImpl implements PaymentService {
                 payment.getPaymentKey(),
                 e
             );
-
             cancelPgPayment(payment);
 
             throw new PaymentException(PaymentErrorCode.ORDER_COMPLETE_FAILED);
@@ -207,6 +206,7 @@ public class PaymentServiceImpl implements PaymentService {
             pgPaymentClient.cancel(payment.getPaymentKey(), "주문 완료 처리 실패로 인한 자동 취소");
 
             payment.fail("주문 완료 처리 실패로 승인 후 자동 취소됨");
+            paymentRepository.save(payment);
 
             log.warn(
                 "PG 자동 취소 성공: orderId={}, paymentKey={}",
@@ -222,6 +222,7 @@ public class PaymentServiceImpl implements PaymentService {
             );
 
             payment.fail("주문 완료 처리 실패 및 PG 자동 취소 실패");
+            paymentRepository.save(payment);
 
             throw new PaymentException(PaymentErrorCode.PG_REFUND_FAILED);
         }
