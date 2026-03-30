@@ -1,6 +1,7 @@
 package com.devticket.payment.mock;
 
 import com.devticket.payment.payment.infrastructure.client.dto.InternalOrderInfoResponse;
+import com.devticket.payment.payment.infrastructure.client.dto.InternalOrderItemInfoResponse;
 import java.util.UUID;
 import org.springframework.context.annotation.Profile;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -34,5 +35,16 @@ public class MockCommerceController {
     @PostMapping("/internal/orders/{orderId}/payment-failed")
     public void failOrder(@PathVariable String orderId) {
         // 성공 응답만 반환
+    }
+
+    @GetMapping("/internal/order-items/by-ticket/{ticketId}")
+    public InternalOrderItemInfoResponse getOrderItemByTicketId(@PathVariable String ticketId) {
+        return new InternalOrderItemInfoResponse(
+            1L,                                                          // orderItemId
+            1L,                                                          // orderId
+            UUID.fromString("550e8400-e29b-41d4-a716-446655440000"),    // userId
+            15L,                                                         // eventId
+            50000                                                        // amount
+        );
     }
 }

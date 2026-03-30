@@ -3,6 +3,7 @@ package com.devticket.payment.payment.infrastructure.client;
 import com.devticket.payment.common.exception.BusinessException;
 import com.devticket.payment.common.exception.CommonErrorCode;
 import com.devticket.payment.payment.infrastructure.client.dto.InternalOrderInfoResponse;
+import com.devticket.payment.payment.infrastructure.client.dto.InternalOrderItemInfoResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -56,5 +57,12 @@ public class CommerceInternalClient {
             .uri("/internal/orders/{orderId}/payment-failed", orderId)
             .retrieve()
             .toBodilessEntity();
+    }
+
+    public InternalOrderItemInfoResponse getOrderItemInfoByTicketId(String ticketId) {
+        return restClient.get()
+            .uri("/internal/order-items/by-ticket/{ticketId}", ticketId)
+            .retrieve()
+            .body(InternalOrderItemInfoResponse.class);
     }
 }

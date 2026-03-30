@@ -24,6 +24,8 @@ jwt:
 internal:
   commerce:
     base-url: http://commerce-service:8083
+  event:
+    base-url: http://event-service:8082
 
 pg:
   toss:

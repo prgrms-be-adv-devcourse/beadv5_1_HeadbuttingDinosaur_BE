@@ -34,9 +34,15 @@ logging:
 
 internal:
   commerce:
-    base-url: http://commerce-service:8083
+    #base-url: http://commerce-service:8083
+    base-url: http://localhost:8084/mock/commerce
+  event:
+    #base-url: http://event-service:8082
+    base-url: http://localhost:8084/mock/event
 
 pg:
   toss:
-    base-url: https://api.tosspayments.com
+    #base-url: https://api.tosspayments.com
+    base-url: http://localhost:8084/mock/pg
     secret-key: ${PG_SECRET_KEY}
+
