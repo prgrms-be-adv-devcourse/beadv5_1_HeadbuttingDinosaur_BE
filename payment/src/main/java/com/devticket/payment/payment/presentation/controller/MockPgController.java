@@ -37,7 +37,7 @@ public class MockPgController {
         return new TossPaymentConfirmResponse(
             "mock_pg_key",
             request.orderId(),   // 요청에서 그대로 반환
-            "카드",
+            "PG",
             "DONE",
             request.amount(),    // 요청에서 그대로 반환
             "2024-01-01T00:00:00+09:00"
