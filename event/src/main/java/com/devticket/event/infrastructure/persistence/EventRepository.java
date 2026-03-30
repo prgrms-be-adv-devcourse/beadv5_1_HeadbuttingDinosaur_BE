@@ -29,5 +29,8 @@ public interface EventRepository extends JpaRepository<Event, Long>, EventReposi
     @Query("SELECT e FROM Event e WHERE e.id = :id")
     Optional<Event> findByIdWithLock(@Param("id") Long id);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT e FROM Event e WHERE e.id IN :ids ORDER BY e.id ASC")
+    List<Event> findAllByIdInWithLock(@Param("ids") List<Long> ids);
 
 }

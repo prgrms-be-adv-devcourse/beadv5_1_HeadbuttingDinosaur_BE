@@ -15,8 +15,13 @@ import com.devticket.event.presentation.dto.internal.InternalStockOperationRespo
 import com.devticket.event.presentation.dto.internal.PurchaseUnavailableReason;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -119,31 +124,82 @@ public class EventInternalService {
     }
 
     /**
-     * API 4: 벌크 재고 조정 — 단일 트랜잭션, 항목별 성공/실패 수집
-     * delta > 0: 재고 차감 (판매), delta < 0: 재고 복원 (환불), delta == 0: no-op
+     * API 4: 벌크 재고 조정 — 원자적 처리 (All or Nothing)
+     *
+     * 설계 원칙:
+     * - 하나의 트랜잭션 내에서 모든 항목을 처리
+     * - 하나라도 실패하면 전체 롤백 (원자성 보장)
+     * - 부분 성공 상태는 발생하지 않음
+     *
+     * delta > 0: 재고 차감 (판매)
+     * delta < 0: 재고 복원 (환불)
+     * delta == 0: no-op
+     *
+     * HTTP 호출측:
+     * - 성공: 모든 항목이 처리됨
+     * - 실패: 예외 발생 → 하나라도 실패하면 전체 롤백 → 주문 취소
+     *
+     * Kafka 전환 시:
+     * - Consumer가 성공/실패 이벤트만 수신
+     * - 부분 보상 로직 불필요 → Saga 구조 단순화
      */
     @Transactional
     public InternalStockAdjustmentResponse adjustStockBulk(InternalBulkStockAdjustmentRequest request) {
-        List<InternalStockAdjustmentResponse.StockAdjustmentResult> results = new ArrayList<>();
-        for (InternalBulkStockAdjustmentRequest.StockAdjustmentItem item : request.items()) {
-            try {
-                Event event = eventRepository.findByIdWithLock(item.id())
-                    .orElseThrow(() -> new BusinessException(EventErrorCode.EVENT_NOT_FOUND));
-                if (item.delta() > 0) {
-                    event.deductStock(item.delta());
-                } else if (item.delta() < 0) {
-                    event.restoreStock(-item.delta());
-                }
-                results.add(new InternalStockAdjustmentResponse.StockAdjustmentResult(
-                    item.id(), true, event.getRemainingQuantity(), event.getTitle(), event.getPrice()
-                ));
-            } catch (BusinessException e) {
-                results.add(new InternalStockAdjustmentResponse.StockAdjustmentResult(
-                    item.id(), false, null, null, null
-                ));
+        // Step 1: 인덱스와 함께 정렬 (락 순서 고정)
+        record ItemWithIndex(
+            int originalIndex,
+            InternalBulkStockAdjustmentRequest.StockAdjustmentItem item
+        ) {}
+
+        List<ItemWithIndex> sortedItems = IntStream.range(0, request.items().size())
+            .mapToObj(i -> new ItemWithIndex(i, request.items().get(i)))
+            .sorted(Comparator.comparing(x -> x.item().id()))
+            .toList();
+
+        // Step 2: 모든 고유 ID를 정렬하여 한 번에 락 획득 (deadlock 방지)
+        List<Long> uniqueSortedIds = sortedItems.stream()
+            .map(x -> x.item().id())
+            .distinct()
+            .sorted()
+            .toList();
+
+        Map<Long, Event> eventMap = eventRepository.findAllByIdInWithLock(uniqueSortedIds)
+            .stream()
+            .collect(Collectors.toMap(Event::getId, e -> e));
+
+        // Step 3: 정렬된 순서로 처리 — 예외 발생 시 전체 롤백
+        List<InternalStockAdjustmentResponse.StockAdjustmentResult> sortedResults = new ArrayList<>();
+        for (var itemWithIndex : sortedItems) {
+            Event event = eventMap.get(itemWithIndex.item().id());
+            if (event == null) {
+                throw new BusinessException(EventErrorCode.EVENT_NOT_FOUND);
             }
+
+            // 각 처리가 Event 상태를 변경 (같은 id의 다음 item은 변경된 상태를 봄)
+            if (itemWithIndex.item().delta() > 0) {
+                event.deductStock(itemWithIndex.item().delta());
+            } else if (itemWithIndex.item().delta() < 0) {
+                event.restoreStock(-itemWithIndex.item().delta());
+            }
+
+            sortedResults.add(new InternalStockAdjustmentResponse.StockAdjustmentResult(
+                itemWithIndex.item().id(),
+                true,
+                event.getRemainingQuantity(),
+                event.getTitle(),
+                event.getPrice()
+            ));
         }
-        return new InternalStockAdjustmentResponse(results);
+
+        // Step 4: 원래 요청 순서로 재정렬하여 응답
+        InternalStockAdjustmentResponse.StockAdjustmentResult[] results =
+            new InternalStockAdjustmentResponse.StockAdjustmentResult[request.items().size()];
+
+        for (int i = 0; i < sortedItems.size(); i++) {
+            results[sortedItems.get(i).originalIndex()] = sortedResults.get(i);
+        }
+
+        return new InternalStockAdjustmentResponse(Arrays.asList(results));
     }
 
     /**
