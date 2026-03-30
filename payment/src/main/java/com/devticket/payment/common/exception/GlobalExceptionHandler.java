@@ -1,5 +1,6 @@
 package com.devticket.payment.common.exception;
 
+import jakarta.persistence.PessimisticLockException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -20,6 +21,13 @@ public class GlobalExceptionHandler {
         return ResponseEntity
             .badRequest()
             .body(ErrorResponse.from(CommonErrorCode.INVALID_INPUT_VALUE));
+    }
+
+    @ExceptionHandler(PessimisticLockException.class)
+    public ResponseEntity<ErrorResponse> handleLockException(PessimisticLockException e) {
+        return ResponseEntity
+            .status(409)
+            .body(ErrorResponse.from(CommonErrorCode.CONFLICT));
     }
 
     @ExceptionHandler(Exception.class)
