@@ -8,6 +8,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -24,6 +25,8 @@ import com.devticket.event.presentation.dto.SellerEventCreateRequest;
 import com.devticket.event.presentation.dto.SellerEventCreateResponse;
 import com.devticket.event.presentation.dto.SellerEventDetailResponse;
 import com.devticket.event.presentation.dto.SellerEventSummaryResponse;
+import com.devticket.event.presentation.dto.SellerEventUpdateRequest;
+import com.devticket.event.presentation.dto.SellerEventUpdateResponse;
 import java.time.LocalDateTime;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -365,6 +368,96 @@ class EventControllerTest {
         // when & then (헤더 미포함)
         mockMvc.perform(get("/api/v1/events/{eventId}/statistics", eventId)
                 .contentType(MediaType.APPLICATION_JSON))
+            .andDo(print())
+            .andExpect(status().isBadRequest());
+    }
+
+    // 이벤트 수정 및 판매 중지 테스트
+
+    @Test
+    void 정상_판매_중지_요청_성공() throws Exception {
+        // given
+        UUID sellerId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+        SellerEventUpdateRequest cancelRequest = EventTestFixture.createUpdateEventRequest_Cancel();
+        SellerEventUpdateResponse expectedResponse = EventTestFixture.createSellerEventUpdateResponse(eventId, EventStatus.CANCELLED);
+
+        // ArgumentCaptor로 요청 필드 검증
+        ArgumentCaptor<SellerEventUpdateRequest> requestCaptor = ArgumentCaptor.forClass(SellerEventUpdateRequest.class);
+        when(eventService.updateEvent(eq(sellerId), eq(eventId), requestCaptor.capture()))
+            .thenReturn(expectedResponse);
+
+        // when & then
+        mockMvc.perform(patch("/api/v1/events/{eventId}", eventId)
+                .header("X-User-Id", sellerId.toString())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(cancelRequest)))
+            .andDo(print())
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.eventId").value(eventId.toString()))
+            .andExpect(jsonPath("$.data.status").value("CANCELLED"));
+
+        // 요청 바디 검증
+        SellerEventUpdateRequest capturedRequest = requestCaptor.getValue();
+        assertThat(capturedRequest.status()).isEqualTo(EventStatus.CANCELLED);
+    }
+
+    @Test
+    void 판매_중지_X_User_Id_헤더_누락_실패() throws Exception {
+        // given
+        UUID eventId = UUID.randomUUID();
+        SellerEventUpdateRequest cancelRequest = EventTestFixture.createUpdateEventRequest_Cancel();
+
+        // when & then (헤더 미포함)
+        mockMvc.perform(patch("/api/v1/events/{eventId}", eventId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(cancelRequest)))
+            .andDo(print())
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void 정상_이벤트_수정_요청_성공() throws Exception {
+        // given
+        UUID sellerId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+        SellerEventUpdateRequest updateRequest = EventTestFixture.createUpdateEventRequest();
+        SellerEventUpdateResponse expectedResponse = EventTestFixture.createSellerEventUpdateResponse(eventId, EventStatus.DRAFT);
+
+        // ArgumentCaptor로 요청 필드 검증
+        ArgumentCaptor<SellerEventUpdateRequest> requestCaptor = ArgumentCaptor.forClass(SellerEventUpdateRequest.class);
+        when(eventService.updateEvent(eq(sellerId), eq(eventId), requestCaptor.capture()))
+            .thenReturn(expectedResponse);
+
+        // when & then
+        mockMvc.perform(patch("/api/v1/events/{eventId}", eventId)
+                .header("X-User-Id", sellerId.toString())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(updateRequest)))
+            .andDo(print())
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.eventId").value(eventId.toString()))
+            .andExpect(jsonPath("$.data.status").value("DRAFT"));
+
+        // 요청 바디 JSON 바인딩 검증
+        SellerEventUpdateRequest capturedRequest = requestCaptor.getValue();
+        assertThat(capturedRequest.title()).isEqualTo(updateRequest.title());
+        assertThat(capturedRequest.price()).isEqualTo(updateRequest.price());
+        assertThat(capturedRequest.totalQuantity()).isEqualTo(updateRequest.totalQuantity());
+        assertThat(capturedRequest.maxQuantity()).isEqualTo(updateRequest.maxQuantity());
+        assertThat(capturedRequest.saleStartAt()).isEqualTo(updateRequest.saleStartAt());
+    }
+
+    @Test
+    void 이벤트_수정_X_User_Id_헤더_누락_실패() throws Exception {
+        // given
+        UUID eventId = UUID.randomUUID();
+        SellerEventUpdateRequest updateRequest = EventTestFixture.createUpdateEventRequest();
+
+        // when & then (헤더 미포함)
+        mockMvc.perform(patch("/api/v1/events/{eventId}", eventId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(updateRequest)))
             .andDo(print())
             .andExpect(status().isBadRequest());
     }
