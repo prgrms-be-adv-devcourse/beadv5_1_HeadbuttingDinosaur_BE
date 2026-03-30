@@ -1,8 +1,10 @@
 package com.devticket.event.domain.model;
 
 import com.devticket.event.common.entity.BaseEntity;
+import com.devticket.event.common.exception.BusinessException;
 import com.devticket.event.domain.enums.EventCategory;
 import com.devticket.event.domain.enums.EventStatus;
+import com.devticket.event.domain.exception.EventErrorCode;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -158,6 +160,41 @@ public class Event extends BaseEntity {
 
     public void cancel() {
         this.status = EventStatus.CANCELLED;
+    }
+
+    public void deductStock(int quantity) {
+        if (quantity < 1) {
+            throw new BusinessException(EventErrorCode.INVALID_STOCK_QUANTITY);
+        }
+        if (this.status != EventStatus.ON_SALE) {
+            throw new BusinessException(EventErrorCode.PURCHASE_NOT_ALLOWED);
+        }
+        if (this.remainingQuantity < quantity) {
+            throw new BusinessException(EventErrorCode.OUT_OF_STOCK);
+        }
+        this.remainingQuantity -= quantity;
+        if (this.remainingQuantity == 0) {
+            this.status = EventStatus.SOLD_OUT;
+        }
+    }
+
+    public void restoreStock(int quantity) {
+        if (quantity < 1) {
+            throw new BusinessException(EventErrorCode.INVALID_STOCK_QUANTITY);
+        }
+        if (this.status == EventStatus.CANCELLED || this.status == EventStatus.FORCE_CANCELLED) {
+            throw new BusinessException(EventErrorCode.CANNOT_CHANGE_STATUS);
+        }
+        this.remainingQuantity = Math.min(this.totalQuantity, this.remainingQuantity + quantity);
+        if (this.status == EventStatus.SOLD_OUT && this.remainingQuantity > 0) {
+            this.status = EventStatus.ON_SALE;
+        }
+    }
+
+    public boolean isPurchasable(int requestedQuantity) {
+        return this.status == EventStatus.ON_SALE
+            && this.remainingQuantity >= requestedQuantity
+            && requestedQuantity <= this.maxQuantity;
     }
 
 }
