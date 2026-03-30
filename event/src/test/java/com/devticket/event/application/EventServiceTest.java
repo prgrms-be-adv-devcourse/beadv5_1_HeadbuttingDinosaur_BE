@@ -75,7 +75,7 @@ class EventServiceTest {
 
         // then
         assertThat(response.eventId()).isEqualTo(expectedUuid);
-        assertThat(response.status()).isEqualTo(EventStatus.DRAFT);
+        assertThat(response.status()).isEqualTo(EventStatus.ON_SALE);
 
         verify(eventRepository, times(2)).save(argThat(event -> event != null));
     }
