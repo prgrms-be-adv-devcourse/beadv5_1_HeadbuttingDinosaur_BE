@@ -37,7 +37,7 @@ public class AdminActionHistory {
     private AdminTargetType targetType;
 
     @Column(name = "target_id", nullable = false)
-    private Long targetId;
+    private UUID targetId;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "action_type", nullable = false)
@@ -45,14 +45,14 @@ public class AdminActionHistory {
 
     @CreatedDate
     @Column(name = "created_at", nullable = false)
-    LocalDateTime createdAt;
+    private LocalDateTime createdAt;
 
     @LastModifiedDate
     @Column(name = "updated_at")
-    LocalDateTime updatedAt;
+    private LocalDateTime updatedAt;
 
     @Builder
-    AdminActionHistory(UUID adminId, AdminTargetType targetType, AdminActionType actionType, Long targetId
+    AdminActionHistory(UUID adminId, AdminTargetType targetType, AdminActionType actionType, UUID targetId
     ) {
         this.adminId = adminId;
         this.targetType = targetType;
