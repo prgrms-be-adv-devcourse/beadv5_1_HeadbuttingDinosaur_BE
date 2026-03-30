@@ -50,4 +50,11 @@ public class CommerceInternalClient {
             throw e;
         }
     }
+
+    public void failOrder(Long orderId) {
+        restClient.post()
+            .uri("/internal/orders/{orderId}/payment-failed", orderId)
+            .retrieve()
+            .toBodilessEntity();
+    }
 }

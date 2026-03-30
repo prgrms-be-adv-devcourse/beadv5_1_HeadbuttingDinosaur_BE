@@ -30,4 +30,9 @@ public class MockCommerceController {
     public void completePayment(@PathVariable String orderId) {
         // 성공 응답만 반환
     }
+
+    @PostMapping("/internal/orders/{orderId}/payment-failed")
+    public void failOrder(@PathVariable String orderId) {
+        // 성공 응답만 반환
+    }
 }
