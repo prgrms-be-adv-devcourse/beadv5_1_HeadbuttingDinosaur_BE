@@ -271,7 +271,7 @@ public class PaymentServiceImpl implements PaymentService {
                 e
             );
 
-            payment.fail("주문 완료 처리 실패로 승인 후 자동 취소됨");
+            payment.fail("주문 완료 처리 실패 및 PG 자동 취소 실패");
             paymentRepository.save(payment);
 
             throw new PaymentException(PaymentErrorCode.PG_REFUND_FAILED);
