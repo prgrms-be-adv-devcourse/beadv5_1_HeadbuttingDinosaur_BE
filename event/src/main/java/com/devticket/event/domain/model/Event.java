@@ -166,8 +166,15 @@ public class Event extends BaseEntity {
         if (quantity < 1) {
             throw new BusinessException(EventErrorCode.INVALID_STOCK_QUANTITY);
         }
+        LocalDateTime now = LocalDateTime.now();
+        if (now.isBefore(this.saleStartAt) || now.isAfter(this.saleEndAt)) {
+            throw new BusinessException(EventErrorCode.PURCHASE_NOT_ALLOWED);
+        }
         if (this.status != EventStatus.ON_SALE) {
             throw new BusinessException(EventErrorCode.PURCHASE_NOT_ALLOWED);
+        }
+        if (quantity > this.maxQuantity) {
+            throw new BusinessException(EventErrorCode.MAX_QUANTITY_EXCEEDED);
         }
         if (this.remainingQuantity < quantity) {
             throw new BusinessException(EventErrorCode.OUT_OF_STOCK);
@@ -192,7 +199,12 @@ public class Event extends BaseEntity {
     }
 
     public boolean isPurchasable(int requestedQuantity) {
+        if (requestedQuantity < 1) {
+            return false;
+        }
+        LocalDateTime now = LocalDateTime.now();
         return this.status == EventStatus.ON_SALE
+            && now.isAfter(this.saleStartAt) && now.isBefore(this.saleEndAt)
             && this.remainingQuantity >= requestedQuantity
             && requestedQuantity <= this.maxQuantity;
     }
