@@ -1,10 +1,14 @@
 package com.devticket.payment.wallet.application.service;
 
+import com.devticket.payment.payment.application.dto.PgPaymentConfirmCommand;
+import com.devticket.payment.payment.application.dto.PgPaymentConfirmResult;
+import com.devticket.payment.payment.infrastructure.external.PgPaymentClient;
 import com.devticket.payment.wallet.domain.WalletPolicyConstants;
 import com.devticket.payment.wallet.domain.exception.WalletErrorCode;
 import com.devticket.payment.wallet.domain.exception.WalletException;
 import com.devticket.payment.wallet.domain.model.Wallet;
 import com.devticket.payment.wallet.domain.model.WalletCharge;
+import com.devticket.payment.wallet.domain.model.WalletTransaction;
 import com.devticket.payment.wallet.domain.repository.WalletChargeRepository;
 import com.devticket.payment.wallet.domain.repository.WalletRepository;
 import com.devticket.payment.wallet.domain.repository.WalletTransactionRepository;
@@ -35,6 +39,7 @@ public class WalletServiceImpl implements WalletService {
     private final WalletRepository walletRepository;
     private final WalletTransactionRepository walletTransactionRepository;
     private final WalletChargeRepository walletChargeRepository;
+    private final PgPaymentClient pgPaymentClient;
 
     @Override
     @Transactional
@@ -74,8 +79,75 @@ public class WalletServiceImpl implements WalletService {
     }
 
     @Override
-    public WalletChargeConfirmResponse confirmCharge(UUID userId, WalletChargeConfirmRequest request) {
-        return null;
+    @Transactional
+    public WalletChargeConfirmResponse confirmCharge(UUID userId,
+        WalletChargeConfirmRequest request) {
+        // 1. WalletCharge 조회
+        UUID chargeId = UUID.fromString(request.chargeId());
+        WalletCharge walletCharge = walletChargeRepository.findByChargeId(chargeId)
+            .orElseThrow(() -> new WalletException(WalletErrorCode.CHARGE_NOT_FOUND));
+
+        // 2. PENDING 상태 확인
+        if (!walletCharge.isPending()) {
+            throw new WalletException(WalletErrorCode.CHARGE_NOT_PENDING);
+        }
+
+        // 3. 금액 일치 검증
+        if (!walletCharge.getAmount().equals(request.amount())) {
+            throw new WalletException(WalletErrorCode.CHARGE_AMOUNT_MISMATCH);
+        }
+
+        // 4. PG 승인 호출
+        PgPaymentConfirmResult pgResult;
+        try {
+            pgResult = pgPaymentClient.confirm(new PgPaymentConfirmCommand(
+                request.paymentKey(),
+                walletCharge.getChargeId().toString(),
+                request.amount()
+            ));
+        } catch (Exception e) {
+            log.error("[WalletCharge] PG 승인 실패 — chargeId={}, error={}",
+                chargeId, e.getMessage());
+            walletCharge.fail();
+            return WalletChargeConfirmResponse.from(
+                walletCharge.getChargeId().toString(),
+                walletCharge.getAmount(),
+                null,
+                "FAILED",
+                null
+            );
+        }
+
+        // 5. Wallet 잔액 증가 (비관적 락)
+        Wallet wallet = walletRepository.findByUserIdForUpdate(userId)
+            .orElseThrow(() -> new WalletException(WalletErrorCode.WALLET_NOT_FOUND));
+
+        wallet.charge(walletCharge.getAmount());
+
+        // 6. WalletCharge 완료 처리
+        walletCharge.complete(pgResult.paymentKey());
+
+        // 7. WalletTransaction 생성
+        String transactionKey = "CHARGE:" + pgResult.paymentKey();
+        WalletTransaction walletTransaction = WalletTransaction.createCharge(
+            wallet.getId(),
+            userId,
+            transactionKey,
+            walletCharge.getAmount(),
+            wallet.getBalance()
+        );
+        walletTransactionRepository.save(walletTransaction);
+
+        log.info("[WalletCharge] 충전 승인 완료 — chargeId={}, amount={}, balance={}",
+            chargeId, walletCharge.getAmount(), wallet.getBalance());
+
+        return WalletChargeConfirmResponse.from(
+            walletCharge.getChargeId().toString(),
+            walletCharge.getAmount(),
+            wallet.getBalance(),
+            walletCharge.getStatus().name(),
+            walletTransaction.getCreatedAt()
+        );
     }
 
     @Override

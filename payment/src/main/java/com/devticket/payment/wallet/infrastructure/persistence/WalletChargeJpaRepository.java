@@ -9,10 +9,10 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface WalletChargeJpaRepository extends JpaRepository<WalletCharge, Long> {
-
-    Optional<WalletCharge> findByIdempotencyKey(String idempotencyKey);
-
+    
     Optional<WalletCharge> findByUserIdAndIdempotencyKey(UUID userId, String idempotencyKey);
+
+    Optional<WalletCharge> findByChargeId(UUID chargeId);
 
     @Query("SELECT COALESCE(SUM(wc.amount), 0) FROM WalletCharge wc "
         + "WHERE wc.userId = :userId "
