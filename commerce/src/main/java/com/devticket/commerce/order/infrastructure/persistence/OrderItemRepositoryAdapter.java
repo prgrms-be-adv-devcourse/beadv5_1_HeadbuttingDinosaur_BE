@@ -4,6 +4,7 @@ import com.devticket.commerce.order.domain.model.OrderItem;
 import com.devticket.commerce.order.domain.repository.OrderItemRepository;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
@@ -37,5 +38,10 @@ public class OrderItemRepositoryAdapter implements OrderItemRepository {
     @Override
     public List<OrderItem> findAllByEventId(Long eventId) {
         return orderItemJpaRepository.findAllByEventId(eventId);
+    }
+
+    @Override
+    public Optional<OrderItem> findByOrderItemId(UUID orderItemId) {
+        return orderItemJpaRepository.findByOrderItemId(orderItemId);
     }
 }
