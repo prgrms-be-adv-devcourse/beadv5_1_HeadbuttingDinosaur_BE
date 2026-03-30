@@ -9,6 +9,7 @@ public record WalletChargeConfirmResponse(
     String status,
     LocalDateTime approvedAt
 ) {
+
     public static WalletChargeConfirmResponse from(
         String transactionId,
         Integer amount,

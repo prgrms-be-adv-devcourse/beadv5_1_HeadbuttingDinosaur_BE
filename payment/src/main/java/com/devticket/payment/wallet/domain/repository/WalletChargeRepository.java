@@ -11,7 +11,7 @@ public interface WalletChargeRepository {
 
     Optional<WalletCharge> findByUserIdAndIdempotencyKey(UUID userId, String idempotencyKey);
 
-    Optional<WalletCharge> findByIdempotencyKey(String idempotencyKey);
+    Optional<WalletCharge> findByChargeId(UUID chargeId);
 
     int sumTodayChargeAmount(UUID userId, LocalDateTime startOfDay);
 }

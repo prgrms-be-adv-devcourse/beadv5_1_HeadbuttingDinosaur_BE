@@ -25,8 +25,8 @@ public class WalletChargeRepositoryImpl implements WalletChargeRepository {
     }
 
     @Override
-    public Optional<WalletCharge> findByIdempotencyKey(String idempotencyKey) {
-        return walletChargeJpaRepository.findByIdempotencyKey(idempotencyKey);
+    public Optional<WalletCharge> findByChargeId(UUID chargeId) {
+        return walletChargeJpaRepository.findByChargeId(chargeId);
     }
 
     @Override
