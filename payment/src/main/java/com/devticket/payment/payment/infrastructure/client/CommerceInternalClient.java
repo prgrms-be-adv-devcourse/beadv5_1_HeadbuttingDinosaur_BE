@@ -3,15 +3,17 @@ package com.devticket.payment.payment.infrastructure.client;
 import com.devticket.payment.common.exception.BusinessException;
 import com.devticket.payment.common.exception.CommonErrorCode;
 import com.devticket.payment.payment.infrastructure.client.dto.InternalOrderInfoResponse;
+import com.devticket.payment.wallet.infrastructure.client.dto.InternalEventOrdersResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
+@Slf4j
 @Component
 public class CommerceInternalClient {
 
@@ -32,7 +34,7 @@ public class CommerceInternalClient {
                 .uri("/internal/orders/{orderId}", orderId)
                 .retrieve()
                 .body(InternalOrderInfoResponse.class);
-        }  catch (HttpServerErrorException e) {
+        } catch (HttpServerErrorException e) {
             // 5xx
             throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
         }
@@ -56,5 +58,19 @@ public class CommerceInternalClient {
             .uri("/internal/orders/{orderId}/payment-failed", orderId)
             .retrieve()
             .toBodilessEntity();
+    }
+
+    public InternalEventOrdersResponse getOrdersByEvent(Long eventId) {
+        log.info("[CommerceClient] 이벤트 주문 조회 — eventId={}", eventId);
+        try {
+            return restClient.get()
+                .uri("/internal/orders/by-event/{eventId}?status=PAID", eventId)
+                .retrieve()
+                .body(InternalEventOrdersResponse.class);
+        } catch (RestClientException e) {
+            log.error("[CommerceClient] 이벤트 주문 조회 실패 — eventId={}, error={}",
+                eventId, e.getMessage());
+            throw new IllegalStateException("Commerce 서비스 호출 실패 — eventId=" + eventId, e);
+        }
     }
 }
