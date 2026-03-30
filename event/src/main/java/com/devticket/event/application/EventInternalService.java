@@ -6,11 +6,15 @@ import com.devticket.event.domain.exception.EventErrorCode;
 import com.devticket.event.domain.model.Event;
 import com.devticket.event.infrastructure.persistence.EventRepository;
 import com.devticket.event.presentation.dto.internal.InternalBulkEventInfoResponse;
+import com.devticket.event.presentation.dto.internal.InternalBulkStockAdjustmentRequest;
 import com.devticket.event.presentation.dto.internal.InternalEventInfoResponse;
 import com.devticket.event.presentation.dto.internal.InternalPurchaseValidationResponse;
 import com.devticket.event.presentation.dto.internal.InternalSellerEventsResponse;
+import com.devticket.event.presentation.dto.internal.InternalStockAdjustmentResponse;
+import com.devticket.event.presentation.dto.internal.InternalStockOperationResponse;
 import com.devticket.event.presentation.dto.internal.PurchaseUnavailableReason;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -88,6 +92,58 @@ public class EventInternalService {
                 ))
                 .toList();
         return new InternalSellerEventsResponse(sellerId, summaries);
+    }
+
+    /**
+     * API 5: 단건 재고 차감
+     * Pessimistic Lock으로 동시성 제어
+     */
+    @Transactional
+    public InternalStockOperationResponse deductStock(Long id, int quantity) {
+        Event event = eventRepository.findByIdWithLock(id)
+            .orElseThrow(() -> new BusinessException(EventErrorCode.EVENT_NOT_FOUND));
+        event.deductStock(quantity);
+        return new InternalStockOperationResponse(id, true, event.getRemainingQuantity(), event.getTitle());
+    }
+
+    /**
+     * API 6: 단건 재고 복원
+     * Pessimistic Lock으로 동시성 제어
+     */
+    @Transactional
+    public InternalStockOperationResponse restoreStock(Long id, int quantity) {
+        Event event = eventRepository.findByIdWithLock(id)
+            .orElseThrow(() -> new BusinessException(EventErrorCode.EVENT_NOT_FOUND));
+        event.restoreStock(quantity);
+        return new InternalStockOperationResponse(id, true, event.getRemainingQuantity(), event.getTitle());
+    }
+
+    /**
+     * API 4: 벌크 재고 조정 — 단일 트랜잭션, 항목별 성공/실패 수집
+     * delta > 0: 재고 차감 (판매), delta < 0: 재고 복원 (환불), delta == 0: no-op
+     */
+    @Transactional
+    public InternalStockAdjustmentResponse adjustStockBulk(InternalBulkStockAdjustmentRequest request) {
+        List<InternalStockAdjustmentResponse.StockAdjustmentResult> results = new ArrayList<>();
+        for (InternalBulkStockAdjustmentRequest.StockAdjustmentItem item : request.items()) {
+            try {
+                Event event = eventRepository.findByIdWithLock(item.id())
+                    .orElseThrow(() -> new BusinessException(EventErrorCode.EVENT_NOT_FOUND));
+                if (item.delta() > 0) {
+                    event.deductStock(item.delta());
+                } else if (item.delta() < 0) {
+                    event.restoreStock(-item.delta());
+                }
+                results.add(new InternalStockAdjustmentResponse.StockAdjustmentResult(
+                    item.id(), true, event.getRemainingQuantity(), event.getTitle(), event.getPrice()
+                ));
+            } catch (BusinessException e) {
+                results.add(new InternalStockAdjustmentResponse.StockAdjustmentResult(
+                    item.id(), false, null, null, null
+                ));
+            }
+        }
+        return new InternalStockAdjustmentResponse(results);
     }
 
     /**
