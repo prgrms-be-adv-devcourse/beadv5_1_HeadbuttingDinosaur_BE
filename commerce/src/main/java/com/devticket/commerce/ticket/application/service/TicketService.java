@@ -8,13 +8,22 @@ import com.devticket.commerce.order.domain.repository.OrderRepository;
 import com.devticket.commerce.ticket.application.usecase.TicketUsecase;
 import com.devticket.commerce.ticket.domain.model.Ticket;
 import com.devticket.commerce.ticket.domain.repository.TicketRepository;
+import com.devticket.commerce.ticket.infrastructure.external.client.TicketToEventClient;
+import com.devticket.commerce.ticket.infrastructure.external.client.dto.InternalBulkEventInfoRequest;
+import com.devticket.commerce.ticket.infrastructure.external.client.dto.InternalEventInfoResponse;
+import com.devticket.commerce.ticket.presentation.dto.req.TicketListRequest;
 import com.devticket.commerce.ticket.presentation.dto.req.TicketRequest;
+import com.devticket.commerce.ticket.presentation.dto.res.TicketDetailResponse;
+import com.devticket.commerce.ticket.presentation.dto.res.TicketListResponse;
 import com.devticket.commerce.ticket.presentation.dto.res.TicketResponse;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +35,43 @@ public class TicketService implements TicketUsecase {
     private final TicketRepository ticketRepository;
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
+    private final TicketToEventClient ticketToEventClient;
+
+    @Override
+    public TicketListResponse getTicketList(UUID userId, TicketListRequest request) {
+        //티켓조회
+        Page<Ticket> ticketPage = ticketRepository.findAllByUserId(userId, request);
+
+        //각 티켓의 eventId 가져오기
+        List<Ticket> ticketList = ticketPage.getContent();
+        List<Long> eventIds = ticketList.stream()
+            .map(Ticket::getEventId)
+            .distinct()
+            .toList();
+
+        //외부 API호출 : Event정보 조회
+        InternalBulkEventInfoRequest bulkRequest = new InternalBulkEventInfoRequest(eventIds);
+        List<InternalEventInfoResponse> eventInfos = ticketToEventClient.getBulkEventInfo(bulkRequest);
+
+        Map<Long, InternalEventInfoResponse> eventMap = eventInfos.stream()
+            .collect(Collectors.toMap(InternalEventInfoResponse::id, info -> info));
+
+        // Ticket, Event정보 조합
+        List<TicketDetailResponse> tickets = ticketList.stream()
+            .map(ticket -> {
+                InternalEventInfoResponse event = eventMap.get(ticket.getEventId());
+                return new TicketDetailResponse(
+                    ticket.getId(),
+                    ticket.getEventId(),
+                    event != null ? event.eventTitle() : "정보 없음",
+                    event != null ? event.eventDateTime() : null,
+                    ticket.getStatus().name()
+                );
+            })
+            .toList();
+
+        return TicketListResponse.of(ticketPage, tickets);
+    }
 
     @Override
     @Transactional
