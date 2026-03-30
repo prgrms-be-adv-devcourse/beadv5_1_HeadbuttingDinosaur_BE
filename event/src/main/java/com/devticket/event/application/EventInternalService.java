@@ -51,6 +51,11 @@ public class EventInternalService {
      * 성공 시 reason=null, 실패 시 불가 사유 + 이벤트 정보(maxQuantity, title, price) 포함
      */
     public InternalPurchaseValidationResponse validatePurchase(Long id, int requestedQuantity) {
+        // 잘못된 수량 요청 — 명시적 검증 (재고 부족으로 오분류하지 않기 위함)
+        if (requestedQuantity < 1) {
+            throw new BusinessException(EventErrorCode.INVALID_STOCK_QUANTITY);
+        }
+
         Event event = eventRepository.findById(id)
             .orElseThrow(() -> new BusinessException(EventErrorCode.EVENT_NOT_FOUND));
 

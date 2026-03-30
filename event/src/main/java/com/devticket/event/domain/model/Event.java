@@ -204,7 +204,7 @@ public class Event extends BaseEntity {
         }
         LocalDateTime now = LocalDateTime.now();
         return this.status == EventStatus.ON_SALE
-            && now.isAfter(this.saleStartAt) && now.isBefore(this.saleEndAt)
+            && !now.isBefore(this.saleStartAt) && !now.isAfter(this.saleEndAt)
             && this.remainingQuantity >= requestedQuantity
             && requestedQuantity <= this.maxQuantity;
     }
