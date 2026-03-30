@@ -15,7 +15,8 @@ public enum WalletErrorCode implements ErrorCode {
     WALLET_NOT_FOUND(404, "WALLET_005", "예치금 지갑을 찾을 수 없습니다."),
     CHARGE_AMOUNT_MISMATCH(400, "WALLET_006", "충전 금액이 일치하지 않습니다."),
     CHARGE_NOT_FOUND(404, "WALLET_007", "충전 요청을 찾을 수 없습니다."),
-    CHARGE_NOT_PENDING(409, "WALLET_008", "대기 상태가 아닌 충전 건입니다.");
+    CHARGE_NOT_PENDING(409, "WALLET_008", "대기 상태가 아닌 충전 건입니다."),
+    INVALID_CHARGE_REQUEST(400, "WALLET_009", "유효하지 않은 충전 요청입니다.");
 
     private final int status;
     private final String code;

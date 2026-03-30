@@ -83,9 +83,14 @@ public class WalletServiceImpl implements WalletService {
     public WalletChargeConfirmResponse confirmCharge(UUID userId,
         WalletChargeConfirmRequest request) {
         // 1. WalletCharge 조회
-        UUID chargeId = UUID.fromString(request.chargeId());
+        UUID chargeId = parseUUID(request.chargeId());
         WalletCharge walletCharge = walletChargeRepository.findByChargeId(chargeId)
             .orElseThrow(() -> new WalletException(WalletErrorCode.CHARGE_NOT_FOUND));
+
+        // 소유자 검증 추가
+        if (!walletCharge.getUserId().equals(userId)) {
+            throw new WalletException(WalletErrorCode.CHARGE_NOT_FOUND);
+        }
 
         // 2. PENDING 상태 확인
         if (!walletCharge.isPending()) {
@@ -163,5 +168,13 @@ public class WalletServiceImpl implements WalletService {
     @Override
     public WalletWithdrawResponse withdraw(UUID userId, WalletWithdrawRequest request) {
         return null;
+    }
+
+    private UUID parseUUID(String value) {
+        try {
+            return UUID.fromString(value);
+        } catch (IllegalArgumentException e) {
+            throw new WalletException(WalletErrorCode.INVALID_CHARGE_REQUEST);
+        }
     }
 }
