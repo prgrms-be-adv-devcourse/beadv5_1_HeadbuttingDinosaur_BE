@@ -20,7 +20,9 @@ public enum EventErrorCode implements ErrorCode {
     INVALID_SALE_PERIOD(400, "EVENT_014", "판매 시작 시각은 판매 종료 시각 이전이어야 합니다."),
     INVALID_EVENT_DATE(400, "EVENT_015", "판매 종료 시각은 행사 일시 이전이어야 합니다."),
     MAX_QUANTITY_EXCEEDED(400, "EVENT_016", "인당 최대 구매 수량은 총 수량을 초과할 수 없습니다."),
-    TOTAL_QUANTITY_BELOW_SOLD(400, "EVENT_017", "총 수량은 이미 판매된 수량 이하로 줄일 수 없습니다.");
+    TOTAL_QUANTITY_BELOW_SOLD(400, "EVENT_017", "총 수량은 이미 판매된 수량 이하로 줄일 수 없습니다."),
+    INVALID_STOCK_QUANTITY(400, "EVENT_018", "재고 변경 수량은 1 이상이어야 합니다."),
+    PURCHASE_NOT_ALLOWED(409, "EVENT_019", "현재 구매 불가능한 이벤트입니다.");
 
     private final int status;
     private final String code;
