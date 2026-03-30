@@ -3,12 +3,14 @@ package com.devticket.commerce.cart.presentation.controller;
 import com.devticket.commerce.cart.application.usecase.CartUseCase;
 import com.devticket.commerce.cart.presentation.dto.req.CartItemRequest;
 import com.devticket.commerce.cart.presentation.dto.res.CartItemResponse;
+import com.devticket.commerce.cart.presentation.dto.res.CartResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -34,4 +36,16 @@ public class CartController {
             .status(HttpStatus.CREATED)
             .body(response);
     }
+
+    @GetMapping
+    @Operation(description = "장바구니 조회")
+    public ResponseEntity<CartResponse> getCart(
+        @RequestHeader("X-User-Id") UUID userId
+    ) {
+        CartResponse response = cartUseCase.getCart(userId);
+        return ResponseEntity
+            .status(HttpStatus.OK)
+            .body(response);
+    }
+
 }

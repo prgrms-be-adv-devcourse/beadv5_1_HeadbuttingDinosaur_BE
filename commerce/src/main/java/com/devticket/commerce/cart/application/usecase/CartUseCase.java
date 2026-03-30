@@ -2,6 +2,7 @@ package com.devticket.commerce.cart.application.usecase;
 
 import com.devticket.commerce.cart.presentation.dto.req.CartItemRequest;
 import com.devticket.commerce.cart.presentation.dto.res.CartItemResponse;
+import com.devticket.commerce.cart.presentation.dto.res.CartResponse;
 import java.util.UUID;
 
 public interface CartUseCase {
@@ -12,5 +13,6 @@ public interface CartUseCase {
     //장바구니 생성
     CartItemResponse save(UUID userId, CartItemRequest request);
 
-
+    // 장바구니 조회
+    CartResponse getCart(UUID userId);
 }
