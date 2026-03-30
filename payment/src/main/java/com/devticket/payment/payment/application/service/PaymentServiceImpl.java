@@ -31,10 +31,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
 @Slf4j
 public class PaymentServiceImpl implements PaymentService {
 
@@ -45,6 +45,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final WalletTransactionRepository walletTransactionRepository;
     private final CommerceInternalClient commerceInternalClient;
     private final PgPaymentClient pgPaymentClient;
+    private final TransactionTemplate transactionTemplate;
 
     //결제 준비
     @Override
@@ -272,7 +273,7 @@ public class PaymentServiceImpl implements PaymentService {
                 e
             );
 
-            payment.fail("주문 완료 처리 실패 및 PG 자동 취소 실패");
+            payment.fail("주문 완료 처리 실패로 승인 후 자동 취소됨");
             paymentRepository.save(payment);
 
             throw new PaymentException(PaymentErrorCode.PG_REFUND_FAILED);

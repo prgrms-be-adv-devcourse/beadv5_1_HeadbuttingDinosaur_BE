@@ -17,7 +17,7 @@ public class MockCommerceController {
     @GetMapping("/internal/orders/{orderId}")
     public InternalOrderInfoResponse getOrderInfo(@PathVariable String orderId) {
         return new InternalOrderInfoResponse(
-            1L,
+            4L,
             UUID.fromString("123e4567-e89b-12d3-a456-426614174000"),
             "test",
             50000,
