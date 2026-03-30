@@ -15,6 +15,11 @@ public class WalletChargeRepositoryImpl implements WalletChargeRepository {
     private final WalletChargeJpaRepository walletChargeJpaRepository;
 
     @Override
+    public Optional<WalletCharge> findByUserIdAndIdempotencyKey(UUID userId, String idempotencyKey) {
+        return walletChargeJpaRepository.findByUserIdAndIdempotencyKey(userId, idempotencyKey);
+    }
+
+    @Override
     public WalletCharge save(WalletCharge walletCharge) {
         return walletChargeJpaRepository.save(walletCharge);
     }

@@ -12,6 +12,8 @@ public interface WalletChargeJpaRepository extends JpaRepository<WalletCharge, L
 
     Optional<WalletCharge> findByIdempotencyKey(String idempotencyKey);
 
+    Optional<WalletCharge> findByUserIdAndIdempotencyKey(UUID userId, String idempotencyKey);
+
     @Query("SELECT COALESCE(SUM(wc.amount), 0) FROM WalletCharge wc "
         + "WHERE wc.userId = :userId "
         + "AND wc.status IN (com.devticket.payment.wallet.domain.enums.WalletChargeStatus.PENDING, "

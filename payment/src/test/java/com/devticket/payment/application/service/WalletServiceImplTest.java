@@ -15,9 +15,9 @@ import com.devticket.payment.wallet.domain.enums.WalletChargeStatus;
 import com.devticket.payment.wallet.domain.exception.WalletException;
 import com.devticket.payment.wallet.domain.model.Wallet;
 import com.devticket.payment.wallet.domain.model.WalletCharge;
+import com.devticket.payment.wallet.domain.repository.WalletChargeRepository;
 import com.devticket.payment.wallet.domain.repository.WalletRepository;
 import com.devticket.payment.wallet.domain.repository.WalletTransactionRepository;
-import com.devticket.payment.wallet.domain.repository.WalletChargeRepository;
 import com.devticket.payment.wallet.presentation.dto.WalletChargeRequest;
 import com.devticket.payment.wallet.presentation.dto.WalletChargeResponse;
 import java.time.LocalDateTime;
@@ -30,6 +30,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 
 @ExtendWith(MockitoExtension.class)
 class WalletServiceImplTest {
@@ -60,9 +61,9 @@ class WalletServiceImplTest {
             WalletChargeRequest request = new WalletChargeRequest(10_000);
             Wallet wallet = Wallet.create(USER_ID);
 
-            given(walletChargeRepository.findByIdempotencyKey(IDEMPOTENCY_KEY))
+            given(walletChargeRepository.findByUserIdAndIdempotencyKey(USER_ID, IDEMPOTENCY_KEY))
                 .willReturn(Optional.empty());
-            given(walletRepository.findByUserId(USER_ID))
+            given(walletRepository.findByUserIdForUpdate(USER_ID))
                 .willReturn(Optional.of(wallet));
             given(walletChargeRepository.sumTodayChargeAmount(eq(USER_ID), any(LocalDateTime.class)))
                 .willReturn(0);
@@ -89,7 +90,7 @@ class WalletServiceImplTest {
             WalletCharge existingCharge = WalletCharge.create(
                 1L, USER_ID, 10_000, IDEMPOTENCY_KEY);
 
-            given(walletChargeRepository.findByIdempotencyKey(IDEMPOTENCY_KEY))
+            given(walletChargeRepository.findByUserIdAndIdempotencyKey(USER_ID, IDEMPOTENCY_KEY))
                 .willReturn(Optional.of(existingCharge));
 
             // when
@@ -110,9 +111,9 @@ class WalletServiceImplTest {
             WalletChargeRequest request = new WalletChargeRequest(50_000);
             Wallet wallet = Wallet.create(USER_ID);
 
-            given(walletChargeRepository.findByIdempotencyKey(IDEMPOTENCY_KEY))
+            given(walletChargeRepository.findByUserIdAndIdempotencyKey(USER_ID, IDEMPOTENCY_KEY))
                 .willReturn(Optional.empty());
-            given(walletRepository.findByUserId(USER_ID))
+            given(walletRepository.findByUserIdForUpdate(USER_ID))
                 .willReturn(Optional.of(wallet));
             given(walletChargeRepository.sumTodayChargeAmount(eq(USER_ID), any(LocalDateTime.class)))
                 .willReturn(WalletPolicyConstants.DAILY_CHARGE_LIMIT);
@@ -132,9 +133,9 @@ class WalletServiceImplTest {
             WalletChargeRequest request = new WalletChargeRequest(10_000);
             Wallet newWallet = Wallet.create(USER_ID);
 
-            given(walletChargeRepository.findByIdempotencyKey(IDEMPOTENCY_KEY))
+            given(walletChargeRepository.findByUserIdAndIdempotencyKey(USER_ID, IDEMPOTENCY_KEY))
                 .willReturn(Optional.empty());
-            given(walletRepository.findByUserId(USER_ID))
+            given(walletRepository.findByUserIdForUpdate(USER_ID))
                 .willReturn(Optional.empty());
             given(walletRepository.save(any(Wallet.class)))
                 .willReturn(newWallet);
@@ -161,9 +162,9 @@ class WalletServiceImplTest {
             WalletChargeRequest request = new WalletChargeRequest(WalletPolicyConstants.MAX_CHARGE_AMOUNT);
             Wallet wallet = Wallet.create(USER_ID);
 
-            given(walletChargeRepository.findByIdempotencyKey(IDEMPOTENCY_KEY))
+            given(walletChargeRepository.findByUserIdAndIdempotencyKey(USER_ID, IDEMPOTENCY_KEY))
                 .willReturn(Optional.empty());
-            given(walletRepository.findByUserId(USER_ID))
+            given(walletRepository.findByUserIdForUpdate(USER_ID))
                 .willReturn(Optional.of(wallet));
             given(walletChargeRepository.sumTodayChargeAmount(eq(USER_ID), any(LocalDateTime.class)))
                 .willReturn(todayTotal);
@@ -186,9 +187,9 @@ class WalletServiceImplTest {
             WalletChargeRequest request = new WalletChargeRequest(WalletPolicyConstants.MIN_CHARGE_AMOUNT);
             Wallet wallet = Wallet.create(USER_ID);
 
-            given(walletChargeRepository.findByIdempotencyKey(IDEMPOTENCY_KEY))
+            given(walletChargeRepository.findByUserIdAndIdempotencyKey(USER_ID, IDEMPOTENCY_KEY))
                 .willReturn(Optional.empty());
-            given(walletRepository.findByUserId(USER_ID))
+            given(walletRepository.findByUserIdForUpdate(USER_ID))
                 .willReturn(Optional.of(wallet));
             given(walletChargeRepository.sumTodayChargeAmount(eq(USER_ID), any(LocalDateTime.class)))
                 .willReturn(todayTotal);
@@ -198,6 +199,35 @@ class WalletServiceImplTest {
                 .isInstanceOf(WalletException.class);
 
             verify(walletChargeRepository, never()).save(any(WalletCharge.class));
+        }
+
+        @Test
+        @DisplayName("유니크 충돌 — 동시 요청 시 기존 레코드로 멱등 응답")
+        void 유니크_충돌_멱등_응답() {
+            // given
+            WalletChargeRequest request = new WalletChargeRequest(10_000);
+            Wallet wallet = Wallet.create(USER_ID);
+            WalletCharge existingCharge = WalletCharge.create(
+                1L, USER_ID, 10_000, IDEMPOTENCY_KEY);
+
+            given(walletChargeRepository.findByUserIdAndIdempotencyKey(USER_ID, IDEMPOTENCY_KEY))
+                .willReturn(Optional.empty());
+            given(walletRepository.findByUserIdForUpdate(USER_ID))
+                .willReturn(Optional.of(wallet));
+            given(walletChargeRepository.sumTodayChargeAmount(eq(USER_ID), any(LocalDateTime.class)))
+                .willReturn(0);
+            given(walletChargeRepository.save(any(WalletCharge.class)))
+                .willThrow(new DataIntegrityViolationException("unique constraint"));
+            given(walletChargeRepository.findByUserIdAndIdempotencyKey(USER_ID, IDEMPOTENCY_KEY))
+                .willReturn(Optional.empty())
+                .willReturn(Optional.of(existingCharge));
+
+            // when
+            WalletChargeResponse response = walletService.charge(USER_ID, request, IDEMPOTENCY_KEY);
+
+            // then
+            assertThat(response).isNotNull();
+            assertThat(response.amount()).isEqualTo(10_000);
         }
     }
 }

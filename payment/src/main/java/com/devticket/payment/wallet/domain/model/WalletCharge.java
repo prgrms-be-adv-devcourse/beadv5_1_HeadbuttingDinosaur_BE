@@ -10,6 +10,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -18,7 +19,9 @@ import lombok.NoArgsConstructor;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(name = "wallet_charge")
+@Table(name = "wallet_charge", uniqueConstraints = {
+    @UniqueConstraint(columnNames = {"user_id", "idempotency_key"})
+})
 public class WalletCharge extends BaseEntity {
 
     @Id
@@ -44,7 +47,7 @@ public class WalletCharge extends BaseEntity {
     @Column(name = "payment_key", unique = true)
     private String paymentKey;
 
-    @Column(name = "idempotency_key", nullable = false, unique = true)
+    @Column(name = "idempotency_key", nullable = false)
     private String idempotencyKey;
 
     public static WalletCharge create(Long walletId, UUID userId,
