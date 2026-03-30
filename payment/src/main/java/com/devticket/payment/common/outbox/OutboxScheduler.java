@@ -15,7 +15,7 @@ public class OutboxScheduler {
     private final OutboxRepository outboxRepository;
     private final OutboxEventProducer outboxEventProducer;
 
-    @Scheduled(fixedDelay = 10000)
+    @Scheduled(fixedDelay = 3000)
     @Transactional
     public void publishPendingEvents() {
         List<Outbox> pendingList =
@@ -32,18 +32,12 @@ public class OutboxScheduler {
                 OutboxEventMessage message = OutboxEventMessage.from(outbox);
                 String key = outbox.getAggregateId().toString();
 
-                boolean sent = outboxEventProducer.send(
-                    outbox.getEventType(), key, message);
-
-                if (sent) {
-                    outbox.markSent();
-                } else {
-                    outbox.markFailed();
-                }
-            } catch (Exception e) {
-                log.error("[OutboxScheduler] 이벤트 발행 실패 — outboxId={}, eventType={}, error={}",
-                    outbox.getId(), outbox.getEventType(), e.getMessage());
-                outbox.markFailed();
+                outboxEventProducer.send(outbox.getEventType(), key, message);
+                outbox.markSent();
+            } catch (OutboxPublishException e) {
+                log.warn("[OutboxScheduler] 이벤트 발행 실패 — outboxId={}, eventType={}, retry={}, error={}",
+                    outbox.getId(), outbox.getEventType(), outbox.getRetryCount() + 1, e.getMessage());
+                outbox.increaseRetryCount();
             }
         }
 

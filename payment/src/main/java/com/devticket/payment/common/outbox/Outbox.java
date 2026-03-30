@@ -46,6 +46,11 @@ public class Outbox extends BaseEntity {
     @Column(name = "message_id", nullable = false, unique = true)
     private UUID messageId;
 
+    @Column(name = "retry_count", nullable = false)
+    private int retryCount;
+
+    private static final int MAX_RETRY = 5;
+
     public static Outbox create(String aggregateType, Long aggregateId,
                                 String eventType, String payload) {
         Outbox outbox = new Outbox();
@@ -55,6 +60,7 @@ public class Outbox extends BaseEntity {
         outbox.payload = payload;
         outbox.status = OutboxStatus.PENDING;
         outbox.messageId = UUID.randomUUID();
+        outbox.retryCount = 0;
         return outbox;
     }
 
@@ -62,8 +68,11 @@ public class Outbox extends BaseEntity {
         this.status = OutboxStatus.SENT;
     }
 
-    public void markFailed() {
-        this.status = OutboxStatus.FAILED;
+    public void increaseRetryCount() {
+        this.retryCount++;
+        if (this.retryCount >= MAX_RETRY) {
+            this.status = OutboxStatus.FAILED;
+        }
     }
 
     public boolean isPending() {

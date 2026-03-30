@@ -2,6 +2,7 @@ package com.devticket.payment.common.outbox;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.concurrent.ExecutionException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -15,27 +16,27 @@ public class OutboxEventProducer {
     private final KafkaTemplate<String, String> kafkaTemplate;
     private final ObjectMapper objectMapper;
 
-    public boolean send(String topic, String key, OutboxEventMessage message) {
+    /**
+     * Kafka 메시지를 동기적으로 발행한다.
+     * 발행 실패 시 OutboxPublishException을 던진다.
+     */
+    public void send(String topic, String key, OutboxEventMessage message) {
         try {
             String json = objectMapper.writeValueAsString(message);
 
-            kafkaTemplate.send(topic, key, json)
-                .whenComplete((result, ex) -> {
-                    if (ex != null) {
-                        log.error("[Outbox] Kafka 발행 실패 — topic={}, messageId={}, error={}",
-                            topic, message.messageId(), ex.getMessage());
-                    } else {
-                        log.info("[Outbox] Kafka 발행 성공 — topic={}, messageId={}, offset={}",
-                            topic, message.messageId(),
-                            result.getRecordMetadata().offset());
-                    }
-                });
+            var result = kafkaTemplate.send(topic, key, json).get();
 
-            return true;
+            log.info("[Outbox] Kafka 발행 성공 — topic={}, messageId={}, offset={}",
+                topic, message.messageId(),
+                result.getRecordMetadata().offset());
+
         } catch (JsonProcessingException e) {
-            log.error("[Outbox] 메시지 직렬화 실패 — topic={}, messageId={}",
-                topic, message.messageId(), e);
-            return false;
+            throw new OutboxPublishException("메시지 직렬화 실패", e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new OutboxPublishException("Kafka 발행 중 인터럽트 발생", e);
+        } catch (ExecutionException e) {
+            throw new OutboxPublishException("Kafka 발행 실패", e);
         }
     }
 }
