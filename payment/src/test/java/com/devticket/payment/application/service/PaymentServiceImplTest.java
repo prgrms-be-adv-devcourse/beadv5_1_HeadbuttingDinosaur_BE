@@ -606,7 +606,7 @@ public class PaymentServiceImplTest {
 
         @Test
         @DisplayName("성공 — 결제 정보 반환")
-        void 성공() {
+        void 주문_ID로_결제_정보_조회성공() {
             // given
             Payment payment = createReadyPayment();
             given(paymentRepository.findByOrderId(orderInfo.id())).willReturn(Optional.of(payment));
