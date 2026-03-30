@@ -18,6 +18,7 @@ import com.devticket.commerce.ticket.presentation.dto.res.TicketListResponse;
 import com.devticket.commerce.ticket.presentation.dto.res.TicketResponse;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -71,6 +72,18 @@ public class TicketService implements TicketUsecase {
             .toList();
 
         return TicketListResponse.of(ticketPage, tickets);
+    }
+
+    @Override
+    public Optional<TicketDetailResponse> getTicketDetail(UUID ticketId) {
+
+        return ticketRepository.findByTicketId(ticketId)
+            .map(ticket -> {
+                // 단건 이벤트 정보 조회
+                InternalEventInfoResponse event = ticketToEventClient.getSingleEventInfo(ticket.getEventId());
+                // 응답DTO 구성(ticket + event)
+                return TicketDetailResponse.of(ticket, event.eventTitle(), event.eventDateTime());
+            });
     }
 
     @Override
