@@ -492,16 +492,30 @@ class EventServiceTest {
         UUID sellerId = UUID.randomUUID();
         Event event = EventTestFixture.createEventWithStatus(sellerId, EventStatus.DRAFT);
         UUID eventId = event.getEventId();
-        SellerEventUpdateRequest updateRequest = EventTestFixture.createUpdateEventRequest();
+
+        // 수정 요청
+        SellerEventUpdateRequest updateRequest = new SellerEventUpdateRequest(
+            "수정된_제목", "수정된_설명", "수정된_위치",
+            LocalDateTime.now().plusDays(20),
+            LocalDateTime.now().plusDays(5), LocalDateTime.now().plusDays(15),
+            60000, 150, 5, EventCategory.CONFERENCE,
+            List.of(3L, 4L), List.of("newUrl"), null
+        );
 
         when(eventRepository.findWithDetailsByEventId(eventId)).thenReturn(Optional.of(event));
 
         // when
         SellerEventUpdateResponse response = eventService.updateEvent(sellerId, eventId, updateRequest);
 
-        // then
+        // then - 응답 검증
         assertThat(response.eventId()).isEqualTo(eventId);
         assertThat(response.status()).isEqualTo(EventStatus.DRAFT);
+
+        // 실제 변경된 필드 검증 (Event 객체 상태 확인)
+        assertThat(event.getTitle()).isEqualTo("수정된_제목");
+        assertThat(event.getPrice()).isEqualTo(60000);
+        assertThat(event.getTotalQuantity()).isEqualTo(150);
+        assertThat(event.getMaxQuantity()).isEqualTo(5);
     }
 
     @Test

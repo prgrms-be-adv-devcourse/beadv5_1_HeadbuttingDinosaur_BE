@@ -382,7 +382,9 @@ class EventControllerTest {
         SellerEventUpdateRequest cancelRequest = EventTestFixture.createUpdateEventRequest_Cancel();
         SellerEventUpdateResponse expectedResponse = EventTestFixture.createSellerEventUpdateResponse(eventId, EventStatus.CANCELLED);
 
-        when(eventService.updateEvent(eq(sellerId), eq(eventId), any(SellerEventUpdateRequest.class)))
+        // ArgumentCaptor로 요청 필드 검증
+        ArgumentCaptor<SellerEventUpdateRequest> requestCaptor = ArgumentCaptor.forClass(SellerEventUpdateRequest.class);
+        when(eventService.updateEvent(eq(sellerId), eq(eventId), requestCaptor.capture()))
             .thenReturn(expectedResponse);
 
         // when & then
@@ -395,7 +397,9 @@ class EventControllerTest {
             .andExpect(jsonPath("$.data.eventId").value(eventId.toString()))
             .andExpect(jsonPath("$.data.status").value("CANCELLED"));
 
-        verify(eventService).updateEvent(eq(sellerId), eq(eventId), any(SellerEventUpdateRequest.class));
+        // 요청 바디 검증
+        SellerEventUpdateRequest capturedRequest = requestCaptor.getValue();
+        assertThat(capturedRequest.status()).isEqualTo(EventStatus.CANCELLED);
     }
 
     @Test
@@ -420,7 +424,9 @@ class EventControllerTest {
         SellerEventUpdateRequest updateRequest = EventTestFixture.createUpdateEventRequest();
         SellerEventUpdateResponse expectedResponse = EventTestFixture.createSellerEventUpdateResponse(eventId, EventStatus.DRAFT);
 
-        when(eventService.updateEvent(eq(sellerId), eq(eventId), any(SellerEventUpdateRequest.class)))
+        // ArgumentCaptor로 요청 필드 검증
+        ArgumentCaptor<SellerEventUpdateRequest> requestCaptor = ArgumentCaptor.forClass(SellerEventUpdateRequest.class);
+        when(eventService.updateEvent(eq(sellerId), eq(eventId), requestCaptor.capture()))
             .thenReturn(expectedResponse);
 
         // when & then
@@ -433,7 +439,13 @@ class EventControllerTest {
             .andExpect(jsonPath("$.data.eventId").value(eventId.toString()))
             .andExpect(jsonPath("$.data.status").value("DRAFT"));
 
-        verify(eventService).updateEvent(eq(sellerId), eq(eventId), any(SellerEventUpdateRequest.class));
+        // 요청 바디 JSON 바인딩 검증
+        SellerEventUpdateRequest capturedRequest = requestCaptor.getValue();
+        assertThat(capturedRequest.title()).isEqualTo(updateRequest.title());
+        assertThat(capturedRequest.price()).isEqualTo(updateRequest.price());
+        assertThat(capturedRequest.totalQuantity()).isEqualTo(updateRequest.totalQuantity());
+        assertThat(capturedRequest.maxQuantity()).isEqualTo(updateRequest.maxQuantity());
+        assertThat(capturedRequest.saleStartAt()).isEqualTo(updateRequest.saleStartAt());
     }
 
     @Test
