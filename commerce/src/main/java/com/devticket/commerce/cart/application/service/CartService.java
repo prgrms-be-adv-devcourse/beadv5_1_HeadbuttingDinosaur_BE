@@ -1,5 +1,6 @@
 package com.devticket.commerce.cart.application.service;
 
+import com.devticket.commerce.cart.application.usecase.CartItemUseCase;
 import com.devticket.commerce.cart.application.usecase.CartUseCase;
 import com.devticket.commerce.cart.domain.exception.CartErrorCode;
 import com.devticket.commerce.cart.domain.exception.EventErrorCode;
@@ -9,8 +10,12 @@ import com.devticket.commerce.cart.domain.repository.CartItemRepository;
 import com.devticket.commerce.cart.domain.repository.CartRepository;
 import com.devticket.commerce.cart.infrastructure.external.client.EventClient;
 import com.devticket.commerce.cart.infrastructure.external.client.dto.InternalPurchaseValidationResponse;
+import com.devticket.commerce.cart.presentation.dto.req.CartItemQuantityRequest;
 import com.devticket.commerce.cart.presentation.dto.req.CartItemRequest;
+import com.devticket.commerce.cart.presentation.dto.res.CartClearResponse;
+import com.devticket.commerce.cart.presentation.dto.res.CartItemDeleteResponse;
 import com.devticket.commerce.cart.presentation.dto.res.CartItemDetail;
+import com.devticket.commerce.cart.presentation.dto.res.CartItemQuantityResponse;
 import com.devticket.commerce.cart.presentation.dto.res.CartItemResponse;
 import com.devticket.commerce.cart.presentation.dto.res.CartResponse;
 import com.devticket.commerce.common.exception.BusinessException;
@@ -25,7 +30,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class CartService implements CartUseCase {
+public class CartService implements CartUseCase, CartItemUseCase {
 
     private final CartRepository cartRepository;
     private final CartItemRepository cartItemRepository;
@@ -60,12 +65,11 @@ public class CartService implements CartUseCase {
         return CartItemResponse.of(cart, cartItem, event.title(), event.price());
     }
 
+    // 장바구니 전체 조회
     @Override
     public CartResponse getCart(UUID userId) {
         // 장바구니 비어 있음 예외
-        Cart cart = cartRepository.findByUserId(userId)
-            .orElseThrow(() -> new BusinessException(CartErrorCode.CART_EMPTY));
-
+        Cart cart = getCartByUserId(userId);
         // 장바구니 내 아이템 조회
         List<CartItem> cartItems = cartItemRepository.findAllByCartId(cart.getId());
 
@@ -78,6 +82,52 @@ public class CartService implements CartUseCase {
             }).toList();
 
         return CartResponse.of(cart, itemDetails);
+    }
+
+    // 장바구니 비우기
+    @Override
+    public CartClearResponse clearCart(UUID userId) {
+        Cart cart = getCartByUserId(userId);
+        List<CartItem> cartItems = cartItemRepository.findAllByCartId(cart.getId());
+        cartItemRepository.deleteAllInBatch(cartItems);
+        return CartClearResponse.of();
+    }
+
+    // 장바구니 아이템 갯수 증감
+    @Override
+    public CartItemQuantityResponse updateTicket(UUID userId, Long cartItemId, CartItemQuantityRequest request) {
+        // 장바구니 가져오기
+        Cart cart = getCartByUserId(userId);
+        // 장바구니 아이템 가져오기
+        CartItem cartItem = getCartItemById(cartItemId);
+
+        // 장바구니 아이템이 유저의 장바구니 아이템인가 확인 예외
+        if (!cartItem.getCartId().equals(cart.getId())) {
+            throw new BusinessException(CartErrorCode.ITEM_NOT_FOUND);
+        }
+
+        cartItem.addQuantity(request.quantity());
+
+        CartItem savedCartItem = cartItemRepository.save(cartItem);
+
+        return CartItemQuantityResponse.of(savedCartItem);
+    }
+
+    // 장바구니 아이템 삭제
+    @Override
+    public CartItemDeleteResponse deleteTicket(UUID userId, Long cartItemId) {
+        // 장바구니 가져오기
+        Cart cart = getCartByUserId(userId);
+        // 장바구니 아이템 가져오기
+        CartItem cartItem = getCartItemById(cartItemId);
+
+        // 장바구니 아이템이 유저의 장바구니 아이템인가 확인 예외
+        if (!cartItem.getCartId().equals(cart.getId())) {
+            throw new BusinessException(CartErrorCode.ITEM_NOT_FOUND);
+        }
+
+        cartItemRepository.deleteAllInBatch(List.of(cartItem));
+        return CartItemDeleteResponse.of();
     }
 
     // =========================================================================
@@ -135,6 +185,20 @@ public class CartService implements CartUseCase {
                 throw new BusinessException(EventErrorCode.INVALID_PURCHASE_REQUEST);
             }
         }
+
+    }
+
+
+    // 장바구니 존재 유무 확인
+    private Cart getCartByUserId(UUID userId) {
+        return cartRepository.findByUserId(userId)
+            .orElseThrow(() -> new BusinessException(CartErrorCode.CART_EMPTY));
+    }
+
+    // 장바구니 아이템 존재 유무 확인
+    private CartItem getCartItemById(Long cartItemId) {
+        return cartItemRepository.findById(cartItemId)
+            .orElseThrow(() -> new BusinessException(CartErrorCode.ITEM_NOT_FOUND));
     }
 
 }
