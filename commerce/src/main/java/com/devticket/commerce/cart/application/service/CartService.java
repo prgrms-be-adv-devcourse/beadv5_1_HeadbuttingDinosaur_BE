@@ -101,10 +101,19 @@ public class CartService implements CartUseCase, CartItemUseCase {
         // 장바구니 아이템 가져오기
         CartItem cartItem = getCartItemById(cartItemId);
 
+        // 변경 후 수량
+        int newQuantity = cartItem.getQuantity() + request.quantity();
+
         // 장바구니 아이템이 유저의 장바구니 아이템인가 확인 예외
         if (!cartItem.getCartId().equals(cart.getId())) {
             throw new BusinessException(CartErrorCode.ITEM_NOT_FOUND);
         }
+
+        // Event 구매 가능 검증 - 1) Event 현재 상태 가져 오기
+        InternalPurchaseValidationResponse event = eventClient.getValidateEventStatus(cartItem.getEventId(), userId,
+            newQuantity);
+        // Event 구매 가능 검증 - 2) Event의 구매 가능 상태 확인
+        handlePurchaseValidationError(event);
 
         cartItem.addQuantity(request.quantity());
 
