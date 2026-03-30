@@ -10,8 +10,11 @@ import com.devticket.commerce.cart.domain.repository.CartRepository;
 import com.devticket.commerce.cart.infrastructure.external.client.EventClient;
 import com.devticket.commerce.cart.infrastructure.external.client.dto.InternalPurchaseValidationResponse;
 import com.devticket.commerce.cart.presentation.dto.req.CartItemRequest;
+import com.devticket.commerce.cart.presentation.dto.res.CartItemDetail;
 import com.devticket.commerce.cart.presentation.dto.res.CartItemResponse;
+import com.devticket.commerce.cart.presentation.dto.res.CartResponse;
 import com.devticket.commerce.common.exception.BusinessException;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -55,6 +58,26 @@ public class CartService implements CartUseCase {
 
         //응답데이터 구성
         return CartItemResponse.of(cart, cartItem, event.title(), event.price());
+    }
+
+    @Override
+    public CartResponse getCart(UUID userId) {
+        // 장바구니 비어 있음 예외
+        Cart cart = cartRepository.findByUserId(userId)
+            .orElseThrow(() -> new BusinessException(CartErrorCode.CART_EMPTY));
+
+        // 장바구니 내 아이템 조회
+        List<CartItem> cartItems = cartItemRepository.findAllByCartId(cart.getId());
+
+        // 아이템 -> 아이템 상세
+        List<CartItemDetail> itemDetails = cartItems.stream()
+            .map(cartItem -> {
+                InternalPurchaseValidationResponse event =
+                    eventClient.getValidateEventStatus(cartItem.getEventId(), userId, cartItem.getQuantity());
+                return CartItemDetail.of(cartItem, event.title(), event.price());
+            }).toList();
+
+        return CartResponse.of(cart, itemDetails);
     }
 
     // =========================================================================
