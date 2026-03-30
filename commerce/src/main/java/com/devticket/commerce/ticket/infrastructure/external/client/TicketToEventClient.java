@@ -19,7 +19,7 @@ public class TicketToEventClient {
 
     private final RestClient restClient;
 
-    public TicketToEventClient(@Qualifier("orderToEventRestClient") RestClient restClient) {
+    public TicketToEventClient(@Qualifier("ticketToEventRestClient") RestClient restClient) {
         this.restClient = restClient;
     }
 

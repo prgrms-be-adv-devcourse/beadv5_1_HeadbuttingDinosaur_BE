@@ -36,7 +36,7 @@ public class TicketController {
 
         TicketListResponse response = ticketUsecase.getTicketList(userId, request);
         return ResponseEntity
-            .status(HttpStatus.CREATED)
+            .status(HttpStatus.OK)
             .body(response);
     }
 
