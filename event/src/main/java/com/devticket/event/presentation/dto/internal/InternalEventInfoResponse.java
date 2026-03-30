@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 public record InternalEventInfoResponse(
-    UUID eventId,
+    Long id,
     UUID sellerId,
     String title,
     Integer price,
@@ -24,7 +24,7 @@ public record InternalEventInfoResponse(
 
     public static InternalEventInfoResponse from(Event event) {
         return new InternalEventInfoResponse(
-            event.getEventId(),
+            event.getId(),
             event.getSellerId(),
             event.getTitle(),
             event.getPrice(),

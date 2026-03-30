@@ -5,14 +5,13 @@ import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 
 import java.util.List;
-import java.util.UUID;
 
 public record InternalBulkStockAdjustmentRequest(
     @NotEmpty @Valid List<StockAdjustmentItem> items
 ) {
 
     public record StockAdjustmentItem(
-        @NotNull UUID eventId,
+        @NotNull Long id,
         @NotNull Integer delta
     ) {}
 }
