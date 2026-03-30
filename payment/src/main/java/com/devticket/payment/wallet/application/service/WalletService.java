@@ -11,7 +11,8 @@ import com.devticket.payment.wallet.presentation.dto.WalletWithdrawResponse;
 import java.util.UUID;
 
 public interface WalletService {
-    WalletChargeResponse charge(UUID userId, WalletChargeRequest request);
+
+    WalletChargeResponse charge(UUID userId, WalletChargeRequest request, String idempotencyKey);
 
     WalletChargeConfirmResponse confirmCharge(UUID userId, WalletChargeConfirmRequest request);
 
