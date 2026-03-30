@@ -3,6 +3,8 @@ package com.devticket.payment.payment.presentation.controller;
 import com.devticket.payment.payment.application.service.PaymentService;
 import com.devticket.payment.payment.presentation.dto.PaymentConfirmRequest;
 import com.devticket.payment.payment.presentation.dto.PaymentConfirmResponse;
+import com.devticket.payment.payment.presentation.dto.PaymentFailRequest;
+import com.devticket.payment.payment.presentation.dto.PaymentFailResponse;
 import com.devticket.payment.payment.presentation.dto.PaymentReadyRequest;
 import com.devticket.payment.payment.presentation.dto.PaymentReadyResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -74,6 +76,21 @@ public class PaymentController {
         @Valid @RequestBody PaymentConfirmRequest request
     ) {
         PaymentConfirmResponse response = paymentService.confirmPgPayment(userId, request);
+        return ResponseEntity.ok(response);
+    }
+
+    @Operation(
+        summary = "PG 결제 실패 처리",
+        description = "Toss Payments 결제 실패 시 클라이언트가 전달한 실패 정보를 기반으로 결제 상태를 FAILED로 변경합니다."
+    )
+    @ApiResponse(responseCode = "200", description = "결제 실패 처리 완료")
+    @ApiResponse(responseCode = "400", description = "유효하지 않은 요청", content = @Content(schema = @Schema(hidden = true)))
+    @PostMapping("/fail")
+    public ResponseEntity<PaymentFailResponse> fail(
+        @RequestHeader("X-User-Id") UUID userId,
+        @Valid @RequestBody PaymentFailRequest request
+    ) {
+        PaymentFailResponse response = paymentService.failPgPayment(userId, request);
         return ResponseEntity.ok(response);
     }
 }

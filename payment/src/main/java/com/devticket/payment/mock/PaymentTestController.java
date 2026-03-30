@@ -3,6 +3,8 @@ package com.devticket.payment.mock;
 import com.devticket.payment.payment.application.service.PaymentService;
 import com.devticket.payment.payment.presentation.dto.PaymentConfirmRequest;
 import com.devticket.payment.payment.presentation.dto.PaymentConfirmResponse;
+import com.devticket.payment.payment.presentation.dto.PaymentFailRequest;
+import com.devticket.payment.payment.presentation.dto.PaymentFailResponse;
 import com.devticket.payment.payment.presentation.dto.PaymentReadyRequest;
 import com.devticket.payment.payment.presentation.dto.PaymentReadyResponse;
 import java.util.UUID;
@@ -35,6 +37,11 @@ public class PaymentTestController {
     @PostMapping("/confirm")
     public PaymentConfirmResponse confirmPayment(@RequestBody PaymentConfirmRequest request) {
         return paymentService.confirmPgPayment(TEST_USER_ID, request);
+    }
+
+    @PostMapping("/fail")
+    public PaymentFailResponse failPayment(@RequestBody PaymentFailRequest request) {
+        return paymentService.failPgPayment(TEST_USER_ID, request);
     }
 
 }

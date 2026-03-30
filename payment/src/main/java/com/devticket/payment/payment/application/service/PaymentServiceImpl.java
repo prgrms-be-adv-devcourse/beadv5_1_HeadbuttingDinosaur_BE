@@ -14,6 +14,8 @@ import com.devticket.payment.payment.infrastructure.client.dto.InternalOrderInfo
 import com.devticket.payment.payment.infrastructure.external.PgPaymentClient;
 import com.devticket.payment.payment.presentation.dto.PaymentConfirmRequest;
 import com.devticket.payment.payment.presentation.dto.PaymentConfirmResponse;
+import com.devticket.payment.payment.presentation.dto.PaymentFailRequest;
+import com.devticket.payment.payment.presentation.dto.PaymentFailResponse;
 import com.devticket.payment.payment.presentation.dto.PaymentReadyRequest;
 import com.devticket.payment.payment.presentation.dto.PaymentReadyResponse;
 import com.devticket.payment.wallet.domain.exception.WalletErrorCode;
@@ -188,6 +190,46 @@ public class PaymentServiceImpl implements PaymentService {
                 payment.getAmount(), request.amount(), request.orderId());
             throw new PaymentException(PaymentErrorCode.INVALID_PAYMENT_REQUEST);
         }
+    }
+
+    @Override
+    @Transactional
+    public PaymentFailResponse failPgPayment(UUID userId, PaymentFailRequest request) {
+        InternalOrderInfoResponse order = commerceInternalClient.getOrderInfo(request.orderId());
+
+        Payment payment = paymentRepository.findByOrderId(order.id())
+            .orElseThrow(() -> new PaymentException(PaymentErrorCode.INVALID_PAYMENT_REQUEST));
+
+        validateOrderOwner(payment.getUserId(), userId);
+        validatePaymentStatus(payment, request.orderId());
+
+        String reason = buildFailureReason(request.code(), request.message());
+        payment.fail(reason);
+        paymentRepository.save(payment);
+
+        log.info("PG 결제 실패 처리 완료: orderId={}, code={}, message={}",
+            request.orderId(), request.code(), request.message());
+
+        try {
+            commerceInternalClient.failOrder(order.id());
+        } catch (Exception e) {
+            log.error("주문 실패 처리 중 Commerce 연동 오류: orderId={}", order.id(), e);
+        }
+
+        return PaymentFailResponse.from(payment);
+    }
+
+    private String buildFailureReason(String code, String message) {
+        if (code != null && message != null) {
+            return "[" + code + "] " + message;
+        }
+        if (code != null) {
+            return "[" + code + "]";
+        }
+        if (message != null) {
+            return message;
+        }
+        return "PG 결제 실패";
     }
 
     // PG 승인 요청
