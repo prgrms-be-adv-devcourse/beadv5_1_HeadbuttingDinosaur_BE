@@ -24,6 +24,8 @@ import com.devticket.event.presentation.dto.SellerEventCreateRequest;
 import com.devticket.event.presentation.dto.SellerEventCreateResponse;
 import com.devticket.event.presentation.dto.SellerEventDetailResponse;
 import com.devticket.event.presentation.dto.SellerEventSummaryResponse;
+import com.devticket.event.presentation.dto.SellerEventUpdateRequest;
+import com.devticket.event.presentation.dto.SellerEventUpdateResponse;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
@@ -428,6 +430,231 @@ class EventServiceTest {
 
         // when & then
         assertThatThrownBy(() -> eventService.getEventSummary(sellerId, eventId))
+            .isInstanceOf(BusinessException.class)
+            .hasMessageContaining(EventErrorCode.UNAUTHORIZED_SELLER.getMessage());
+    }
+
+    // 이벤트 수정 및 판매 중지 테스트
+
+    @Test
+    void 정상적인_판매_중지_성공() {
+        // given
+        UUID sellerId = UUID.randomUUID();
+        Event event = EventTestFixture.createEventWithStatus(sellerId, EventStatus.DRAFT);
+        UUID eventId = event.getEventId();
+        SellerEventUpdateRequest cancelRequest = EventTestFixture.createUpdateEventRequest_Cancel();
+
+        when(eventRepository.findWithDetailsByEventId(eventId)).thenReturn(Optional.of(event));
+
+        // when
+        SellerEventUpdateResponse response = eventService.updateEvent(sellerId, eventId, cancelRequest);
+
+        // then
+        assertThat(response.eventId()).isEqualTo(eventId);
+        assertThat(response.status()).isEqualTo(EventStatus.CANCELLED);
+    }
+
+    @Test
+    void 취소_불가_상태_이벤트_취소시_예외가_발생한다() {
+        // given
+        UUID sellerId = UUID.randomUUID();
+        Event event = EventTestFixture.createEventWithStatus(sellerId, EventStatus.CANCELLED);
+        UUID eventId = event.getEventId();
+        SellerEventUpdateRequest cancelRequest = EventTestFixture.createUpdateEventRequest_Cancel();
+
+        when(eventRepository.findWithDetailsByEventId(eventId)).thenReturn(Optional.of(event));
+
+        // when & then
+        assertThatThrownBy(() -> eventService.updateEvent(sellerId, eventId, cancelRequest))
+            .isInstanceOf(BusinessException.class)
+            .hasMessageContaining(EventErrorCode.CANNOT_CHANGE_STATUS.getMessage());
+    }
+
+    @Test
+    void 판매_중지시_다른_판매자의_이벤트이면_예외가_발생한다() {
+        // given
+        UUID sellerId = UUID.randomUUID();
+        Event event = EventTestFixture.createEventWithStatus(UUID.randomUUID(), EventStatus.DRAFT);
+        UUID eventId = event.getEventId();
+        SellerEventUpdateRequest cancelRequest = EventTestFixture.createUpdateEventRequest_Cancel();
+
+        when(eventRepository.findWithDetailsByEventId(eventId)).thenReturn(Optional.of(event));
+
+        // when & then
+        assertThatThrownBy(() -> eventService.updateEvent(sellerId, eventId, cancelRequest))
+            .isInstanceOf(BusinessException.class)
+            .hasMessageContaining(EventErrorCode.UNAUTHORIZED_SELLER.getMessage());
+    }
+
+    @Test
+    void 이벤트_수정에_성공한다() {
+        // given
+        UUID sellerId = UUID.randomUUID();
+        Event event = EventTestFixture.createEventWithStatus(sellerId, EventStatus.DRAFT);
+        UUID eventId = event.getEventId();
+        SellerEventUpdateRequest updateRequest = EventTestFixture.createUpdateEventRequest();
+
+        when(eventRepository.findWithDetailsByEventId(eventId)).thenReturn(Optional.of(event));
+
+        // when
+        SellerEventUpdateResponse response = eventService.updateEvent(sellerId, eventId, updateRequest);
+
+        // then
+        assertThat(response.eventId()).isEqualTo(eventId);
+        assertThat(response.status()).isEqualTo(EventStatus.DRAFT);
+    }
+
+    @Test
+    void 필수_필드가_누락되면_수정에_실패한다() {
+        // given
+        UUID sellerId = UUID.randomUUID();
+        Event event = EventTestFixture.createEventWithStatus(sellerId, EventStatus.DRAFT);
+        UUID eventId = event.getEventId();
+        SellerEventUpdateRequest updateRequest = new SellerEventUpdateRequest(
+            null, "설명", "위치", LocalDateTime.now().plusDays(15),
+            LocalDateTime.now().plusDays(4), LocalDateTime.now().plusDays(10),
+            50000, 100, 4, EventCategory.MEETUP, List.of(1L), List.of("url"), null
+        );
+
+        when(eventRepository.findWithDetailsByEventId(eventId)).thenReturn(Optional.of(event));
+
+        // when & then
+        assertThatThrownBy(() -> eventService.updateEvent(sellerId, eventId, updateRequest))
+            .isInstanceOf(BusinessException.class)
+            .hasMessageContaining(EventErrorCode.INVALID_REQUEST.getMessage());
+    }
+
+    @Test
+    void 유효하지_않은_가격이면_수정에_실패한다() {
+        // given
+        UUID sellerId = UUID.randomUUID();
+        Event event = EventTestFixture.createEventWithStatus(sellerId, EventStatus.DRAFT);
+        UUID eventId = event.getEventId();
+        SellerEventUpdateRequest updateRequest = new SellerEventUpdateRequest(
+            "제목", "설명", "위치", LocalDateTime.now().plusDays(15),
+            LocalDateTime.now().plusDays(4), LocalDateTime.now().plusDays(10),
+            -1000, 100, 4, EventCategory.MEETUP, List.of(1L), List.of("url"), null
+        );
+
+        when(eventRepository.findWithDetailsByEventId(eventId)).thenReturn(Optional.of(event));
+
+        // when & then
+        assertThatThrownBy(() -> eventService.updateEvent(sellerId, eventId, updateRequest))
+            .isInstanceOf(BusinessException.class)
+            .hasMessageContaining(EventErrorCode.INVALID_PRICE.getMessage());
+    }
+
+    @Test
+    void 유효하지_않은_수량이면_수정에_실패한다() {
+        // given
+        UUID sellerId = UUID.randomUUID();
+        Event event = EventTestFixture.createEventWithStatus(sellerId, EventStatus.DRAFT);
+        UUID eventId = event.getEventId();
+        SellerEventUpdateRequest updateRequest = new SellerEventUpdateRequest(
+            "제목", "설명", "위치", LocalDateTime.now().plusDays(15),
+            LocalDateTime.now().plusDays(4), LocalDateTime.now().plusDays(10),
+            50000, 4, 4, EventCategory.MEETUP, List.of(1L), List.of("url"), null
+        );
+
+        when(eventRepository.findWithDetailsByEventId(eventId)).thenReturn(Optional.of(event));
+
+        // when & then
+        assertThatThrownBy(() -> eventService.updateEvent(sellerId, eventId, updateRequest))
+            .isInstanceOf(BusinessException.class)
+            .hasMessageContaining(EventErrorCode.INVALID_QUANTITY.getMessage());
+    }
+
+    @Test
+    void 판매된_수량보다_총수량을_줄이면_수정에_실패한다() {
+        // given
+        UUID sellerId = UUID.randomUUID();
+        Event event = EventTestFixture.createEventWithStatus(sellerId, EventStatus.ON_SALE);
+        EventTestFixture.adjustQuantity(event, 80); // 판매된 수량: 80, 남은 수량: 20
+        UUID eventId = event.getEventId();
+        SellerEventUpdateRequest updateRequest = new SellerEventUpdateRequest(
+            "제목", "설명", "위치", LocalDateTime.now().plusDays(15),
+            LocalDateTime.now().plusDays(4), LocalDateTime.now().plusDays(10),
+            50000, 50, 4, EventCategory.MEETUP, List.of(1L), List.of("url"), null
+        );
+
+        when(eventRepository.findWithDetailsByEventId(eventId)).thenReturn(Optional.of(event));
+
+        // when & then
+        assertThatThrownBy(() -> eventService.updateEvent(sellerId, eventId, updateRequest))
+            .isInstanceOf(BusinessException.class)
+            .hasMessageContaining(EventErrorCode.TOTAL_QUANTITY_BELOW_SOLD.getMessage());
+    }
+
+    @Test
+    void 판매_시작일이_종료일_이후이면_수정에_실패한다() {
+        // given
+        UUID sellerId = UUID.randomUUID();
+        Event event = EventTestFixture.createEventWithStatus(sellerId, EventStatus.DRAFT);
+        UUID eventId = event.getEventId();
+        LocalDateTime saleEnd = LocalDateTime.now().plusDays(10);
+        SellerEventUpdateRequest updateRequest = new SellerEventUpdateRequest(
+            "제목", "설명", "위치", LocalDateTime.now().plusDays(15),
+            saleEnd.plusDays(1), saleEnd, // saleStartAt > saleEndAt
+            50000, 100, 4, EventCategory.MEETUP, List.of(1L), List.of("url"), null
+        );
+
+        when(eventRepository.findWithDetailsByEventId(eventId)).thenReturn(Optional.of(event));
+
+        // when & then
+        assertThatThrownBy(() -> eventService.updateEvent(sellerId, eventId, updateRequest))
+            .isInstanceOf(BusinessException.class)
+            .hasMessageContaining(EventErrorCode.INVALID_SALE_PERIOD.getMessage());
+    }
+
+    @Test
+    void 판매_종료일이_행사일_이후이면_수정에_실패한다() {
+        // given
+        UUID sellerId = UUID.randomUUID();
+        Event event = EventTestFixture.createEventWithStatus(sellerId, EventStatus.DRAFT);
+        UUID eventId = event.getEventId();
+        LocalDateTime eventDate = LocalDateTime.now().plusDays(10);
+        SellerEventUpdateRequest updateRequest = new SellerEventUpdateRequest(
+            "제목", "설명", "위치", eventDate,
+            LocalDateTime.now().plusDays(4), eventDate.plusDays(1), // saleEndAt > eventDateTime
+            50000, 100, 4, EventCategory.MEETUP, List.of(1L), List.of("url"), null
+        );
+
+        when(eventRepository.findWithDetailsByEventId(eventId)).thenReturn(Optional.of(event));
+
+        // when & then
+        assertThatThrownBy(() -> eventService.updateEvent(sellerId, eventId, updateRequest))
+            .isInstanceOf(BusinessException.class)
+            .hasMessageContaining(EventErrorCode.INVALID_EVENT_DATE.getMessage());
+    }
+
+    @Test
+    void 수정_불가_상태이면_수정에_실패한다() {
+        // given
+        UUID sellerId = UUID.randomUUID();
+        Event event = EventTestFixture.createEventWithStatus(sellerId, EventStatus.SOLD_OUT);
+        UUID eventId = event.getEventId();
+        SellerEventUpdateRequest updateRequest = EventTestFixture.createUpdateEventRequest();
+
+        when(eventRepository.findWithDetailsByEventId(eventId)).thenReturn(Optional.of(event));
+
+        // when & then
+        assertThatThrownBy(() -> eventService.updateEvent(sellerId, eventId, updateRequest))
+            .isInstanceOf(BusinessException.class)
+            .hasMessageContaining(EventErrorCode.CANNOT_CHANGE_STATUS.getMessage());
+    }
+
+    @Test
+    void 수정시_다른_판매자의_이벤트이면_예외가_발생한다() {
+        // given
+        UUID sellerId = UUID.randomUUID();
+        Event event = EventTestFixture.createEventWithStatus(UUID.randomUUID(), EventStatus.DRAFT);
+        UUID eventId = event.getEventId();
+        SellerEventUpdateRequest updateRequest = EventTestFixture.createUpdateEventRequest();
+
+        when(eventRepository.findWithDetailsByEventId(eventId)).thenReturn(Optional.of(event));
+
+        // when & then
+        assertThatThrownBy(() -> eventService.updateEvent(sellerId, eventId, updateRequest))
             .isInstanceOf(BusinessException.class)
             .hasMessageContaining(EventErrorCode.UNAUTHORIZED_SELLER.getMessage());
     }

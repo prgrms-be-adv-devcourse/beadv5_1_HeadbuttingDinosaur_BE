@@ -8,6 +8,8 @@ import com.devticket.event.presentation.dto.EventListResponse;
 import com.devticket.event.presentation.dto.SellerEventCreateRequest;
 import com.devticket.event.presentation.dto.SellerEventDetailResponse;
 import com.devticket.event.presentation.dto.SellerEventSummaryResponse;
+import com.devticket.event.presentation.dto.SellerEventUpdateRequest;
+import com.devticket.event.presentation.dto.SellerEventUpdateResponse;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -98,5 +100,56 @@ public class EventTestFixture {
             LocalDateTime.now().plusDays(10),
             LocalDateTime.now().plusDays(15)
         );
+    }
+
+    // 이벤트 수정 요청 생성
+    public static SellerEventUpdateRequest createUpdateEventRequest() {
+        return new SellerEventUpdateRequest(
+            "수정된 이벤트 제목",
+            "수정된 설명",
+            "서울시 강남구",
+            LocalDateTime.now().plusDays(15),
+            LocalDateTime.now().plusDays(4),
+            LocalDateTime.now().plusDays(10),
+            50000,
+            100,
+            4,
+            EventCategory.MEETUP,
+            List.of(1L, 2L),
+            List.of("url1"),
+            null
+        );
+    }
+
+    // 판매 중지 요청 생성
+    public static SellerEventUpdateRequest createUpdateEventRequest_Cancel() {
+        return new SellerEventUpdateRequest(
+            null, null, null, null, null, null,
+            null, null, null, null, null, null,
+            EventStatus.CANCELLED
+        );
+    }
+
+    // 이벤트 수정 응답 생성
+    public static SellerEventUpdateResponse createSellerEventUpdateResponse(UUID eventId, EventStatus status) {
+        return new SellerEventUpdateResponse(eventId, status, LocalDateTime.now());
+    }
+
+    // 특정 상태의 Event 생성
+    public static Event createEventWithStatus(UUID sellerId, EventStatus status) {
+        Event event = Event.create(
+            sellerId, "상세 조회 테스트 밋업", "설명", "강남역",
+            LocalDateTime.now().plusDays(15), LocalDateTime.now().plusDays(4), LocalDateTime.now().plusDays(10),
+            50000, 100, 4, EventCategory.MEETUP
+        );
+        ReflectionTestUtils.setField(event, "eventId", UUID.randomUUID());
+        ReflectionTestUtils.setField(event, "status", status);
+        return event;
+    }
+
+    // Event 객체의 판매된 수량 설정
+    public static void adjustQuantity(Event event, int soldQuantity) {
+        int remaining = event.getTotalQuantity() - soldQuantity;
+        ReflectionTestUtils.setField(event, "remainingQuantity", remaining);
     }
 }
