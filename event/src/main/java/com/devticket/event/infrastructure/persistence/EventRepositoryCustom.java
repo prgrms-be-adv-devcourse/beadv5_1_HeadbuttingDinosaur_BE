@@ -17,4 +17,6 @@ public interface EventRepositoryCustom {
         List<EventStatus> statuses, // 허용된 상태값 리스트
         Pageable pageable
     );
+
+    List<Event> findEventsBySeller(UUID sellerId, EventStatus status);
 }

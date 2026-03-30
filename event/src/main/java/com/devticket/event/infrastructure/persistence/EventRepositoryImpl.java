@@ -104,6 +104,18 @@ public class EventRepositoryImpl implements EventRepositoryCustom {
         return orderSpecifiers.toArray(new OrderSpecifier[0]);
     }
 
+    @Override
+    public List<Event> findEventsBySeller(UUID sellerId, EventStatus status) {
+        return queryFactory
+            .selectFrom(event)
+            .where(
+                sellerEq(sellerId),
+                statusEq(status)
+            )
+            .orderBy(event.createdAt.desc())
+            .fetch();
+    }
+
     // --- 동적 쿼리 조건 메서드들 ---
 
     private BooleanExpression keywordContains(String keyword) {
