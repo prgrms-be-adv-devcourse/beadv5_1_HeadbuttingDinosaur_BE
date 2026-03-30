@@ -1,5 +1,6 @@
 package com.devticket.event.presentation.dto.internal;
 
+import java.util.Objects;
 import java.util.UUID;
 
 public record InternalPurchaseValidationResponse(
@@ -18,6 +19,7 @@ public record InternalPurchaseValidationResponse(
     public static InternalPurchaseValidationResponse failure(
         UUID eventId, PurchaseUnavailableReason reason,
         Integer maxQuantity, String title, Integer price) {
+        Objects.requireNonNull(reason, "실패 응답의 reason은 null이 될 수 없습니다");
         return new InternalPurchaseValidationResponse(eventId, false, reason, maxQuantity, title, price);
     }
 }
