@@ -1,11 +1,10 @@
 package com.devticket.payment.payment.infrastructure.external.dto;
 
-public record TossPaymentConfirmResponse(
+public record TossPaymentCancelResponse(
     String paymentKey,
     String orderId,
-    String method,
-    String status,
-    Integer totalAmount,
+    String status,       // CANCELED
+    Long totalAmount,
+    String requestedAt,
     String approvedAt
-) {
-}
+) {}

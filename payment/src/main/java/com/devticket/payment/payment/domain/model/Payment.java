@@ -89,6 +89,12 @@ public class Payment extends BaseEntity {
         this.approvedAt = LocalDateTime.now();
     }
 
+    public void approve(String paymentKey, LocalDateTime approvedAt) {
+        this.paymentKey = paymentKey;
+        this.status = PaymentStatus.SUCCESS;
+        this.approvedAt = approvedAt;
+    }
+
     public void fail(String reason) {
         this.status = PaymentStatus.FAILED;
         this.failureReason = reason;

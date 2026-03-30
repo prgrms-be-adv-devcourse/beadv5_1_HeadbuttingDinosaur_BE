@@ -4,6 +4,8 @@ import com.devticket.payment.payment.application.dto.PgPaymentConfirmCommand;
 import com.devticket.payment.payment.application.dto.PgPaymentConfirmResult;
 import com.devticket.payment.payment.domain.exception.PaymentErrorCode;
 import com.devticket.payment.payment.domain.exception.PaymentException;
+import com.devticket.payment.payment.infrastructure.external.dto.TossPaymentCancelRequest;
+import com.devticket.payment.payment.infrastructure.external.dto.TossPaymentCancelResponse;
 import com.devticket.payment.payment.infrastructure.external.dto.TossPaymentConfirmRequest;
 import com.devticket.payment.payment.infrastructure.external.dto.TossPaymentConfirmResponse;
 import java.nio.charset.StandardCharsets;
@@ -24,6 +26,7 @@ import org.springframework.web.client.RestClientResponseException;
 public class PgPaymentClient {
 
     private static final String CONFIRM_PATH = "/v1/payments/confirm";
+    private static final String CANCEL_PATH = "/v1/payments/{paymentKey}/cancel";
 
     private final RestClient restClient;
 
@@ -102,6 +105,56 @@ public class PgPaymentClient {
                 e.getResponseBodyAsString()
             );
             throw new PaymentException(PaymentErrorCode.PG_CONFIRM_FAILED);
+        }
+    }
+
+    public void cancel(String paymentKey, String cancelReason) {
+        TossPaymentCancelRequest request = new TossPaymentCancelRequest(cancelReason);
+
+        try {
+            TossPaymentCancelResponse response = restClient.post()
+                .uri(CANCEL_PATH, paymentKey)
+                .body(request)
+                .retrieve()
+                .onStatus(HttpStatusCode::is4xxClientError, (req, res) -> {
+                    HttpStatusCode status = res.getStatusCode();
+                    if (status == HttpStatus.UNAUTHORIZED || status == HttpStatus.FORBIDDEN) {
+                        throw new PaymentException(PaymentErrorCode.PG_CANCEL_FAILED);
+                    }
+                    throw new PaymentException(PaymentErrorCode.INVALID_PAYMENT_REQUEST);
+                })
+                .onStatus(HttpStatusCode::is5xxServerError, (req, res) -> {
+                    throw new PaymentException(PaymentErrorCode.PG_CANCEL_FAILED);
+                })
+                .body(TossPaymentCancelResponse.class);
+
+            if (response == null) {
+                throw new PaymentException(PaymentErrorCode.PG_CANCEL_FAILED);
+            }
+
+            log.info("PG 결제 취소 성공: paymentKey={}, cancelReason={}, cancelAmount={}",
+                paymentKey,
+                cancelReason,
+                response.totalAmount()
+            );
+
+        } catch (PaymentException e) {
+            throw e;
+
+        } catch (ResourceAccessException e) {
+            log.error("PG 결제 취소 타임아웃/네트워크 오류: paymentKey={}, message={}",
+                paymentKey,
+                e.getMessage()
+            );
+            throw new PaymentException(PaymentErrorCode.PG_CANCEL_FAILED);
+
+        } catch (RestClientResponseException e) {
+            log.error("PG 결제 취소 실패: paymentKey={}, statusCode={}, responseBody={}",
+                paymentKey,
+                e.getStatusCode(),
+                e.getResponseBodyAsString()
+            );
+            throw new PaymentException(PaymentErrorCode.PG_CANCEL_FAILED);
         }
     }
 

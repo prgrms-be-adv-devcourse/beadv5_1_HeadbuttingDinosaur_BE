@@ -10,6 +10,7 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
 @Component
 public class CommerceInternalClient {
@@ -34,6 +35,19 @@ public class CommerceInternalClient {
         }  catch (HttpServerErrorException e) {
             // 5xx
             throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    public void completePayment(Long orderId) {
+        try {
+            restClient.post()
+                .uri("/internal/orders/{orderId}/payment-completed", orderId)
+                .retrieve()
+                .toBodilessEntity();
+        } catch (ResourceAccessException e) {
+            throw e;
+        } catch (RestClientResponseException e) {
+            throw e;
         }
     }
 }
