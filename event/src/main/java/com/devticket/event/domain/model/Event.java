@@ -128,4 +128,36 @@ public class Event extends BaseEntity {
             .category(category)
             .build();
     }
+
+    public boolean canBeUpdated() {
+        return this.status == EventStatus.DRAFT || this.status == EventStatus.ON_SALE;
+    }
+
+    public boolean canBeCancelled() {
+        return this.status != EventStatus.CANCELLED
+            && this.status != EventStatus.FORCE_CANCELLED
+            && this.status != EventStatus.SALE_ENDED;
+    }
+
+    public void update(String title, String description, String location,
+        LocalDateTime eventDateTime, LocalDateTime saleStartAt, LocalDateTime saleEndAt,
+        Integer price, Integer totalQuantity, Integer maxQuantity, EventCategory category) {
+        int delta = totalQuantity - this.totalQuantity;
+        this.remainingQuantity = Math.max(0, this.remainingQuantity + delta);
+        this.title = title;
+        this.description = description;
+        this.location = location;
+        this.eventDateTime = eventDateTime;
+        this.saleStartAt = saleStartAt;
+        this.saleEndAt = saleEndAt;
+        this.price = price;
+        this.totalQuantity = totalQuantity;
+        this.maxQuantity = maxQuantity;
+        this.category = category;
+    }
+
+    public void cancel() {
+        this.status = EventStatus.CANCELLED;
+    }
+
 }

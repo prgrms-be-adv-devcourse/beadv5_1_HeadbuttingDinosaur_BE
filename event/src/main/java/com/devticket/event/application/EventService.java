@@ -4,6 +4,7 @@ import com.devticket.event.common.exception.BusinessException;
 import com.devticket.event.domain.enums.EventStatus;
 import com.devticket.event.domain.exception.EventErrorCode;
 import com.devticket.event.domain.model.Event;
+import com.devticket.event.domain.model.EventImage;
 import com.devticket.event.domain.model.EventTechStack;
 import com.devticket.event.infrastructure.persistence.EventRepository;
 import com.devticket.event.presentation.dto.EventDetailResponse;
@@ -13,6 +14,8 @@ import com.devticket.event.presentation.dto.SellerEventCreateRequest;
 import com.devticket.event.presentation.dto.SellerEventCreateResponse;
 import com.devticket.event.presentation.dto.SellerEventDetailResponse;
 import com.devticket.event.presentation.dto.SellerEventSummaryResponse;
+import com.devticket.event.presentation.dto.SellerEventUpdateRequest;
+import com.devticket.event.presentation.dto.SellerEventUpdateResponse;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -174,4 +177,90 @@ public class EventService {
             status == EventStatus.SOLD_OUT ||
             status == EventStatus.SALE_ENDED;
     }
+
+    @Transactional
+    public SellerEventUpdateResponse updateEvent(UUID sellerId, UUID eventId,
+        SellerEventUpdateRequest request) {
+
+        Event event = eventRepository.findWithDetailsByEventId(eventId)
+            .orElseThrow(() -> new BusinessException(EventErrorCode.EVENT_NOT_FOUND));
+
+        if (!event.getSellerId().equals(sellerId)) {
+            throw new BusinessException(EventErrorCode.UNAUTHORIZED_SELLER);
+        }
+
+        // 판매중지 분기
+        if (EventStatus.CANCELLED.equals(request.status())) {
+            if (!event.canBeCancelled()) {
+                throw new BusinessException(EventErrorCode.CANNOT_CHANGE_STATUS);
+            }
+            event.cancel();
+            return SellerEventUpdateResponse.from(event);
+        }
+
+        // 내용 수정 분기
+        if (!event.canBeUpdated()) {
+            throw new BusinessException(EventErrorCode.CANNOT_CHANGE_STATUS);
+        }
+
+        if (request.title() == null || request.title().isBlank()
+            || request.description() == null || request.location() == null
+            || request.eventDateTime() == null || request.saleStartAt() == null
+            || request.saleEndAt() == null || request.price() == null
+            || request.totalQuantity() == null || request.maxQuantity() == null
+            || request.category() == null || request.techStackIds() == null) {
+            throw new BusinessException(EventErrorCode.INVALID_REQUEST);
+        }
+
+        // 가격 정책 검증
+        if (request.price() < 0 || request.price() > 9_999_999) {
+            throw new BusinessException(EventErrorCode.INVALID_PRICE);
+        }
+
+        // 수량 정책 검증
+        if (request.totalQuantity() < 5 || request.totalQuantity() > 9_999) {
+            throw new BusinessException(EventErrorCode.INVALID_QUANTITY);
+        }
+
+        // 총 수량 축소 시 기판매 수량 역전 방지
+        int soldQuantity = event.getTotalQuantity() - event.getRemainingQuantity();
+        if (request.totalQuantity() < soldQuantity) {
+            throw new BusinessException(EventErrorCode.TOTAL_QUANTITY_BELOW_SOLD);
+        }
+
+        if (request.saleStartAt().isAfter(request.saleEndAt())
+            || request.saleStartAt().isEqual(request.saleEndAt())) {
+            throw new BusinessException(EventErrorCode.INVALID_SALE_PERIOD);
+        }
+        if (request.saleEndAt().isAfter(request.eventDateTime())) {
+            throw new BusinessException(EventErrorCode.INVALID_EVENT_DATE);
+        }
+        if (request.maxQuantity() > request.totalQuantity()) {
+            throw new BusinessException(EventErrorCode.MAX_QUANTITY_EXCEEDED);
+        }
+
+        event.update(
+            request.title(), request.description(), request.location(),
+            request.eventDateTime(), request.saleStartAt(), request.saleEndAt(),
+            request.price(), request.totalQuantity(), request.maxQuantity(), request.category()
+        );
+
+        // TechStack 교체
+        event.getEventTechStacks().clear();
+        for (Long techStackId : request.techStackIds()) {
+            event.getEventTechStacks().add(
+                EventTechStack.of(event, techStackId, getTechStackName(techStackId)));
+        }
+
+        // Image 교체
+        event.getEventImages().clear();
+        if (request.imageUrls() != null) {
+            for (int i = 0; i < request.imageUrls().size(); i++) {
+                event.getEventImages().add(EventImage.of(event, request.imageUrls().get(i), i));
+            }
+        }
+
+        return SellerEventUpdateResponse.from(event);
+    }
+
 }
