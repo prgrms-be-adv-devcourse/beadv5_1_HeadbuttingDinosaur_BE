@@ -1,5 +1,6 @@
 package com.devticket.payment.refund.application.service;
 
+import com.devticket.payment.payment.domain.enums.PaymentStatus;
 import com.devticket.payment.payment.domain.exception.PaymentErrorCode;
 import com.devticket.payment.payment.domain.exception.PaymentException;
 import com.devticket.payment.payment.domain.model.Payment;
@@ -9,6 +10,7 @@ import com.devticket.payment.payment.infrastructure.client.dto.InternalOrderItem
 import com.devticket.payment.refund.domain.RefundPolicyConstants;
 import com.devticket.payment.refund.domain.RefundRateConstants;
 import com.devticket.payment.refund.domain.exception.RefundErrorCode;
+import com.devticket.payment.refund.domain.exception.RefundException;
 import com.devticket.payment.refund.infrastructure.client.EventInternalClient;
 import com.devticket.payment.refund.infrastructure.client.dto.InternalEventInfoResponse;
 import com.devticket.payment.refund.presentation.dto.RefundInfoResponse;
@@ -18,7 +20,9 @@ import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpClientErrorException;
 
 @Service
 @RequiredArgsConstructor
@@ -50,6 +54,8 @@ public class RefundServiceImpl implements RefundService {
         int refundRate = calculateRefundRate(eventDateTime);
         int refundAmount = calculateRefundAmount(orderItem.amount(), refundRate);
 
+        boolean refundable = isRefundable(eventDateTime) && isPaymentRefundable(payment);
+
         return new RefundInfoResponse(
             ticketId,
             event.title(),
@@ -58,9 +64,31 @@ public class RefundServiceImpl implements RefundService {
             refundAmount,
             refundRate,
             dDay,
-            isRefundable(eventDateTime),
+            refundable,
             payment.getPaymentMethod().toString()
         );
+    }
+
+    private InternalOrderItemInfoResponse getOrderItemSafely(String ticketId) {
+        try {
+            return commerceInternalClient.getOrderItemInfoByTicketId(ticketId);
+        } catch (HttpClientErrorException e) {
+            if (e.getStatusCode() == HttpStatus.NOT_FOUND) {
+                throw new RefundException(RefundErrorCode.TICKET_NOT_FOUND);
+            }
+            throw new RefundException(RefundErrorCode.REFUND_INVALID_REQUEST);
+        }
+    }
+
+    private InternalEventInfoResponse getEventInfoSafely(Long eventId) {
+        try {
+            return eventInternalClient.getEventInfo(eventId);
+        } catch (HttpClientErrorException e) {
+            if (e.getStatusCode() == HttpStatus.NOT_FOUND) {
+                throw new RefundException(RefundErrorCode.EVENT_NOT_FOUND);
+            }
+            throw new RefundException(RefundErrorCode.REFUND_INVALID_REQUEST);
+        }
     }
 
     private int calculateRefundRate(LocalDateTime eventDateTime) {
@@ -76,6 +104,10 @@ public class RefundServiceImpl implements RefundService {
 
     private boolean isRefundable(LocalDateTime eventDateTime) {
         return calculateRefundRate(eventDateTime) > 0;
+    }
+
+    private boolean isPaymentRefundable(Payment payment) {
+        return payment.getStatus() == PaymentStatus.SUCCESS;
     }
 
     private void validateOrderOwner(UUID orderUserId, UUID userId) {
