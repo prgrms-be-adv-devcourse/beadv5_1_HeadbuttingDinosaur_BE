@@ -38,6 +38,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 public class PaymentServiceImpl implements PaymentService {
 
+    private static final int MAX_FAILURE_REASON_LENGTH = 255;
+
     private final PaymentRepository paymentRepository;
     private final WalletRepository walletRepository;
     private final WalletTransactionRepository walletTransactionRepository;
@@ -220,16 +222,23 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     private String buildFailureReason(String code, String message) {
+        String reason;
+
         if (code != null && message != null) {
-            return "[" + code + "] " + message;
+            reason = "[" + code + "] " + message;
+        } else if (code != null) {
+            reason = "[" + code + "]";
+        } else if (message != null) {
+            reason = message;
+        } else {
+            reason = "PG 결제 실패";
         }
-        if (code != null) {
-            return "[" + code + "]";
+
+        // 255자 초과 시 절단
+        if (reason.length() > MAX_FAILURE_REASON_LENGTH) {
+            return reason.substring(0, MAX_FAILURE_REASON_LENGTH);
         }
-        if (message != null) {
-            return message;
-        }
-        return "PG 결제 실패";
+        return reason;
     }
 
     // PG 승인 요청
