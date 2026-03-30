@@ -1,8 +1,11 @@
 package com.devticket.commerce.mock.controller.dto;
 
+import com.devticket.commerce.order.domain.model.Order;
+import java.util.UUID;
+
 public record InternalOrderInfoResponse(
     Long id,
-    Long userId,
+    UUID userId,
     String orderNumber,
     String paymentMethod,
     Integer totalAmount,
@@ -10,5 +13,15 @@ public record InternalOrderInfoResponse(
     String orderedAt
 ) {
 
-
+    public static InternalOrderInfoResponse from(Order order) {
+        return new InternalOrderInfoResponse(
+            order.getId(),
+            order.getUserId(),
+            order.getOrderNumber(),
+            order.getPaymentMethod() != null ? order.getPaymentMethod().name() : null,
+            order.getTotalAmount(),
+            order.getStatus().name(),
+            order.getOrderedAt().toString()
+        );
+    }
 }
