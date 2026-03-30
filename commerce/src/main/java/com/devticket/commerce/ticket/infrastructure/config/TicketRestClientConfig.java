@@ -20,5 +20,14 @@ public class TicketRestClientConfig {
             .build();
     }
 
+    // 2. Ticket-Member 내부API용 설정
+    @Bean
+    public RestClient ticketToMemberRestClient(@Value("${external.member-base-url}") String baseUrl) {
+        return RestClient.builder()
+            .baseUrl(baseUrl)
+            .defaultHeader("Content-Type", "application/json")
+            .build();
+    }
+
 
 }

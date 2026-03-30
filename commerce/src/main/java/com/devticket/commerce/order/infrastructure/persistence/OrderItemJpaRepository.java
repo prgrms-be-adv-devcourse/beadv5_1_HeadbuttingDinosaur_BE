@@ -3,6 +3,7 @@ package com.devticket.commerce.order.infrastructure.persistence;
 import com.devticket.commerce.order.domain.model.OrderItem;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -25,4 +26,6 @@ public interface OrderItemJpaRepository extends JpaRepository<OrderItem, Long> {
     );
 
     List<OrderItem> findAllByEventId(Long eventId);
+
+    Optional<OrderItem> findByOrderItemId(UUID orderItemId);
 }

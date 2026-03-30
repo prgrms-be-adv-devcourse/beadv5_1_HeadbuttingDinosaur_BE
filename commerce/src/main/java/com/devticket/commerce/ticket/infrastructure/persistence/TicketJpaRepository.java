@@ -9,4 +9,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface TicketJpaRepository extends JpaRepository<Ticket, Long> {
 
     Page<Ticket> findAllByUserId(UUID userId, Pageable pageable);
+    
+    Page<Ticket> findAllByEventId(Long eventId, Pageable pageable);
 }
