@@ -66,7 +66,7 @@ class EventControllerTest {
 
         SellerEventCreateResponse expectedResponse = new SellerEventCreateResponse(
             expectedEventId,
-            EventStatus.DRAFT,
+            EventStatus.ON_SALE,
             now
         );
 
@@ -81,7 +81,7 @@ class EventControllerTest {
             .andDo(print())
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.data.eventId").value(expectedEventId.toString()))
-            .andExpect(jsonPath("$.data.status").value("DRAFT"))
+            .andExpect(jsonPath("$.data.status").value("ON_SALE"))
             .andExpect(jsonPath("$.data.createdAt").exists());
     }
 
