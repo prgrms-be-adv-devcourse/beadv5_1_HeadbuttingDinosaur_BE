@@ -31,7 +31,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 @RequiredArgsConstructor
@@ -45,7 +44,6 @@ public class PaymentServiceImpl implements PaymentService {
     private final WalletTransactionRepository walletTransactionRepository;
     private final CommerceInternalClient commerceInternalClient;
     private final PgPaymentClient pgPaymentClient;
-    private final TransactionTemplate transactionTemplate;
 
     //결제 준비
     @Override
