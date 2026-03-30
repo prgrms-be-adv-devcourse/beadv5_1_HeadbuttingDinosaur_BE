@@ -14,4 +14,10 @@ public interface CartItemRepository {
 
     //장바구니 아이템 삭제
     void deleteAllInBatch(List<CartItem> cartItems);
+
+    // 장바구니 전체 조회
+    List<CartItem> findAllByCartId(Long cartId);
+
+    // 장바구니 아이템 조회
+    Optional<CartItem> findById(Long cartItemId);
 }

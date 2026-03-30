@@ -1,10 +1,15 @@
 package com.devticket.commerce.cart.application.usecase;
 
-import com.devticket.commerce.cart.presentation.dto.req.CartItemRequest;
-import com.devticket.commerce.cart.presentation.dto.res.CartItemResponse;
+import com.devticket.commerce.cart.presentation.dto.req.CartItemQuantityRequest;
+import com.devticket.commerce.cart.presentation.dto.res.CartItemDeleteResponse;
+import com.devticket.commerce.cart.presentation.dto.res.CartItemQuantityResponse;
+import java.util.UUID;
 
 public interface CartItemUseCase {
 
-    CartItemResponse save(Long userId, CartItemRequest request);
-    
+    // 장바구니 티켓 수량 변경
+    CartItemQuantityResponse updateTicket(UUID userId, Long cartItemId, CartItemQuantityRequest request);
+
+    CartItemDeleteResponse deleteTicket(UUID userId, Long cartItemId);
+
 }

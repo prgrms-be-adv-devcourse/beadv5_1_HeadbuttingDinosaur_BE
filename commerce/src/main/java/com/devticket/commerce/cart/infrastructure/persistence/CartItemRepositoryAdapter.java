@@ -32,4 +32,14 @@ public class CartItemRepositoryAdapter implements CartItemRepository {
     public void deleteAllInBatch(List<CartItem> cartItems) {
         cartItemJpaRepository.deleteAllInBatch(cartItems);
     }
+
+    @Override
+    public List<CartItem> findAllByCartId(Long cartId) {
+        return cartItemJpaRepository.findAllByCartId(cartId);
+    }
+
+    @Override
+    public Optional<CartItem> findById(Long cartItemId) {
+        return cartItemJpaRepository.findById(cartItemId);
+    }
 }
