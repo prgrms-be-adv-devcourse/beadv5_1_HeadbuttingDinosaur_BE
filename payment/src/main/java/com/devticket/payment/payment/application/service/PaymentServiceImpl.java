@@ -12,6 +12,7 @@ import com.devticket.payment.payment.domain.repository.PaymentRepository;
 import com.devticket.payment.payment.infrastructure.client.CommerceInternalClient;
 import com.devticket.payment.payment.infrastructure.client.dto.InternalOrderInfoResponse;
 import com.devticket.payment.payment.infrastructure.external.PgPaymentClient;
+import com.devticket.payment.payment.presentation.dto.InternalPaymentInfoResponse;
 import com.devticket.payment.payment.presentation.dto.PaymentConfirmRequest;
 import com.devticket.payment.payment.presentation.dto.PaymentConfirmResponse;
 import com.devticket.payment.payment.presentation.dto.PaymentFailRequest;
@@ -218,6 +219,14 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
         return PaymentFailResponse.from(payment);
+    }
+
+    @Override
+    public InternalPaymentInfoResponse getPaymentByOrderId(Long orderId) {
+        Payment payment = paymentRepository.findByOrderId(orderId)
+            .orElseThrow(() -> new PaymentException(PaymentErrorCode.INVALID_PAYMENT_REQUEST));
+
+        return InternalPaymentInfoResponse.from(payment);
     }
 
     private String buildFailureReason(String code, String message) {
