@@ -19,6 +19,7 @@ import com.devticket.payment.payment.domain.repository.PaymentRepository;
 import com.devticket.payment.payment.infrastructure.client.CommerceInternalClient;
 import com.devticket.payment.payment.infrastructure.client.dto.InternalOrderInfoResponse;
 import com.devticket.payment.payment.infrastructure.external.PgPaymentClient;
+import com.devticket.payment.payment.presentation.dto.InternalPaymentInfoResponse;
 import com.devticket.payment.payment.presentation.dto.PaymentConfirmRequest;
 import com.devticket.payment.payment.presentation.dto.PaymentConfirmResponse;
 import com.devticket.payment.payment.presentation.dto.PaymentFailRequest;
@@ -592,6 +593,44 @@ public class PaymentServiceImplTest {
                 // then
                 assertThat(response.failureReason()).isEqualTo("PG 결제 실패");
             }
+        }
+    }
+
+    // =========================================================
+    // getPaymentByOrderId
+    // =========================================================
+
+    @Nested
+    @DisplayName("주문 ID로 결제 정보 조회")
+    class GetPaymentByOrderIdTest {
+
+        @Test
+        @DisplayName("성공 — 결제 정보 반환")
+        void 주문_ID로_결제_정보_조회성공() {
+            // given
+            Payment payment = createReadyPayment();
+            given(paymentRepository.findByOrderId(orderInfo.id())).willReturn(Optional.of(payment));
+
+            // when
+            InternalPaymentInfoResponse response = paymentService.getPaymentByOrderId(orderInfo.id());
+
+            // then
+            assertThat(response.orderId()).isEqualTo(orderInfo.id());
+            assertThat(response.amount()).isEqualTo(orderInfo.totalAmount());
+            assertThat(response.status()).isEqualTo(PaymentStatus.READY.name());
+        }
+
+        @Test
+        @DisplayName("결제 정보 미존재 — INVALID_PAYMENT_REQUEST 예외")
+        void 결제_정보_미존재() {
+            // given
+            given(paymentRepository.findByOrderId(orderInfo.id())).willReturn(Optional.empty());
+
+            // when & then
+            assertThatThrownBy(() -> paymentService.getPaymentByOrderId(orderInfo.id()))
+                .isInstanceOf(PaymentException.class)
+                .extracting(e -> ((PaymentException) e).getErrorCode())
+                .isEqualTo(PaymentErrorCode.INVALID_PAYMENT_REQUEST);
         }
     }
 }
