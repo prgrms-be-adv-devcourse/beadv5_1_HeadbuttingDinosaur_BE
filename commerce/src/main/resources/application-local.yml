@@ -29,3 +29,4 @@ logging:
 external:
   event-base-url: http://localhost:8083
   payment-base-url: http://localhost:8083
+  member-base-url: http://localhost:8083

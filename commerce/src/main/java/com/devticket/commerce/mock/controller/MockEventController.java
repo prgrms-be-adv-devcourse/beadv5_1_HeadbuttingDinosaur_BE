@@ -6,7 +6,6 @@ import com.devticket.commerce.order.infrastructure.external.client.dto.InternalS
 import com.devticket.commerce.order.infrastructure.external.client.dto.InternalStockAdjustmentResponse;
 import com.devticket.commerce.ticket.infrastructure.external.client.dto.InternalBulkEventInfoRequest;
 import com.devticket.commerce.ticket.infrastructure.external.client.dto.InternalEventInfoResponse;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -83,22 +82,43 @@ public class MockEventController {
                 15L,
                 UUID.fromString("1d7f4d4a-1c6b-4aa2-b49e-8ed2fdb10001"),
                 "Spring 밋업 (Mock)",
-                LocalDateTime.of(2026, 4, 1, 14, 0),
-                "강남역 루비홀"
+                30000,
+                "ON_SALE",
+                "MEETUP",
+                50,
+                4,
+                23,
+                "2026-04-01T14:00:00",
+                "2026-03-01T00:00:00",
+                "2026-03-31T23:59:59"
             ),
             new InternalEventInfoResponse(
                 102L,
                 UUID.fromString("48e57d51-0d3f-4404-8c4e-f9d7ef710002"),
                 "Java 컨퍼런스 (Mock)",
-                LocalDateTime.of(2026, 5, 15, 10, 0),
-                "코엑스 B홀"
+                30000,
+                "ON_SALE",
+                "CONFERENCE",
+                100,
+                4,
+                50,
+                "2026-05-15T10:00:00",
+                "2026-04-01T00:00:00",
+                "2026-05-14T23:59:59"
             ),
             new InternalEventInfoResponse(
                 103L,
                 UUID.fromString("99b32c12-3d4f-4ee1-b22a-1cd2fdb10005"),
                 "MSA 아키텍처 특강 (Mock)",
-                LocalDateTime.of(2026, 6, 20, 19, 30),
-                "온라인 스트리밍"
+                30000,
+                "ON_SALE",
+                "MEETUP",
+                30,
+                2,
+                10,
+                "2026-06-20T19:30:00",
+                "2026-05-01T00:00:00",
+                "2026-06-19T23:59:59"
             )
         );
     }

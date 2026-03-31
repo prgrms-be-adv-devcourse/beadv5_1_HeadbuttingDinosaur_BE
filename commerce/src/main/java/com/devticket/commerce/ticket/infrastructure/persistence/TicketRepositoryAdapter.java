@@ -2,6 +2,7 @@ package com.devticket.commerce.ticket.infrastructure.persistence;
 
 import com.devticket.commerce.ticket.domain.model.Ticket;
 import com.devticket.commerce.ticket.domain.repository.TicketRepository;
+import com.devticket.commerce.ticket.presentation.dto.req.SellerEventParticipantListRequest;
 import com.devticket.commerce.ticket.presentation.dto.req.TicketListRequest;
 import java.util.List;
 import java.util.Optional;
@@ -34,5 +35,7 @@ public class TicketRepositoryAdapter implements TicketRepository {
     @Override
     public Optional<Ticket> findByTicketId(UUID ticketId) {
         return ticketJpaRepository.findByTicketId(ticketId);
+    public Page<Ticket> findAllByEventId(Long eventId, SellerEventParticipantListRequest request) {
+        return ticketJpaRepository.findAllByEventId(eventId, request.toPageable());
     }
 }

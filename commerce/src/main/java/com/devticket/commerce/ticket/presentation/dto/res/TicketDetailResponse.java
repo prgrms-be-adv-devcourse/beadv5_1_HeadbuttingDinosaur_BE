@@ -1,17 +1,16 @@
 package com.devticket.commerce.ticket.presentation.dto.res;
 
 import com.devticket.commerce.ticket.domain.model.Ticket;
-import java.time.LocalDateTime;
 
 public record TicketDetailResponse(
     Long ticketId,
     Long eventId,
     String eventTitle,
-    LocalDateTime eventDate,
+    String eventDate,
     String status
 ) {
 
-    public static TicketDetailResponse of(Ticket ticket, String eventTitle, LocalDateTime eventDate
+    public static TicketDetailResponse of(Ticket ticket, String eventTitle, String eventDate
 
     ) {
         return new TicketDetailResponse(
