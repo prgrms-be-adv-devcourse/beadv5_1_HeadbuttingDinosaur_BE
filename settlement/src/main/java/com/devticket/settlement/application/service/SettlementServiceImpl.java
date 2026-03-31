@@ -7,6 +7,9 @@ import com.devticket.settlement.domain.model.Settlement;
 import com.devticket.settlement.domain.model.SettlementItem;
 import com.devticket.settlement.domain.repository.SettlementItemRepository;
 import com.devticket.settlement.domain.repository.SettlementRepository;
+import com.devticket.settlement.infrastructure.client.SettlementToCommerceClient;
+import com.devticket.settlement.infrastructure.client.dto.req.InternalSettlementDataRequest;
+import com.devticket.settlement.infrastructure.client.dto.res.InternalSettlementDataResponse;
 import com.devticket.settlement.presentation.dto.EventItemResponse;
 import com.devticket.settlement.presentation.dto.SellerSettlementDetailResponse;
 import com.devticket.settlement.presentation.dto.SettlementResponse;
@@ -23,10 +26,17 @@ public class SettlementServiceImpl implements SettlementService {
 
     private final SettlementRepository settlementRepository;
     private final SettlementItemRepository settlementItemRepository;
+    private final SettlementToCommerceClient settlementToCommerceClient;
+
+    @Override
+    public InternalSettlementDataResponse fetchSettlementData(UUID sellerId, String periodStart, String periodEnd) {
+        InternalSettlementDataRequest request = new InternalSettlementDataRequest(sellerId, periodStart, periodEnd);
+        return settlementToCommerceClient.getSettlementData(request);
+    }
 
     // 정산 내역 목록 조회
     @Override
-    public List<SettlementResponse> getSellerSettlements(Long sellerId) {
+    public List<SettlementResponse> getSellerSettlements(UUID sellerId) {
         List<Settlement> settlements = settlementRepository.findBySellerId(sellerId);
         if (settlements.isEmpty()) {
             throw new BusinessException(SettlementErrorCode.SETTLEMENT_NOT_FOUND);
@@ -39,7 +49,7 @@ public class SettlementServiceImpl implements SettlementService {
 
     // 정산 내역 상세 조회
     @Override
-    public SellerSettlementDetailResponse getSellerSettlementDetail(Long sellerId, UUID settlementId) {
+    public SellerSettlementDetailResponse getSellerSettlementDetail(UUID sellerId, UUID settlementId) {
         Settlement settlement = settlementRepository.findBySettlementId(settlementId)
             .orElseThrow(() -> new BusinessException(SettlementErrorCode.SETTLEMENT_BAD_REQUEST));
 
@@ -53,7 +63,7 @@ public class SettlementServiceImpl implements SettlementService {
 
 
     //    사용자 인가 확인 메서드
-    private void validateSellerAccess(Long sellerId, Settlement settlement) {
+    private void validateSellerAccess(UUID sellerId, Settlement settlement) {
         if (!sellerId.equals(settlement.getSellerId())) {
             throw new BusinessException(CommonErrorCode.ACCESS_DENIED);
         }

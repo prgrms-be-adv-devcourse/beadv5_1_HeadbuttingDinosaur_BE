@@ -17,3 +17,6 @@ logging:
   level:
     org.hibernate.SQL: DEBUG
     com.devticket: DEBUG
+
+external:
+  commerce-base-url: http://localhost:8085

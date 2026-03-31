@@ -29,7 +29,7 @@ public class Settlement {
     private UUID settlementId;
 
     @Column(name = "seller_id", nullable = false)
-    private Long sellerId;
+    private UUID sellerId;
 
     @Column(name = "period_start_at", nullable = false)
     private LocalDateTime periodStartAt;
@@ -70,7 +70,7 @@ public class Settlement {
 
     //    빌더
     @Builder
-    public Settlement(Long id, UUID settlementId, Long sellerId, LocalDateTime periodStartAt, LocalDateTime periodEndAt,
+    public Settlement(Long id, UUID settlementId, UUID sellerId, LocalDateTime periodStartAt, LocalDateTime periodEndAt,
         Integer totalSalesAmount, Integer totalRefundAmount, Integer totalFeeAmount, Integer finalSettlementAmount,
         SettlementStatus status) {
         this.id = id;
@@ -94,7 +94,7 @@ public class Settlement {
         return settlementId;
     }
 
-    public Long getSellerId() {
+    public UUID getSellerId() {
         return sellerId;
     }
 

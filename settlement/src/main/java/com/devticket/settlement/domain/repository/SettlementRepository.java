@@ -7,7 +7,7 @@ import java.util.UUID;
 
 public interface SettlementRepository {
 
-    List<Settlement> findBySellerId(Long sellerId);
+    List<Settlement> findBySellerId(UUID sellerId);
 
     Optional<Settlement> findBySettlementId(UUID settlementId);
 
