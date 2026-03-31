@@ -24,6 +24,7 @@ import com.devticket.commerce.order.presentation.dto.res.OrderDetailResponse;
 import com.devticket.commerce.order.presentation.dto.res.OrderListResponse;
 import com.devticket.commerce.order.presentation.dto.res.OrderResponse;
 import com.devticket.commerce.ticket.application.usecase.TicketUsecase;
+import com.devticket.commerce.ticket.domain.enums.TicketStatus;
 import com.devticket.commerce.ticket.domain.exception.TicketErrorCode;
 import com.devticket.commerce.ticket.domain.model.Ticket;
 import com.devticket.commerce.ticket.domain.repository.TicketRepository;
@@ -335,6 +336,12 @@ public class OrderService implements OrderUsecase {
         // 1. 티켓 조회 후 REFUNDED 상태 변경
         Ticket ticket = ticketRepository.findById(ticketId)
             .orElseThrow(() -> new BusinessException(TicketErrorCode.TICKET_NOT_FOUND));
+
+        if (ticket.getStatus() == TicketStatus.REFUNDED) {
+            log.info("이미 환불 처리된 티켓입니다. ticketId: {}", ticketId);
+            return;
+        }
+        
         ticket.refundTicket();
 
         // 2. OrderItem 수량 -1, subtotalAmount 재계산
