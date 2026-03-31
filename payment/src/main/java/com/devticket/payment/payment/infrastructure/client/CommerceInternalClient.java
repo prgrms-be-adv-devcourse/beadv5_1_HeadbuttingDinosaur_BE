@@ -74,6 +74,7 @@ public class CommerceInternalClient {
                 eventId, e.getMessage());
             throw new IllegalStateException("Commerce 서비스 호출 실패 — eventId=" + eventId, e);
         }
+    }
       
     public InternalOrderItemInfoResponse getOrderItemInfoByTicketId(String ticketId) {
         return restClient.get()
