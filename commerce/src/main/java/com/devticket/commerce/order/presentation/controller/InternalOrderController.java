@@ -61,6 +61,13 @@ public class InternalOrderController {
         return ResponseEntity.ok().build();
     }
 
+    //Payment -> Commerce : 결제 실패 후 Order상태 FAILED로 변경
+    @PostMapping("/orders/{orderId}/payment-failed")
+    public ResponseEntity<Void> failOrder(@PathVariable Long orderId) {
+        orderUsecase.failOrder(orderId);
+        return ResponseEntity.ok().build();
+    }
+
     //Ticket -> Commerce : ticketId(PK)로 해당 OrderItem 전체 정보 조회
     @GetMapping("/order-items/by-ticket/{ticketId}")
     public ResponseEntity<InternalOrderItemResponse> getOrderItemByTicketId(@PathVariable Long ticketId) {
