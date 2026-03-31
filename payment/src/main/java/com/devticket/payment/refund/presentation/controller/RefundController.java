@@ -2,6 +2,7 @@ package com.devticket.payment.refund.presentation.controller;
 
 import com.devticket.payment.refund.application.service.RefundService;
 import com.devticket.payment.refund.presentation.dto.RefundInfoResponse;
+import com.devticket.payment.refund.presentation.dto.RefundListItemResponse;
 import com.devticket.payment.refund.presentation.dto.PgRefundRequest;
 import com.devticket.payment.refund.presentation.dto.PgRefundResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -11,6 +12,10 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -34,12 +39,24 @@ public class RefundController {
         @ApiResponse(responseCode = "200", description = "조회 성공"),
         @ApiResponse(responseCode = "404", description = "결제 정보 없음")
     })
-    @GetMapping()
+    @GetMapping("/info")
     public ResponseEntity<RefundInfoResponse> getRefundInfo(
         @RequestHeader("X-User-Id") UUID userId,
         @RequestParam String ticketId) {
 
         return ResponseEntity.ok(refundService.getRefundInfo(userId, ticketId));
+    }
+
+    @Operation(summary = "환불 내역 목록 조회", description = "사용자의 환불 내역을 페이징으로 조회합니다.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "조회 성공")
+    })
+    @GetMapping()
+    public ResponseEntity<Page<RefundListItemResponse>> getRefundList(
+        @RequestHeader("X-User-Id") UUID userId,
+        @PageableDefault(size = 10, sort = "requestedAt", direction = Sort.Direction.DESC) Pageable pageable
+    ) {
+        return ResponseEntity.ok(refundService.getRefundList(userId, pageable));
     }
 
     @PostMapping("/pg/{ticketId}")

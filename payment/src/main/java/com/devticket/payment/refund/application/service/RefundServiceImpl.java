@@ -19,6 +19,7 @@ import com.devticket.payment.refund.domain.repository.RefundRepository;
 import com.devticket.payment.refund.infrastructure.client.EventInternalClient;
 import com.devticket.payment.refund.infrastructure.client.dto.InternalEventInfoResponse;
 import com.devticket.payment.refund.presentation.dto.RefundInfoResponse;
+import com.devticket.payment.refund.presentation.dto.RefundListItemResponse;
 import com.devticket.payment.refund.presentation.dto.PgRefundRequest;
 import com.devticket.payment.refund.presentation.dto.PgRefundResponse;
 import java.time.LocalDate;
@@ -26,6 +27,8 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -208,6 +211,12 @@ public class RefundServiceImpl implements RefundService {
         if (refundRate <= 0) {
             throw new RefundException(RefundErrorCode.REFUND_NOT_AVAILABLE);
         }
+    }
+
+    @Override
+    public Page<RefundListItemResponse> getRefundList(UUID userId, Pageable pageable) {
+        return refundRepository.findByUserId(userId, pageable)
+            .map(RefundListItemResponse::from);
     }
 
     private LocalDateTime parseCanceledAt(String canceledAt) {
