@@ -4,6 +4,7 @@ import com.devticket.commerce.mock.controller.dto.InternalOrderInfoResponse;
 import com.devticket.commerce.mock.controller.dto.InternalOrderItemsResponse;
 import com.devticket.commerce.order.presentation.dto.req.CartOrderRequest;
 import com.devticket.commerce.order.presentation.dto.res.InternalSettlementDataResponse;
+import com.devticket.commerce.order.presentation.dto.res.OrderItemResponse;
 import com.devticket.commerce.order.presentation.dto.res.OrderResponse;
 import java.util.UUID;
 
@@ -19,6 +20,8 @@ public interface OrderUsecase {
     void completeOrder(UUID orderId);
 
     InternalSettlementDataResponse getSettelmentData(UUID sellerId, String periodStart, String periodEnd);
+
+    OrderItemResponse getOrderItemByTicketId(Long ticketId);
 
     //InternalEventOrdersResponse getOrdersByEvent(Long eventId, String status);
 }

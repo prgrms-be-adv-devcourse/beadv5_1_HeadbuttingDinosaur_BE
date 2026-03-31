@@ -18,8 +18,12 @@ import com.devticket.commerce.order.infrastructure.external.client.dto.InternalB
 import com.devticket.commerce.order.infrastructure.external.client.dto.InternalStockAdjustmentResponse;
 import com.devticket.commerce.order.presentation.dto.req.CartOrderRequest;
 import com.devticket.commerce.order.presentation.dto.res.InternalSettlementDataResponse;
+import com.devticket.commerce.order.presentation.dto.res.OrderItemResponse;
 import com.devticket.commerce.order.presentation.dto.res.OrderResponse;
 import com.devticket.commerce.ticket.application.usecase.TicketUsecase;
+import com.devticket.commerce.ticket.domain.exception.TicketErrorCode;
+import com.devticket.commerce.ticket.domain.model.Ticket;
+import com.devticket.commerce.ticket.domain.repository.TicketRepository;
 import com.devticket.commerce.ticket.presentation.dto.req.TicketRequest;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -42,6 +46,7 @@ public class OrderService implements OrderUsecase {
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final TicketUsecase ticketUsecase;
+    private final TicketRepository ticketRepository;
 
     // ==== Public Methods (Main Flow) ====================================
 
@@ -269,6 +274,17 @@ public class OrderService implements OrderUsecase {
         return orderItemRepository.saveAll(orderItems);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public OrderItemResponse getOrderItemByTicketId(Long ticketId) {
+        Ticket ticket = ticketRepository.findById(ticketId)
+            .orElseThrow(() -> new BusinessException(TicketErrorCode.TICKET_NOT_FOUND));
+
+        OrderItem orderItem = orderItemRepository.findByOrderItemId(ticket.getOrderItemId())
+            .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
+
+        return OrderItemResponse.from(orderItem);
+    }
 
 }
 

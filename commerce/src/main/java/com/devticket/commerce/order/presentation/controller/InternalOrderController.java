@@ -4,6 +4,7 @@ import com.devticket.commerce.mock.controller.dto.InternalOrderInfoResponse;
 import com.devticket.commerce.mock.controller.dto.InternalOrderItemsResponse;
 import com.devticket.commerce.order.application.usecase.OrderUsecase;
 import com.devticket.commerce.order.presentation.dto.res.InternalSettlementDataResponse;
+import com.devticket.commerce.order.presentation.dto.res.OrderItemResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -60,5 +61,11 @@ public class InternalOrderController {
         return ResponseEntity.ok().build();
     }
 
+    //Ticket -> Commerce : ticketId(PK)로 해당 OrderItem 전체 정보 조회
+    @GetMapping("/order-items/by-ticket/{ticketId}")
+    public ResponseEntity<OrderItemResponse> getOrderItemByTicketId(@PathVariable Long ticketId) {
+        OrderItemResponse response = orderUsecase.getOrderItemByTicketId(ticketId);
+        return ResponseEntity.ok(response);
+    }
 
 }
