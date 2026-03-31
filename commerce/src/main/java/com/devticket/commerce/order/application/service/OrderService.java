@@ -301,8 +301,7 @@ public class OrderService implements OrderUsecase {
 
         orderRepository.save(order);
 
-        return OrderCancelResponse.of(order);
-    }
+       return OrderCancelResponse.of(order);
 
 //    @Override
 //    public InternalEventOrdersResponse getOrdersByEvent(Long eventId, String status) {
