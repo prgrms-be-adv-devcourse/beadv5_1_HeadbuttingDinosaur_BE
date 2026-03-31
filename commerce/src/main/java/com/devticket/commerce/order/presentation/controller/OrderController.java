@@ -2,6 +2,9 @@ package com.devticket.commerce.order.presentation.controller;
 
 import com.devticket.commerce.order.application.usecase.OrderUsecase;
 import com.devticket.commerce.order.presentation.dto.req.CartOrderRequest;
+import com.devticket.commerce.order.presentation.dto.req.OrderListRequest;
+import com.devticket.commerce.order.presentation.dto.res.OrderDetailResponse;
+import com.devticket.commerce.order.presentation.dto.res.OrderListResponse;
 import com.devticket.commerce.order.presentation.dto.res.OrderResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -9,6 +12,9 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -33,7 +39,26 @@ public class OrderController {
         return ResponseEntity
             .status(HttpStatus.CREATED)
             .body(response);
+    }
 
+    @GetMapping
+    @Operation(description = "주문 목록 조회 : 내 주문 목록을 페이징으로 조회 (status 파라미터로 필터링 가능)")
+    public ResponseEntity<OrderListResponse> getOrderList(
+        @RequestHeader("X-User-Id") UUID userId,
+        @ModelAttribute OrderListRequest request
+    ) {
+        OrderListResponse response = orderUsecase.getOrderList(userId, request);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/{orderId}")
+    @Operation(description = "주문 상세 조회 : 특정 주문의 상세 정보 조회")
+    public ResponseEntity<OrderDetailResponse> getOrderDetail(
+        @RequestHeader("X-User-Id") UUID userId,
+        @PathVariable UUID orderId
+    ) {
+        OrderDetailResponse response = orderUsecase.getOrderDetail(userId, orderId);
+        return ResponseEntity.ok(response);
     }
 
 }

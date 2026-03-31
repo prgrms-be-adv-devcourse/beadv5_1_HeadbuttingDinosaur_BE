@@ -38,6 +38,8 @@ public class TicketRepositoryAdapter implements TicketRepository {
     }
 
     @Override
+    public Optional<Ticket> findByTicketId(UUID ticketId) {
+        return ticketJpaRepository.findByTicketId(ticketId);
     public Page<Ticket> findAllByEventId(Long eventId, SellerEventParticipantListRequest request) {
         return ticketJpaRepository.findAllByEventId(eventId, request.toPageable());
     }

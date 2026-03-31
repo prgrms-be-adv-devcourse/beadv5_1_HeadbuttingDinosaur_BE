@@ -122,4 +122,19 @@ public class MockEventController {
             )
         );
     }
+
+    @GetMapping("/{eventId}")
+    public InternalEventInfoResponse getSingleEventInfo(
+        @PathVariable Long eventId
+    ) {
+        return
+            new InternalEventInfoResponse(
+                eventId,
+                UUID.fromString("1d7f4d4a-1c6b-4aa2-b49e-8ed2fdb10001"),
+                "Spring 밋업 (Mock)",
+                LocalDateTime.of(2026, 4, 1, 14, 0),
+                "강남역 루비홀"
+
+            );
+    }
 }
