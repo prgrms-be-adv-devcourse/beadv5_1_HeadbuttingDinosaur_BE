@@ -1,6 +1,7 @@
 package com.devticket.commerce.order.infrastructure.external.client.dto;
 
 import com.devticket.commerce.cart.domain.model.CartItem;
+import com.devticket.commerce.order.domain.model.OrderItem;
 import java.util.List;
 
 public record InternalBulkStockAdjustmentRequest(
@@ -36,6 +37,16 @@ public record InternalBulkStockAdjustmentRequest(
                 .toList()
         );
     }
+
+    // 취소 시 OrderItem 기반 재고 복구
+    public static InternalBulkStockAdjustmentRequest createForCancelByOrderItems(List<OrderItem> orderItems) {
+        return new InternalBulkStockAdjustmentRequest(
+            orderItems.stream()
+                .map(item -> new EventItem(item.getEventId(), item.getQuantity()))
+                .toList()
+        );
+    }
+
 
 }
 

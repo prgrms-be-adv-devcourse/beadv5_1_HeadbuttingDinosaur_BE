@@ -20,12 +20,9 @@ import com.devticket.commerce.order.presentation.dto.req.CartOrderRequest;
 import com.devticket.commerce.order.presentation.dto.req.OrderListRequest;
 import com.devticket.commerce.order.presentation.dto.res.InternalOrderItemResponse;
 import com.devticket.commerce.order.presentation.dto.res.InternalSettlementDataResponse;
-
 import com.devticket.commerce.order.presentation.dto.res.OrderCancelResponse;
-
 import com.devticket.commerce.order.presentation.dto.res.OrderDetailResponse;
 import com.devticket.commerce.order.presentation.dto.res.OrderListResponse;
-
 import com.devticket.commerce.order.presentation.dto.res.OrderResponse;
 import com.devticket.commerce.ticket.application.usecase.TicketUsecase;
 import com.devticket.commerce.ticket.domain.enums.TicketStatus;
@@ -292,7 +289,11 @@ public class OrderService implements OrderUsecase {
         if (order.getStatus().equals(OrderStatus.PAID)) {
             throw new BusinessException(OrderErrorCode.ALREADY_PAID_ORDER);
         }
-        // 4. 주문 취소
+        // 4. 주문 아이템 조회
+        List<OrderItem> orderItems = orderItemRepository.findAllByOrderId(order.getId());
+        // 5. 재고 복구
+        orderToEventClient.adjustStocks(InternalBulkStockAdjustmentRequest.createForCancelByOrderItems(orderItems));
+        // 6. 주문 취소
         order.cancel();
 
         orderRepository.save(order);
@@ -355,6 +356,7 @@ public class OrderService implements OrderUsecase {
         return orderItemRepository.saveAll(orderItems);
     }
 
+
     @Override
     @Transactional(readOnly = true)
     public InternalOrderItemResponse getOrderItemByTicketId(Long ticketId) {
@@ -378,7 +380,7 @@ public class OrderService implements OrderUsecase {
             log.info("이미 환불 처리된 티켓입니다. ticketId: {}", ticketId);
             return;
         }
-        
+
         ticket.refundTicket();
 
         // 2. OrderItem 수량 -1, subtotalAmount 재계산
