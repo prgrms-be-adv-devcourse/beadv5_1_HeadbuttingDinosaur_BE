@@ -16,7 +16,7 @@ public enum RefundErrorCode implements ErrorCode {
     PAYMENT_NOT_FOUND(404, "REFUND_006", "결제 정보를 찾을 수 없습니다."),
     TICKET_NOT_FOUND(404, "REFUND_007", "존재하지 않는 티켓입니다."),
     EVENT_NOT_FOUND(404, "REFUND_008", "존재하지 않는 이벤트입니다."),
-    PG_REFUND_FAILED(502, "REFUND_005", "PG사 환불 처리에 실패했습니다.");;
+    PG_REFUND_FAILED(502, "REFUND_009", "PG사 환불 처리에 실패했습니다.");;
 
     private final int status;
     private final String code;

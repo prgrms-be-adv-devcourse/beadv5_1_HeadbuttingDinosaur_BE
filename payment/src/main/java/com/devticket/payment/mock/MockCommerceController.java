@@ -42,7 +42,7 @@ public class MockCommerceController {
         return new InternalOrderItemInfoResponse(
             1L,                                                          // orderItemId
             1L,                                                          // orderId
-            UUID.fromString("550e8400-e29b-41d4-a716-446655440000"),    // userId
+            UUID.fromString("123e4567-e89b-12d3-a456-426614174000"),    // userId
             15L,                                                         // eventId
             50000                                                        // amount
         );

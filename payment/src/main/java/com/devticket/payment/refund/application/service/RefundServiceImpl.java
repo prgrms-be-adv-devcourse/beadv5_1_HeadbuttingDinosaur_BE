@@ -82,7 +82,6 @@ public class RefundServiceImpl implements RefundService {
     // =========================================================
 
     @Override
-    @Transactional
     public PgRefundResponse refundPgTicket(UUID userId, String ticketId, PgRefundRequest request) {
         InternalOrderItemInfoResponse orderItem = getOrderItemInfo(ticketId);
         validateOrderOwner(orderItem.userId(), userId);
@@ -101,16 +100,6 @@ public class RefundServiceImpl implements RefundService {
 
         int refundAmount = calculateRefundAmount(orderItem.amount(), refundRate);
 
-        validateRefundAmountNotExceedPayment(payment, refundAmount);
-
-        PgPaymentCancelResult cancelResult = pgPaymentClient.cancelPartial(
-            new PgPaymentCancelCommand(
-                payment.getPaymentKey(),
-                refundAmount,
-                request.reason()
-            )
-        );
-
         Refund refund = Refund.create(
             orderItem.orderId(),
             payment.getId(),
@@ -118,14 +107,31 @@ public class RefundServiceImpl implements RefundService {
             refundAmount,
             refundRate
         );
-        refund.complete(parseCanceledAt(cancelResult.canceledAt()));
-        refundRepository.save(refund);
 
-        updatePaymentStatusIfNeeded(payment, refundAmount);
+        try {
+            PgPaymentCancelResult cancelResult = pgPaymentClient.cancelPartial(
+                new PgPaymentCancelCommand(
+                    payment.getPaymentKey(),
+                    refundAmount,
+                    request.reason()
+                )
+            );
+            refund.complete(parseCanceledAt(cancelResult.canceledAt()));
+            refundRepository.save(refund);
+
+        } catch (Exception e) {
+            refund.fail();
+            refundRepository.save(refund);
+            throw new RefundException(RefundErrorCode.PG_REFUND_FAILED);
+        }
 
         //환불 완료 처리
-        commerceInternalClient.completeRefund(ticketId);
-
+        try {
+            commerceInternalClient.completeRefund(ticketId);
+        } catch (Exception e) {
+            log.error("Commerce 환불 완료 통보 실패 — 수동 처리 필요: ticketId={}, refundAmount={}",
+                ticketId, refundAmount, e);
+        }
 
         return PgRefundResponse.of(
             ticketId,
@@ -182,7 +188,7 @@ public class RefundServiceImpl implements RefundService {
 
     private void validateOrderOwner(UUID orderUserId, UUID userId) {
         if (!orderUserId.equals(userId)) {
-            throw new PaymentException(RefundErrorCode.REFUND_INVALID_REQUEST);
+            throw new RefundException(RefundErrorCode.REFUND_INVALID_REQUEST);
         }
     }
 
@@ -206,21 +212,5 @@ public class RefundServiceImpl implements RefundService {
 
     private LocalDateTime parseCanceledAt(String canceledAt) {
         return OffsetDateTime.parse(canceledAt).toLocalDateTime();
-    }
-
-    private void updatePaymentStatusIfNeeded(Payment payment, int refundedAmount) {
-        if (payment.getAmount().equals(refundedAmount)) {
-            payment.refund();
-        } else {
-            payment.cancel();
-        }
-    }
-
-    private void validateRefundAmountNotExceedPayment(Payment payment, int refundAmount) {
-        int completedRefundAmount = refundRepository.sumCompletedRefundAmountByPaymentId(payment.getId());
-
-        if (completedRefundAmount + refundAmount > payment.getAmount()) {
-            throw new RefundException(RefundErrorCode.REFUND_INVALID_REQUEST);
-        }
     }
 }
