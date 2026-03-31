@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -62,7 +63,7 @@ public class InternalOrderController {
     }
 
     //Payment -> Commerce : 결제 실패 후 Order상태 FAILED로 변경
-    @PostMapping("/orders/{orderId}/payment-failed")
+    @PatchMapping("/orders/{orderId}/payment-failed")
     public ResponseEntity<Void> failOrder(@PathVariable Long orderId) {
         orderUsecase.failOrder(orderId);
         return ResponseEntity.ok().build();
