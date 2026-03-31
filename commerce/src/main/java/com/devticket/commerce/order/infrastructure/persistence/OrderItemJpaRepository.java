@@ -1,7 +1,6 @@
 package com.devticket.commerce.order.infrastructure.persistence;
 
 import com.devticket.commerce.order.domain.model.OrderItem;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -15,15 +14,8 @@ public interface OrderItemJpaRepository extends JpaRepository<OrderItem, Long> {
 
     List<OrderItem> findAllByOrderId(Long orderId);
 
-    @Query("SELECT oi FROM OrderItem oi " +
-        "WHERE oi.userId = :sellerId " +
-        "AND oi.createdAt >= :periodStart " +
-        "AND oi.createdAt <= :periodEnd")
-    List<OrderItem> findSettlementItems(
-        @Param("sellerId") UUID sellerId,
-        @Param("periodStart") LocalDateTime periodStart,
-        @Param("periodEnd") LocalDateTime periodEnd
-    );
+    @Query("SELECT oi FROM OrderItem oi WHERE oi.eventId IN :eventIds")
+    List<OrderItem> findSettlementItems(@Param("eventIds") List<Long> eventIds);
 
     List<OrderItem> findAllByEventId(Long eventId);
 
