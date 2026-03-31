@@ -48,13 +48,20 @@ public class MockPgController {
     public TossPaymentCancelResponse cancelPayment(
         @PathVariable String paymentKey,
         @RequestBody TossPaymentCancelRequest request) {
+
+        int cancelAmount = request.cancelAmount() != null ? request.cancelAmount() : 10000;
+
+        TossPaymentCancelResponse.Cancels cancel = new TossPaymentCancelResponse.Cancels(
+            cancelAmount,
+            request.cancelReason(),
+            "2024-01-01T00:00:00+09:00"
+        );
+
         return new TossPaymentCancelResponse(
             paymentKey,
             "mock_order_id",
             "CANCELED",
-            0L,
-            "2024-01-01T00:00:00+09:00",
-            "2024-01-01T00:00:00+09:00"
+            new TossPaymentCancelResponse.Cancels[]{ cancel }
         );
     }
 
