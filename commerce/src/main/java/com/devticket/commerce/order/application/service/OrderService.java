@@ -229,7 +229,11 @@ public class OrderService implements OrderUsecase {
         if (order.getStatus().equals(OrderStatus.PAID)) {
             throw new BusinessException(OrderErrorCode.ALREADY_PAID_ORDER);
         }
-        // 4. 주문 취소
+        // 4. 주문 아이템 조회
+        List<OrderItem> orderItems = orderItemRepository.findAllByOrderId(order.getId());
+        // 5. 재고 복구
+        orderToEventClient.adjustStocks(InternalBulkStockAdjustmentRequest.createForCancelByOrderItems(orderItems));
+        // 6. 주문 취소
         order.cancel();
 
         orderRepository.save(order);
