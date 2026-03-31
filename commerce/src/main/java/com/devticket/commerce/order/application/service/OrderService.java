@@ -24,6 +24,7 @@ import com.devticket.commerce.order.presentation.dto.res.OrderDetailResponse;
 import com.devticket.commerce.order.presentation.dto.res.OrderListResponse;
 import com.devticket.commerce.order.presentation.dto.res.OrderResponse;
 import com.devticket.commerce.ticket.application.usecase.TicketUsecase;
+import com.devticket.commerce.ticket.domain.enums.TicketStatus;
 import com.devticket.commerce.ticket.domain.exception.TicketErrorCode;
 import com.devticket.commerce.ticket.domain.model.Ticket;
 import com.devticket.commerce.ticket.domain.repository.TicketRepository;
@@ -335,6 +336,38 @@ public class OrderService implements OrderUsecase {
             .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
 
         return InternalOrderItemResponse.from(orderItem);
+    }
+
+    @Override
+    @Transactional
+    public void completeRefund(Long ticketId) {
+        // 1. 티켓 조회 후 REFUNDED 상태 변경
+        Ticket ticket = ticketRepository.findById(ticketId)
+            .orElseThrow(() -> new BusinessException(TicketErrorCode.TICKET_NOT_FOUND));
+
+        if (ticket.getStatus() == TicketStatus.REFUNDED) {
+            log.info("이미 환불 처리된 티켓입니다. ticketId: {}", ticketId);
+            return;
+        }
+        
+        ticket.refundTicket();
+
+        // 2. OrderItem 수량 -1, subtotalAmount 재계산
+        OrderItem orderItem = orderItemRepository.findByOrderItemId(ticket.getOrderItemId())
+            .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
+        orderItem.refundOneQuantity();
+
+        // 3. Order totalAmount에서 환불 금액(price * 1) 차감
+        Order order = orderRepository.findById(orderItem.getOrderId())
+            .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
+        order.adjustAmountForRefund(orderItem.getPrice());
+
+        // 4. Event 재고 +1 복구
+        orderToEventClient.adjustStocks(
+            new InternalBulkStockAdjustmentRequest(
+                List.of(new InternalBulkStockAdjustmentRequest.EventItem(orderItem.getEventId(), 1))
+            )
+        );
     }
 
 }
