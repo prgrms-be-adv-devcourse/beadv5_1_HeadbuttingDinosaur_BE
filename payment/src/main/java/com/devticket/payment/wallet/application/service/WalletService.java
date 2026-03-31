@@ -16,9 +16,15 @@ public interface WalletService {
 
     WalletChargeConfirmResponse confirmCharge(UUID userId, WalletChargeConfirmRequest request);
 
+    WalletWithdrawResponse withdraw(UUID userId, WalletWithdrawRequest request);
+
     WalletBalanceResponse getBalance(UUID userId);
 
     WalletTransactionListResponse getTransactions(UUID userId, int page, int size);
 
-    WalletWithdrawResponse withdraw(UUID userId, WalletWithdrawRequest request);
+    void processWalletPayment(UUID userId, Long orderId, int amount);
+
+    void restoreBalance(UUID userId, int amount, UUID refundId, Long orderId);
+
+    void processBatchRefund(Long eventId);
 }
