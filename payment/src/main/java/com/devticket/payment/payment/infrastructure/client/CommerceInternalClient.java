@@ -5,6 +5,7 @@ import com.devticket.payment.common.exception.CommonErrorCode;
 import com.devticket.payment.payment.infrastructure.client.dto.InternalOrderInfoResponse;
 import com.devticket.payment.wallet.infrastructure.client.dto.InternalEventOrdersResponse;
 import lombok.extern.slf4j.Slf4j;
+import com.devticket.payment.payment.infrastructure.client.dto.InternalOrderItemInfoResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpServerErrorException;
@@ -60,6 +61,7 @@ public class CommerceInternalClient {
             .toBodilessEntity();
     }
 
+
     public InternalEventOrdersResponse getOrdersByEvent(Long eventId) {
         log.info("[CommerceClient] 이벤트 주문 조회 — eventId={}", eventId);
         try {
@@ -72,5 +74,12 @@ public class CommerceInternalClient {
                 eventId, e.getMessage());
             throw new IllegalStateException("Commerce 서비스 호출 실패 — eventId=" + eventId, e);
         }
+      
+    public InternalOrderItemInfoResponse getOrderItemInfoByTicketId(String ticketId) {
+        return restClient.get()
+            .uri("/internal/order-items/by-ticket/{ticketId}", ticketId)
+            .retrieve()
+            .body(InternalOrderItemInfoResponse.class);
+
     }
 }
