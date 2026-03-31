@@ -5,8 +5,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestHeaderException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @Slf4j
 @RestControllerAdvice
@@ -53,5 +55,35 @@ public class GlobalExceptionHandler {
         ErrorResponse response = ErrorResponse.of("COMMON_001", message, HttpStatus.BAD_REQUEST.value());
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    /**
+     * 필수 요청 파라미터 누락 처리
+     * 예: GET /internal/events/{id}/validate-purchase 에서 requestedQuantity 파라미터 누락 시
+     */
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ErrorResponse> handleMissingServletRequestParameterException(
+            MissingServletRequestParameterException e) {
+        log.warn("MissingServletRequestParameterException: parameterName={}", e.getParameterName());
+        String message = "필수 요청 파라미터가 누락되었습니다: " + e.getParameterName();
+        return ResponseEntity
+            .status(HttpStatus.BAD_REQUEST)
+            .body(ErrorResponse.of("COMMON_001", message, HttpStatus.BAD_REQUEST.value()));
+    }
+
+    /**
+     * 요청 파라미터 타입 변환 실패 처리
+     * 예: GET /internal/events/by-seller/{sellerId}?status=on_sale 에서 잘못된 enum값 입력 시
+     */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleMethodArgumentTypeMismatchException(
+            MethodArgumentTypeMismatchException e) {
+        log.warn("MethodArgumentTypeMismatchException: parameterName={}, requiredType={}, value={}",
+                e.getName(), e.getRequiredType().getSimpleName(), e.getValue());
+        String message = String.format("요청 파라미터 타입이 올바르지 않습니다: %s (필수: %s)",
+                e.getValue(), e.getRequiredType().getSimpleName());
+        return ResponseEntity
+            .status(HttpStatus.BAD_REQUEST)
+            .body(ErrorResponse.of("COMMON_001", message, HttpStatus.BAD_REQUEST.value()));
     }
 }
