@@ -56,7 +56,7 @@ public class MockEventController {
         );
     }
 
-    @PatchMapping("/{eventId}/stock-adjustments")
+    @PatchMapping("/stock-adjustments")
     public List<InternalStockAdjustmentResponse> mockBulkAdjustStock(
         @RequestBody InternalBulkStockAdjustmentRequest request
     ) {
@@ -127,14 +127,19 @@ public class MockEventController {
     public InternalEventInfoResponse getSingleEventInfo(
         @PathVariable Long eventId
     ) {
-        return
-            new InternalEventInfoResponse(
-                eventId,
-                UUID.fromString("1d7f4d4a-1c6b-4aa2-b49e-8ed2fdb10001"),
-                "Spring 밋업 (Mock)",
-                LocalDateTime.of(2026, 4, 1, 14, 0),
-                "강남역 루비홀"
-
-            );
+        return new InternalEventInfoResponse(
+            eventId,
+            UUID.fromString("1d7f4d4a-1c6b-4aa2-b49e-8ed2fdb10001"),
+            "Spring 밋업 (Mock)",
+            30000,
+            "ON_SALE",
+            "MEETUP",
+            50,
+            4,
+            23,
+            "2026-04-01T14:00:00",
+            "2026-03-01T00:00:00",
+            "2026-03-31T23:59:59"
+        );
     }
 }
