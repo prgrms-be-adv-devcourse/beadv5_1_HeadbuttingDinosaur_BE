@@ -88,9 +88,9 @@ public class Refund extends BaseEntity {
         this.status = RefundStatus.APPROVED;
     }
 
-    public void complete() {
+    public void complete(LocalDateTime canceledAt) {
         this.status = RefundStatus.COMPLETED;
-        this.completedAt = LocalDateTime.now();
+        this.completedAt = canceledAt;
     }
 
     public void reject() {

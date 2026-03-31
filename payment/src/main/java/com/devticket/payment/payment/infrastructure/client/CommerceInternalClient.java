@@ -65,4 +65,17 @@ public class CommerceInternalClient {
             .retrieve()
             .body(InternalOrderItemInfoResponse.class);
     }
+
+    public void completeRefund(String ticketId) {
+        try {
+            restClient.post()
+                .uri("/internal/tickets/{ticketId}/refund-completed", ticketId)
+                .retrieve()
+                .toBodilessEntity();
+        } catch (ResourceAccessException e) {
+            throw e;
+        } catch (RestClientResponseException e) {
+            throw e;
+        }
+    }
 }
