@@ -35,11 +35,8 @@ public class RefundServiceImpl implements RefundService {
 
     public RefundInfoResponse getRefundInfo(UUID userId, String ticketId) {
 
-        // Commerce — orderItem 정보 조회
-        InternalOrderItemInfoResponse orderItem = commerceInternalClient.getOrderItemInfoByTicketId(ticketId);
-
-        // Event — 행사 정보 조회
-        InternalEventInfoResponse event = eventInternalClient.getEventInfo(orderItem.eventId());
+        InternalOrderItemInfoResponse orderItem = getOrderItemInfo(ticketId);
+        InternalEventInfoResponse event = getEventInfo(orderItem.eventId());
 
         // 결제 정보 조회
         Payment payment = paymentRepository.findByOrderId(orderItem.orderId())
@@ -69,7 +66,7 @@ public class RefundServiceImpl implements RefundService {
         );
     }
 
-    private InternalOrderItemInfoResponse getOrderItemSafely(String ticketId) {
+    private InternalOrderItemInfoResponse getOrderItemInfo(String ticketId) {
         try {
             return commerceInternalClient.getOrderItemInfoByTicketId(ticketId);
         } catch (HttpClientErrorException e) {
@@ -80,7 +77,7 @@ public class RefundServiceImpl implements RefundService {
         }
     }
 
-    private InternalEventInfoResponse getEventInfoSafely(Long eventId) {
+    private InternalEventInfoResponse getEventInfo(Long eventId) {
         try {
             return eventInternalClient.getEventInfo(eventId);
         } catch (HttpClientErrorException e) {
