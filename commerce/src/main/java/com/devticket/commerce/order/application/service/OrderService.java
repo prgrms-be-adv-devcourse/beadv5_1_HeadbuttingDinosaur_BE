@@ -29,8 +29,6 @@ import com.devticket.commerce.ticket.domain.model.Ticket;
 import com.devticket.commerce.ticket.domain.repository.TicketRepository;
 import com.devticket.commerce.ticket.infrastructure.external.client.dto.InternalEventInfoResponse;
 import com.devticket.commerce.ticket.presentation.dto.req.TicketRequest;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -162,20 +160,28 @@ public class OrderService implements OrderUsecase {
         try {
             log.info("[Settlement Debug] 시작 - sellerId: {}, period: {} ~ {}", sellerId, periodStart, periodEnd);
 
-            // 1. 날짜 변환
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-            LocalDateTime formattedPeriodStart = LocalDateTime.parse(periodStart + " 00:00:00", formatter);
-            LocalDateTime formattedPeriodEnd = LocalDateTime.parse(periodEnd + " 23:59:59", formatter);
+            // 1. Event 서비스에서 sellerId + 기간으로 해당 판매자의 이벤트 목록 조회
+            List<InternalEventInfoResponse> sellerEvents = orderToEventClient.getSellerEventsByPeriod(
+                sellerId, periodStart, periodEnd);
+            log.info("[Settlement Debug] 정산 기간 내 판매자 Event 수: {}", sellerEvents.size());
 
-            // 2. 정산대상 OrderItem조회
-            List<OrderItem> orderItems = orderItemRepository.findSettlementItems(sellerId, formattedPeriodStart,
-                formattedPeriodEnd);
+            if (sellerEvents.isEmpty()) {
+                log.warn("[Settlement Debug] 정산 기간 내 이벤트가 없어 빈 응답을 반환합니다.");
+                return new InternalSettlementDataResponse(sellerId, periodStart, periodEnd, List.of());
+            }
+
+            // 2. eventId 목록 추출 후 해당 OrderItem만 조회
+            List<Long> eventIds = sellerEvents.stream()
+                .map(InternalEventInfoResponse::id)
+                .toList();
+            log.info("[Settlement Debug] 조회할 Event ID 목록: {}", eventIds);
+
+            List<OrderItem> orderItems = orderItemRepository.findSettlementItems(eventIds);
             log.info("[Settlement Debug] 조회된 OrderItem 수: {}", orderItems.size());
 
             if (orderItems.isEmpty()) {
                 log.warn("[Settlement Debug] 조회된 데이터가 없어 빈 응답을 반환합니다.");
-                return new InternalSettlementDataResponse(sellerId, formattedPeriodStart.toString(),
-                    formattedPeriodEnd.toString(), List.of());
+                return new InternalSettlementDataResponse(sellerId, periodStart, periodEnd, List.of());
             }
 
             // 3. OrderId 추출 및 Order 조회
@@ -230,7 +236,6 @@ public class OrderService implements OrderUsecase {
 
                     List<InternalSettlementDataResponse.EventSettlements.OrderItems> detailItems = itemList.stream()
                         .map(i -> {
-                            // orderMap에서 해당 아이템의 주문 정보를 가져옵니다.
                             Order itemOrder = orderMap.get(i.getOrderId());
                             String orderStatus = (itemOrder != null) ? itemOrder.getStatus().name() : "UNKNOWN";
 
@@ -252,9 +257,7 @@ public class OrderService implements OrderUsecase {
                 .toList();
 
             log.info("[Settlement Debug] 최종 응답 구성 완료");
-            return new InternalSettlementDataResponse(
-                sellerId, formattedPeriodStart.toString(), formattedPeriodEnd.toString(), eventSettlements
-            );
+            return new InternalSettlementDataResponse(sellerId, periodStart, periodEnd, eventSettlements);
 
         } catch (Exception e) {
             log.error("[Settlement Debug] 에러 발생 원인: ", e);

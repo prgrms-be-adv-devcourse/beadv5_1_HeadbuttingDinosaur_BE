@@ -2,7 +2,6 @@ package com.devticket.commerce.order.infrastructure.persistence;
 
 import com.devticket.commerce.order.domain.model.OrderItem;
 import com.devticket.commerce.order.domain.repository.OrderItemRepository;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -31,8 +30,8 @@ public class OrderItemRepositoryAdapter implements OrderItemRepository {
     }
 
     @Override
-    public List<OrderItem> findSettlementItems(UUID sellerId, LocalDateTime periodStart, LocalDateTime periodEnd) {
-        return orderItemJpaRepository.findSettlementItems(sellerId, periodStart, periodEnd);
+    public List<OrderItem> findSettlementItems(List<Long> eventIds) {
+        return orderItemJpaRepository.findSettlementItems(eventIds);
     }
 
     @Override
