@@ -41,8 +41,12 @@ public class SettlementController {
     // 자동 정산 목 데이터
     @GetMapping("/test/batch")
     public ResponseEntity<String> runBatch() {
-        settlementScheduler.runSettlementJob();
-        return ResponseEntity.ok("배치 실행 완료");
+        try {
+            settlementScheduler.runSettlementJob();
+            return ResponseEntity.ok("배치 실행 완료");
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("배치 실행 실패: " + e.getMessage());
+        }
     }
 
     @Operation(
