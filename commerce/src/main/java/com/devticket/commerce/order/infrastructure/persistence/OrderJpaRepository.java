@@ -1,9 +1,12 @@
 package com.devticket.commerce.order.infrastructure.persistence;
 
+import com.devticket.commerce.common.enums.OrderStatus;
 import com.devticket.commerce.order.domain.model.Order;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface OrderJpaRepository extends JpaRepository<Order, Long> {
@@ -15,5 +18,9 @@ public interface OrderJpaRepository extends JpaRepository<Order, Long> {
     Optional<Order> findByOrderId(UUID orderId);
 
     List<Order> findAllByOrderIdIn(List<UUID> orderIds);
+
+    Page<Order> findAllByUserId(UUID userId, Pageable pageable);
+
+    Page<Order> findAllByUserIdAndStatus(UUID userId, OrderStatus status, Pageable pageable);
 
 }
