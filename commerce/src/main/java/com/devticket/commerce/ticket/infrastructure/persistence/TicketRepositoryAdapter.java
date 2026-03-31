@@ -23,6 +23,11 @@ public class TicketRepositoryAdapter implements TicketRepository {
     }
 
     @Override
+    public Optional<Ticket> findById(Long id) {
+        return ticketJpaRepository.findById(id);
+    }
+
+    @Override
     public Page<Ticket> findAllByUserId(UUID userId, TicketListRequest request) {
         return ticketJpaRepository.findAllByUserId(userId, request.toPageable());
     }

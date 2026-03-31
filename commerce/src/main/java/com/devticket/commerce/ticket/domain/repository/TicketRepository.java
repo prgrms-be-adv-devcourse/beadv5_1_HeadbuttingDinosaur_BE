@@ -12,6 +12,8 @@ public interface TicketRepository {
 
     Ticket save(Ticket ticket);
 
+    Optional<Ticket> findById(Long id);
+
     Page<Ticket> findAllByUserId(UUID userId, TicketListRequest request);
 
     List<Ticket> saveAll(List<Ticket> ticketList);

@@ -3,6 +3,7 @@ package com.devticket.commerce.order.application.usecase;
 import com.devticket.commerce.mock.controller.dto.InternalOrderInfoResponse;
 import com.devticket.commerce.mock.controller.dto.InternalOrderItemsResponse;
 import com.devticket.commerce.order.presentation.dto.req.CartOrderRequest;
+import com.devticket.commerce.order.presentation.dto.res.InternalOrderItemResponse;
 import com.devticket.commerce.order.presentation.dto.req.OrderListRequest;
 import com.devticket.commerce.order.presentation.dto.res.InternalSettlementDataResponse;
 import com.devticket.commerce.order.presentation.dto.res.OrderDetailResponse;
@@ -28,6 +29,8 @@ public interface OrderUsecase {
     void completeOrder(UUID orderId);
 
     InternalSettlementDataResponse getSettelmentData(UUID sellerId, String periodStart, String periodEnd);
+
+    InternalOrderItemResponse getOrderItemByTicketId(Long ticketId);
 
     //InternalEventOrdersResponse getOrdersByEvent(Long eventId, String status);
 }
