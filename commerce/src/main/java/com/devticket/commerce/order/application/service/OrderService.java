@@ -20,12 +20,9 @@ import com.devticket.commerce.order.presentation.dto.req.CartOrderRequest;
 import com.devticket.commerce.order.presentation.dto.req.OrderListRequest;
 import com.devticket.commerce.order.presentation.dto.res.InternalOrderItemResponse;
 import com.devticket.commerce.order.presentation.dto.res.InternalSettlementDataResponse;
-
 import com.devticket.commerce.order.presentation.dto.res.OrderCancelResponse;
-
 import com.devticket.commerce.order.presentation.dto.res.OrderDetailResponse;
 import com.devticket.commerce.order.presentation.dto.res.OrderListResponse;
-
 import com.devticket.commerce.order.presentation.dto.res.OrderResponse;
 import com.devticket.commerce.ticket.application.usecase.TicketUsecase;
 import com.devticket.commerce.ticket.domain.enums.TicketStatus;
@@ -301,7 +298,8 @@ public class OrderService implements OrderUsecase {
 
         orderRepository.save(order);
 
-       return OrderCancelResponse.of(order);
+        return OrderCancelResponse.of(order);
+    }
 
 //    @Override
 //    public InternalEventOrdersResponse getOrdersByEvent(Long eventId, String status) {
@@ -358,6 +356,7 @@ public class OrderService implements OrderUsecase {
         return orderItemRepository.saveAll(orderItems);
     }
 
+
     @Override
     @Transactional(readOnly = true)
     public InternalOrderItemResponse getOrderItemByTicketId(Long ticketId) {
@@ -381,7 +380,7 @@ public class OrderService implements OrderUsecase {
             log.info("이미 환불 처리된 티켓입니다. ticketId: {}", ticketId);
             return;
         }
-        
+
         ticket.refundTicket();
 
         // 2. OrderItem 수량 -1, subtotalAmount 재계산
