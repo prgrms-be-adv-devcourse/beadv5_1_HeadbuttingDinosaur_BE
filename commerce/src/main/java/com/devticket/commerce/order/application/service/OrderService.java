@@ -329,7 +329,7 @@ public class OrderService implements OrderUsecase {
         return InternalOrderItemResponse.from(orderItem);
     }
 
-ㅊ    @Override
+    @Override
     @Transactional
     public void completeRefund(Long ticketId) {
         // 1. 티켓 조회 후 REFUNDED 상태 변경
