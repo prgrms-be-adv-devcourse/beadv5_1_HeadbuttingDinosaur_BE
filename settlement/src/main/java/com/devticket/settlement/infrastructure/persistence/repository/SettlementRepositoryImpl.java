@@ -18,7 +18,7 @@ public class SettlementRepositoryImpl implements SettlementRepository {
 
     // 판매자 아이디 -> settlement 목록 조회
     @Override
-    public List<Settlement> findBySellerId(Long sellerId) {
+    public List<Settlement> findBySellerId(UUID sellerId) {
         return settlementJpaRepository.findBySellerId(sellerId);
     }
 
