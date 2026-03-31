@@ -1,60 +1,48 @@
 package com.devticket.payment.wallet.presentation.dto;
 
+import com.devticket.payment.wallet.domain.model.WalletTransaction;
 import java.time.LocalDateTime;
 import java.util.List;
+import org.springframework.data.domain.Page;
 
 public record WalletTransactionListResponse(
-    List<WalletTransactionItemResponse> transactions,
-    int page,
-    int size,
-    long totalElements,
+    List<Item> items,
+    int currentPage,
     int totalPages,
-    boolean hasNext
+    long totalElements
 ) {
-    public static WalletTransactionListResponse from(
-        List<WalletTransactionItemResponse> transactions,
-        int page,
-        int size,
-        long totalElements,
-        int totalPages,
-        boolean hasNext
-    ) {
+
+    public static WalletTransactionListResponse of(Page<WalletTransaction> page, int currentPage) {
+        List<Item> items = page.getContent().stream()
+            .map(Item::of)
+            .toList();
         return new WalletTransactionListResponse(
-            transactions,
-            page,
-            size,
-            totalElements,
-            totalPages,
-            hasNext
+            items,
+            currentPage,
+            page.getTotalPages(),
+            page.getTotalElements()
         );
     }
 
-    public record WalletTransactionItemResponse(
+    public record Item(
         String transactionId,
-        String type,
+        String type,           // CHARGE | USE | REFUND | WITHDRAW
         Integer amount,
         Integer balanceAfter,
-        String relatedOrderId,
-        String relatedRefundId,
+        String relatedOrderId, // nullable
+        String relatedRefundId, // nullable
         LocalDateTime createdAt
     ) {
-        public static WalletTransactionItemResponse of(
-            String transactionId,
-            String type,
-            Integer amount,
-            Integer balanceAfter,
-            String relatedOrderId,
-            String relatedRefundId,
-            LocalDateTime createdAt
-        ) {
-            return new WalletTransactionItemResponse(
-                transactionId,
-                type,
-                amount,
-                balanceAfter,
-                relatedOrderId,
-                relatedRefundId,
-                createdAt
+
+        public static Item of(WalletTransaction tx) {
+            return new Item(
+                tx.getWalletTransactionId().toString(),
+                tx.getType().name(),
+                tx.getAmount(),
+                tx.getBalanceAfter(),
+                tx.getRelatedOrderId() != null ? tx.getRelatedOrderId().toString() : null,
+                tx.getRelatedRefundId() != null ? tx.getRelatedRefundId().toString() : null,
+                tx.getCreatedAt()
             );
         }
     }
