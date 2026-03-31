@@ -39,11 +39,11 @@ public class SettlementServiceImplTest {
     private SettlementServiceImpl settlementServiceImpl;
 
     // 공용  Mock 데이터
-    Long sellerId = 1L;
+    UUID sellerId = UUID.randomUUID();
     UUID settlementId = UUID.randomUUID();
 
     // Mock Settlement 생성 메서드
-    private Settlement makeSettlement(Long sellerId) {
+    private Settlement makeSettlement(UUID sellerId) {
         return Settlement.builder()
             .sellerId(sellerId)
             .settlementId(settlementId)
@@ -142,7 +142,7 @@ public class SettlementServiceImplTest {
     // 5. 정산 상세 조회 실패(2) - 다른 판매자 접근
     @Test
     void getSellerSettlementDetailFail_AccessDenied() {
-        Long anotherSellerId = 999L;
+        UUID anotherSellerId = UUID.randomUUID();
 
         Settlement settlement = makeSettlement(sellerId);
 
@@ -156,5 +156,5 @@ public class SettlementServiceImplTest {
                 assertThat(be.getErrorCode()).isEqualTo(CommonErrorCode.ACCESS_DENIED);
             });
     }
-    
+
 }
