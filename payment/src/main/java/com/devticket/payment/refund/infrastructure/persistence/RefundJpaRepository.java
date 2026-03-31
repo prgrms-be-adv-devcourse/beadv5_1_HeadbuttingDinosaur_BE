@@ -2,6 +2,9 @@ package com.devticket.payment.refund.infrastructure.persistence;
 
 import com.devticket.payment.refund.domain.model.Refund;
 import java.util.Optional;
+import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -15,4 +18,6 @@ public interface RefundJpaRepository extends JpaRepository<Refund, Long> {
       and r.status = com.devticket.payment.refund.domain.enums.RefundStatus.COMPLETED
 """)
     Optional<Integer> sumCompletedRefundAmountByPaymentId(@Param("paymentId") Long paymentId);
+
+    Page<Refund> findByUserId(UUID userId, Pageable pageable);
 }

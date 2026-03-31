@@ -4,6 +4,8 @@ import com.devticket.payment.refund.domain.model.Refund;
 import com.devticket.payment.refund.domain.repository.RefundRepository;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -23,4 +25,8 @@ public class RefundRepositoryImpl implements RefundRepository {
             .orElse(0);
     }
 
+    @Override
+    public Page<Refund> findByUserId(UUID userId, Pageable pageable) {
+        return refundJpaRepository.findByUserId(userId, pageable);
+    }
 }
