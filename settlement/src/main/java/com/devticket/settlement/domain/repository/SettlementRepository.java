@@ -11,4 +11,5 @@ public interface SettlementRepository {
 
     Optional<Settlement> findBySettlementId(UUID settlementId);
 
+    List<Settlement> saveAll(List<? extends Settlement> settlements);
 }

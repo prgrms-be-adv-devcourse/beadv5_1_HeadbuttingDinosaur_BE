@@ -4,6 +4,7 @@ import com.devticket.settlement.application.service.SettlementServiceImpl;
 import com.devticket.settlement.infrastructure.client.dto.res.InternalSettlementDataResponse;
 import com.devticket.settlement.presentation.dto.SellerSettlementDetailResponse;
 import com.devticket.settlement.presentation.dto.SettlementResponse;
+import com.devticket.settlement.presentation.scheduler.SettlementScheduler;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -24,6 +25,9 @@ public class SettlementController {
 
     private final SettlementServiceImpl settlementServiceImpl;
 
+    // 자동 정산 스케쥴러 목 데이터
+    private final SettlementScheduler settlementScheduler;
+
     // 목 데이터
     @GetMapping("/seller/settlements/fetch")
     public ResponseEntity<InternalSettlementDataResponse> fetchSettlementData(
@@ -32,6 +36,17 @@ public class SettlementController {
         @RequestParam String periodEnd
     ) {
         return ResponseEntity.ok(settlementServiceImpl.fetchSettlementData(sellerId, periodStart, periodEnd));
+    }
+
+    // 자동 정산 목 데이터
+    @GetMapping("/test/batch")
+    public ResponseEntity<String> runBatch() {
+        try {
+            settlementScheduler.runSettlementJob();
+            return ResponseEntity.ok("배치 실행 완료");
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("배치 실행 실패: " + e.getMessage());
+        }
     }
 
     @Operation(

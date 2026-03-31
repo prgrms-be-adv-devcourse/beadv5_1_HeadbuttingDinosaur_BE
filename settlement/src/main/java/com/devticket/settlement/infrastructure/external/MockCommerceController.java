@@ -14,7 +14,7 @@ public class MockCommerceController {
 
     @GetMapping("/settlement-data")
     public InternalSettlementDataResponse getSettlementData(
-        @RequestParam UUID sellerId,
+        @RequestParam(required = false) UUID sellerId,
         @RequestParam String periodStart,
         @RequestParam String periodEnd
     ) {

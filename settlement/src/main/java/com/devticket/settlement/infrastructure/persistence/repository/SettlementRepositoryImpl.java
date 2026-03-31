@@ -28,5 +28,11 @@ public class SettlementRepositoryImpl implements SettlementRepository {
         return settlementJpaRepository.findBySettlementId(settlementId);
     }
 
+    // 주문(internal api) -> 정산 
+    @Override
+    public List<Settlement> saveAll(List<? extends Settlement> settlements) {
+        return settlementJpaRepository.saveAll((List<Settlement>) settlements);
+    }
+
 
 }
