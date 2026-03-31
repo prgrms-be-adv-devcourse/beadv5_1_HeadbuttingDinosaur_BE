@@ -3,6 +3,7 @@ package com.devticket.commerce.order.domain.repository;
 import com.devticket.commerce.order.domain.model.OrderItem;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface OrderItemRepository {
@@ -16,4 +17,6 @@ public interface OrderItemRepository {
     List<OrderItem> findSettlementItems(UUID sellerId, LocalDateTime periodStart, LocalDateTime periodEnd);
 
     List<OrderItem> findAllByEventId(Long eventId);
+
+    Optional<OrderItem> findByOrderItemId(UUID orderItemId);
 }
