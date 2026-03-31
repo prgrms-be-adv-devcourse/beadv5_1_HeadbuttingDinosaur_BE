@@ -141,6 +141,22 @@ public class Order extends BaseEntity {
         this.status = OrderStatus.CANCELLED;
     }
 
+    //환불에 의한 총 주문금액 차감 (PAID 상태에서도 허용)
+    public void adjustAmountForRefund(int refundAmount) {
+        if (refundAmount <= 0) {
+            throw new BusinessException(OrderErrorCode.INVALID_ORDER_AMOUNT);
+        }
+        this.totalAmount -= refundAmount;
+    }
+
+    //주문 상태 변경 : 결제실패 FAILED
+    public void failPayment() {
+        if (this.status == OrderStatus.PAID) {
+            throw new BusinessException(OrderErrorCode.ALREADY_PAID_ORDER);
+        }
+        this.status = OrderStatus.FAILED;
+    }
+
     //-------------------
     private static void validateTotalAmount(int totalAmount) {
         if (totalAmount <= 0) {

@@ -82,6 +82,15 @@ public class OrderItem extends BaseEntity {
 
     //---- 도메인 비즈니스 메서드 ------------------------------
 
+    //환불 처리 : 수량 1 차감 후 subtotalAmount 재계산
+    public void refundOneQuantity() {
+        if (this.quantity <= 0) {
+            throw new BusinessException(OrderErrorCode.INVALID_QUANTITY);
+        }
+        this.quantity -= 1;
+        this.subtotalAmount = calcSubtotalAmount(this.price, this.quantity);
+    }
+
     //아이템의 수량 직접변경 + 수량이 변경되면 subtotalAmount재계산
     public void updateQuantity(int newQuantity, int maxQuantity) {
         validateQuantity(newQuantity, maxQuantity);

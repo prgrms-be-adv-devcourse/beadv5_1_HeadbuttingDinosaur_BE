@@ -3,8 +3,12 @@ package com.devticket.commerce.order.infrastructure.external.client;
 import com.devticket.commerce.common.exception.BusinessException;
 import com.devticket.commerce.common.exception.CommonErrorCode;
 import com.devticket.commerce.order.infrastructure.external.client.dto.InternalBulkStockAdjustmentRequest;
+import com.devticket.commerce.order.infrastructure.external.client.dto.InternalSellerEventsByPeriodRequest;
 import com.devticket.commerce.order.infrastructure.external.client.dto.InternalStockAdjustmentResponse;
+import com.devticket.commerce.ticket.infrastructure.external.client.dto.InternalBulkEventInfoRequest;
+import com.devticket.commerce.ticket.infrastructure.external.client.dto.InternalEventInfoResponse;
 import java.util.List;
+import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.ParameterizedTypeReference;
@@ -52,6 +56,54 @@ public class OrderToEventClient {
         }
     }
 
+    // sellerId + 기간으로 해당 판매자의 이벤트 목록 조회
+    public List<InternalEventInfoResponse> getSellerEventsByPeriod(UUID sellerId, String periodStart, String periodEnd) {
+        try {
+            log.info("[OrderToEventClient] getSellerEventsByPeriod - sellerId: {}, period: {} ~ {}",
+                sellerId, periodStart, periodEnd);
+
+            return restClient.post()
+                .uri("/internal/events/seller-period")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(new InternalSellerEventsByPeriodRequest(sellerId, periodStart, periodEnd))
+                .retrieve()
+                .onStatus(HttpStatusCode::isError, (req, res) -> {
+                    log.error("[OrderToEventClient] API Error Status: {} {}", res.getStatusCode(), res.getStatusText());
+                    throw new BusinessException(CommonErrorCode.EXTERNAL_SERVICE_ERROR);
+                })
+                .body(new ParameterizedTypeReference<List<InternalEventInfoResponse>>() {});
+
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("[OrderToEventClient] Critical Error (getSellerEventsByPeriod): ", e);
+            throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    // 이벤트 정보 여러건 조회 (이벤트 타이틀 등)
+    public List<InternalEventInfoResponse> getBulkEventInfo(List<Long> eventIds) {
+        try {
+            log.info("[OrderToEventClient] getBulkEventInfo - eventIds: {}", eventIds);
+
+            return restClient.post()
+                .uri("/internal/events/bulk")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(new InternalBulkEventInfoRequest(eventIds))
+                .retrieve()
+                .onStatus(HttpStatusCode::isError, (req, res) -> {
+                    log.error("[OrderToEventClient] API Error Status: {} {}", res.getStatusCode(), res.getStatusText());
+                    throw new BusinessException(CommonErrorCode.EXTERNAL_SERVICE_ERROR);
+                })
+                .body(new ParameterizedTypeReference<List<InternalEventInfoResponse>>() {});
+
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("[OrderToEventClient] Critical Error (getBulkEventInfo): ", e);
+            throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
+        }
+    }
 
 }
 

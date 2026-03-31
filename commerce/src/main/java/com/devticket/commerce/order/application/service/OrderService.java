@@ -17,19 +17,32 @@ import com.devticket.commerce.order.infrastructure.external.client.OrderToEventC
 import com.devticket.commerce.order.infrastructure.external.client.dto.InternalBulkStockAdjustmentRequest;
 import com.devticket.commerce.order.infrastructure.external.client.dto.InternalStockAdjustmentResponse;
 import com.devticket.commerce.order.presentation.dto.req.CartOrderRequest;
+import com.devticket.commerce.order.presentation.dto.req.OrderListRequest;
+import com.devticket.commerce.order.presentation.dto.res.InternalOrderItemResponse;
 import com.devticket.commerce.order.presentation.dto.res.InternalSettlementDataResponse;
+
 import com.devticket.commerce.order.presentation.dto.res.OrderCancelResponse;
+
+import com.devticket.commerce.order.presentation.dto.res.OrderDetailResponse;
+import com.devticket.commerce.order.presentation.dto.res.OrderListResponse;
+
 import com.devticket.commerce.order.presentation.dto.res.OrderResponse;
 import com.devticket.commerce.ticket.application.usecase.TicketUsecase;
+import com.devticket.commerce.ticket.domain.enums.TicketStatus;
+import com.devticket.commerce.ticket.domain.exception.TicketErrorCode;
+import com.devticket.commerce.ticket.domain.model.Ticket;
+import com.devticket.commerce.ticket.domain.repository.TicketRepository;
+import com.devticket.commerce.ticket.infrastructure.external.client.dto.InternalEventInfoResponse;
 import com.devticket.commerce.ticket.presentation.dto.req.TicketRequest;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,6 +56,7 @@ public class OrderService implements OrderUsecase {
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final TicketUsecase ticketUsecase;
+    private final TicketRepository ticketRepository;
 
     // ==== Public Methods (Main Flow) ====================================
 
@@ -85,6 +99,42 @@ public class OrderService implements OrderUsecase {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public OrderDetailResponse getOrderDetail(UUID userId, UUID orderId) {
+        Order order = orderRepository.findByOrderId(orderId)
+            .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
+
+        if (!order.getUserId().equals(userId)) {
+            throw new BusinessException(OrderErrorCode.ORDER_FORBIDDEN);
+        }
+
+        List<OrderItem> orderItems = orderItemRepository.findAllByOrderId(order.getId());
+
+        List<Long> eventIds = orderItems.stream()
+            .map(OrderItem::getEventId)
+            .distinct()
+            .toList();
+
+        Map<Long, String> eventTitles = orderToEventClient.getBulkEventInfo(eventIds).stream()
+            .collect(Collectors.toMap(InternalEventInfoResponse::id, InternalEventInfoResponse::title));
+
+        return OrderDetailResponse.of(order, orderItems, eventTitles);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public OrderListResponse getOrderList(UUID userId, OrderListRequest request) {
+        OrderStatus status = (request.status() != null && !request.status().isBlank())
+            ? OrderStatus.valueOf(request.status())
+            : null;
+
+        PageRequest pageable = PageRequest.of(request.page() - 1, request.size(), Sort.by("id").descending());
+        Page<Order> orderPage = orderRepository.findAllByUserId(userId, status, pageable);
+
+        return OrderListResponse.of(orderPage);
+    }
+
+    @Override
     public InternalOrderInfoResponse getOrderInfo(Long id) {
         Order order = orderRepository.findById(id)
             .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
@@ -95,6 +145,14 @@ public class OrderService implements OrderUsecase {
     public InternalOrderItemsResponse getOrderListForSettlement(Long id) {
         List<OrderItem> orderItems = orderItemRepository.findAllByOrderId(id);
         return InternalOrderItemsResponse.from(id, orderItems);
+    }
+
+    @Override
+    @Transactional
+    public void failOrder(Long orderId) {
+        Order order = orderRepository.findById(orderId)
+            .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
+        order.failPayment();
     }
 
     @Override
@@ -115,20 +173,28 @@ public class OrderService implements OrderUsecase {
         try {
             log.info("[Settlement Debug] 시작 - sellerId: {}, period: {} ~ {}", sellerId, periodStart, periodEnd);
 
-            // 1. 날짜 변환
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-            LocalDateTime formattedPeriodStart = LocalDateTime.parse(periodStart + " 00:00:00", formatter);
-            LocalDateTime formattedPeriodEnd = LocalDateTime.parse(periodEnd + " 23:59:59", formatter);
+            // 1. Event 서비스에서 sellerId + 기간으로 해당 판매자의 이벤트 목록 조회
+            List<InternalEventInfoResponse> sellerEvents = orderToEventClient.getSellerEventsByPeriod(
+                sellerId, periodStart, periodEnd);
+            log.info("[Settlement Debug] 정산 기간 내 판매자 Event 수: {}", sellerEvents.size());
 
-            // 2. 정산대상 OrderItem조회
-            List<OrderItem> orderItems = orderItemRepository.findSettlementItems(sellerId, formattedPeriodStart,
-                formattedPeriodEnd);
+            if (sellerEvents.isEmpty()) {
+                log.warn("[Settlement Debug] 정산 기간 내 이벤트가 없어 빈 응답을 반환합니다.");
+                return new InternalSettlementDataResponse(sellerId, periodStart, periodEnd, List.of());
+            }
+
+            // 2. eventId 목록 추출 후 해당 OrderItem만 조회
+            List<Long> eventIds = sellerEvents.stream()
+                .map(InternalEventInfoResponse::id)
+                .toList();
+            log.info("[Settlement Debug] 조회할 Event ID 목록: {}", eventIds);
+
+            List<OrderItem> orderItems = orderItemRepository.findSettlementItems(eventIds);
             log.info("[Settlement Debug] 조회된 OrderItem 수: {}", orderItems.size());
 
             if (orderItems.isEmpty()) {
                 log.warn("[Settlement Debug] 조회된 데이터가 없어 빈 응답을 반환합니다.");
-                return new InternalSettlementDataResponse(sellerId, formattedPeriodStart.toString(),
-                    formattedPeriodEnd.toString(), List.of());
+                return new InternalSettlementDataResponse(sellerId, periodStart, periodEnd, List.of());
             }
 
             // 3. OrderId 추출 및 Order 조회
@@ -183,7 +249,6 @@ public class OrderService implements OrderUsecase {
 
                     List<InternalSettlementDataResponse.EventSettlements.OrderItems> detailItems = itemList.stream()
                         .map(i -> {
-                            // orderMap에서 해당 아이템의 주문 정보를 가져옵니다.
                             Order itemOrder = orderMap.get(i.getOrderId());
                             String orderStatus = (itemOrder != null) ? itemOrder.getStatus().name() : "UNKNOWN";
 
@@ -205,9 +270,7 @@ public class OrderService implements OrderUsecase {
                 .toList();
 
             log.info("[Settlement Debug] 최종 응답 구성 완료");
-            return new InternalSettlementDataResponse(
-                sellerId, formattedPeriodStart.toString(), formattedPeriodEnd.toString(), eventSettlements
-            );
+            return new InternalSettlementDataResponse(sellerId, periodStart, periodEnd, eventSettlements);
 
         } catch (Exception e) {
             log.error("[Settlement Debug] 에러 발생 원인: ", e);
@@ -296,6 +359,49 @@ public class OrderService implements OrderUsecase {
         return orderItemRepository.saveAll(orderItems);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public InternalOrderItemResponse getOrderItemByTicketId(Long ticketId) {
+        Ticket ticket = ticketRepository.findById(ticketId)
+            .orElseThrow(() -> new BusinessException(TicketErrorCode.TICKET_NOT_FOUND));
+
+        OrderItem orderItem = orderItemRepository.findByOrderItemId(ticket.getOrderItemId())
+            .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
+
+        return InternalOrderItemResponse.from(orderItem);
+    }
+
+    @Override
+    @Transactional
+    public void completeRefund(Long ticketId) {
+        // 1. 티켓 조회 후 REFUNDED 상태 변경
+        Ticket ticket = ticketRepository.findById(ticketId)
+            .orElseThrow(() -> new BusinessException(TicketErrorCode.TICKET_NOT_FOUND));
+
+        if (ticket.getStatus() == TicketStatus.REFUNDED) {
+            log.info("이미 환불 처리된 티켓입니다. ticketId: {}", ticketId);
+            return;
+        }
+        
+        ticket.refundTicket();
+
+        // 2. OrderItem 수량 -1, subtotalAmount 재계산
+        OrderItem orderItem = orderItemRepository.findByOrderItemId(ticket.getOrderItemId())
+            .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
+        orderItem.refundOneQuantity();
+
+        // 3. Order totalAmount에서 환불 금액(price * 1) 차감
+        Order order = orderRepository.findById(orderItem.getOrderId())
+            .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
+        order.adjustAmountForRefund(orderItem.getPrice());
+
+        // 4. Event 재고 +1 복구
+        orderToEventClient.adjustStocks(
+            new InternalBulkStockAdjustmentRequest(
+                List.of(new InternalBulkStockAdjustmentRequest.EventItem(orderItem.getEventId(), 1))
+            )
+        );
+    }
 
 }
 

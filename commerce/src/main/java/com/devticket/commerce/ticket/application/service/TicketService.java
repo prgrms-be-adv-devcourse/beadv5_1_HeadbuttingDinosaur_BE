@@ -26,6 +26,7 @@ import com.devticket.commerce.ticket.presentation.dto.res.TicketListResponse;
 import com.devticket.commerce.ticket.presentation.dto.res.TicketResponse;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -83,6 +84,18 @@ public class TicketService implements TicketUsecase {
     }
 
     @Override
+    public Optional<TicketDetailResponse> getTicketDetail(UUID ticketId) {
+
+        return ticketRepository.findByTicketId(ticketId)
+            .map(ticket -> {
+                // 단건 이벤트 정보 조회
+                InternalEventInfoResponse event = ticketToEventClient.getSingleEventInfo(ticket.getEventId());
+                // 응답DTO 구성(ticket + event)
+                return TicketDetailResponse.of(ticket, event.title(), event.eventDateTime());
+            });
+    }
+
+    @Override
     @Transactional
     public TicketResponse createTicket(TicketRequest request) {
         //order.id -> orderItem목록 조회
@@ -110,7 +123,7 @@ public class TicketService implements TicketUsecase {
     public SellerEventParticipantListResponse getParticipantList(UUID userId, Long eventId,
         SellerEventParticipantListRequest request) {
         // 0단계 : 사용자 소유권 검증
-        InternalEventInfoResponse eventInfo = ticketToEventClient.getEventInfo(eventId);
+        InternalEventInfoResponse eventInfo = ticketToEventClient.getSingleEventInfo(eventId);
         if (eventInfo.sellerId().equals(userId)) {
             throw new BusinessException(TicketErrorCode.UNAUTHORIZED_EVENT_ACCESS);
         }

@@ -3,13 +3,16 @@ package com.devticket.commerce.order.presentation.controller;
 import com.devticket.commerce.mock.controller.dto.InternalOrderInfoResponse;
 import com.devticket.commerce.mock.controller.dto.InternalOrderItemsResponse;
 import com.devticket.commerce.order.application.usecase.OrderUsecase;
+import com.devticket.commerce.order.presentation.dto.res.InternalOrderItemResponse;
 import com.devticket.commerce.order.presentation.dto.res.InternalSettlementDataResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -60,5 +63,25 @@ public class InternalOrderController {
         return ResponseEntity.ok().build();
     }
 
+    //Payment -> Commerce : 결제 실패 후 Order상태 FAILED로 변경
+    @PatchMapping("/orders/{orderId}/payment-failed")
+    public ResponseEntity<Void> failOrder(@PathVariable Long orderId) {
+        orderUsecase.failOrder(orderId);
+        return ResponseEntity.ok().build();
+    }
+
+    //Ticket -> Commerce : ticketId(PK)로 해당 OrderItem 전체 정보 조회
+    @GetMapping("/order-items/by-ticket/{ticketId}")
+    public ResponseEntity<InternalOrderItemResponse> getOrderItemByTicketId(@PathVariable Long ticketId) {
+        InternalOrderItemResponse response = orderUsecase.getOrderItemByTicketId(ticketId);
+        return ResponseEntity.ok(response);
+    }
+
+    //Refund -> Commerce : 환불 완료 후 ticket.status REFUNDED 변경 + orderItem.deletedAt 기록
+    @PatchMapping("/tickets/{ticketId}/refund-completed")
+    public ResponseEntity<Void> completeRefund(@PathVariable Long ticketId) {
+        orderUsecase.completeRefund(ticketId);
+        return ResponseEntity.ok().build();
+    }
 
 }
