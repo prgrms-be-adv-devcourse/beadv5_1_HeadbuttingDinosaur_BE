@@ -1,6 +1,7 @@
 package com.devticket.payment.mock;
 
 import com.devticket.payment.refund.application.service.RefundService;
+import com.devticket.payment.refund.presentation.dto.RefundDetailResponse;
 import com.devticket.payment.refund.presentation.dto.RefundInfoResponse;
 import com.devticket.payment.refund.presentation.dto.RefundListItemResponse;
 import com.devticket.payment.refund.presentation.dto.PgRefundRequest;
@@ -43,6 +44,11 @@ public class RefundTestController {
         @PageableDefault(size = 10, sort = "requestedAt", direction = Sort.Direction.DESC) Pageable pageable
     ) {
         return ResponseEntity.ok(refundService.getRefundList(TEST_USER_ID, pageable));
+    }
+
+    @GetMapping("/{refundId}")
+    public ResponseEntity<RefundDetailResponse> getRefundDetail(@PathVariable UUID refundId) {
+        return ResponseEntity.ok(refundService.getRefundDetail(TEST_USER_ID, refundId));
     }
 
     @PostMapping("/pg/{ticketId}")

@@ -1,6 +1,7 @@
 package com.devticket.payment.refund.presentation.controller;
 
 import com.devticket.payment.refund.application.service.RefundService;
+import com.devticket.payment.refund.presentation.dto.RefundDetailResponse;
 import com.devticket.payment.refund.presentation.dto.RefundInfoResponse;
 import com.devticket.payment.refund.presentation.dto.RefundListItemResponse;
 import com.devticket.payment.refund.presentation.dto.PgRefundRequest;
@@ -57,6 +58,19 @@ public class RefundController {
         @PageableDefault(size = 10, sort = "requestedAt", direction = Sort.Direction.DESC) Pageable pageable
     ) {
         return ResponseEntity.ok(refundService.getRefundList(userId, pageable));
+    }
+
+    @Operation(summary = "환불 상세 조회", description = "refundId로 환불 상세 정보를 조회합니다.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "조회 성공"),
+        @ApiResponse(responseCode = "404", description = "환불 내역 없음")
+    })
+    @GetMapping("/{refundId}")
+    public ResponseEntity<RefundDetailResponse> getRefundDetail(
+        @RequestHeader("X-User-Id") UUID userId,
+        @PathVariable UUID refundId
+    ) {
+        return ResponseEntity.ok(refundService.getRefundDetail(userId, refundId));
     }
 
     @PostMapping("/pg/{ticketId}")

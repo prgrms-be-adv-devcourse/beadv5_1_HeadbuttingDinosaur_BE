@@ -20,4 +20,6 @@ public interface RefundJpaRepository extends JpaRepository<Refund, Long> {
     Optional<Integer> sumCompletedRefundAmountByPaymentId(@Param("paymentId") Long paymentId);
 
     Page<Refund> findByUserId(UUID userId, Pageable pageable);
+
+    Optional<Refund> findByRefundId(UUID refundId);
 }
