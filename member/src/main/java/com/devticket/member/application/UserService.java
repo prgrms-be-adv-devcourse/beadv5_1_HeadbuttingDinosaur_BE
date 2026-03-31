@@ -164,6 +164,10 @@ public class UserService {
             .orElseThrow(() -> new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND));
     }
 
+    public List<TechStack> getAllTechStacks() {
+        return techStackRepository.findAll();
+    }
+
     // ========== 유틸 ==========
 
     private Position parsePosition(String position) {
