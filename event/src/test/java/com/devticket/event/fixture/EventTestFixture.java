@@ -106,7 +106,7 @@ public class EventTestFixture {
             20,
             0,
             50000,
-            20 * 50000
+            (long) 20 * 50000
         );
     }
 

@@ -38,4 +38,10 @@ public interface EventRepository extends JpaRepository<Event, Long>, EventReposi
     @Query("SELECT e FROM Event e WHERE e.id IN :ids ORDER BY e.id ASC")
     List<Event> findAllByIdInWithLock(@Param("ids") List<Long> ids);
 
+    // 공개 API - 목록 조회용 이미지 배치 로딩 (N+1 쿼리 제거)
+    @Query("SELECT DISTINCT e FROM Event e " +
+        "LEFT JOIN FETCH e.eventImages " +
+        "WHERE e.eventId IN :eventIds")
+    List<Event> findEventImagesByEventIdIn(@Param("eventIds") List<UUID> eventIds);
+
 }

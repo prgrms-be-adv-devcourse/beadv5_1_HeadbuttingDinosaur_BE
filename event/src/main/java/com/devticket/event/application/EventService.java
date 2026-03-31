@@ -152,13 +152,26 @@ public class EventService {
 
         List<Event> hydratedEvents = pageEventIds.isEmpty()
             ? List.of()
-            : eventRepository.findAllWithDetailsByEventIdIn(pageEventIds);
+            : eventRepository.findAllWithDetailsByEventIdIn(pageEventIds);  // techStacks
 
+        List<Event> imageEvents = pageEventIds.isEmpty()
+            ? List.of()
+            : eventRepository.findEventImagesByEventIdIn(pageEventIds);  // images
+
+        // 두 결과를 합치기
         Map<UUID, Event> hydratedById = hydratedEvents.stream()
             .collect(Collectors.toMap(Event::getEventId, e -> e));
 
+        Map<UUID, Event> imagesById = imageEvents.stream()
+            .collect(Collectors.toMap(Event::getEventId, e -> e));
+
+        // EventListContentResponse 생성 시 image-hydrated 엔티티 사용
         List<EventListContentResponse> content = eventPage.getContent().stream()
-            .map(e -> EventListContentResponse.from(hydratedById.getOrDefault(e.getEventId(), e)))
+            .map(e -> {
+                Event hydrated = hydratedById.getOrDefault(e.getEventId(), e);
+                Event withImages = imagesById.getOrDefault(e.getEventId(), hydrated);
+                return EventListContentResponse.from(withImages);
+            })
             .toList();
 
         return new EventListResponse(

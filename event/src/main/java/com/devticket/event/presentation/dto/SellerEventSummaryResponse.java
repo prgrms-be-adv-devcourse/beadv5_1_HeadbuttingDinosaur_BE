@@ -15,7 +15,7 @@ public record SellerEventSummaryResponse(
     Integer soldQuantity,
     Integer cancelledQuantity,
     Integer price,
-    Integer totalSalesAmount
+    Long totalSalesAmount
 ) {
     public static SellerEventSummaryResponse from(Event event) {
         int soldQuantity = event.getTotalQuantity() - event.getRemainingQuantity();
@@ -29,7 +29,7 @@ public record SellerEventSummaryResponse(
             soldQuantity,
             event.getCancelledQuantity(),
             event.getPrice(),
-            soldQuantity * event.getPrice()
+            (long) soldQuantity * event.getPrice()
         );
     }
 }
