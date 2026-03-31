@@ -6,11 +6,10 @@ import org.springframework.data.domain.Page;
 
 public record EventListResponse(
     List<EventListContentResponse> content,
-    int pageNumber,
-    int pageSize,
+    int page,
+    int size,
     long totalElements,
-    int totalPages,
-    boolean isLast
+    int totalPages
 ) {
     public static EventListResponse of(Page<Event> page) {
         List<EventListContentResponse> content = page.getContent().stream()
@@ -22,8 +21,7 @@ public record EventListResponse(
             page.getNumber(),
             page.getSize(),
             page.getTotalElements(),
-            page.getTotalPages(),
-            page.isLast()
+            page.getTotalPages()
         );
     }
 }

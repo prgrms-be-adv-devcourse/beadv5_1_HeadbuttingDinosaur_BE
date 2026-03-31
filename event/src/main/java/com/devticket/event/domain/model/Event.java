@@ -26,7 +26,7 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.SQLRestriction;
 
 @Entity
-@Table(name = "events")
+@Table(name = "events", schema = "event")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @SQLRestriction("deleted_at IS NULL") // Soft Delete: 조회 시 삭제된 데이터 제외
@@ -71,6 +71,9 @@ public class Event extends BaseEntity {
 
     @Column(nullable = false)
     private Integer remainingQuantity;
+
+    @Column(nullable = false)
+    private Integer cancelledQuantity = 0;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

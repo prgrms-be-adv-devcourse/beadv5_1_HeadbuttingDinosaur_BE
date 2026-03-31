@@ -9,22 +9,27 @@ public record SellerEventSummaryResponse(
     UUID eventId,
     String title,
     EventStatus status,
-    Integer totalQuantity,
-    Integer soldQuantity,
-    Integer remainingQuantity,
     LocalDateTime saleEndAt,
-    LocalDateTime eventDateTime
+    Integer totalQuantity,
+    Integer remainingQuantity,
+    Integer soldQuantity,
+    Integer cancelledQuantity,
+    Integer price,
+    Long totalSalesAmount
 ) {
     public static SellerEventSummaryResponse from(Event event) {
+        int soldQuantity = event.getTotalQuantity() - event.getRemainingQuantity();
         return new SellerEventSummaryResponse(
             event.getEventId(),
             event.getTitle(),
             event.getStatus(),
-            event.getTotalQuantity(),
-            event.getTotalQuantity() - event.getRemainingQuantity(),
-            event.getRemainingQuantity(),
             event.getSaleEndAt(),
-            event.getEventDateTime()
+            event.getTotalQuantity(),
+            event.getRemainingQuantity(),
+            soldQuantity,
+            event.getCancelledQuantity(),
+            event.getPrice(),
+            (long) soldQuantity * event.getPrice()
         );
     }
 }
