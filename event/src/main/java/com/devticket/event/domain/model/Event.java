@@ -72,6 +72,9 @@ public class Event extends BaseEntity {
     @Column(nullable = false)
     private Integer remainingQuantity;
 
+    @Column(nullable = false)
+    private Integer cancelledQuantity = 0;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private EventStatus status;

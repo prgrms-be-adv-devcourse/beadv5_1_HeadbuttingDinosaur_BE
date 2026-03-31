@@ -2,6 +2,7 @@ package com.devticket.event.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -136,7 +137,7 @@ class EventServiceTest {
         Event event = EventTestFixture.createEvent(sellerId);
         UUID eventId = event.getEventId();
 
-        when(eventRepository.findByEventId(eventId)).thenReturn(Optional.of(event));
+        when(eventRepository.findWithDetailsByEventId(eventId)).thenReturn(Optional.of(event));
 
         // when
         EventDetailResponse response = eventService.getEvent(eventId);
@@ -144,14 +145,14 @@ class EventServiceTest {
         // then
         assertThat(response.eventId()).isEqualTo(eventId);
         assertThat(response.title()).isEqualTo("상세 조회 테스트 밋업");
-        verify(eventRepository).findByEventId(eventId);
+        verify(eventRepository).findWithDetailsByEventId(eventId);
     }
 
     @Test
     void 존재하지_않는_이벤트_조회시_예외가_발생한다() {
         // given
         UUID invalidEventId = UUID.randomUUID(); // 아무 UUID나 생성
-        when(eventRepository.findByEventId(invalidEventId)).thenReturn(Optional.empty());
+        when(eventRepository.findWithDetailsByEventId(invalidEventId)).thenReturn(Optional.empty());
 
         // when & then
         assertThatThrownBy(() -> eventService.getEvent(invalidEventId))
@@ -175,6 +176,7 @@ class EventServiceTest {
         given(eventRepository.searchEvents(
             eq("스프링"), eq(EventCategory.MEETUP), eq(List.of(1L, 2L)), isNull(), eq(publicStatuses), eq(pageable)
         )).willReturn(mockPage);
+        given(eventRepository.findAllWithDetailsByEventIdIn(anyList())).willReturn(mockPage.getContent());
 
         // when (currentUserId는 일반 조회이므로 null로 전달)
         EventListResponse response = eventService.getEventList(request, null, pageable);
@@ -241,6 +243,7 @@ class EventServiceTest {
         // 파라미터가 해체되어 전달됨을 검증
         when(eventRepository.searchEvents("스프링", EventCategory.MEETUP, List.of(1L, 2L), null, publicStatuses, pageable))
             .thenReturn(mockPage);
+        when(eventRepository.findAllWithDetailsByEventIdIn(anyList())).thenReturn(mockPage.getContent());
 
         // when (currentUserId가 null)
         EventListResponse response = eventService.getEventList(request, null, pageable);
@@ -257,8 +260,10 @@ class EventServiceTest {
         EventListRequest request = new EventListRequest(null, null, null, sellerId, null);
         Pageable pageable = PageRequest.of(0, 20);
 
+        Page<Event> mockPage = EventTestFixture.createEventPage();
         when(eventRepository.searchEvents(null, null, null, sellerId, null, pageable))
-            .thenReturn(EventTestFixture.createEventPage());
+            .thenReturn(mockPage);
+        when(eventRepository.findAllWithDetailsByEventIdIn(anyList())).thenReturn(mockPage.getContent());
 
         // when (currentUserId와 request의 sellerId가 일치함)
         EventListResponse response = eventService.getEventList(request, sellerId, pageable);
@@ -275,8 +280,10 @@ class EventServiceTest {
         EventListRequest request = new EventListRequest(null, null, null, sellerId, EventStatus.DRAFT);
         Pageable pageable = PageRequest.of(0, 20);
 
+        Page<Event> mockPage = EventTestFixture.createEventPage();
         when(eventRepository.searchEvents(null, null, null, sellerId, List.of(EventStatus.DRAFT), pageable))
-            .thenReturn(EventTestFixture.createEventPage());
+            .thenReturn(mockPage);
+        when(eventRepository.findAllWithDetailsByEventIdIn(anyList())).thenReturn(mockPage.getContent());
 
         // when
         EventListResponse response = eventService.getEventList(request, sellerId, pageable);

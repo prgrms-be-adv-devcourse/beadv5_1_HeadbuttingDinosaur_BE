@@ -44,9 +44,15 @@ public class EventTestFixture {
 
     public static EventDetailResponse createEventDetailResponse(UUID eventId) {
         return new EventDetailResponse(
-            eventId, "상세 조회 테스트 밋업", "설명", "강남역",
+            eventId,
+            UUID.randomUUID(),
+            "상세 조회 테스트 밋업", "설명", "강남역",
             LocalDateTime.now().plusDays(15), LocalDateTime.now().plusDays(4), LocalDateTime.now().plusDays(10),
-            50000, 100, 4, EventCategory.MEETUP
+            50000, 100, 100, 4,
+            EventStatus.ON_SALE,
+            EventCategory.MEETUP,
+            List.of(),
+            List.of()
         );
     }
 
@@ -94,11 +100,13 @@ public class EventTestFixture {
             eventId,
             "상세 조회 테스트 밋업",
             EventStatus.ON_SALE,
-            100,
-            20,
-            80,
             LocalDateTime.now().plusDays(10),
-            LocalDateTime.now().plusDays(15)
+            100,
+            80,
+            20,
+            0,
+            50000,
+            20 * 50000
         );
     }
 

@@ -7,12 +7,14 @@ import java.util.UUID;
 
 public record SellerEventCreateResponse(
     UUID eventId,
+    UUID sellerId,
     EventStatus status,
     LocalDateTime createdAt
 ) {
     public static SellerEventCreateResponse from(Event event) {
         return new SellerEventCreateResponse(
             event.getEventId(),
+            event.getSellerId(),
             event.getStatus(),
             event.getCreatedAt()
         );

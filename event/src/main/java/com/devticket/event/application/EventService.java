@@ -8,6 +8,7 @@ import com.devticket.event.domain.model.EventImage;
 import com.devticket.event.domain.model.EventTechStack;
 import com.devticket.event.infrastructure.persistence.EventRepository;
 import com.devticket.event.presentation.dto.EventDetailResponse;
+import com.devticket.event.presentation.dto.EventListContentResponse;
 import com.devticket.event.presentation.dto.EventListRequest;
 import com.devticket.event.presentation.dto.EventListResponse;
 import com.devticket.event.presentation.dto.SellerEventCreateRequest;
@@ -21,6 +22,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -105,7 +107,7 @@ public class EventService {
     @Transactional(readOnly = true)
     public EventDetailResponse getEvent(UUID eventId) {
 
-        Event event = eventRepository.findByEventId(eventId)
+        Event event = eventRepository.findWithDetailsByEventId(eventId)
             .orElseThrow(() -> new BusinessException(EventErrorCode.EVENT_NOT_FOUND));
 
         return EventDetailResponse.from(event);
@@ -143,7 +145,29 @@ public class EventService {
             pageable
         );
 
-        return EventListResponse.of(eventPage);
+        // 4. N+1 방지: 페이지 이벤트 ID로 컬렉션 일괄 로드
+        List<UUID> pageEventIds = eventPage.getContent().stream()
+            .map(Event::getEventId)
+            .toList();
+
+        List<Event> hydratedEvents = pageEventIds.isEmpty()
+            ? List.of()
+            : eventRepository.findAllWithDetailsByEventIdIn(pageEventIds);
+
+        Map<UUID, Event> hydratedById = hydratedEvents.stream()
+            .collect(Collectors.toMap(Event::getEventId, e -> e));
+
+        List<EventListContentResponse> content = eventPage.getContent().stream()
+            .map(e -> EventListContentResponse.from(hydratedById.getOrDefault(e.getEventId(), e)))
+            .toList();
+
+        return new EventListResponse(
+            content,
+            eventPage.getNumber(),
+            eventPage.getSize(),
+            eventPage.getTotalElements(),
+            eventPage.getTotalPages()
+        );
     }
 
     @Transactional(readOnly = true)

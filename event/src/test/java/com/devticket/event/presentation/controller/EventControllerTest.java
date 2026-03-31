@@ -66,6 +66,7 @@ class EventControllerTest {
 
         SellerEventCreateResponse expectedResponse = new SellerEventCreateResponse(
             expectedEventId,
+            sellerId,
             EventStatus.ON_SALE,
             now
         );

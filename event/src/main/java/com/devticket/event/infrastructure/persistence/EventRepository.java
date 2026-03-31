@@ -22,6 +22,11 @@ public interface EventRepository extends JpaRepository<Event, Long>, EventReposi
         "WHERE e.eventId = :eventId")
     Optional<Event> findWithDetailsByEventId(@Param("eventId") UUID eventId);
 
+    @Query("SELECT DISTINCT e FROM Event e " +
+        "LEFT JOIN FETCH e.eventTechStacks " +
+        "WHERE e.eventId IN :eventIds")
+    List<Event> findAllWithDetailsByEventIdIn(@Param("eventIds") List<UUID> eventIds);
+
     // 내부 API
     List<Event> findAllByIdIn(List<Long> ids);
 
