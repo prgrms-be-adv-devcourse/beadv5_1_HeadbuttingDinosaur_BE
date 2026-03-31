@@ -17,10 +17,21 @@ import com.devticket.commerce.order.infrastructure.external.client.OrderToEventC
 import com.devticket.commerce.order.infrastructure.external.client.dto.InternalBulkStockAdjustmentRequest;
 import com.devticket.commerce.order.infrastructure.external.client.dto.InternalStockAdjustmentResponse;
 import com.devticket.commerce.order.presentation.dto.req.CartOrderRequest;
+import com.devticket.commerce.order.presentation.dto.res.InternalOrderItemResponse;
+import com.devticket.commerce.order.presentation.dto.req.OrderListRequest;
 import com.devticket.commerce.order.presentation.dto.res.InternalSettlementDataResponse;
+
 import com.devticket.commerce.order.presentation.dto.res.OrderCancelResponse;
+
+import com.devticket.commerce.order.presentation.dto.res.OrderDetailResponse;
+import com.devticket.commerce.order.presentation.dto.res.OrderListResponse;
+
 import com.devticket.commerce.order.presentation.dto.res.OrderResponse;
 import com.devticket.commerce.ticket.application.usecase.TicketUsecase;
+import com.devticket.commerce.ticket.domain.exception.TicketErrorCode;
+import com.devticket.commerce.ticket.domain.model.Ticket;
+import com.devticket.commerce.ticket.domain.repository.TicketRepository;
+import com.devticket.commerce.ticket.infrastructure.external.client.dto.InternalEventInfoResponse;
 import com.devticket.commerce.ticket.presentation.dto.req.TicketRequest;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -30,6 +41,9 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,6 +57,7 @@ public class OrderService implements OrderUsecase {
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final TicketUsecase ticketUsecase;
+    private final TicketRepository ticketRepository;
 
     // ==== Public Methods (Main Flow) ====================================
 
@@ -82,6 +97,42 @@ public class OrderService implements OrderUsecase {
                 InternalBulkStockAdjustmentRequest.createForCancel(cartItems));
             throw new BusinessException(OrderErrorCode.ORDER_CREATION_FAILED);
         }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public OrderDetailResponse getOrderDetail(UUID userId, UUID orderId) {
+        Order order = orderRepository.findByOrderId(orderId)
+            .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
+
+        if (!order.getUserId().equals(userId)) {
+            throw new BusinessException(OrderErrorCode.ORDER_FORBIDDEN);
+        }
+
+        List<OrderItem> orderItems = orderItemRepository.findAllByOrderId(order.getId());
+
+        List<Long> eventIds = orderItems.stream()
+            .map(OrderItem::getEventId)
+            .distinct()
+            .toList();
+
+        Map<Long, String> eventTitles = orderToEventClient.getBulkEventInfo(eventIds).stream()
+            .collect(Collectors.toMap(InternalEventInfoResponse::id, InternalEventInfoResponse::eventTitle));
+
+        return OrderDetailResponse.of(order, orderItems, eventTitles);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public OrderListResponse getOrderList(UUID userId, OrderListRequest request) {
+        OrderStatus status = (request.status() != null && !request.status().isBlank())
+            ? OrderStatus.valueOf(request.status())
+            : null;
+
+        PageRequest pageable = PageRequest.of(request.page() - 1, request.size(), Sort.by("id").descending());
+        Page<Order> orderPage = orderRepository.findAllByUserId(userId, status, pageable);
+
+        return OrderListResponse.of(orderPage);
     }
 
     @Override
@@ -292,6 +343,17 @@ public class OrderService implements OrderUsecase {
         return orderItemRepository.saveAll(orderItems);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public InternalOrderItemResponse getOrderItemByTicketId(Long ticketId) {
+        Ticket ticket = ticketRepository.findById(ticketId)
+            .orElseThrow(() -> new BusinessException(TicketErrorCode.TICKET_NOT_FOUND));
+
+        OrderItem orderItem = orderItemRepository.findByOrderItemId(ticket.getOrderItemId())
+            .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
+
+        return InternalOrderItemResponse.from(orderItem);
+    }
 
 }
 
