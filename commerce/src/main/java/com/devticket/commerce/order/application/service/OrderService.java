@@ -17,8 +17,8 @@ import com.devticket.commerce.order.infrastructure.external.client.OrderToEventC
 import com.devticket.commerce.order.infrastructure.external.client.dto.InternalBulkStockAdjustmentRequest;
 import com.devticket.commerce.order.infrastructure.external.client.dto.InternalStockAdjustmentResponse;
 import com.devticket.commerce.order.presentation.dto.req.CartOrderRequest;
-import com.devticket.commerce.order.presentation.dto.res.InternalOrderItemResponse;
 import com.devticket.commerce.order.presentation.dto.req.OrderListRequest;
+import com.devticket.commerce.order.presentation.dto.res.InternalOrderItemResponse;
 import com.devticket.commerce.order.presentation.dto.res.InternalSettlementDataResponse;
 import com.devticket.commerce.order.presentation.dto.res.OrderDetailResponse;
 import com.devticket.commerce.order.presentation.dto.res.OrderListResponse;
@@ -113,7 +113,7 @@ public class OrderService implements OrderUsecase {
             .toList();
 
         Map<Long, String> eventTitles = orderToEventClient.getBulkEventInfo(eventIds).stream()
-            .collect(Collectors.toMap(InternalEventInfoResponse::id, InternalEventInfoResponse::eventTitle));
+            .collect(Collectors.toMap(InternalEventInfoResponse::id, InternalEventInfoResponse::title));
 
         return OrderDetailResponse.of(order, orderItems, eventTitles);
     }

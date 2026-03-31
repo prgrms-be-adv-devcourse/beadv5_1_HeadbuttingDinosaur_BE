@@ -91,7 +91,7 @@ public class TicketService implements TicketUsecase {
                 // 단건 이벤트 정보 조회
                 InternalEventInfoResponse event = ticketToEventClient.getSingleEventInfo(ticket.getEventId());
                 // 응답DTO 구성(ticket + event)
-                return TicketDetailResponse.of(ticket, event.eventTitle(), event.eventDateTime());
+                return TicketDetailResponse.of(ticket, event.title(), event.eventDateTime());
             });
     }
 
@@ -123,7 +123,7 @@ public class TicketService implements TicketUsecase {
     public SellerEventParticipantListResponse getParticipantList(UUID userId, Long eventId,
         SellerEventParticipantListRequest request) {
         // 0단계 : 사용자 소유권 검증
-        InternalEventInfoResponse eventInfo = ticketToEventClient.getEventInfo(eventId);
+        InternalEventInfoResponse eventInfo = ticketToEventClient.getSingleEventInfo(eventId);
         if (eventInfo.sellerId().equals(userId)) {
             throw new BusinessException(TicketErrorCode.UNAUTHORIZED_EVENT_ACCESS);
         }
