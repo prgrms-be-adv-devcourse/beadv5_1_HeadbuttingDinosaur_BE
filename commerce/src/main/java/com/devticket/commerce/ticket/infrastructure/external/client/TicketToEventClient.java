@@ -24,15 +24,18 @@ public class TicketToEventClient {
     }
 
     // 이벤트 정보 조회(단건)
-    public InternalEventInfoResponse getEventInfo(Long eventId) {
+    public InternalEventInfoResponse getSingleEventInfo(Long eventId) {
         try {
-            log.info("[TicketToEventClient] getEventInfo - ID: {}", eventId);
+            log.info("[TicketToEventClient] getSingleEventInfo - ID: {}", eventId);
 
             return restClient.get() // 단건 조희는 GET 권장 (서버 설정에 따라 PATCH/POST 가능)
                 .uri("/internal/events/{eventId}", eventId)
                 .accept(MediaType.APPLICATION_JSON)
                 .retrieve()
                 .onStatus(HttpStatusCode::isError, (req, res) -> {
+                    String errorDetail = new String(res.getBody().readAllBytes());
+                    log.error("[TicketToEventClient] API Error! Status: {}, Body: {}", res.getStatusCode(),
+                        errorDetail);
                     log.error("[TicketToEventClient] External API Error: Status {}", res.getStatusCode());
                     throw new BusinessException(CommonErrorCode.EXTERNAL_SERVICE_ERROR);
                 })
@@ -70,5 +73,6 @@ public class TicketToEventClient {
             throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
         }
     }
+
 }
 
