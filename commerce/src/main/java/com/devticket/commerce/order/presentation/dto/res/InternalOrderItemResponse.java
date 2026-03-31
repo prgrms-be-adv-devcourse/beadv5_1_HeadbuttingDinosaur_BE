@@ -6,7 +6,7 @@ import java.util.UUID;
 import lombok.Builder;
 
 @Builder
-public record OrderItemResponse(
+public record InternalOrderItemResponse(
     Long id,
     UUID orderItemId,
     Long orderId,
@@ -19,8 +19,8 @@ public record OrderItemResponse(
     LocalDateTime updatedAt
 ) {
 
-    public static OrderItemResponse from(OrderItem orderItem) {
-        return OrderItemResponse.builder()
+    public static InternalOrderItemResponse from(OrderItem orderItem) {
+        return InternalOrderItemResponse.builder()
             .id(orderItem.getId())
             .orderItemId(orderItem.getOrderItemId())
             .orderId(orderItem.getOrderId())
