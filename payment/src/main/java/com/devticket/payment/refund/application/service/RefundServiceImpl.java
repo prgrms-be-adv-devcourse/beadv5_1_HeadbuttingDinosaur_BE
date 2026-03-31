@@ -18,6 +18,7 @@ import com.devticket.payment.refund.domain.model.Refund;
 import com.devticket.payment.refund.domain.repository.RefundRepository;
 import com.devticket.payment.refund.infrastructure.client.EventInternalClient;
 import com.devticket.payment.refund.infrastructure.client.dto.InternalEventInfoResponse;
+import com.devticket.payment.refund.presentation.dto.RefundDetailResponse;
 import com.devticket.payment.refund.presentation.dto.RefundInfoResponse;
 import com.devticket.payment.refund.presentation.dto.RefundListItemResponse;
 import com.devticket.payment.refund.presentation.dto.PgRefundRequest;
@@ -217,6 +218,16 @@ public class RefundServiceImpl implements RefundService {
     public Page<RefundListItemResponse> getRefundList(UUID userId, Pageable pageable) {
         return refundRepository.findByUserId(userId, pageable)
             .map(RefundListItemResponse::from);
+    }
+
+    @Override
+    public RefundDetailResponse getRefundDetail(UUID userId, UUID refundId) {
+        Refund refund = refundRepository.findByRefundId(refundId)
+            .orElseThrow(() -> new RefundException(RefundErrorCode.REFUND_NOT_FOUND));
+        validateOrderOwner(refund.getUserId(), userId);
+        Payment payment = paymentRepository.findById(refund.getPaymentId())
+            .orElseThrow(() -> new RefundException(RefundErrorCode.PAYMENT_NOT_FOUND));
+        return RefundDetailResponse.of(refund, payment.getPaymentMethod().name());
     }
 
     private LocalDateTime parseCanceledAt(String canceledAt) {

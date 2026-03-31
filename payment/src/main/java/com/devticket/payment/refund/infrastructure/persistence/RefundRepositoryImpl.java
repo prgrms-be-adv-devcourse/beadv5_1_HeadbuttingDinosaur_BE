@@ -2,6 +2,7 @@ package com.devticket.payment.refund.infrastructure.persistence;
 
 import com.devticket.payment.refund.domain.model.Refund;
 import com.devticket.payment.refund.domain.repository.RefundRepository;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -28,5 +29,10 @@ public class RefundRepositoryImpl implements RefundRepository {
     @Override
     public Page<Refund> findByUserId(UUID userId, Pageable pageable) {
         return refundJpaRepository.findByUserId(userId, pageable);
+    }
+
+    @Override
+    public Optional<Refund> findByRefundId(UUID refundId) {
+        return refundJpaRepository.findByRefundId(refundId);
     }
 }

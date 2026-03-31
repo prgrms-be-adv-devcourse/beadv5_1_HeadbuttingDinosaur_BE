@@ -1,5 +1,6 @@
 package com.devticket.payment.refund.application.service;
 
+import com.devticket.payment.refund.presentation.dto.RefundDetailResponse;
 import com.devticket.payment.refund.presentation.dto.RefundInfoResponse;
 import com.devticket.payment.refund.presentation.dto.RefundListItemResponse;
 import com.devticket.payment.refund.presentation.dto.PgRefundRequest;
@@ -12,4 +13,5 @@ public interface RefundService {
     RefundInfoResponse getRefundInfo(UUID userId, String ticketId);
     PgRefundResponse refundPgTicket(UUID userId, String ticketId, PgRefundRequest request);
     Page<RefundListItemResponse> getRefundList(UUID userId, Pageable pageable);
+    RefundDetailResponse getRefundDetail(UUID userId, UUID refundId);
 }
