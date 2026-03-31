@@ -6,8 +6,12 @@ import com.devticket.commerce.order.presentation.dto.req.CartOrderRequest;
 import com.devticket.commerce.order.presentation.dto.req.OrderListRequest;
 import com.devticket.commerce.order.presentation.dto.res.InternalOrderItemResponse;
 import com.devticket.commerce.order.presentation.dto.res.InternalSettlementDataResponse;
+
+import com.devticket.commerce.order.presentation.dto.res.OrderCancelResponse;
+
 import com.devticket.commerce.order.presentation.dto.res.OrderDetailResponse;
 import com.devticket.commerce.order.presentation.dto.res.OrderListResponse;
+
 import com.devticket.commerce.order.presentation.dto.res.OrderResponse;
 import java.util.UUID;
 
@@ -37,5 +41,8 @@ public interface OrderUsecase {
     void completeRefund(Long ticketId);
 
     //InternalEventOrdersResponse getOrdersByEvent(Long eventId, String status);
+
+    // 결제 전 주문 취소
+    OrderCancelResponse cancelOrder(UUID userId, UUID orderId);
 }
 
