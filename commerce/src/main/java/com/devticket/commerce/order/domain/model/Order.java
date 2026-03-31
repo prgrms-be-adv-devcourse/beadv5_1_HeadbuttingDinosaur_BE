@@ -141,6 +141,14 @@ public class Order extends BaseEntity {
         this.status = OrderStatus.CANCELLED;
     }
 
+    //주문 상태 변경 : 결제실패 FAILED
+    public void failPayment() {
+        if (this.status == OrderStatus.PAID) {
+            throw new BusinessException(OrderErrorCode.ALREADY_PAID_ORDER);
+        }
+        this.status = OrderStatus.FAILED;
+    }
+
     //-------------------
     private static void validateTotalAmount(int totalAmount) {
         if (totalAmount <= 0) {
