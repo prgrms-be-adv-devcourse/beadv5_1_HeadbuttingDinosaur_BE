@@ -2,6 +2,7 @@ package com.devticket.commerce.mock.controller;
 
 import com.devticket.commerce.cart.infrastructure.external.client.dto.InternalPurchaseValidationResponse;
 import com.devticket.commerce.order.infrastructure.external.client.dto.InternalBulkStockAdjustmentRequest;
+import com.devticket.commerce.order.infrastructure.external.client.dto.InternalSellerEventsByPeriodRequest;
 import com.devticket.commerce.order.infrastructure.external.client.dto.InternalStockAdjustmentRequest;
 import com.devticket.commerce.order.infrastructure.external.client.dto.InternalStockAdjustmentResponse;
 import com.devticket.commerce.ticket.infrastructure.external.client.dto.InternalBulkEventInfoRequest;
@@ -119,6 +120,42 @@ public class MockEventController {
                 "2026-06-20T19:30:00",
                 "2026-05-01T00:00:00",
                 "2026-06-19T23:59:59"
+            )
+        );
+    }
+
+    @PostMapping("/seller-period")
+    public List<InternalEventInfoResponse> mockGetSellerEventsByPeriod(
+        @RequestBody InternalSellerEventsByPeriodRequest request
+    ) {
+        return List.of(
+            new InternalEventInfoResponse(
+                15L,
+                UUID.fromString("1d7f4d4a-1c6b-4aa2-b49e-8ed2fdb10001"),
+                "Spring 밋업 (Mock)",
+                30000,
+                "ON_SALE",
+                "MEETUP",
+                50,
+                4,
+                23,
+                "2026-04-01T14:00:00",
+                "2026-03-01T00:00:00",
+                "2026-03-31T23:59:59"
+            ),
+            new InternalEventInfoResponse(
+                102L,
+                UUID.fromString("48e57d51-0d3f-4404-8c4e-f9d7ef710002"),
+                "Java 컨퍼런스 (Mock)",
+                30000,
+                "ON_SALE",
+                "CONFERENCE",
+                100,
+                4,
+                50,
+                "2026-05-15T10:00:00",
+                "2026-04-01T00:00:00",
+                "2026-05-14T23:59:59"
             )
         );
     }
