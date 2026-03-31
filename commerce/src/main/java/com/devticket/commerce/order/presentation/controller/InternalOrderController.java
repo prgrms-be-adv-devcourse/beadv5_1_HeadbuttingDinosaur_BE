@@ -10,6 +10,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -66,6 +67,13 @@ public class InternalOrderController {
     public ResponseEntity<InternalOrderItemResponse> getOrderItemByTicketId(@PathVariable Long ticketId) {
         InternalOrderItemResponse response = orderUsecase.getOrderItemByTicketId(ticketId);
         return ResponseEntity.ok(response);
+    }
+
+    //Refund -> Commerce : 환불 완료 후 ticket.status REFUNDED 변경 + orderItem.deletedAt 기록
+    @PatchMapping("/tickets/{ticketId}/refund-completed")
+    public ResponseEntity<Void> completeRefund(@PathVariable Long ticketId) {
+        orderUsecase.completeRefund(ticketId);
+        return ResponseEntity.ok().build();
     }
 
 }

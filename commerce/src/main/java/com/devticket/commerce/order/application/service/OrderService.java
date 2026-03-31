@@ -329,6 +329,32 @@ public class OrderService implements OrderUsecase {
         return InternalOrderItemResponse.from(orderItem);
     }
 
+ㅊ    @Override
+    @Transactional
+    public void completeRefund(Long ticketId) {
+        // 1. 티켓 조회 후 REFUNDED 상태 변경
+        Ticket ticket = ticketRepository.findById(ticketId)
+            .orElseThrow(() -> new BusinessException(TicketErrorCode.TICKET_NOT_FOUND));
+        ticket.refundTicket();
+
+        // 2. OrderItem 수량 -1, subtotalAmount 재계산
+        OrderItem orderItem = orderItemRepository.findByOrderItemId(ticket.getOrderItemId())
+            .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
+        orderItem.refundOneQuantity();
+
+        // 3. Order totalAmount에서 환불 금액(price * 1) 차감
+        Order order = orderRepository.findById(orderItem.getOrderId())
+            .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
+        order.adjustAmountForRefund(orderItem.getPrice());
+
+        // 4. Event 재고 +1 복구
+        orderToEventClient.adjustStocks(
+            new InternalBulkStockAdjustmentRequest(
+                List.of(new InternalBulkStockAdjustmentRequest.EventItem(orderItem.getEventId(), 1))
+            )
+        );
+    }
+
 }
 
 

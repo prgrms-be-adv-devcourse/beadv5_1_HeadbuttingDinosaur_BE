@@ -19,5 +19,6 @@ public interface TicketRepository {
     List<Ticket> saveAll(List<Ticket> ticketList);
 
     Optional<Ticket> findByTicketId(UUID ticketId);
+
     Page<Ticket> findAllByEventId(Long eventId, SellerEventParticipantListRequest request);
 }
