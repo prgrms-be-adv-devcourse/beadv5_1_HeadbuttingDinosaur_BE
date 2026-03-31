@@ -8,6 +8,7 @@ import com.devticket.commerce.order.domain.model.OrderItem;
 import com.devticket.commerce.order.domain.repository.OrderItemRepository;
 import com.devticket.commerce.order.domain.repository.OrderRepository;
 import com.devticket.commerce.ticket.application.usecase.TicketUsecase;
+import com.devticket.commerce.ticket.domain.exception.TicketErrorCode;
 import com.devticket.commerce.ticket.domain.model.Ticket;
 import com.devticket.commerce.ticket.domain.repository.TicketRepository;
 import com.devticket.commerce.ticket.infrastructure.external.client.TicketToEventClient;
@@ -71,7 +72,7 @@ public class TicketService implements TicketUsecase {
                 return new TicketDetailResponse(
                     ticket.getId(),
                     ticket.getEventId(),
-                    event != null ? event.eventTitle() : "정보 없음",
+                    event != null ? event.title() : "정보 없음",
                     event != null ? event.eventDateTime() : null,
                     ticket.getStatus().name()
                 );
@@ -108,6 +109,11 @@ public class TicketService implements TicketUsecase {
 
     public SellerEventParticipantListResponse getParticipantList(UUID userId, Long eventId,
         SellerEventParticipantListRequest request) {
+        // 0단계 : 사용자 소유권 검증
+        InternalEventInfoResponse eventInfo = ticketToEventClient.getEventInfo(eventId);
+        if (eventInfo.sellerId().equals(userId)) {
+            throw new BusinessException(TicketErrorCode.UNAUTHORIZED_EVENT_ACCESS);
+        }
 
         // 1단계: eventId로 티켓 목록 조회 (페이징)
         Page<Ticket> ticketPage = ticketRepository.findAllByEventId(eventId, request);
