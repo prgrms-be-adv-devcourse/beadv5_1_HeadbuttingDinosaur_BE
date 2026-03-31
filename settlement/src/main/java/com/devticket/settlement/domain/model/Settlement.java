@@ -65,7 +65,7 @@ public class Settlement extends BaseEntity {
     @Builder
     public Settlement(Long id, UUID settlementId, UUID sellerId, LocalDateTime periodStartAt, LocalDateTime periodEndAt,
         Integer totalSalesAmount, Integer totalRefundAmount, Integer totalFeeAmount, Integer finalSettlementAmount,
-        SettlementStatus status) {
+        SettlementStatus status, LocalDateTime settledAt) {
         this.id = id;
         this.settlementId = (settlementId != null) ? settlementId : UUID.randomUUID();
         this.sellerId = sellerId;
@@ -76,6 +76,7 @@ public class Settlement extends BaseEntity {
         this.totalFeeAmount = totalFeeAmount;
         this.finalSettlementAmount = finalSettlementAmount;
         this.status = (status != null) ? status : SettlementStatus.PENDING;
+        this.settledAt = settledAt;
     }
 
 
