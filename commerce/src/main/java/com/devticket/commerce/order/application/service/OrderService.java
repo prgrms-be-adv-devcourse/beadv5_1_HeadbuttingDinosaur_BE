@@ -18,6 +18,7 @@ import com.devticket.commerce.order.infrastructure.external.client.dto.InternalB
 import com.devticket.commerce.order.infrastructure.external.client.dto.InternalStockAdjustmentResponse;
 import com.devticket.commerce.order.presentation.dto.req.CartOrderRequest;
 import com.devticket.commerce.order.presentation.dto.res.InternalSettlementDataResponse;
+import com.devticket.commerce.order.presentation.dto.res.OrderCancelResponse;
 import com.devticket.commerce.order.presentation.dto.res.OrderResponse;
 import com.devticket.commerce.ticket.application.usecase.TicketUsecase;
 import com.devticket.commerce.ticket.presentation.dto.req.TicketRequest;
@@ -212,6 +213,28 @@ public class OrderService implements OrderUsecase {
             log.error("[Settlement Debug] 에러 발생 원인: ", e);
             throw e;
         }
+    }
+
+    // 결제 전 주문 취소
+    @Override
+    public OrderCancelResponse cancelOrder(UUID userId, UUID orderId) {
+        // 1. 주문 정보 확인
+        Order order = orderRepository.findByOrderId(orderId)
+            .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
+        // 2. 주문자 검증
+        if (!order.getUserId().equals(userId)) {
+            throw new BusinessException(OrderErrorCode.ORDER_FORBIDDEN);
+        }
+        // 3. 결제 상태 체크
+        if (order.getStatus().equals(OrderStatus.PAID)) {
+            throw new BusinessException(OrderErrorCode.ALREADY_PAID_ORDER);
+        }
+        // 4. 주문 취소
+        order.cancel();
+
+        orderRepository.save(order);
+
+        return OrderCancelResponse.of(order);
     }
 
 //    @Override

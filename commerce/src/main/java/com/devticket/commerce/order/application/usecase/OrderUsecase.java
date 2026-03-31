@@ -4,6 +4,7 @@ import com.devticket.commerce.mock.controller.dto.InternalOrderInfoResponse;
 import com.devticket.commerce.mock.controller.dto.InternalOrderItemsResponse;
 import com.devticket.commerce.order.presentation.dto.req.CartOrderRequest;
 import com.devticket.commerce.order.presentation.dto.res.InternalSettlementDataResponse;
+import com.devticket.commerce.order.presentation.dto.res.OrderCancelResponse;
 import com.devticket.commerce.order.presentation.dto.res.OrderResponse;
 import java.util.UUID;
 
@@ -21,5 +22,8 @@ public interface OrderUsecase {
     InternalSettlementDataResponse getSettelmentData(UUID sellerId, String periodStart, String periodEnd);
 
     //InternalEventOrdersResponse getOrdersByEvent(Long eventId, String status);
+
+    // 결제 전 주문 취소
+    OrderCancelResponse cancelOrder(UUID userId, UUID orderId);
 }
 

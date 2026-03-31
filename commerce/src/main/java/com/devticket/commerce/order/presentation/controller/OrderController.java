@@ -2,6 +2,7 @@ package com.devticket.commerce.order.presentation.controller;
 
 import com.devticket.commerce.order.application.usecase.OrderUsecase;
 import com.devticket.commerce.order.presentation.dto.req.CartOrderRequest;
+import com.devticket.commerce.order.presentation.dto.res.OrderCancelResponse;
 import com.devticket.commerce.order.presentation.dto.res.OrderResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -9,6 +10,8 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -34,6 +37,18 @@ public class OrderController {
             .status(HttpStatus.CREATED)
             .body(response);
 
+    }
+    
+    @Operation(description = "결제 전 주문 취소")
+    @PatchMapping("/{orderId}/cancel")
+    public ResponseEntity<OrderCancelResponse> cancelOrder(
+        @RequestHeader("X-User-Id") UUID userId,
+        @PathVariable UUID orderId
+    ) {
+        OrderCancelResponse response = orderUsecase.cancelOrder(userId, orderId);
+        return ResponseEntity
+            .status(HttpStatus.OK)
+            .body(response);
     }
 
 }
