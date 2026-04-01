@@ -1,4 +1,4 @@
-ame: CD - Log Service
+name: CD - Log Service
 
 on:
   push:
