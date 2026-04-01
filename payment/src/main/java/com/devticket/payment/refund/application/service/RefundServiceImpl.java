@@ -23,10 +23,13 @@ import com.devticket.payment.refund.presentation.dto.RefundInfoResponse;
 import com.devticket.payment.refund.presentation.dto.RefundListItemResponse;
 import com.devticket.payment.refund.presentation.dto.PgRefundRequest;
 import com.devticket.payment.refund.presentation.dto.PgRefundResponse;
+import com.devticket.payment.wallet.infrastructure.client.dto.InternalEventOrdersResponse;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -228,6 +231,24 @@ public class RefundServiceImpl implements RefundService {
         Payment payment = paymentRepository.findById(refund.getPaymentId())
             .orElseThrow(() -> new RefundException(RefundErrorCode.PAYMENT_NOT_FOUND));
         return RefundDetailResponse.of(refund, payment.getPaymentMethod().name());
+    }
+
+    @Override
+    public Page<RefundListItemResponse> getRefundListByEventId(Long eventId, Pageable pageable) {
+        InternalEventOrdersResponse eventOrders = commerceInternalClient.getOrdersByEvent(eventId);
+
+        List<Long> orderIds = eventOrders.getOrders() == null
+            ? Collections.emptyList()
+            : eventOrders.getOrders().stream()
+                .map(InternalEventOrdersResponse.OrderInfo::getOrderId)
+                .toList();
+
+        if (orderIds.isEmpty()) {
+            return Page.empty(pageable);
+        }
+
+        return refundRepository.findByOrderIdIn(orderIds, pageable)
+            .map(RefundListItemResponse::from);
     }
 
     private LocalDateTime parseCanceledAt(String canceledAt) {

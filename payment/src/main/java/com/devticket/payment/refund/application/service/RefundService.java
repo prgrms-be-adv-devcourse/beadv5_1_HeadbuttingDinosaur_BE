@@ -14,4 +14,5 @@ public interface RefundService {
     PgRefundResponse refundPgTicket(UUID userId, String ticketId, PgRefundRequest request);
     Page<RefundListItemResponse> getRefundList(UUID userId, Pageable pageable);
     RefundDetailResponse getRefundDetail(UUID userId, UUID refundId);
+    Page<RefundListItemResponse> getRefundListByEventId(Long eventId, Pageable pageable);
 }

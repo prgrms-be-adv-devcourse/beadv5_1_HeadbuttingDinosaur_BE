@@ -73,6 +73,18 @@ public class RefundController {
         return ResponseEntity.ok(refundService.getRefundDetail(userId, refundId));
     }
 
+    @Operation(summary = "이벤트별 환불 내역 조회", description = "특정 이벤트의 전체 환불 내역을 페이징으로 조회합니다.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "조회 성공")
+    })
+    @GetMapping("/events/{eventId}")
+    public ResponseEntity<Page<RefundListItemResponse>> getRefundListByEventId(
+        @PathVariable Long eventId,
+        @PageableDefault(size = 10, sort = "requestedAt", direction = Sort.Direction.DESC) Pageable pageable
+    ) {
+        return ResponseEntity.ok(refundService.getRefundListByEventId(eventId, pageable));
+    }
+
     @PostMapping("/pg/{ticketId}")
     public ResponseEntity<PgRefundResponse> refundPgTicket(
         @RequestHeader("X-User-Id") UUID userId,
