@@ -37,8 +37,8 @@ public class EventInternalService {
      * API 1: 단건 이벤트 정보 조회
      * Commerce/Payment 서비스가 eventId(Long)로 이벤트 기본 정보를 조회할 때 사용
      */
-    public InternalEventInfoResponse getEventInfo(Long id) {
-        Event event = eventRepository.findById(id)
+    public InternalEventInfoResponse getEventInfo(UUID id) {
+        Event event = eventRepository.findByEventId(id)
             .orElseThrow(() -> new BusinessException(EventErrorCode.EVENT_NOT_FOUND));
         return InternalEventInfoResponse.from(event);
     }
@@ -59,22 +59,24 @@ public class EventInternalService {
      * API 3: 구매 가능 여부 검증
      * 성공 시 reason=null, 실패 시 불가 사유 + 이벤트 정보(maxQuantity, title, price) 포함
      */
-    public InternalPurchaseValidationResponse validatePurchase(Long id, int requestedQuantity) {
+    public InternalPurchaseValidationResponse validatePurchase(UUID id, int requestedQuantity) {
         // 잘못된 수량 요청 — 명시적 검증 (재고 부족으로 오분류하지 않기 위함)
         if (requestedQuantity < 1) {
             throw new BusinessException(EventErrorCode.INVALID_STOCK_QUANTITY);
         }
 
-        Event event = eventRepository.findById(id)
+        Event event = eventRepository.findByEventId(id)
             .orElseThrow(() -> new BusinessException(EventErrorCode.EVENT_NOT_FOUND));
 
         if (event.isPurchasable(requestedQuantity)) {
-            return InternalPurchaseValidationResponse.success(id);
+            return InternalPurchaseValidationResponse.success(
+                event.getEventId(), event.getMaxQuantity(), event.getTitle(), event.getPrice()
+            );
         }
 
         PurchaseUnavailableReason reason = resolveReason(event, requestedQuantity);
         return InternalPurchaseValidationResponse.failure(
-            id, reason, event.getMaxQuantity(), event.getTitle(), event.getPrice()
+            event.getEventId(), reason, event.getMaxQuantity(), event.getTitle(), event.getPrice()
         );
     }
 
@@ -87,7 +89,7 @@ public class EventInternalService {
             eventRepository.findEventsBySeller(sellerId, status)
                 .stream()
                 .map(e -> new InternalSellerEventsResponse.SellerEventSummary(
-                    e.getId(),
+                    e.getEventId(),
                     e.getTitle(),
                     e.getPrice(),
                     e.getTotalQuantity(),
@@ -104,11 +106,11 @@ public class EventInternalService {
      * Pessimistic Lock으로 동시성 제어
      */
     @Transactional
-    public InternalStockOperationResponse deductStock(Long id, int quantity) {
-        Event event = eventRepository.findByIdWithLock(id)
+    public InternalStockOperationResponse deductStock(UUID id, int quantity) {
+        Event event = eventRepository.findByEventIdWithLock(id)
             .orElseThrow(() -> new BusinessException(EventErrorCode.EVENT_NOT_FOUND));
         event.deductStock(quantity);
-        return new InternalStockOperationResponse(id, true, event.getRemainingQuantity(), event.getTitle());
+        return new InternalStockOperationResponse(event.getEventId(), true, event.getRemainingQuantity(), event.getTitle());
     }
 
     /**
@@ -116,11 +118,11 @@ public class EventInternalService {
      * Pessimistic Lock으로 동시성 제어
      */
     @Transactional
-    public InternalStockOperationResponse restoreStock(Long id, int quantity) {
-        Event event = eventRepository.findByIdWithLock(id)
+    public InternalStockOperationResponse restoreStock(UUID id, int quantity) {
+        Event event = eventRepository.findByEventIdWithLock(id)
             .orElseThrow(() -> new BusinessException(EventErrorCode.EVENT_NOT_FOUND));
         event.restoreStock(quantity);
-        return new InternalStockOperationResponse(id, true, event.getRemainingQuantity(), event.getTitle());
+        return new InternalStockOperationResponse(event.getEventId(), true, event.getRemainingQuantity(), event.getTitle());
     }
 
     /**
@@ -157,15 +159,15 @@ public class EventInternalService {
             .toList();
 
         // Step 2: 모든 고유 ID를 정렬하여 한 번에 락 획득 (deadlock 방지)
-        List<Long> uniqueSortedIds = sortedItems.stream()
+        List<UUID> uniqueSortedIds = sortedItems.stream()
             .map(x -> x.item().id())
             .distinct()
             .sorted()
             .toList();
 
-        Map<Long, Event> eventMap = eventRepository.findAllByIdInWithLock(uniqueSortedIds)
+        Map<UUID, Event> eventMap = eventRepository.findAllByEventIdInWithLock(uniqueSortedIds)
             .stream()
-            .collect(Collectors.toMap(Event::getId, e -> e));
+            .collect(Collectors.toMap(Event::getEventId, e -> e));
 
         // Step 3: 정렬된 순서로 처리 — 예외 발생 시 전체 롤백
         List<InternalStockAdjustmentResponse.StockAdjustmentResult> sortedResults = new ArrayList<>();
@@ -183,11 +185,12 @@ public class EventInternalService {
             }
 
             sortedResults.add(new InternalStockAdjustmentResponse.StockAdjustmentResult(
-                itemWithIndex.item().id(),
+                event.getEventId(),
                 true,
                 event.getRemainingQuantity(),
                 event.getTitle(),
-                event.getPrice()
+                event.getPrice(),
+                event.getMaxQuantity()
             ));
         }
 

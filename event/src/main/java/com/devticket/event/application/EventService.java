@@ -6,6 +6,7 @@ import com.devticket.event.domain.exception.EventErrorCode;
 import com.devticket.event.domain.model.Event;
 import com.devticket.event.domain.model.EventImage;
 import com.devticket.event.domain.model.EventTechStack;
+import com.devticket.event.infrastructure.client.MemberClient;
 import com.devticket.event.infrastructure.persistence.EventRepository;
 import com.devticket.event.presentation.dto.EventDetailResponse;
 import com.devticket.event.presentation.dto.EventListContentResponse;
@@ -34,6 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class EventService {
 
     private final EventRepository eventRepository;
+    private final MemberClient memberClient;
 
     @Transactional
     public SellerEventCreateResponse createEvent(UUID sellerId, SellerEventCreateRequest request) {
@@ -109,8 +111,9 @@ public class EventService {
 
         Event event = eventRepository.findWithDetailsByEventId(eventId)
             .orElseThrow(() -> new BusinessException(EventErrorCode.EVENT_NOT_FOUND));
+        String nickname = memberClient.getNickname(event.getSellerId());
 
-        return EventDetailResponse.from(event);
+        return EventDetailResponse.from(event, nickname);
     }
 
     @Transactional(readOnly = true)

@@ -12,7 +12,7 @@ public record InternalSellerEventsResponse(
 ) {
 
     public record SellerEventSummary(
-        Long id,
+        UUID eventId,
         String title,
         Integer price,
         Integer totalQuantity,

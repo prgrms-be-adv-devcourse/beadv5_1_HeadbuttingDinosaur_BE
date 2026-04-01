@@ -45,7 +45,7 @@ public class EventTestFixture {
     public static EventDetailResponse createEventDetailResponse(UUID eventId) {
         return new EventDetailResponse(
             eventId,
-            UUID.randomUUID(),
+            UUID.randomUUID(), "테스트 셀러",
             "상세 조회 테스트 밋업", "설명", "강남역",
             LocalDateTime.now().plusDays(15), LocalDateTime.now().plusDays(4), LocalDateTime.now().plusDays(10),
             50000, 100, 100, 4,
