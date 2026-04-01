@@ -47,8 +47,8 @@ public class EventInternalService {
      * API 2: 벌크 이벤트 정보 조회
      * 없는 ID는 조용히 누락 (예외 없음) — 부분 성공 시나리오 허용
      */
-    public InternalBulkEventInfoResponse getBulkEventInfo(List<Long> ids) {
-        List<InternalEventInfoResponse> responses = eventRepository.findAllByIdIn(ids)
+    public InternalBulkEventInfoResponse getBulkEventInfo(List<UUID> eventIds) {
+        List<InternalEventInfoResponse> responses = eventRepository.findAllByEventIdIn(eventIds)
             .stream()
             .map(InternalEventInfoResponse::from)
             .toList();

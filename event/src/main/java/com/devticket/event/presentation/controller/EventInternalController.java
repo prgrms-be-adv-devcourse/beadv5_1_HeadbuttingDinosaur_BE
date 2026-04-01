@@ -55,7 +55,7 @@ public class EventInternalController {
     public ResponseEntity<SuccessResponse<InternalBulkEventInfoResponse>> getBulkEventInfo(
         @RequestBody @Valid InternalBulkEventInfoRequest request) {
         return ResponseEntity.ok(SuccessResponse.success(
-            eventInternalService.getBulkEventInfo(request.ids())
+            eventInternalService.getBulkEventInfo(request.eventIds())
         ));
     }
 
