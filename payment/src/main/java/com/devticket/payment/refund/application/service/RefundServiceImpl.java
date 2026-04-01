@@ -105,7 +105,7 @@ public class RefundServiceImpl implements RefundService {
 
         Refund refund = Refund.create(
             orderItem.orderId(),
-            payment.getId(),
+            payment.getPaymentId(),
             userId,
             refundAmount,
             refundRate
@@ -224,7 +224,7 @@ public class RefundServiceImpl implements RefundService {
         Refund refund = refundRepository.findByRefundId(refundId)
             .orElseThrow(() -> new RefundException(RefundErrorCode.REFUND_NOT_FOUND));
         validateOrderOwner(refund.getUserId(), userId);
-        Payment payment = paymentRepository.findById(refund.getPaymentId())
+        Payment payment = paymentRepository.findByPaymentId(refund.getPaymentId())
             .orElseThrow(() -> new RefundException(RefundErrorCode.PAYMENT_NOT_FOUND));
         return RefundDetailResponse.of(refund, payment.getPaymentMethod().name());
     }
