@@ -4,6 +4,7 @@ import com.devticket.commerce.cart.infrastructure.external.client.dto.EventSucce
 import com.devticket.commerce.common.exception.BusinessException;
 import com.devticket.commerce.common.exception.CommonErrorCode;
 import com.devticket.commerce.ticket.infrastructure.external.client.dto.InternalBulkEventInfoRequest;
+import com.devticket.commerce.ticket.infrastructure.external.client.dto.InternalBulkEventInfoResponse;
 import com.devticket.commerce.ticket.infrastructure.external.client.dto.InternalEventInfoResponse;
 import java.util.List;
 import java.util.UUID;
@@ -56,9 +57,9 @@ public class TicketToEventClient {
                 .onStatus(HttpStatusCode::isError, (req, res) -> {
                     throw new BusinessException(CommonErrorCode.EXTERNAL_SERVICE_ERROR);
                 })
-                .body(new ParameterizedTypeReference<EventSuccessResponse<List<InternalEventInfoResponse>>>() {
+                .body(new ParameterizedTypeReference<EventSuccessResponse<InternalBulkEventInfoResponse>>() {
                 });
-            return response.data();
+            return response.data().events();
         } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {

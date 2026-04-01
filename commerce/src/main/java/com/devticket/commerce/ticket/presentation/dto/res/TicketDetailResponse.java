@@ -4,7 +4,7 @@ import com.devticket.commerce.ticket.domain.model.Ticket;
 import java.util.UUID;
 
 public record TicketDetailResponse(
-    Long ticketId,
+    UUID ticketId,
     UUID eventId,
     String eventTitle,
     String eventDate,
@@ -15,7 +15,7 @@ public record TicketDetailResponse(
 
     ) {
         return new TicketDetailResponse(
-            ticket.getId(),
+            ticket.getTicketId(),
             ticket.getEventId(),
             eventTitle,
             eventDate,
