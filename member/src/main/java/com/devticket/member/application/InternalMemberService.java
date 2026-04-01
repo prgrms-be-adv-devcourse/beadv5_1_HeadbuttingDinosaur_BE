@@ -4,7 +4,9 @@ import com.devticket.member.common.exception.BusinessException;
 import com.devticket.member.presentation.domain.MemberErrorCode;
 import com.devticket.member.presentation.domain.model.SellerApplication;
 import com.devticket.member.presentation.domain.model.User;
+import com.devticket.member.presentation.domain.model.UserProfile;
 import com.devticket.member.presentation.domain.repository.SellerApplicationRepository;
+import com.devticket.member.presentation.domain.repository.UserProfileRepository;
 import com.devticket.member.presentation.domain.repository.UserRepository;
 import com.devticket.member.presentation.dto.internal.response.InternalMemberInfoResponse;
 import com.devticket.member.presentation.dto.internal.response.InternalMemberRoleResponse;
@@ -21,11 +23,15 @@ import org.springframework.transaction.annotation.Transactional;
 public class InternalMemberService {
 
     private final UserRepository userRepository;
+    private final UserProfileRepository userProfileRepository;
     private final SellerApplicationRepository sellerApplicationRepository;
 
     public InternalMemberInfoResponse getMemberInfo(UUID userId) {
         User user = findUserByUuidOrThrow(userId);
-        return InternalMemberInfoResponse.from(user);
+        String nickname = userProfileRepository.findByUserId(user.getId())
+            .map(UserProfile::getNickname)
+            .orElse(null);
+        return InternalMemberInfoResponse.from(user, nickname);
     }
 
     public InternalMemberStatusResponse getMemberStatus(UUID userId) {
