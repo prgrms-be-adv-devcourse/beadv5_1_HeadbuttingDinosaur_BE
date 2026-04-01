@@ -10,6 +10,6 @@ public interface PaymentRepository {
 
     Optional<Payment> findByOrderId(UUID orderId);
 
-    Optional<Payment> findById(Long id);
+    Optional<Payment> findByPaymentId(UUID id);
 
 }
