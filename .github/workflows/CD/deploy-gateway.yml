@@ -3,7 +3,7 @@ name: CD - Gateway Service
 on:
   push:
     branches: [ "devticket-gateway" ]
-    paths: [ "gateway/**" ]
+    paths: [ "apigateway/**" ]
 
 jobs:
   deploy:
@@ -21,11 +21,11 @@ jobs:
           cache: 'gradle'
 
       - name: Grant execute permission for gradlew
-        run: chmod +x ./gateway/gradlew
+        run: chmod +x ./apigateway/gradlew
 
       - name: Build with Gradle
         run: |
-          cd gateway
+          cd apigateway
           ./gradlew clean bootJar
 
       - name: Login to Docker Hub
@@ -37,7 +37,7 @@ jobs:
       - name: Build and Push Docker Image
         run: |
           IMAGE_URL=${{ secrets.DOCKERHUB_USERNAME }}/devticket-gateway:latest
-          docker build -t $IMAGE_URL ./gateway
+          docker build -t $IMAGE_URL ./apigateway
           docker push $IMAGE_URL
 
       - name: Deploy
