@@ -15,6 +15,8 @@ import org.springframework.stereotype.Repository;
 public interface EventRepository extends JpaRepository<Event, Long>, EventRepositoryCustom {
 
     // 외부 API
+    List<Event> findAllByEventIdIn(List<UUID> eventIds);
+
     Optional<Event> findByEventId(UUID eventId);
 
     @Query("SELECT DISTINCT e FROM Event e " +
