@@ -197,7 +197,7 @@ public class RefundServiceImpl implements RefundService {
     }
 
     private void validatePgPayment(Payment payment) {
-        if (payment.getPaymentMethod() != PaymentMethod.PG) {
+        if (payment.getPaymentMethod() != PaymentMethod.TOSS) {
             throw new RefundException(RefundErrorCode.REFUND_INVALID_REQUEST);
         }
     }
