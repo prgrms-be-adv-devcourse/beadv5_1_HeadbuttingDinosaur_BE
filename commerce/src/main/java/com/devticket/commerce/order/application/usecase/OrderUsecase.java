@@ -29,7 +29,7 @@ public interface OrderUsecase {
 
     void completeOrder(UUID orderId);
 
-    void failOrder(Long orderId);
+    void failOrder(UUID orderId);
 
     InternalSettlementDataResponse getSettelmentData(UUID sellerId, String periodStart, String periodEnd);
 

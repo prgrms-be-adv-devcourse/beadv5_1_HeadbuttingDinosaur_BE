@@ -64,7 +64,7 @@ public class InternalOrderController {
 
     //Payment -> Commerce : 결제 실패 후 Order상태 FAILED로 변경
     @PatchMapping("/orders/{orderId}/payment-failed")
-    public ResponseEntity<Void> failOrder(@PathVariable Long orderId) {
+    public ResponseEntity<Void> failOrder(@PathVariable UUID orderId) {
         orderUsecase.failOrder(orderId);
         return ResponseEntity.ok().build();
     }
