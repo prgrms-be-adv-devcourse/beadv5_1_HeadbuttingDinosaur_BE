@@ -30,12 +30,12 @@ public class OrderItemRepositoryAdapter implements OrderItemRepository {
     }
 
     @Override
-    public List<OrderItem> findSettlementItems(List<Long> eventIds) {
+    public List<OrderItem> findSettlementItems(List<UUID> eventIds) {
         return orderItemJpaRepository.findSettlementItems(eventIds);
     }
 
     @Override
-    public List<OrderItem> findAllByEventId(Long eventId) {
+    public List<OrderItem> findAllByEventId(UUID eventId) {
         return orderItemJpaRepository.findAllByEventId(eventId);
     }
 

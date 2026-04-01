@@ -20,7 +20,7 @@ public record OrderResponse(
     LocalDateTime createdAt
 ) {
 
-    public static OrderResponse of(Order order, List<OrderItem> orderItems, Map<Long, String> eventTitles) {
+    public static OrderResponse of(Order order, List<OrderItem> orderItems, Map<UUID, String> eventTitles) {
 
         List<OrderItemsResponse> itemResponses = orderItems.stream()
             .map(item -> {
@@ -40,22 +40,3 @@ public record OrderResponse(
 }
 
 
-//inner record
-@Builder
-record OrderItemsResponse(
-    Long eventId,
-    String eventTitle,
-    int quantity,
-    int price
-) {
-
-    static OrderItemsResponse of(OrderItem orderItem, String eventTitle) {
-        return OrderItemsResponse.builder()
-            .eventId(orderItem.getEventId())
-            .eventTitle(eventTitle)
-            .quantity(orderItem.getQuantity())
-            .price(orderItem.getPrice())
-            .build();
-    }
-
-}

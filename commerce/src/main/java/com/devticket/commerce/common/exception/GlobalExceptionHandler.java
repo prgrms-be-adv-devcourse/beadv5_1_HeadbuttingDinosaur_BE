@@ -1,10 +1,12 @@
 package com.devticket.commerce.common.exception;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -28,6 +30,7 @@ public class GlobalExceptionHandler {
     //예측하지 못한 시스템 오류 발생시
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleException(Exception e) {
+        log.error("Unhandled exception: ", e);
         return ResponseEntity
             .internalServerError()
             .body(ErrorResponse.from(CommonErrorCode.INTERNAL_SERVER_ERROR));

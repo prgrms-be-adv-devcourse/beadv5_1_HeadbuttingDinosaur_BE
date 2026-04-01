@@ -11,7 +11,7 @@ public record InternalOrderItemResponse(
     UUID orderItemId,
     Long orderId,
     UUID userId,
-    Long eventId,
+    UUID eventId,
     int price,
     int quantity,
     int subtotalAmount,

@@ -28,7 +28,7 @@ public class SellerTicketController {
     @Operation(description = "이벤트 참여자 목록 조회")
     public ResponseEntity<SellerEventParticipantListResponse> getParticipantList(
         @RequestHeader("X-User-Id") UUID userId,
-        @PathVariable Long eventId,
+        @PathVariable UUID eventId,
         @ModelAttribute SellerEventParticipantListRequest request
     ) {
         SellerEventParticipantListResponse response = ticketUsecase.getParticipantList(userId, eventId, request);

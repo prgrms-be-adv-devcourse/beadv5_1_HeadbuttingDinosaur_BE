@@ -11,8 +11,10 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
+import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
@@ -31,13 +33,17 @@ public class CartItem extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Builder.Default
+    @Column(name = "cart_item_id", nullable = false, updatable = false, unique = true)
+    private UUID cartItemId = UUID.randomUUID();
+
     @Column(name = "cart_id")
     @Schema(description = "장바구니 항목")
     private Long cartId;
 
     @Column(name = "event_id", nullable = false)
     @Schema(description = "상품 ID : Event PK")
-    private Long eventId;
+    private UUID eventId;
 
     @Column(nullable = false)
     @Schema(description = "수량")
@@ -49,7 +55,7 @@ public class CartItem extends BaseEntity {
 
     //---- 정적 팩토리 메서드 ------------------
     //객체 생성
-    public static CartItem create(Long cartId, Long eventId, int quantity) {
+    public static CartItem create(Long cartId, UUID eventId, int quantity) {
 
         // 수량 정책 검증 (최소 1개)
         if (quantity < 1) {

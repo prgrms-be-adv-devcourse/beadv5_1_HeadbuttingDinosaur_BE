@@ -41,7 +41,7 @@ public class Ticket extends BaseEntity {
     UUID userId;
 
     @Column(name = "event_id", nullable = false)
-    Long eventId;
+    UUID eventId;
 
     @Column(name = "ticket_number", unique = true, length = 100, nullable = false)
     String ticketNumber;
@@ -61,7 +61,7 @@ public class Ticket extends BaseEntity {
     public static Ticket create(
         UUID orderItemId,
         UUID userId,
-        Long eventId
+        UUID eventId
     ) {
         LocalDateTime now = LocalDateTime.now();
         //티켓번호 생성 20250327-*******

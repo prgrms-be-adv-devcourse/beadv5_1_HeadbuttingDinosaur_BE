@@ -13,9 +13,9 @@ public interface OrderItemRepository {
 
     List<OrderItem> saveAll(List<OrderItem> orderItems);
 
-    List<OrderItem> findSettlementItems(List<Long> eventIds);
+    List<OrderItem> findSettlementItems(List<UUID> eventIds);
 
-    List<OrderItem> findAllByEventId(Long eventId);
+    List<OrderItem> findAllByEventId(UUID eventId);
 
     Optional<OrderItem> findByOrderItemId(UUID orderItemId);
 }

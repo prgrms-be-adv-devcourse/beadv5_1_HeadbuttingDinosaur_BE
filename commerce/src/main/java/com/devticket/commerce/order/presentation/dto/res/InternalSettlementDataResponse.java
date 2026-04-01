@@ -11,7 +11,7 @@ public record InternalSettlementDataResponse(
 ) {
 
     public record EventSettlements(
-        Long eventId,
+        UUID eventId,
         Integer totalSalesAmount,
         Integer totalRefundAmount,
         Integer soldQuantity,
@@ -21,7 +21,7 @@ public record InternalSettlementDataResponse(
 
         public record OrderItems(
             UUID orderItemId,
-            Long eventId,
+            UUID eventId,
             Integer price,
             Integer quantity,
             Integer subtotalAmount,
