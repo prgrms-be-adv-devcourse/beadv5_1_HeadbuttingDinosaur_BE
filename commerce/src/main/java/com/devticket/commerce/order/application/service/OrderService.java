@@ -146,8 +146,8 @@ public class OrderService implements OrderUsecase {
 
     @Override
     @Transactional
-    public void failOrder(Long orderId) {
-        Order order = orderRepository.findById(orderId)
+    public void failOrder(UUID orderId) {
+        Order order = orderRepository.findByOrderId(orderId)
             .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
         order.failPayment();
     }
