@@ -4,22 +4,24 @@ import com.devticket.commerce.ticket.domain.model.Ticket;
 import java.util.UUID;
 
 public record TicketDetailResponse(
-    Long ticketId,
+    UUID ticketId,
     UUID eventId,
     String eventTitle,
-    String eventDate,
-    String status
+    String eventDateTime,
+    String status,
+    String issuedAt
 ) {
 
     public static TicketDetailResponse of(Ticket ticket, String eventTitle, String eventDate
 
     ) {
         return new TicketDetailResponse(
-            ticket.getId(),
+            ticket.getTicketId(),
             ticket.getEventId(),
             eventTitle,
             eventDate,
-            ticket.getStatus().name()
+            ticket.getStatus().name(),
+            ticket.getIssuedAt().toString()
         );
     }
 

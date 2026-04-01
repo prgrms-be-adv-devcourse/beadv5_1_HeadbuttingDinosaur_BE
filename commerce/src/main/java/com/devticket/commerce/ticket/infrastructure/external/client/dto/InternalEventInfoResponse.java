@@ -1,5 +1,8 @@
 package com.devticket.commerce.ticket.infrastructure.external.client.dto;
 
+import com.devticket.commerce.common.enums.EventCategory;
+import com.devticket.commerce.common.enums.EventStatus;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 public record InternalEventInfoResponse(
@@ -7,14 +10,14 @@ public record InternalEventInfoResponse(
     UUID sellerId,
     String title,
     Integer price,
-    String status,
-    String category,
+    EventStatus status,
+    EventCategory category,
     Integer totalQuantity,
     Integer maxQuantity,
     Integer remainingQuantity,
-    String eventDateTime,
-    String saleStartAt,
-    String saleEndAt
+    LocalDateTime eventDateTime,
+    LocalDateTime saleStartAt,
+    LocalDateTime saleEndAt
 ) {
 
 }
