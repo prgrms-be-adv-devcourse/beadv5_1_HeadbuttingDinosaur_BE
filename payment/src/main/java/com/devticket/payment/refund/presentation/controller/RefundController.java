@@ -28,7 +28,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/refunds")
+@RequestMapping("/api/refunds")
 @Tag(name = "Refund", description = "환불 API")
 @RequiredArgsConstructor
 public class RefundController {
