@@ -23,7 +23,7 @@ spring:
 
 jwt:
   secret-key: local-dev-jwt-secret-key-devticket-2025
-  access-token-ttl: 1800000
+  access-token-ttl: 86400000
   refresh-token-ttl: 604800000
 
 logging:
