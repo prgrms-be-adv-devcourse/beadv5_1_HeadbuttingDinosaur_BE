@@ -1,4 +1,4 @@
-package com.devticket.admin.infrastructure.external.dto;
+package com.devticket.admin.infrastructure.external.dto.res;
 
 
 public record InternalMemberInfoResponse(
