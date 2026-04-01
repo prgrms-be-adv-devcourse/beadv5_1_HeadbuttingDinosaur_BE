@@ -93,7 +93,7 @@ public class Order extends BaseEntity {
             .orderNumber(generatedOrderNumber)
             .paymentMethod(null)
             .totalAmount(totalAmount)
-            .status(OrderStatus.CREATED)
+            .status(OrderStatus.PAYMENT_PENDING)
             .orderedAt(now)
             .deletedAt(null)
             .build();

@@ -4,7 +4,7 @@ import com.devticket.commerce.order.domain.model.Order;
 import java.util.UUID;
 
 public record InternalOrderInfoResponse(
-    Long id,
+    UUID id,
     UUID userId,
     String orderNumber,
     String paymentMethod,
@@ -15,7 +15,7 @@ public record InternalOrderInfoResponse(
 
     public static InternalOrderInfoResponse from(Order order) {
         return new InternalOrderInfoResponse(
-            order.getId(),
+            order.getOrderId(),
             order.getUserId(),
             order.getOrderNumber(),
             order.getPaymentMethod() != null ? order.getPaymentMethod().name() : null,
