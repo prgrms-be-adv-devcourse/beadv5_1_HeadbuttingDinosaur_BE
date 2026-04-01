@@ -88,7 +88,8 @@ public class TicketService implements TicketUsecase {
                         ticket.getEventId(),
                         event != null ? event.title() : "정보 없음",
                         event != null ? String.valueOf(event.eventDateTime()) : null,
-                        ticket.getStatus().name()
+                        ticket.getStatus().name(),
+                        ticket.getIssuedAt().toString()
                     );
                 })
                 .toList();

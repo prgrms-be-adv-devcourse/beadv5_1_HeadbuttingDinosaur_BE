@@ -7,8 +7,9 @@ public record TicketDetailResponse(
     UUID ticketId,
     UUID eventId,
     String eventTitle,
-    String eventDate,
-    String status
+    String eventDateTime,
+    String status,
+    String issuedAt
 ) {
 
     public static TicketDetailResponse of(Ticket ticket, String eventTitle, String eventDate
@@ -19,7 +20,8 @@ public record TicketDetailResponse(
             ticket.getEventId(),
             eventTitle,
             eventDate,
-            ticket.getStatus().name()
+            ticket.getStatus().name(),
+            ticket.getIssuedAt().toString()
         );
     }
 
