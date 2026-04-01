@@ -3,7 +3,7 @@ name: CD - Event Service
 on:
   push:
     branches: [ "devticket-event" ]
-    paths: [ "../../event" ]
+    paths: [ "event/**" ]
 
 jobs:
   deploy:
