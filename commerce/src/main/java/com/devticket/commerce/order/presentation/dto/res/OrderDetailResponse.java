@@ -22,7 +22,7 @@ public record OrderDetailResponse(
     LocalDateTime createdAt
 ) {
 
-    public static OrderDetailResponse of(Order order, List<OrderItem> orderItems, Map<Long, String> eventTitles) {
+    public static OrderDetailResponse of(Order order, List<OrderItem> orderItems, Map<UUID, String> eventTitles) {
         List<OrderDetailItemResponse> itemResponses = orderItems.stream()
             .map(item -> {
                 String title = eventTitles.getOrDefault(item.getEventId(), "알 수 없는 이벤트");
@@ -41,21 +41,3 @@ public record OrderDetailResponse(
     }
 }
 
-
-@Builder
-record OrderDetailItemResponse(
-    Long eventId,
-    String eventTitle,
-    int quantity,
-    int price
-) {
-
-    static OrderDetailItemResponse of(OrderItem orderItem, String eventTitle) {
-        return OrderDetailItemResponse.builder()
-            .eventId(orderItem.getEventId())
-            .eventTitle(eventTitle)
-            .quantity(orderItem.getQuantity())
-            .price(orderItem.getPrice())
-            .build();
-    }
-}

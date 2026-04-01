@@ -3,7 +3,7 @@ package com.devticket.commerce.ticket.infrastructure.external.client.dto;
 import java.util.UUID;
 
 public record InternalEventInfoResponse(
-    Long id,
+    UUID eventId,
     UUID sellerId,
     String title,
     Integer price,

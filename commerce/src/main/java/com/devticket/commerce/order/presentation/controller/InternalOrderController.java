@@ -1,9 +1,10 @@
 package com.devticket.commerce.order.presentation.controller;
 
-import com.devticket.commerce.mock.controller.dto.InternalOrderInfoResponse;
-import com.devticket.commerce.mock.controller.dto.InternalOrderItemsResponse;
+
 import com.devticket.commerce.order.application.usecase.OrderUsecase;
+import com.devticket.commerce.order.presentation.dto.res.InternalOrderInfoResponse;
 import com.devticket.commerce.order.presentation.dto.res.InternalOrderItemResponse;
+import com.devticket.commerce.order.presentation.dto.res.InternalOrderItemsResponse;
 import com.devticket.commerce.order.presentation.dto.res.InternalSettlementDataResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.UUID;
@@ -12,7 +13,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -27,10 +27,9 @@ public class InternalOrderController {
     private final OrderUsecase orderUsecase;
 
     //Payment -> Commerce : 결제요청시 주문정보 조회
-    @GetMapping("/orders/{id}")
-    public ResponseEntity<InternalOrderInfoResponse> getOrderInfo(@PathVariable Long id) {
-        InternalOrderInfoResponse response = orderUsecase.getOrderInfo(id);
-        return ResponseEntity.ok(response);
+    @GetMapping("/orders/{orderId}")
+    public ResponseEntity<InternalOrderInfoResponse> getOrderInfo(@PathVariable UUID orderId) {
+        return ResponseEntity.ok(orderUsecase.getOrderInfo(orderId));
     }
 
     //Settlement -> Commerce : 정산집계시 주문 항목 조회

@@ -4,6 +4,7 @@ import com.devticket.commerce.cart.domain.model.CartItem;
 import com.devticket.commerce.cart.domain.repository.CartItemRepository;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
@@ -24,7 +25,12 @@ public class CartItemRepositoryAdapter implements CartItemRepository {
     }
 
     @Override
-    public Optional<CartItem> findByCartIdAndEventId(Long cartId, Long eventId) {
+    public List<CartItem> findAllByCartItemId(List<UUID> cartItemIds) {
+        return cartItemJpaRepository.findAllByCartItemIdIn(cartItemIds);
+    }
+
+    @Override
+    public Optional<CartItem> findByCartIdAndEventId(Long cartId, UUID eventId) {
         return cartItemJpaRepository.findByCartIdAndEventId(cartId, eventId);
     }
 

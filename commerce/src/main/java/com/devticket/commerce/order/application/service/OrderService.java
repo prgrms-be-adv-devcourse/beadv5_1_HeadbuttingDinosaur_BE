@@ -5,8 +5,6 @@ import com.devticket.commerce.cart.domain.model.CartItem;
 import com.devticket.commerce.cart.domain.repository.CartItemRepository;
 import com.devticket.commerce.common.enums.OrderStatus;
 import com.devticket.commerce.common.exception.BusinessException;
-import com.devticket.commerce.mock.controller.dto.InternalOrderInfoResponse;
-import com.devticket.commerce.mock.controller.dto.InternalOrderItemsResponse;
 import com.devticket.commerce.order.application.usecase.OrderUsecase;
 import com.devticket.commerce.order.domain.exception.OrderErrorCode;
 import com.devticket.commerce.order.domain.model.Order;
@@ -18,7 +16,9 @@ import com.devticket.commerce.order.infrastructure.external.client.dto.InternalB
 import com.devticket.commerce.order.infrastructure.external.client.dto.InternalStockAdjustmentResponse;
 import com.devticket.commerce.order.presentation.dto.req.CartOrderRequest;
 import com.devticket.commerce.order.presentation.dto.req.OrderListRequest;
+import com.devticket.commerce.order.presentation.dto.res.InternalOrderInfoResponse;
 import com.devticket.commerce.order.presentation.dto.res.InternalOrderItemResponse;
+import com.devticket.commerce.order.presentation.dto.res.InternalOrderItemsResponse;
 import com.devticket.commerce.order.presentation.dto.res.InternalSettlementDataResponse;
 import com.devticket.commerce.order.presentation.dto.res.OrderCancelResponse;
 import com.devticket.commerce.order.presentation.dto.res.OrderDetailResponse;
@@ -62,7 +62,7 @@ public class OrderService implements OrderUsecase {
     @Override
     public OrderResponse createOrderByCart(UUID userId, CartOrderRequest request) {
         //장바구니 아이템 조회
-        List<CartItem> cartItems = cartItemRepository.findAllById(request.cartItemIds());
+        List<CartItem> cartItems = cartItemRepository.findAllByCartItemId(request.cartItemIds());
         //재고 선차감 : Event API호출
         List<InternalStockAdjustmentResponse> eventResults = orderToEventClient.adjustStocks(
             InternalBulkStockAdjustmentRequest.createForOrder(cartItems));
@@ -80,7 +80,7 @@ public class OrderService implements OrderUsecase {
                 cartItemRepository.deleteAllInBatch(cartItems);
             }
             //응답데이터 변환
-            Map<Long, String> eventTitles = eventResults.stream()
+            Map<UUID, String> eventTitles = eventResults.stream()
                 .collect(Collectors.toMap(
                     InternalStockAdjustmentResponse::eventId,
                     InternalStockAdjustmentResponse::eventTitle
@@ -107,13 +107,13 @@ public class OrderService implements OrderUsecase {
 
         List<OrderItem> orderItems = orderItemRepository.findAllByOrderId(order.getId());
 
-        List<Long> eventIds = orderItems.stream()
+        List<UUID> eventIds = orderItems.stream()
             .map(OrderItem::getEventId)
             .distinct()
             .toList();
 
-        Map<Long, String> eventTitles = orderToEventClient.getBulkEventInfo(eventIds).stream()
-            .collect(Collectors.toMap(InternalEventInfoResponse::id, InternalEventInfoResponse::title));
+        Map<UUID, String> eventTitles = orderToEventClient.getBulkEventInfo(eventIds).stream()
+            .collect(Collectors.toMap(InternalEventInfoResponse::eventId, InternalEventInfoResponse::title));
 
         return OrderDetailResponse.of(order, orderItems, eventTitles);
     }
@@ -132,8 +132,8 @@ public class OrderService implements OrderUsecase {
     }
 
     @Override
-    public InternalOrderInfoResponse getOrderInfo(Long id) {
-        Order order = orderRepository.findById(id)
+    public InternalOrderInfoResponse getOrderInfo(UUID orderId) {
+        Order order = orderRepository.findByOrderId(orderId)
             .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
         return InternalOrderInfoResponse.from(order);
     }
@@ -181,8 +181,8 @@ public class OrderService implements OrderUsecase {
             }
 
             // 2. eventId 목록 추출 후 해당 OrderItem만 조회
-            List<Long> eventIds = sellerEvents.stream()
-                .map(InternalEventInfoResponse::id)
+            List<UUID> eventIds = sellerEvents.stream()
+                .map(InternalEventInfoResponse::eventId)
                 .toList();
             log.info("[Settlement Debug] 조회할 Event ID 목록: {}", eventIds);
 
@@ -213,14 +213,14 @@ public class OrderService implements OrderUsecase {
                 ));
 
             // 4. eventId별로 그룹화
-            Map<Long, List<OrderItem>> itemsByEvent = orderItems.stream()
+            Map<UUID, List<OrderItem>> itemsByEvent = orderItems.stream()
                 .collect(Collectors.groupingBy(OrderItem::getEventId));
             log.info("[Settlement Debug] 그룹화된 Event 수: {}", itemsByEvent.size());
 
             // 5. 데이터 집계
             List<InternalSettlementDataResponse.EventSettlements> eventSettlements = itemsByEvent.entrySet().stream()
                 .map(entry -> {
-                    Long eventId = entry.getKey();
+                    UUID eventId = entry.getKey();
                     List<OrderItem> itemList = entry.getValue();
 
                     int totalSales = 0;
@@ -311,7 +311,7 @@ public class OrderService implements OrderUsecase {
 
     private int calculateTotalAmount(List<CartItem> cartItems, List<InternalStockAdjustmentResponse> eventItems) {
         int totalAmount = 0;
-        Map<Long, Integer> priceMap = eventItems.stream()
+        Map<UUID, Integer> priceMap = eventItems.stream()
             .collect(
                 Collectors.toMap(InternalStockAdjustmentResponse::eventId, InternalStockAdjustmentResponse::price));
 
@@ -331,7 +331,7 @@ public class OrderService implements OrderUsecase {
     private List<OrderItem> createOrderItem(Long orderId, UUID userId, List<CartItem> cartItems,
         List<InternalStockAdjustmentResponse> eventItems) {
 
-        Map<Long, InternalStockAdjustmentResponse> eventMap = eventItems.stream()
+        Map<UUID, InternalStockAdjustmentResponse> eventMap = eventItems.stream()
             .collect(Collectors.toMap(InternalStockAdjustmentResponse::eventId, r -> r));
 
         List<OrderItem> orderItems = cartItems.stream()

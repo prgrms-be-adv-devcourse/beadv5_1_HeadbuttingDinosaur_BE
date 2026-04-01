@@ -39,8 +39,8 @@ public class OrderItem extends BaseEntity {
     @Column(name = "user_id")
     UUID userId;
 
-    @Column(name = "event_id")
-    Long eventId;
+    @Column(name = "event_id", columnDefinition = "uuid")
+    UUID eventId;
 
     @Column
     int price;
@@ -58,7 +58,7 @@ public class OrderItem extends BaseEntity {
     public static OrderItem create(
         Long orderId,
         UUID userId,
-        Long eventId,
+        UUID eventId,
         int price,
         int quantity,
         int maxQuantity

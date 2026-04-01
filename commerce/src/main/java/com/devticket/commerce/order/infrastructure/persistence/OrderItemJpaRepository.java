@@ -15,9 +15,9 @@ public interface OrderItemJpaRepository extends JpaRepository<OrderItem, Long> {
     List<OrderItem> findAllByOrderId(Long orderId);
 
     @Query("SELECT oi FROM OrderItem oi WHERE oi.eventId IN :eventIds")
-    List<OrderItem> findSettlementItems(@Param("eventIds") List<Long> eventIds);
+    List<OrderItem> findSettlementItems(@Param("eventIds") List<UUID> eventIds);
 
-    List<OrderItem> findAllByEventId(Long eventId);
+    List<OrderItem> findAllByEventId(UUID eventId);
 
     Optional<OrderItem> findByOrderItemId(UUID orderItemId);
 }

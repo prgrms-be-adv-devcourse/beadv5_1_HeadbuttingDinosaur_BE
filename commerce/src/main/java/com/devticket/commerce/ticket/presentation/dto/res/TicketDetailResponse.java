@@ -1,10 +1,11 @@
 package com.devticket.commerce.ticket.presentation.dto.res;
 
 import com.devticket.commerce.ticket.domain.model.Ticket;
+import java.util.UUID;
 
 public record TicketDetailResponse(
     Long ticketId,
-    Long eventId,
+    UUID eventId,
     String eventTitle,
     String eventDate,
     String status

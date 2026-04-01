@@ -2,6 +2,7 @@ package com.devticket.commerce.ticket.presentation.dto.res;
 
 import com.devticket.commerce.ticket.domain.model.Ticket;
 import java.util.List;
+import java.util.UUID;
 
 public record TicketResponse(
     Long orderItemId,
@@ -25,7 +26,7 @@ public record TicketResponse(
     public record TicketInfo(
         Long ticketId,
         String ticketNumber,
-        Long eventId,
+        UUID eventId,
         String status
     ) {
 

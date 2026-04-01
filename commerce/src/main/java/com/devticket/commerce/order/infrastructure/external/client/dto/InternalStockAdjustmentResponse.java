@@ -1,7 +1,9 @@
 package com.devticket.commerce.order.infrastructure.external.client.dto;
 
+import java.util.UUID;
+
 public record InternalStockAdjustmentResponse(
-    Long eventId,
+    UUID eventId,
     Boolean success,
     Integer remainingQuantity,
     String eventTitle,

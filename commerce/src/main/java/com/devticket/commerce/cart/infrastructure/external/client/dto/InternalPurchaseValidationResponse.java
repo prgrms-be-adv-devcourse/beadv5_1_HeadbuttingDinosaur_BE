@@ -1,14 +1,15 @@
 package com.devticket.commerce.cart.infrastructure.external.client.dto;
 
 import jakarta.annotation.Nullable;
+import java.util.UUID;
 
 public record InternalPurchaseValidationResponse(
-    Long eventId,
+    UUID eventId,
     Boolean purchasable,
     @Nullable String reason,
-    int maxQuantity,
+    Integer maxQuantity,
     String title,
-    int price
+    Integer price
 ) {
 
 

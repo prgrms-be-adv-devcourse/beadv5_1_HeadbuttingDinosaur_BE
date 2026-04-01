@@ -2,14 +2,10 @@ package com.devticket.commerce.order.presentation.controller;
 
 import com.devticket.commerce.order.application.usecase.OrderUsecase;
 import com.devticket.commerce.order.presentation.dto.req.CartOrderRequest;
-
-import com.devticket.commerce.order.presentation.dto.res.OrderCancelResponse;
-
 import com.devticket.commerce.order.presentation.dto.req.OrderListRequest;
 import com.devticket.commerce.order.presentation.dto.res.OrderCancelResponse;
 import com.devticket.commerce.order.presentation.dto.res.OrderDetailResponse;
 import com.devticket.commerce.order.presentation.dto.res.OrderListResponse;
-
 import com.devticket.commerce.order.presentation.dto.res.OrderResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -17,16 +13,9 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-
-import org.springframework.web.bind.annotation.PatchMapping;
-
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
-
-
-
 import org.springframework.web.bind.annotation.PatchMapping;
-
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -35,7 +24,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/orders")
+@RequestMapping("/api/orders")
 @RequiredArgsConstructor
 @Tag(name = "Order API", description = "주문서 생성,수정,조회,삭제")
 public class OrderController {
@@ -73,7 +62,7 @@ public class OrderController {
         OrderDetailResponse response = orderUsecase.getOrderDetail(userId, orderId);
         return ResponseEntity.ok(response);
     }
-    
+
     @Operation(description = "결제 전 주문 취소")
     @PatchMapping("/{orderId}/cancel")
     public ResponseEntity<OrderCancelResponse> cancelOrder(

@@ -54,7 +54,7 @@ public class TicketService implements TicketUsecase {
 
         //각 티켓의 eventId 가져오기
         List<Ticket> ticketList = ticketPage.getContent();
-        List<Long> eventIds = ticketList.stream()
+        List<UUID> eventIds = ticketList.stream()
             .map(Ticket::getEventId)
             .distinct()
             .toList();
@@ -63,8 +63,8 @@ public class TicketService implements TicketUsecase {
         InternalBulkEventInfoRequest bulkRequest = new InternalBulkEventInfoRequest(eventIds);
         List<InternalEventInfoResponse> eventInfos = ticketToEventClient.getBulkEventInfo(bulkRequest);
 
-        Map<Long, InternalEventInfoResponse> eventMap = eventInfos.stream()
-            .collect(Collectors.toMap(InternalEventInfoResponse::id, info -> info));
+        Map<UUID, InternalEventInfoResponse> eventMap = eventInfos.stream()
+            .collect(Collectors.toMap(InternalEventInfoResponse::eventId, info -> info));
 
         // Ticket, Event정보 조합
         List<TicketDetailResponse> tickets = ticketList.stream()
@@ -120,7 +120,7 @@ public class TicketService implements TicketUsecase {
         return TicketResponse.of(request.orderId(), savedTickets);
     }
 
-    public SellerEventParticipantListResponse getParticipantList(UUID userId, Long eventId,
+    public SellerEventParticipantListResponse getParticipantList(UUID userId, UUID eventId,
         SellerEventParticipantListRequest request) {
         // 0단계 : 사용자 소유권 검증
         InternalEventInfoResponse eventInfo = ticketToEventClient.getSingleEventInfo(eventId);
