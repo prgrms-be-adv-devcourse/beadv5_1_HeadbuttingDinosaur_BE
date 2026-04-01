@@ -29,7 +29,7 @@ public class SellerApplication {
     private UUID sellerApplicationId;
 
     @Column(name = "user_id", nullable = false)
-    private Long userId;
+    private UUID userId;
 
     @Column(name = "bank_name", nullable = false, length = 100)
     private String bankName;
@@ -50,7 +50,7 @@ public class SellerApplication {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    public SellerApplication(Long userId, String bankName,
+    public SellerApplication(UUID userId, String bankName,
         String accountNumber, String accountHolder) {
         this.sellerApplicationId = UUID.randomUUID();
         this.userId = userId;

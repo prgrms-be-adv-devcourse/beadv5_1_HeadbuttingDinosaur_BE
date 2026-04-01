@@ -33,7 +33,7 @@ public class SellerApplicationService {
         validateNoPendingApplication(user.getId());
 
         SellerApplication application = new SellerApplication(
-            user.getId(),
+            user.getUserId(),
             request.bankName(),
             request.accountNumber(),
             request.accountHolder()
