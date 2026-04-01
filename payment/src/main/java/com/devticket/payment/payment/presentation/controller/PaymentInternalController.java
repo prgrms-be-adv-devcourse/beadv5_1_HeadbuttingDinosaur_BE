@@ -2,6 +2,7 @@ package com.devticket.payment.payment.presentation.controller;
 
 import com.devticket.payment.payment.application.service.PaymentService;
 import com.devticket.payment.payment.presentation.dto.InternalPaymentInfoResponse;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,7 +19,7 @@ public class PaymentInternalController {
 
     @GetMapping("/by-order/{orderId}")
     public ResponseEntity<InternalPaymentInfoResponse> getPaymentByOrderId(
-        @PathVariable Long orderId) {
+        @PathVariable UUID orderId) {
         InternalPaymentInfoResponse response = paymentService.getPaymentByOrderId(orderId);
         return ResponseEntity.ok(response);
     }

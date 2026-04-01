@@ -4,6 +4,7 @@ import com.devticket.payment.common.exception.BusinessException;
 import com.devticket.payment.common.exception.CommonErrorCode;
 import com.devticket.payment.payment.infrastructure.client.dto.InternalOrderInfoResponse;
 import com.devticket.payment.wallet.infrastructure.client.dto.InternalEventOrdersResponse;
+import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import com.devticket.payment.payment.infrastructure.client.dto.InternalOrderItemInfoResponse;
 import org.springframework.beans.factory.annotation.Value;
@@ -29,7 +30,7 @@ public class CommerceInternalClient {
             .build();
     }
 
-    public InternalOrderInfoResponse getOrderInfo(String orderId) {
+    public InternalOrderInfoResponse getOrderInfo(UUID orderId) {
         try {
             return restClient.get()
                 .uri("/internal/orders/{orderId}", orderId)
@@ -41,7 +42,7 @@ public class CommerceInternalClient {
         }
     }
 
-    public void completePayment(Long orderId) {
+    public void completePayment(UUID orderId) {
         try {
             restClient.post()
                 .uri("/internal/orders/{orderId}/payment-completed", orderId)
@@ -54,7 +55,7 @@ public class CommerceInternalClient {
         }
     }
 
-    public void failOrder(Long orderId) {
+    public void failOrder(UUID orderId) {
         restClient.post()
             .uri("/internal/orders/{orderId}/payment-failed", orderId)
             .retrieve()
@@ -62,7 +63,7 @@ public class CommerceInternalClient {
     }
 
 
-    public InternalEventOrdersResponse getOrdersByEvent(Long eventId) {
+    public InternalEventOrdersResponse getOrdersByEvent(UUID eventId) {
         log.info("[CommerceClient] 이벤트 주문 조회 — eventId={}", eventId);
         try {
             return restClient.get()

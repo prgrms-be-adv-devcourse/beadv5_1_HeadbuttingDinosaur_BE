@@ -80,13 +80,14 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     public PaymentConfirmResponse confirmPgPayment(UUID userId, PaymentConfirmRequest request) {
-        InternalOrderInfoResponse order = commerceInternalClient.getOrderInfo(request.orderId());
 
+        InternalOrderInfoResponse order = commerceInternalClient.getOrderInfo(request.orderId());
+        log.info("[Confirm Debug] order.id={}, order.status={}", order.id(), order.status());
         Payment payment = paymentRepository.findByOrderId(order.id())
             .orElseThrow(() -> new PaymentException(PaymentErrorCode.INVALID_PAYMENT_REQUEST));
 
         validateOrderOwner(payment.getUserId(), userId); // 올바른 사용자인지 확인
-        validatePaymentStatus(payment, request.orderId()); // 결제 상태 검증 (중복 승인 방지)
+        validatePaymentStatus(payment, request.paymentId()); // 결제 상태 검증 (중복 승인 방지)
         validatePaymentAmount(payment, request); // 금액 검증
 
         // PG 승인 요청
@@ -118,7 +119,7 @@ public class PaymentServiceImpl implements PaymentService {
     private PaymentReadyResponse processWalletPayment(
         UUID userId,
         InternalOrderInfoResponse order,
-        String orderId,
+        UUID orderId,
         Payment payment
     ) {
         Wallet wallet = walletRepository.findByUserId(userId)
@@ -178,7 +179,7 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     // 결제 상태 검증 (중복 승인 방지)
-    private void validatePaymentStatus(Payment payment, String orderId) {
+    private void validatePaymentStatus(Payment payment, UUID orderId) {
         if (payment.getStatus() != PaymentStatus.READY) {
             log.warn("이미 처리된 결제 요청: orderId={}, status={}", orderId, payment.getStatus());
             throw new PaymentException(PaymentErrorCode.ALREADY_PROCESSED_PAYMENT);
@@ -189,7 +190,7 @@ public class PaymentServiceImpl implements PaymentService {
     private void validatePaymentAmount(Payment payment, PaymentConfirmRequest request) {
         if (!payment.getAmount().equals(request.amount())) {
             log.warn("결제 금액 불일치: expected={}, actual={}, orderId={}",
-                payment.getAmount(), request.amount(), request.orderId());
+                payment.getAmount(), request.amount(), request.paymentId());
             throw new PaymentException(PaymentErrorCode.INVALID_PAYMENT_REQUEST);
         }
     }
@@ -222,7 +223,8 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     @Override
-    public InternalPaymentInfoResponse getPaymentByOrderId(Long orderId) {
+    public InternalPaymentInfoResponse getPaymentByOrderId(UUID orderId) {
+
         Payment payment = paymentRepository.findByOrderId(orderId)
             .orElseThrow(() -> new PaymentException(PaymentErrorCode.INVALID_PAYMENT_REQUEST));
 
@@ -254,7 +256,7 @@ public class PaymentServiceImpl implements PaymentService {
         return pgPaymentClient.confirm(
             new PgPaymentConfirmCommand(
                 request.paymentKey(),
-                request.orderId(),
+                request.paymentId().toString(),
                 request.amount()
             )
         );

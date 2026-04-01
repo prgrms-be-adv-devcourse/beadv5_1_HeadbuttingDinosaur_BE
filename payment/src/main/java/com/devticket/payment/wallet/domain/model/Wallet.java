@@ -16,7 +16,7 @@ import lombok.NoArgsConstructor;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(name = "wallet")
+@Table(name = "wallet", schema = "payment")
 public class Wallet extends BaseEntity {
 
     @Id

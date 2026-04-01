@@ -34,7 +34,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.HttpClientErrorException;
 
 @Service
@@ -160,7 +159,7 @@ public class RefundServiceImpl implements RefundService {
         }
     }
 
-    private InternalEventInfoResponse getEventInfo(Long eventId) {
+    private InternalEventInfoResponse getEventInfo(UUID eventId) {
         try {
             return eventInternalClient.getEventInfo(eventId);
         } catch (HttpClientErrorException e) {
@@ -197,7 +196,7 @@ public class RefundServiceImpl implements RefundService {
     }
 
     private void validatePgPayment(Payment payment) {
-        if (payment.getPaymentMethod() != PaymentMethod.TOSS) {
+        if (payment.getPaymentMethod() != PaymentMethod.PG) {
             throw new RefundException(RefundErrorCode.REFUND_INVALID_REQUEST);
         }
     }
