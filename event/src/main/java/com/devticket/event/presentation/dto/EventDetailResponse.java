@@ -13,6 +13,7 @@ import java.util.UUID;
 public record EventDetailResponse(
     UUID eventId,
     UUID sellerId,
+    String sellerNickname,
     String title,
     String description,
     String location,
@@ -31,7 +32,7 @@ public record EventDetailResponse(
 
     public record TechStackInfo(Long techStackId, String name) {}
 
-    public static EventDetailResponse from(Event event) {
+    public static EventDetailResponse from(Event event, String sellerNickname) {
         List<TechStackInfo> techStacks = event.getEventTechStacks().stream()
             .map(ts -> new TechStackInfo(ts.getTechStackId(), ts.getTechStackName()))
             .toList();
@@ -44,6 +45,7 @@ public record EventDetailResponse(
         return new EventDetailResponse(
             event.getEventId(),
             event.getSellerId(),
+            sellerNickname,
             event.getTitle(),
             event.getDescription(),
             event.getLocation(),

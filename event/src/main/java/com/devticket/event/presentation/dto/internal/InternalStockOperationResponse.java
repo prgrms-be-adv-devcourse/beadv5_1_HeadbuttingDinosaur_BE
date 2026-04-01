@@ -1,7 +1,9 @@
 package com.devticket.event.presentation.dto.internal;
 
+import java.util.UUID;
+
 public record InternalStockOperationResponse(
-    Long id,
+    UUID id,
     boolean success,
     Integer remainingQuantity,
     String eventTitle

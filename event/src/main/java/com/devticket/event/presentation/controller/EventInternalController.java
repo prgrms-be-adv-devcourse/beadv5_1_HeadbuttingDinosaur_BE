@@ -39,11 +39,11 @@ public class EventInternalController {
      * API 1: 단건 이벤트 정보 조회
      * Commerce/Payment 서비스가 id(Long)로 이벤트 기본 정보를 조회할 때 사용
      */
-    @GetMapping("/{id}")
+    @GetMapping("/{eventId}")
     public ResponseEntity<SuccessResponse<InternalEventInfoResponse>> getEventInfo(
-        @PathVariable Long id) {
+        @PathVariable UUID eventId) {
         return ResponseEntity.ok(SuccessResponse.success(
-            eventInternalService.getEventInfo(id)
+            eventInternalService.getEventInfo(eventId)
         ));
     }
 
@@ -63,12 +63,12 @@ public class EventInternalController {
      * API 3: 구매 가능 여부 검증
      * 성공: purchasable=true / 실패: purchasable=false + 불가 사유 포함
      */
-    @GetMapping("/{id}/validate-purchase")
+    @GetMapping("/{eventId}/validate-purchase")
     public ResponseEntity<SuccessResponse<InternalPurchaseValidationResponse>> validatePurchase(
-        @PathVariable Long id,
+        @PathVariable UUID eventId,
         @RequestParam int requestedQuantity) {
         return ResponseEntity.ok(SuccessResponse.success(
-            eventInternalService.validatePurchase(id, requestedQuantity)
+            eventInternalService.validatePurchase(eventId, requestedQuantity)
         ));
     }
 
@@ -89,12 +89,12 @@ public class EventInternalController {
      * API 5: 단건 재고 차감
      * Pessimistic Lock 적용 — 동시 요청 직렬화
      */
-    @PostMapping("/{id}/deduct-stock")
+    @PostMapping("/{eventId}/deduct-stock")
     public ResponseEntity<SuccessResponse<InternalStockOperationResponse>> deductStock(
-        @PathVariable Long id,
+        @PathVariable UUID eventId,
         @RequestBody @Valid InternalStockDeductRequest request) {
         return ResponseEntity.ok(SuccessResponse.success(
-            eventInternalService.deductStock(id, request.quantity())
+            eventInternalService.deductStock(eventId, request.quantity())
         ));
     }
 
@@ -102,12 +102,12 @@ public class EventInternalController {
      * API 6: 단건 재고 복원
      * Pessimistic Lock 적용 — 동시 요청 직렬화
      */
-    @PostMapping("/{id}/restore-stock")
+    @PostMapping("/{eventId}/restore-stock")
     public ResponseEntity<SuccessResponse<InternalStockOperationResponse>> restoreStock(
-        @PathVariable Long id,
+        @PathVariable UUID eventId,
         @RequestBody @Valid InternalStockRestoreRequest request) {
         return ResponseEntity.ok(SuccessResponse.success(
-            eventInternalService.restoreStock(id, request.quantity())
+            eventInternalService.restoreStock(eventId, request.quantity())
         ));
     }
 

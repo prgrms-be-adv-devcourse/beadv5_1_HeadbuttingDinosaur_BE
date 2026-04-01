@@ -20,7 +20,7 @@ import org.hibernate.annotations.SQLRestriction;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
-@Table(name = "event_image", schema = "event_image")
+@Table(name = "event_image", schema = "event")
 @SQLDelete(sql = "UPDATE event_image SET deleted_at = NOW() WHERE id = ?")
 @SQLRestriction("deleted_at IS NULL")
 public class EventImage extends BaseEntity {

@@ -22,6 +22,10 @@ spring:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
 
+service:
+  member:
+    url: http://localhost:8081
+
 logging:
   level:
     org.hibernate.SQL: DEBUG

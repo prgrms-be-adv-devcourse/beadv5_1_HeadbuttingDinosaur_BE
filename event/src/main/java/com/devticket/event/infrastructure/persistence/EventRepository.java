@@ -35,8 +35,16 @@ public interface EventRepository extends JpaRepository<Event, Long>, EventReposi
     Optional<Event> findByIdWithLock(@Param("id") Long id);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT e FROM Event e WHERE e.eventId = :eventId")
+    Optional<Event> findByEventIdWithLock(@Param("eventId") UUID eventId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT e FROM Event e WHERE e.id IN :ids ORDER BY e.id ASC")
     List<Event> findAllByIdInWithLock(@Param("ids") List<Long> ids);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT e FROM Event e WHERE e.eventId IN :eventIds ORDER BY e.eventId ASC")
+    List<Event> findAllByEventIdInWithLock(@Param("eventIds") List<UUID> eventIds);
 
     // 공개 API - 목록 조회용 이미지 배치 로딩 (N+1 쿼리 제거)
     @Query("SELECT DISTINCT e FROM Event e " +
