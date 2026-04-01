@@ -3,7 +3,7 @@ name: CD - Gateway Service
 on:
   push:
     branches: [ "devticket-gateway" ]
-    paths: [ "apigateway/**" ]
+#    paths: [ "apigateway/**" ]
 
 jobs:
   deploy:
