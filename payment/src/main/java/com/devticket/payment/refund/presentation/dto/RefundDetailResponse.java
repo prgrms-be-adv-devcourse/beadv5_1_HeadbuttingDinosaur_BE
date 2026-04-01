@@ -5,7 +5,7 @@ import java.time.LocalDateTime;
 
 public record RefundDetailResponse(
     String refundId,
-    Long orderId,
+    java.util.UUID orderId,
     Long paymentId,
     String paymentMethod,
     Integer refundAmount,

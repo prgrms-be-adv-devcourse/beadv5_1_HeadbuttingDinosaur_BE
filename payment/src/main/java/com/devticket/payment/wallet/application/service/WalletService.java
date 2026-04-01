@@ -22,9 +22,9 @@ public interface WalletService {
 
     WalletTransactionListResponse getTransactions(UUID userId, int page, int size);
 
-    void processWalletPayment(UUID userId, Long orderId, int amount);
+    void processWalletPayment(UUID userId, UUID orderId, int amount);
 
-    void restoreBalance(UUID userId, int amount, UUID refundId, Long orderId);
+    void restoreBalance(UUID userId, int amount, UUID refundId, UUID orderId);
 
-    void processBatchRefund(Long eventId);
+    void processBatchRefund(UUID eventId);
 }

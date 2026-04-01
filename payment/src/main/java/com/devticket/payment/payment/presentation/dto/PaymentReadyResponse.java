@@ -2,10 +2,11 @@ package com.devticket.payment.payment.presentation.dto;
 
 import com.devticket.payment.payment.domain.enums.PaymentStatus;
 import com.devticket.payment.payment.domain.model.Payment;
+import java.util.UUID;
 import lombok.Builder;
 
 public record PaymentReadyResponse(
-    String orderId,
+    UUID orderId,
     String orderNumber,
     String paymentId,
     String paymentMethod,
@@ -17,7 +18,7 @@ public record PaymentReadyResponse(
 
     public static PaymentReadyResponse from(
         Payment payment,
-        String orderId,
+        UUID orderId,
         String orderNumber,
         String orderStatus
     ) {

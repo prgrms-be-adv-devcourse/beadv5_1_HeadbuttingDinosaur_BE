@@ -13,5 +13,5 @@ public interface PaymentService {
     PaymentReadyResponse readyPayment(UUID userId, PaymentReadyRequest request);
     PaymentConfirmResponse confirmPgPayment(UUID userId, PaymentConfirmRequest request);
     PaymentFailResponse failPgPayment(UUID userId, PaymentFailRequest request);
-    InternalPaymentInfoResponse getPaymentByOrderId(Long orderId);
+    InternalPaymentInfoResponse getPaymentByOrderId(UUID orderId);
 }

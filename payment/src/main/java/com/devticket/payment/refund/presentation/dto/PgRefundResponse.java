@@ -1,10 +1,11 @@
 package com.devticket.payment.refund.presentation.dto;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 public record PgRefundResponse(
     String ticketId,
-    Long orderId,
+    UUID orderId,
     int paymentAmount,
     int refundAmount,
     int refundRate,
@@ -14,7 +15,7 @@ public record PgRefundResponse(
 ) {
     public static PgRefundResponse of(
         String ticketId,
-        Long orderId,
+        UUID orderId,
         int paymentAmount,
         int refundAmount,
         int refundRate,

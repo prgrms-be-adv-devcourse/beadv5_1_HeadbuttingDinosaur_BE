@@ -2,7 +2,6 @@ package com.devticket.payment.refund.infrastructure.client;
 
 import com.devticket.payment.refund.infrastructure.client.dto.InternalEventInfoResponse;
 import java.util.UUID;
-import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -21,7 +20,7 @@ public class EventInternalClient {
             .build();
     }
 
-    public InternalEventInfoResponse getEventInfo(Long eventId) {
+    public InternalEventInfoResponse getEventInfo(UUID eventId) {
         return restClient.get()
             .uri("/internal/events/{eventId}", eventId)
             .retrieve()

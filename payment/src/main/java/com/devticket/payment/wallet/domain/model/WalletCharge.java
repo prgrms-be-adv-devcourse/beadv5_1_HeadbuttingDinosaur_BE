@@ -21,7 +21,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "wallet_charge", uniqueConstraints = {
     @UniqueConstraint(columnNames = {"user_id", "idempotency_key"})
-})
+}, schema = "payment")
 public class WalletCharge extends BaseEntity {
 
     @Id
