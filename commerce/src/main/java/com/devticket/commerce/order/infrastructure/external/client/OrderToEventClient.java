@@ -73,19 +73,19 @@ public class OrderToEventClient {
         }
     }
 
-    public List<InternalEventInfoResponse> getSellerEventsByPeriod(UUID sellerId, String periodStart,
-        String periodEnd) {
+    public List<InternalEventInfoResponse> getSellerEventsByPeriod(UUID sellerId, String periodStart, String periodEnd) {
         try {
-            var response = restClient.post()
-                .uri("/internal/events/seller-period")
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(new InternalSellerEventsByPeriodRequest(sellerId, periodStart, periodEnd))
+            var response = restClient.get()
+                .uri(uriBuilder -> uriBuilder
+                    .path("/internal/events/by-seller/{sellerId}/settlement")
+                    .queryParam("periodStart", periodStart)
+                    .queryParam("periodEnd", periodEnd)
+                    .build(sellerId))
                 .retrieve()
                 .onStatus(HttpStatusCode::isError, (req, res) -> {
                     throw new BusinessException(CommonErrorCode.EXTERNAL_SERVICE_ERROR);
                 })
-                .body(new ParameterizedTypeReference<EventSuccessResponse<List<InternalEventInfoResponse>>>() {
-                });
+                .body(new ParameterizedTypeReference<EventSuccessResponse<List<InternalEventInfoResponse>>>() {});
             return response.data();
         } catch (BusinessException e) {
             throw e;
