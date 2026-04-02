@@ -37,7 +37,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.HttpClientErrorException;
 
 @Service
@@ -109,7 +108,7 @@ public class RefundServiceImpl implements RefundService {
 
         Refund refund = Refund.create(
             orderItem.orderId(),
-            payment.getId(),
+            payment.getPaymentId(),
             userId,
             refundAmount,
             refundRate
@@ -163,7 +162,7 @@ public class RefundServiceImpl implements RefundService {
         }
     }
 
-    private InternalEventInfoResponse getEventInfo(Long eventId) {
+    private InternalEventInfoResponse getEventInfo(UUID eventId) {
         try {
             return eventInternalClient.getEventInfo(eventId);
         } catch (HttpClientErrorException e) {
@@ -228,7 +227,7 @@ public class RefundServiceImpl implements RefundService {
         Refund refund = refundRepository.findByRefundId(refundId)
             .orElseThrow(() -> new RefundException(RefundErrorCode.REFUND_NOT_FOUND));
         validateOrderOwner(refund.getUserId(), userId);
-        Payment payment = paymentRepository.findById(refund.getPaymentId())
+        Payment payment = paymentRepository.findByPaymentId(refund.getPaymentId())
             .orElseThrow(() -> new RefundException(RefundErrorCode.PAYMENT_NOT_FOUND));
         return RefundDetailResponse.of(refund, payment.getPaymentMethod().name());
     }

@@ -29,7 +29,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/wallet")
+@RequestMapping("/api/wallet")
 @Tag(name = "Wallet", description = "예치금 API")
 @RequiredArgsConstructor
 public class WalletController {

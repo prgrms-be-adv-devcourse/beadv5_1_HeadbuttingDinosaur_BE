@@ -2,11 +2,12 @@ package com.devticket.payment.refund.presentation.dto;
 
 import com.devticket.payment.refund.domain.model.Refund;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 public record RefundDetailResponse(
     String refundId,
-    Long orderId,
-    Long paymentId,
+    UUID orderId,
+    UUID paymentId,
     String paymentMethod,
     Integer refundAmount,
     Integer refundRate,

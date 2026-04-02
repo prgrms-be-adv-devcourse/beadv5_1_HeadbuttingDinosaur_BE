@@ -6,8 +6,8 @@ import java.util.UUID;
 
 public record RefundListItemResponse(
     String refundId,
-    Long orderId,
-    Long paymentId,
+    UUID orderId,
+    UUID paymentId,
     Integer refundAmount,
     Integer refundRate,
     String status,

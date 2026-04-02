@@ -1,10 +1,10 @@
 package com.devticket.payment.payment.presentation.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import java.util.UUID;
 
 public record PaymentFailRequest(
-    @NotBlank(message = "orderId는 필수입니다.")
-    String orderId,
+    UUID orderId,
 
     String code,
 

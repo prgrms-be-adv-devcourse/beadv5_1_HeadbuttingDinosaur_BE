@@ -19,7 +19,7 @@ import lombok.NoArgsConstructor;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(name = "wallet_transaction")
+@Table(name = "wallet_transaction", schema = "payment")
 public class WalletTransaction extends BaseEntity {
 
     @Id
@@ -49,7 +49,7 @@ public class WalletTransaction extends BaseEntity {
     private Integer balanceAfter;
 
     @Column(name = "related_order_id")
-    private Long relatedOrderId;
+    private UUID relatedOrderId;
 
     @Column(name = "related_refund_id")
     private Long relatedRefundId;
@@ -81,7 +81,7 @@ public class WalletTransaction extends BaseEntity {
         String transactionKey,
         Integer amount,
         Integer balanceAfter,
-        Long relatedOrderId
+        UUID relatedOrderId
     ) {
         WalletTransaction walletTransaction = new WalletTransaction();
         walletTransaction.walletTransactionId = UUID.randomUUID();
@@ -101,7 +101,7 @@ public class WalletTransaction extends BaseEntity {
         String transactionKey,
         Integer amount,
         Integer balanceAfter,
-        Long relatedOrderId,
+        UUID relatedOrderId,
         Long relatedRefundId
     ) {
         WalletTransaction walletTransaction = new WalletTransaction();

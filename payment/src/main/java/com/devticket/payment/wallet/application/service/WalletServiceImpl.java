@@ -190,9 +190,10 @@ public class WalletServiceImpl implements WalletService {
     // =====================================================================
 
     @Override
+    @Transactional
     public WalletBalanceResponse getBalance(UUID userId) {
         Wallet wallet = walletRepository.findByUserId(userId)
-            .orElseThrow(() -> new WalletException(WalletErrorCode.WALLET_NOT_FOUND));
+            .orElseGet(() -> walletRepository.save(Wallet.create(userId)));
         return WalletBalanceResponse.of(wallet);
     }
 
@@ -214,7 +215,7 @@ public class WalletServiceImpl implements WalletService {
 
     @Override
     @Transactional
-    public void processWalletPayment(UUID userId, Long orderId, int amount) {
+    public void processWalletPayment(UUID userId, UUID orderId, int amount) {
         String transactionKey = "USE_" + orderId;
 
         if (walletTransactionRepository.existsByTransactionKey(transactionKey)) {
@@ -260,7 +261,7 @@ public class WalletServiceImpl implements WalletService {
 
     @Override
     @Transactional
-    public void restoreBalance(UUID userId, int amount, UUID refundId, Long orderId) {
+    public void restoreBalance(UUID userId, int amount, UUID refundId, UUID orderId) {
         String transactionKey = "REFUND_" + refundId;
 
         if (walletTransactionRepository.existsByTransactionKey(transactionKey)) {
@@ -289,7 +290,7 @@ public class WalletServiceImpl implements WalletService {
 
     @Override
     @Transactional
-    public void processBatchRefund(Long eventId) {
+    public void processBatchRefund(UUID eventId) {
         InternalEventOrdersResponse response = commerceInternalClient.getOrdersByEvent(eventId);
 
         if (response == null || response.getOrders() == null || response.getOrders().isEmpty()) {
@@ -304,7 +305,7 @@ public class WalletServiceImpl implements WalletService {
         log.info("[BatchRefund] 일괄 환불 시작 — eventId={}, 대상 건수={}", eventId, orders.size());
 
         for (InternalEventOrdersResponse.OrderInfo orderInfo : orders) {
-            Long orderId = orderInfo.getOrderId();
+            UUID orderId = orderInfo.getOrderId();
             UUID userId = UUID.fromString(orderInfo.getUserId());
             int refundAmount = orderInfo.getTotalAmount();
 

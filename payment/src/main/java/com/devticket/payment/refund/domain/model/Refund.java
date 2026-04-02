@@ -19,7 +19,7 @@ import lombok.NoArgsConstructor;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(name = "refund")
+@Table(name = "refund", schema = "payment")
 public class Refund extends BaseEntity {
 
     @Id
@@ -33,10 +33,10 @@ public class Refund extends BaseEntity {
     private UUID userId;
 
     @Column(name = "order_id", nullable = false)
-    private Long orderId;
+    private UUID orderId;
 
     @Column(name = "payment_id", nullable = false)
-    private Long paymentId;
+    private UUID paymentId;
 
     @Column(name = "refund_amount", nullable = false)
     private Integer refundAmount;
@@ -62,8 +62,8 @@ public class Refund extends BaseEntity {
        ======================= */
 
     public static Refund create(
-        Long orderId,
-        Long paymentId,
+        UUID orderId,
+        UUID paymentId,
         UUID userId,
         Integer amount,
         Integer refundRate

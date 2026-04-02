@@ -29,17 +29,16 @@ jwt:
 
 logging:
   level:
-    org.hibernate.SQL: DEBUG
-    com.devticket: DEBUG
+    org.hibernate.SQL: OFF
 
 internal:
   commerce:
-    base-url: http://commerce-service:8083
+    base-url: http://localhost:8083
   event:
-    base-url: http://event-service:8082
+    base-url: http://localhost:8082
 
 pg:
   toss:
     base-url: https://api.tosspayments.com
-    secret-key: ${PG_SECRET_KEY}
+    secret-key:
 

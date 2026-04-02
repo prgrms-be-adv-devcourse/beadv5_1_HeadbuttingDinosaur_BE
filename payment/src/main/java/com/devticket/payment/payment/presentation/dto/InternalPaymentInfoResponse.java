@@ -2,10 +2,11 @@ package com.devticket.payment.payment.presentation.dto;
 
 import com.devticket.payment.payment.domain.model.Payment;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 public record InternalPaymentInfoResponse(
     Long id,
-    Long orderId,
+    UUID orderId,
     String paymentKey,
     String paymentMethod,
     Integer amount,
