@@ -59,6 +59,7 @@ jobs:
             -e JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }} \
             -e KAFKA_BOOTSTRAP_SERVERS=localhost:9092 \
             -e JAVA_OPTS="-Xms256m -Xmx512m" \
+            -e SERVICE_MEMBER_URL=http://localhost:8081 \
             $IMAGE_URL
           docker image prune -f
 
