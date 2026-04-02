@@ -2,6 +2,7 @@ package com.devticket.member.application;
 
 import com.devticket.member.common.exception.BusinessException;
 import com.devticket.member.presentation.domain.MemberErrorCode;
+import com.devticket.member.presentation.domain.SellerApplicationDecision;
 import com.devticket.member.presentation.domain.UserRole;
 import com.devticket.member.presentation.domain.model.SellerApplication;
 import com.devticket.member.presentation.domain.model.User;
@@ -52,7 +53,7 @@ public class InternalMemberService {
 
     public InternalSellerInfoResponse getSellerInfo(UUID userId) {
         User user = findUserByUuidOrThrow(userId);
-        SellerApplication application = sellerApplicationRepository.findTopByUserIdOrderByCreatedAtDesc(user.getId())
+        SellerApplication application = sellerApplicationRepository.findTopByUserIdOrderByCreatedAtDesc(user.getUserId())
             .orElseThrow(() -> new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND));
         return InternalSellerInfoResponse.from(user, application);
     }
@@ -76,14 +77,14 @@ public class InternalMemberService {
             .orElseThrow(()-> new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND));
 
         // 판매자 승인 시
-        if(request.decision().equals("APPROVED")){
+        if(request.decision() == SellerApplicationDecision.APPROVED){
             application.approve();
             User user = userRepository.findByUserId(application.getUserId())
                 .orElseThrow(()-> new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND));
             user.changeRole(UserRole.SELLER);
         }
         // 판매자 미승인 시
-        else if(request.decision().equals("REJECTED")){
+        else if(request.decision().equals(SellerApplicationDecision.REJECTED)){
             application.reject();
         }
 

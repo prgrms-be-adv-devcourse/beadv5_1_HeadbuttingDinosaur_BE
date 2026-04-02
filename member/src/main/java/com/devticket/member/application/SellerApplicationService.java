@@ -30,7 +30,7 @@ public class SellerApplicationService {
     public SellerApplicationResponse apply(UUID userId, SellerApplicationRequest request) {
         User user = findUserByUuidOrThrow(userId);
         validateNotAlreadySeller(user);
-        validateNoPendingApplication(user.getId());
+        validateNoPendingApplication(user.getUserId());
 
         SellerApplication application = new SellerApplication(
             user.getUserId(),
@@ -46,7 +46,7 @@ public class SellerApplicationService {
 
     public SellerApplicationStatusResponse getMyApplication(UUID userId) {
         User user = findUserByUuidOrThrow(userId);
-        SellerApplication application = sellerApplicationRepository.findTopByUserIdOrderByCreatedAtDesc(user.getId())
+        SellerApplication application = sellerApplicationRepository.findTopByUserIdOrderByCreatedAtDesc(user.getUserId())
             .orElseThrow(() -> new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND));
 
         return SellerApplicationStatusResponse.from(application);
@@ -60,7 +60,7 @@ public class SellerApplicationService {
         }
     }
 
-    private void validateNoPendingApplication(Long userId) {
+    private void validateNoPendingApplication(UUID userId) {
         if (sellerApplicationRepository.existsByUserIdAndStatus(userId, SellerApplicationStatus.PENDING)) {
             throw new BusinessException(MemberErrorCode.SELLER_APPLICATION_DUPLICATED);
         }

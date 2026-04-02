@@ -13,7 +13,7 @@ public record InternalUpdateRoleResponse(
     public static InternalUpdateRoleResponse from(User user){
         return new InternalUpdateRoleResponse(
             user.getUserId().toString(),
-            user.getStatus().name()
+            user.getRole().name()
         );
     }
 
