@@ -1,5 +1,6 @@
 package com.devticket.payment.refund.infrastructure.persistence;
 
+import com.devticket.payment.refund.domain.enums.RefundStatus;
 import com.devticket.payment.refund.domain.model.Refund;
 import java.util.List;
 import java.util.Optional;
@@ -24,5 +25,5 @@ public interface RefundJpaRepository extends JpaRepository<Refund, Long> {
 
     Optional<Refund> findByRefundId(UUID refundId);
 
-    Page<Refund> findByOrderIdIn(List<Long> orderIds, Pageable pageable);
+    Page<Refund> findByOrderIdInAndStatus(List<UUID> orderIds, RefundStatus status, Pageable pageable);
 }

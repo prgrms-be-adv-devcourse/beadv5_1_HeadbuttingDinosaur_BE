@@ -1,5 +1,6 @@
 package com.devticket.payment.refund.infrastructure.persistence;
 
+import com.devticket.payment.refund.domain.enums.RefundStatus;
 import com.devticket.payment.refund.domain.model.Refund;
 import com.devticket.payment.refund.domain.repository.RefundRepository;
 import java.util.List;
@@ -38,7 +39,7 @@ public class RefundRepositoryImpl implements RefundRepository {
     }
 
     @Override
-    public Page<Refund> findByOrderIdIn(List<Long> orderIds, Pageable pageable) {
-        return refundJpaRepository.findByOrderIdIn(orderIds, pageable);
+    public Page<Refund> findByOrderIdInAndStatus(List<UUID> orderIds, RefundStatus status, Pageable pageable) {
+        return refundJpaRepository.findByOrderIdInAndStatus(orderIds, status, pageable);
     }
 }

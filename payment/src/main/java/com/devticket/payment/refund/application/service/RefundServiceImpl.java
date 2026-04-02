@@ -12,6 +12,7 @@ import com.devticket.payment.payment.infrastructure.client.dto.InternalOrderItem
 import com.devticket.payment.payment.infrastructure.external.PgPaymentClient;
 import com.devticket.payment.refund.domain.RefundPolicyConstants;
 import com.devticket.payment.refund.domain.RefundRateConstants;
+import com.devticket.payment.refund.domain.enums.RefundStatus;
 import com.devticket.payment.refund.domain.exception.RefundErrorCode;
 import com.devticket.payment.refund.domain.exception.RefundException;
 import com.devticket.payment.refund.domain.model.Refund;
@@ -21,6 +22,7 @@ import com.devticket.payment.refund.infrastructure.client.dto.InternalEventInfoR
 import com.devticket.payment.refund.presentation.dto.RefundDetailResponse;
 import com.devticket.payment.refund.presentation.dto.RefundInfoResponse;
 import com.devticket.payment.refund.presentation.dto.RefundListItemResponse;
+import com.devticket.payment.refund.presentation.dto.SellerRefundListItemResponse;
 import com.devticket.payment.refund.presentation.dto.PgRefundRequest;
 import com.devticket.payment.refund.presentation.dto.PgRefundResponse;
 import com.devticket.payment.wallet.infrastructure.client.dto.InternalEventOrdersResponse;
@@ -233,10 +235,15 @@ public class RefundServiceImpl implements RefundService {
     }
 
     @Override
-    public Page<RefundListItemResponse> getRefundListByEventId(Long eventId, Pageable pageable) {
-        InternalEventOrdersResponse eventOrders = commerceInternalClient.getOrdersByEvent(eventId);
+    public Page<SellerRefundListItemResponse> getSellerRefundListByEventId(UUID sellerId, String eventId, Pageable pageable) {
+        InternalEventInfoResponse event = getEventInfo(UUID.fromString(eventId));
+        if (!event.sellerId().equals(sellerId)) {
+            throw new RefundException(RefundErrorCode.REFUND_INVALID_REQUEST);
+        }
 
-        List<Long> orderIds = eventOrders.getOrders() == null
+        InternalEventOrdersResponse eventOrders = commerceInternalClient.getOrdersByEvent(UUID.fromString(eventId));
+
+        List<UUID> orderIds = eventOrders.getOrders() == null
             ? Collections.emptyList()
             : eventOrders.getOrders().stream()
                 .map(InternalEventOrdersResponse.OrderInfo::getOrderId)
@@ -246,8 +253,13 @@ public class RefundServiceImpl implements RefundService {
             return Page.empty(pageable);
         }
 
-        return refundRepository.findByOrderIdIn(orderIds, pageable)
-            .map(RefundListItemResponse::from);
+        return refundRepository.findByOrderIdInAndStatus(orderIds, RefundStatus.COMPLETED, pageable)
+            .map(refund -> {
+                String paymentMethod = paymentRepository.findByPaymentId(refund.getPaymentId())
+                    .map(payment -> payment.getPaymentMethod().name())
+                    .orElse(null);
+                return SellerRefundListItemResponse.of(refund, paymentMethod);
+            });
     }
 
     private LocalDateTime parseCanceledAt(String canceledAt) {

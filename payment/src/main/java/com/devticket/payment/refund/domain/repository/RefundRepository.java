@@ -1,5 +1,6 @@
 package com.devticket.payment.refund.domain.repository;
 
+import com.devticket.payment.refund.domain.enums.RefundStatus;
 import com.devticket.payment.refund.domain.model.Refund;
 import java.util.List;
 import java.util.Optional;
@@ -12,5 +13,5 @@ public interface RefundRepository {
     int sumCompletedRefundAmountByPaymentId(Long paymentId);
     Page<Refund> findByUserId(UUID userId, Pageable pageable);
     Optional<Refund> findByRefundId(UUID refundId);
-    Page<Refund> findByOrderIdIn(List<Long> orderIds, Pageable pageable);
+    Page<Refund> findByOrderIdInAndStatus(List<UUID> orderIds, RefundStatus status, Pageable pageable);
 }
