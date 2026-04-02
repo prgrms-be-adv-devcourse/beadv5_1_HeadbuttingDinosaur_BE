@@ -1,7 +1,7 @@
 package com.devticket.admin.presentation.dto.req;
 
 import com.devticket.admin.domain.model.temporaryEnum.UserRole;
-import com.devticket.admin.domain.model.temporaryEnum.UserState;
+import com.devticket.admin.domain.model.temporaryEnum.UserStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 public record UserSearchCondition(
@@ -36,7 +36,7 @@ public record UserSearchCondition(
         if (status != null) {
 
             try {
-                UserState.valueOf(status);
+                UserStatus.valueOf(status);
             } catch (IllegalArgumentException e) {
                 throw new IllegalArgumentException("유효하지 status 않은  값" + status);
             }
