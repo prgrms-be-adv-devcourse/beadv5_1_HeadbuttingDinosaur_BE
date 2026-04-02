@@ -11,6 +11,7 @@ import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -111,6 +112,19 @@ public class EventRepositoryImpl implements EventRepositoryCustom {
             .where(
                 sellerEq(sellerId),
                 statusEq(status)
+            )
+            .orderBy(event.createdAt.desc())
+            .fetch();
+    }
+
+    @Override
+    public List<Event> findEventsBySellerAndPeriod(UUID sellerId, LocalDateTime periodStart, LocalDateTime periodEnd) {
+        return queryFactory
+            .selectFrom(event)
+            .where(
+                sellerEq(sellerId),
+                event.saleStartAt.goe(periodStart),
+                event.saleEndAt.loe(periodEnd)
             )
             .orderBy(event.createdAt.desc())
             .fetch();

@@ -13,6 +13,7 @@ import com.devticket.event.presentation.dto.internal.InternalSellerEventsRespons
 import com.devticket.event.presentation.dto.internal.InternalStockAdjustmentResponse;
 import com.devticket.event.presentation.dto.internal.InternalStockOperationResponse;
 import com.devticket.event.presentation.dto.internal.PurchaseUnavailableReason;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -227,4 +228,17 @@ public class EventInternalService {
         }
         return PurchaseUnavailableReason.INSUFFICIENT_STOCK;
     }
+
+
+    // 기간 별 판매자 이벤트
+    public List<InternalEventInfoResponse> getEventsBySellerForSettlement(UUID sellerId, String periodStart, String periodEnd) {
+        LocalDateTime start = LocalDate.parse(periodStart).atStartOfDay();
+        LocalDateTime end = LocalDate.parse(periodEnd).atTime(23, 59, 59);
+
+        return eventRepository.findEventsBySellerAndPeriod(sellerId, start, end)
+            .stream()
+            .map(InternalEventInfoResponse::from)
+            .toList();
+    }
+
 }
