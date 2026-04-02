@@ -16,6 +16,7 @@ import com.devticket.member.presentation.domain.ProviderType;
 import com.devticket.member.presentation.domain.model.User;
 import com.devticket.member.presentation.domain.model.UserProfile;
 import com.devticket.member.presentation.domain.model.UserTechStack;
+import com.devticket.member.infrastructure.jwt.JwtTokenProvider;
 import com.devticket.member.presentation.domain.repository.RefreshTokenRepository;
 import com.devticket.member.presentation.domain.repository.TechStackRepository;
 import com.devticket.member.presentation.domain.repository.UserProfileRepository;
@@ -64,6 +65,9 @@ class UserServiceTest {
 
     @Mock
     private PasswordEncoder passwordEncoder;
+
+    @Mock
+    private JwtTokenProvider jwtTokenProvider;
 
     private static final UUID TEST_USER_UUID = UUID.randomUUID();
 

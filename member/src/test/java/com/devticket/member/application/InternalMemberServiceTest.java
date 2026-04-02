@@ -11,6 +11,7 @@ import com.devticket.member.presentation.domain.UserRole;
 import com.devticket.member.presentation.domain.model.SellerApplication;
 import com.devticket.member.presentation.domain.model.User;
 import com.devticket.member.presentation.domain.repository.SellerApplicationRepository;
+import com.devticket.member.presentation.domain.repository.UserProfileRepository;
 import com.devticket.member.presentation.domain.repository.UserRepository;
 import com.devticket.member.presentation.dto.internal.response.InternalMemberInfoResponse;
 import com.devticket.member.presentation.dto.internal.response.InternalMemberRoleResponse;
@@ -37,6 +38,9 @@ class InternalMemberServiceTest {
 
     @Mock
     private SellerApplicationRepository sellerApplicationRepository;
+
+    @Mock
+    private UserProfileRepository userProfileRepository;
 
     private static final UUID TEST_USER_UUID = UUID.randomUUID();
 
