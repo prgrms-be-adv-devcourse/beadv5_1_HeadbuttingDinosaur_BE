@@ -1,0 +1,79 @@
+name: CD - Event Service
+
+on:
+  push:
+    branches: [ "devticket-event" ]
+    paths: [ "event/**" ]
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x ./event/gradlew
+
+      - name: Build with Gradle
+        run: |
+          cd event
+          ./gradlew clean bootJar
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and Push Docker Image
+        run: |
+          SHORT_SHA=${GITHUB_SHA::7}
+          IMAGE_BASE=${{ secrets.DOCKERHUB_USERNAME }}/devticket-domain-event
+          docker build -t ${IMAGE_BASE}:${SHORT_SHA} -t ${IMAGE_BASE}:latest ./event
+          docker push ${IMAGE_BASE}:${SHORT_SHA}
+          docker push ${IMAGE_BASE}:latest
+
+      - name: Deploy
+        run: |
+          IMAGE_URL=${{ secrets.DOCKERHUB_USERNAME }}/devticket-domain-event:latest
+          docker pull $IMAGE_URL
+          docker stop devticket-event || true
+          docker rm devticket-event || true
+          docker run -d \
+            --name devticket-event \
+            --network host \
+            --restart always \
+            -e SPRING_PROFILES_ACTIVE=prod \
+            -e DB_URL="jdbc:postgresql://localhost:5432/devticket?currentSchema=event" \
+            -e DB_USERNAME=${{ secrets.DB_USERNAME }} \
+            -e DB_PASSWORD=${{ secrets.DB_PASSWORD }} \
+            -e JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }} \
+            -e KAFKA_BOOTSTRAP_SERVERS=localhost:9092 \
+            -e JAVA_OPTS="-Xms256m -Xmx512m" \
+            -e SERVICE_MEMBER_URL=http://localhost:8081 \
+            $IMAGE_URL
+          docker image prune -f
+
+      - name: Health Check
+        run: |
+          echo "Waiting for event service to start..."
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8082/actuator/health > /dev/null 2>&1; then
+              echo "Event service is healthy!"
+              exit 0
+            fi
+            echo "Attempt $i/30 - waiting 3s..."
+            sleep 3
+          done
+          echo "Event service health check failed!"
+          docker logs devticket-event --tail 50
+          exit 1
