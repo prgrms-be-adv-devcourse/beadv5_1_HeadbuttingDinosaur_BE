@@ -55,6 +55,3 @@ jobs:
           docker logs devticket-frontend --tail 30
           exit 1
  
-        run: |
-          sleep 10
-          curl -f http://localhost:80 || exit 1   # ← nginx 포트
