@@ -1,19 +1,26 @@
 package com.devticket.member.presentation.controller;
 
 import com.devticket.member.application.InternalMemberService;
+import com.devticket.member.presentation.dto.internal.request.InternalDecideSellerApplicationRequest;
+import com.devticket.member.presentation.dto.internal.response.InternalDecideSellerApplicationResponse;
 import com.devticket.member.presentation.dto.internal.response.InternalMemberInfoResponse;
 import com.devticket.member.presentation.dto.internal.response.InternalMemberRoleResponse;
 import com.devticket.member.presentation.dto.internal.response.InternalMemberStatusResponse;
+import com.devticket.member.presentation.dto.internal.response.InternalSellerApplicationResponse;
 import com.devticket.member.presentation.dto.internal.response.InternalSellerInfoResponse;
+import com.devticket.member.presentation.dto.internal.response.InternalUpdateStatusResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -70,6 +77,40 @@ public class InternalMemberController {
     public ResponseEntity<InternalSellerInfoResponse> getSellerInfo(
         @PathVariable UUID userId) {
         InternalSellerInfoResponse response = internalMemberService.getSellerInfo(userId);
+        return ResponseEntity.ok(response);
+    }
+
+//    @Operation(summary = "회원 상태 변경", description = "내부 서비스용 — 어드민의 회원 상태 변경")
+//    @ApiResponses({
+//        @ApiResponse(responseCode = "200", description = "변경 성공"),
+//        @ApiResponse(responseCode = "404", description = "회원 없음")
+//    })
+//    @PatchMapping("/{userId}/status")
+//    public ResponseEntity<InternalUpdateStatusResponse> updateMemberStatus(){
+//
+//    }
+
+    // 판매자 등록 신청자 리스트
+    @Operation(summary = "판매자 신청 목록 조회", description = "내부 서비스용 — 판매자 신청 목록 조회")
+    @ApiResponse(responseCode = "200", description = "조회 성공")
+    @GetMapping("/seller-applications")
+    public ResponseEntity<List<InternalSellerApplicationResponse>> getSellerApplications(){
+        List<InternalSellerApplicationResponse> response = internalMemberService.getSellerApplications();
+        return ResponseEntity.ok(response);
+    }
+
+    // 판매자 승인 결정
+    @Operation(summary = "판매자 신청 승인/반려", description = "내부 서비스용 — 판매자 신청 승인/반려")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "처리 성공"),
+        @ApiResponse(responseCode = "404", description = "신청 없음")
+    })
+    @PatchMapping("/seller-applications/{applicationId}")
+    public ResponseEntity<InternalDecideSellerApplicationResponse> decideSellerApplication(
+        @PathVariable UUID applicationId,
+        @RequestBody InternalDecideSellerApplicationRequest request
+    ){
+        InternalDecideSellerApplicationResponse response=internalMemberService.decideSellerApplication(applicationId, request);
         return ResponseEntity.ok(response);
     }
 }

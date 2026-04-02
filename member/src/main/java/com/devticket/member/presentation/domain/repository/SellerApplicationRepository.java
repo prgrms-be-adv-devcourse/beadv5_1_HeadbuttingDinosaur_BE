@@ -8,9 +8,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface SellerApplicationRepository extends JpaRepository<SellerApplication, Long> {
 
-    Optional<SellerApplication> findTopByUserIdOrderByCreatedAtDesc(Long userId);
+    Optional<SellerApplication> findTopByUserIdOrderByCreatedAtDesc(UUID userId);
 
     Optional<SellerApplication> findBySellerApplicationId(UUID sellerApplicationId);
 
-    boolean existsByUserIdAndStatus(Long userId, SellerApplicationStatus status);
+    boolean existsByUserIdAndStatus(UUID userId, SellerApplicationStatus status);
 }
