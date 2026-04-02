@@ -113,4 +113,12 @@ public class InternalMemberController {
         InternalDecideSellerApplicationResponse response=internalMemberService.decideSellerApplication(applicationId, request);
         return ResponseEntity.ok(response);
     }
+
+    @Operation(summary = "판매자 ID 목록 조회", description = "내부 서비스용 — 전체 판매자 ID 목록 조회")
+    @ApiResponse(responseCode = "200", description = "조회 성공")
+    @GetMapping("/sellers")
+    public ResponseEntity<List<UUID>> getSellerId(){
+        List<UUID> response = internalMemberService.getSellerIds();
+        return ResponseEntity.ok(response);
+    }
 }

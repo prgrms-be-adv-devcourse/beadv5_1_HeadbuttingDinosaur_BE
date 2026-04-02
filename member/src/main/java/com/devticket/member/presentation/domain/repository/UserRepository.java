@@ -1,6 +1,8 @@
 package com.devticket.member.presentation.domain.repository;
 
+import com.devticket.member.presentation.domain.UserRole;
 import com.devticket.member.presentation.domain.model.User;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -14,5 +16,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findSellerById(Long id);
 
     boolean existsByEmail(String email);
+
+    List<User> findByRole(UserRole role);
 }
 

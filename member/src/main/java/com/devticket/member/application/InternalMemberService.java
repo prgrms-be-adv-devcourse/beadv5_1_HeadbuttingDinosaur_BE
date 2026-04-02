@@ -90,4 +90,11 @@ public class InternalMemberService {
 
         return InternalDecideSellerApplicationResponse.from(application);
     }
+
+    // seller 아이디 전체 반환
+    public List<UUID> getSellerIds() {
+        return userRepository.findByRole(UserRole.SELLER).stream()
+            .map(User::getUserId)
+            .toList();
+    }
 }
