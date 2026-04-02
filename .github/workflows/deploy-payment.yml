@@ -56,5 +56,6 @@ jobs:
             -e DB_PASSWORD=${{ secrets.DB_PASSWORD }} \
             -e JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }} \
             -e KAFKA_BOOTSTRAP_SERVERS=localhost:9092 \
+            -e PG_SECRET_KEY=${{ secrets.PG_SECRET_KEY }} \ 
             $IMAGE_URL
           docker image prune -f
