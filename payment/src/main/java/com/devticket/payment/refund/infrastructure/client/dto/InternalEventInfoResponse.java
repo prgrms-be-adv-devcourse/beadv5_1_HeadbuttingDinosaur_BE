@@ -4,8 +4,8 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 public record InternalEventInfoResponse(
-    Long id,
-    Long sellerId,
+    UUID eventId,
+    UUID sellerId,
     String title,
     Integer price,
     String status,

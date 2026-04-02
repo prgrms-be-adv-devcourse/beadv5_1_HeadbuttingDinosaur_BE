@@ -40,5 +40,5 @@ internal:
 pg:
   toss:
     base-url: https://api.tosspayments.com
-    secret-key:
+    secret-key: ${PG_SECRET_KEY}
 

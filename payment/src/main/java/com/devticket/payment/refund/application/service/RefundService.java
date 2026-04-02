@@ -3,6 +3,7 @@ package com.devticket.payment.refund.application.service;
 import com.devticket.payment.refund.presentation.dto.RefundDetailResponse;
 import com.devticket.payment.refund.presentation.dto.RefundInfoResponse;
 import com.devticket.payment.refund.presentation.dto.RefundListItemResponse;
+import com.devticket.payment.refund.presentation.dto.SellerRefundListItemResponse;
 import com.devticket.payment.refund.presentation.dto.PgRefundRequest;
 import com.devticket.payment.refund.presentation.dto.PgRefundResponse;
 import java.util.UUID;
@@ -14,4 +15,5 @@ public interface RefundService {
     PgRefundResponse refundPgTicket(UUID userId, String ticketId, PgRefundRequest request);
     Page<RefundListItemResponse> getRefundList(UUID userId, Pageable pageable);
     RefundDetailResponse getRefundDetail(UUID userId, UUID refundId);
+    Page<SellerRefundListItemResponse> getSellerRefundListByEventId(UUID sellerId, String eventId, Pageable pageable);
 }

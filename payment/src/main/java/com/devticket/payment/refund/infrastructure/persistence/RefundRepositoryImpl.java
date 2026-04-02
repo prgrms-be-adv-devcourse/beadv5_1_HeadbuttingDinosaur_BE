@@ -1,7 +1,9 @@
 package com.devticket.payment.refund.infrastructure.persistence;
 
+import com.devticket.payment.refund.domain.enums.RefundStatus;
 import com.devticket.payment.refund.domain.model.Refund;
 import com.devticket.payment.refund.domain.repository.RefundRepository;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -34,5 +36,10 @@ public class RefundRepositoryImpl implements RefundRepository {
     @Override
     public Optional<Refund> findByRefundId(UUID refundId) {
         return refundJpaRepository.findByRefundId(refundId);
+    }
+
+    @Override
+    public Page<Refund> findByOrderIdInAndStatus(List<UUID> orderIds, RefundStatus status, Pageable pageable) {
+        return refundJpaRepository.findByOrderIdInAndStatus(orderIds, status, pageable);
     }
 }
