@@ -1,5 +1,7 @@
 package com.devticket.payment.refund.application.service;
 
+import com.devticket.payment.common.exception.BusinessException;
+import com.devticket.payment.common.exception.CommonErrorCode;
 import com.devticket.payment.payment.application.dto.PgPaymentCancelCommand;
 import com.devticket.payment.payment.application.dto.PgPaymentCancelResult;
 import com.devticket.payment.payment.domain.enums.PaymentMethod;
@@ -236,14 +238,21 @@ public class RefundServiceImpl implements RefundService {
 
     @Override
     public Page<SellerRefundListItemResponse> getSellerRefundListByEventId(UUID sellerId, String eventId, Pageable pageable) {
-        InternalEventInfoResponse event = getEventInfo(UUID.fromString(eventId));
+        UUID eventUUID;
+        try {
+            eventUUID = UUID.fromString(eventId);
+        } catch (IllegalArgumentException e) {
+            throw new BusinessException(CommonErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        InternalEventInfoResponse event = getEventInfo(eventUUID);
         if (!event.sellerId().equals(sellerId)) {
             throw new RefundException(RefundErrorCode.REFUND_INVALID_REQUEST);
         }
 
         InternalEventOrdersResponse eventOrders = commerceInternalClient.getOrdersByEvent(UUID.fromString(eventId));
 
-        List<UUID> orderIds = eventOrders.getOrders() == null
+        List<UUID> orderIds = (eventOrders == null || eventOrders.getOrders() == null)
             ? Collections.emptyList()
             : eventOrders.getOrders().stream()
                 .map(InternalEventOrdersResponse.OrderInfo::getOrderId)
