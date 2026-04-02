@@ -36,9 +36,11 @@ jobs:
 
       - name: Build and Push Docker Image
         run: |
-          IMAGE_URL=${{ secrets.DOCKERHUB_USERNAME }}/devticket-gateway:latest
-          docker build -t $IMAGE_URL ./apigateway
-          docker push $IMAGE_URL
+          SHORT_SHA=${GITHUB_SHA::7}
+          IMAGE_BASE=${{ secrets.DOCKERHUB_USERNAME }}/devticket-gateway
+          docker build -t ${IMAGE_BASE}:${SHORT_SHA} -t ${IMAGE_BASE}:latest ./apigateway
+          docker push ${IMAGE_BASE}:${SHORT_SHA}
+          docker push ${IMAGE_BASE}:latest
 
       - name: Deploy
         run: |
@@ -52,5 +54,21 @@ jobs:
             --restart always \
             -e SPRING_PROFILES_ACTIVE=prod \
             -e JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }} \
+            -e JAVA_OPTS="-Xms256m -Xmx512m" \
             $IMAGE_URL
           docker image prune -f
+
+      - name: Health Check
+        run: |
+          echo "Waiting for gateway to start..."
+          for i in $(seq 1 20); do
+            if curl -sf http://localhost:8080/actuator/health > /dev/null 2>&1; then
+              echo "Gateway is healthy!"
+              exit 0
+            fi
+            echo "Attempt $i/20 - waiting 3s..."
+            sleep 3
+          done
+          echo "Gateway health check failed!"
+          docker logs devticket-gateway --tail 50
+          exit 1
