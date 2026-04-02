@@ -36,9 +36,11 @@ jobs:
 
       - name: Build and Push Docker Image
         run: |
-          IMAGE_URL=${{ secrets.DOCKERHUB_USERNAME }}/devticket-domain-event:latest
-          docker build -t $IMAGE_URL ./event
-          docker push $IMAGE_URL
+          SHORT_SHA=${GITHUB_SHA::7}
+          IMAGE_BASE=${{ secrets.DOCKERHUB_USERNAME }}/devticket-domain-event
+          docker build -t ${IMAGE_BASE}:${SHORT_SHA} -t ${IMAGE_BASE}:latest ./event
+          docker push ${IMAGE_BASE}:${SHORT_SHA}
+          docker push ${IMAGE_BASE}:latest
 
       - name: Deploy
         run: |
@@ -56,5 +58,21 @@ jobs:
             -e DB_PASSWORD=${{ secrets.DB_PASSWORD }} \
             -e JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }} \
             -e KAFKA_BOOTSTRAP_SERVERS=localhost:9092 \
+            -e JAVA_OPTS="-Xms256m -Xmx512m" \
             $IMAGE_URL
           docker image prune -f
+
+      - name: Health Check
+        run: |
+          echo "Waiting for event service to start..."
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8082/actuator/health > /dev/null 2>&1; then
+              echo "Event service is healthy!"
+              exit 0
+            fi
+            echo "Attempt $i/30 - waiting 3s..."
+            sleep 3
+          done
+          echo "Event service health check failed!"
+          docker logs devticket-event --tail 50
+          exit 1
