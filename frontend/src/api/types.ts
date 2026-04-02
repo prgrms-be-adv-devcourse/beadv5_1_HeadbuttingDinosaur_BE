@@ -182,22 +182,22 @@ export type EventFilterResponse = EventListResponse;
 
 // ── Seller Events ────────────────────────────────────────────────────────────
 export interface SellerEventCreateRequest {
-  title: string;
-  description: string;
-  category: string;
-  techStackIds: number[];
-  price: number;
-  totalQuantity: number;
-  maxQuantityPerUser: number;
-  eventDateTime: string;
-  saleStartAt: string;
-  saleEndAt: string;
-  location: string;
-  thumbnailUrl?: string;
+  title: string
+  description: string
+  category: string
+  techStackIds: number[]
+  price: number
+  totalQuantity: number
+  maxQuantity: number
+  eventDateTime: string
+  saleStartAt: string
+  saleEndAt: string
+  location: string
+  imageUrls?: string[]
 }
 export interface SellerEventCreateResponse {
   eventId: string;
-  title: string;
+  sellerId: string;
   status: string;
   createdAt: string;
 }
@@ -245,15 +245,23 @@ export interface SellerEventDetailResponse {
 export interface SellerEventUpdateRequest {
   title?: string;
   description?: string;
-  totalQuantity?: number;
-  maxQuantityPerUser?: number;
   location?: string;
-  thumbnailUrl?: string;
+  eventDateTime?: string;
+  saleStartAt?: string;
+  saleEndAt?: string;
+  price?: number;
+  totalQuantity?: number;
+  maxQuantity?: number;
+  category?: string;
+  techStackIds?: number[];
+  imageUrls?: string[];
+  status?: string;
 }
+
 export interface SellerEventUpdateResponse {
   eventId: string;
-  title: string;
   status: string;
+  updatedAt: string;
 }
 
 export interface SellerEventStopResponse {

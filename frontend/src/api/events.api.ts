@@ -29,7 +29,7 @@ export const filterEvents = (params: EventFilterRequest) =>
 
 // ── 판매자 이벤트 ──────────────────────────────────────────────────────────────
 export const createSellerEvent = (body: SellerEventCreateRequest) =>
-  apiClient.post<ApiResponse<SellerEventCreateResponse>>('/seller/events', body);
+    apiClient.post<ApiResponse<SellerEventCreateResponse>>('/events', body);
 
 export const getSellerEvents = (params?: SellerEventListRequest) =>
   apiClient.get<ApiResponse<SellerEventListResponse>>('/seller/events', { params });
