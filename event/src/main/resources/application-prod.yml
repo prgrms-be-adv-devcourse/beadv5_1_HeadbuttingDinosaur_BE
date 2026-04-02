@@ -17,6 +17,10 @@ spring:
       group-id: devticket-event
       auto-offset-reset: latest
 
+service:
+  member:
+    url: http://localhost:8081
+
 logging:
   level:
     com.devticket: INFO
