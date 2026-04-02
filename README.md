@@ -1,96 +1,99 @@
-# ⎡ DevTicket ⎦
+# DevTicket Frontend
 
-개발자 이벤트 티켓 커머스 플랫폼
+개발자 이벤트·컨퍼런스 티케팅 플랫폼 프론트엔드
 
----
-
-## 프로젝트 소개
-
-개발자 밋업, 컨퍼런스 등 기술 이벤트를 탐색하고 티켓을 구매할 수 있는 커머스 플랫폼입니다.
-
-**일반 사용자**는 관심 기술 스택 기반으로 이벤트를 탐색하고 티켓을 구매합니다.
-**판매자**는 이벤트를 등록하고 티켓을 판매하며 정산을 받습니다.
-**어드민**은 회원 관리, 판매자 승인, 이벤트 관리, 정산 관리를 담당합니다.
-
----
-
-## 기술 스택
-
-| 구분 | 기술 |
-|------|------|
-| Backend | JDK 21, Spring Boot, Spring Security, JPA |
-| Database | MySQL |
-| Messaging | Apache Kafka |
-| Auth | JWT (Access Token + Refresh Token), Google OAuth2.0 |
-| Infra | AWS EC2, Docker, GitHub Actions |
-| Docs | Swagger (springdoc-openapi) |
-
----
-
-## 아키텍처
-
-MSA 구조 — 서비스별 독립 배포
-
-```
-Client → API Gateway (JWT 검증 + 라우팅)
-              ├→ Member Service    (8081)
-              ├→ Event Service     (8082)
-              ├→ Commerce Service  (8083)
-              ├→ Payment Service   (8084)
-              ├→ Settlement Service(8085)
-              ├→ Log Service       (8086)
-              └→ Admin Service     (8087)
-
-서비스 간 동기 통신: Internal API (REST)
-서비스 간 비동기 통신: Kafka
-```
-
----
-
-## 서비스 구조
-
-| 서비스 | 포트 | 역할 |
-|--------|------|------|
-| Gateway | 8080 | JWT 검증, 권한별 라우팅 |
-| Member | 8081 | 회원가입, 로그인, 프로필, 판매자 전환 |
-| Event | 8082 | 이벤트 CRUD, 검색, 필터링 |
-| Commerce | 8083 | 장바구니, 주문, 티켓 |
-| Payment | 8084 | 결제, 예치금, 환불 |
-| Settlement | 8085 | 정산 |
-| Log | 8086 | 행동 로그 수집 (Kafka Consumer) |
-| Admin | 8087 | 회원/판매자/이벤트/정산 관리 |
-
----
-
-## 브랜치 전략
-
-서비스별 독립 브랜치 운영 (모노레포 + 서비스별 Git Flow)
-
-```
-devticket-{서비스}     ← 서비스 main (배포 기준)
-└── develop/{서비스}   ← 서비스 개발 통합
-    └── feat/{서비스}-{기능}  ← 기능 개발
-```
-
----
-
-## 로컬 개발 환경
+## 시작하기
 
 ```bash
-# 인프라 실행 (MySQL + Kafka)
-docker-compose up -d
-
-# 각 서비스 실행 (IntelliJ에서 개별 실행)
+npm install
+npm run dev       # http://localhost:3000
+npm run build
+npm run preview
 ```
 
----
+## 환경변수
 
-## 팀원
+| 변수 | 설명 | 기본값 |
+|------|------|--------|
+| `VITE_API_BASE_URL` | 백엔드 게이트웨이 URL | `http://localhost:8080` |
 
-| 이름 | 역할 |
+## 구조
+
+```
+src/
+├── api/               # 모듈별 API 함수 + 타입
+│   ├── client.ts      # axios 인스턴스, 토큰 인터셉터
+│   ├── types.ts       # 전체 DTO 타입 정의
+│   ├── auth.api.ts    # /auth/*, /users/*
+│   ├── events.api.ts  # /events/*, /seller/events/*
+│   ├── cart.api.ts
+│   ├── orders.api.ts
+│   ├── tickets.api.ts
+│   ├── payments.api.ts
+│   ├── wallet.api.ts
+│   ├── refunds.api.ts
+│   ├── seller.api.ts
+│   ├── admin.api.ts
+│   └── index.ts       # 단일 barrel export
+│
+├── contexts/
+│   ├── AuthContext.tsx  # 전역 인증 상태
+│   └── ToastContext.tsx # 전역 토스트 알림
+│
+├── components/
+│   ├── Layout.tsx        # GNB (일반 사용자)
+│   ├── SellerLayout.tsx  # 판매자 사이드바
+│   ├── AdminLayout.tsx   # 관리자 다크 사이드바
+│   ├── EventCard.tsx
+│   └── Pagination.tsx
+│
+├── pages/
+│   ├── EventList.tsx       # 홈 / 이벤트 목록
+│   ├── EventDetail.tsx     # 이벤트 상세
+│   ├── Login.tsx
+│   ├── Signup.tsx          # 2단계 회원가입
+│   ├── SignupComplete.tsx
+│   ├── Cart.tsx
+│   ├── Payment.tsx
+│   ├── PaymentComplete.tsx
+│   ├── MyPage.tsx          # 탭: 티켓/주문/예치금/환불/설정
+│   ├── SellerApply.tsx
+│   ├── seller/
+│   │   ├── SellerDashboard.tsx
+│   │   ├── SellerEventCreate.tsx
+│   │   ├── SellerEventEdit.tsx
+│   │   ├── SellerEventDetail.tsx
+│   │   └── SellerSettlement.tsx
+│   └── admin/
+│       ├── AdminDashboard.tsx
+│       ├── AdminUsers.tsx
+│       ├── AdminEvents.tsx
+│       ├── AdminApplications.tsx
+│       └── AdminSettlements.tsx
+│
+├── styles/globals.css  # 디자인 시스템 토큰 + 유틸리티
+├── App.tsx             # 라우팅 (역할별 가드)
+└── main.tsx
+
+```
+
+## 역할별 접근 경로
+
+| 역할 | 경로 |
 |------|------|
-| | |
-| | |
-| | |
-| | |
-| | |
+| 비회원 | `/`, `/events/*`, `/login`, `/signup` |
+| USER | 위 + `/cart`, `/payment`, `/mypage`, `/seller-apply` |
+| SELLER | 위 + `/seller/*` |
+| ADMIN | 전체 + `/admin/*` |
+
+## API 관리 포인트
+
+- **base URL**: `.env.development` 한 곳
+- **토큰 주입 / 재발급**: `api/client.ts` 인터셉터만
+- **도메인별 API**: `api/*.api.ts` 해당 파일만
+- **타입 변경**: `api/types.ts` 한 곳만
+
+```ts
+// 컴포넌트에서 사용 예
+import { login, getEvents, createOrder } from '@/api'
+```

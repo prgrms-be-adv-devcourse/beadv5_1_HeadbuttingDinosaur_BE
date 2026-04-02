@@ -1,0 +1,59 @@
+name: CD - Frontend
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+ 
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+ 
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+ 
+      - name: Build and Push Docker Image
+        run: |
+          SHORT_SHA=${GITHUB_SHA::7}
+          IMAGE_BASE=${{ secrets.DOCKERHUB_USERNAME }}/devticket-frontend
+          docker build -t ${IMAGE_BASE}:${SHORT_SHA} -t ${IMAGE_BASE}:latest ./frontend
+          docker push ${IMAGE_BASE}:${SHORT_SHA}
+          docker push ${IMAGE_BASE}:latest
+ 
+      - name: Deploy
+        run: |
+          IMAGE_URL=${{ secrets.DOCKERHUB_USERNAME }}/devticket-frontend:latest
+          docker pull $IMAGE_URL
+          docker stop devticket-frontend || true
+          docker rm devticket-frontend || true
+          docker run -d \
+            --name devticket-frontend \
+            --network host \
+            --restart always \
+            $IMAGE_URL
+          docker image prune -f
+ 
+      - name: Health Check
+        run: |
+          echo "Waiting for frontend to start..."
+          for i in $(seq 1 10); do
+            if curl -sf http://localhost:80 > /dev/null 2>&1; then
+              echo "Frontend is healthy!"
+              exit 0
+            fi
+            echo "Attempt $i/10 - waiting 2s..."
+            sleep 2
+          done
+          echo "Frontend health check failed!"
+          docker logs devticket-frontend --tail 30
+          exit 1
+ 
+        run: |
+          sleep 10
+          curl -f http://localhost:80 || exit 1   # ← nginx 포트
