@@ -72,6 +72,18 @@ public final class RoutePolicy {
     );
 
     // ──────────────────────────────────────────────
+    // OAuth2 소셜 로그인 (인증 제외)
+    // ──────────────────────────────────────────────
+
+    /**
+     * OAuth2 인가 요청 및 콜백 경로. Spring Security가 처리하므로 JWT 필터에서 제외합니다.
+     */
+    public static final List<PathPattern> OAUTH_PATTERNS = List.of(
+        PARSER.parse("/oauth2/**"),
+        PARSER.parse("/login/oauth2/**")
+    );
+
+    // ──────────────────────────────────────────────
     // 외부 차단 (Internal API)
     // ──────────────────────────────────────────────
 
