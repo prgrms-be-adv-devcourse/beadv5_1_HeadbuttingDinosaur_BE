@@ -1,9 +1,11 @@
 package com.devticket.member.application;
 
 import com.devticket.member.common.exception.BusinessException;
+import com.devticket.member.infrastructure.jwt.JwtTokenProvider;
 import com.devticket.member.presentation.domain.MemberErrorCode;
 import com.devticket.member.presentation.domain.Position;
 import com.devticket.member.presentation.domain.ProviderType;
+import com.devticket.member.presentation.domain.model.RefreshToken;
 import com.devticket.member.presentation.domain.model.TechStack;
 import com.devticket.member.presentation.domain.model.User;
 import com.devticket.member.presentation.domain.model.UserProfile;
@@ -21,6 +23,7 @@ import com.devticket.member.presentation.dto.response.GetProfileResponse;
 import com.devticket.member.presentation.dto.response.SignUpProfileResponse;
 import com.devticket.member.presentation.dto.response.UpdateProfileResponse;
 import com.devticket.member.presentation.dto.response.WithdrawResponse;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -41,6 +44,7 @@ public class UserService {
     private final TechStackRepository techStackRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JwtTokenProvider jwtTokenProvider;
 
     @Transactional
     public SignUpProfileResponse createProfile(UUID userId, SignUpProfileRequest request) {
@@ -58,8 +62,11 @@ public class UserService {
 
         saveTechStacks(user.getId(), request.techStackIds());
 
+        String accessToken = jwtTokenProvider.createAccessToken(user.getUserId(), user.getEmail(), user.getRole(), true);
+        String refreshToken = saveRefreshToken(user.getId());
+
         log.info("프로필 생성 완료: userId={}, nickname={}", userId, request.nickname());
-        return SignUpProfileResponse.from(savedProfile);
+        return SignUpProfileResponse.from(savedProfile, accessToken, refreshToken);
     }
 
     public GetProfileResponse getProfile(UUID userId) {
@@ -166,6 +173,16 @@ public class UserService {
 
     public List<TechStack> getAllTechStacks() {
         return techStackRepository.findAll();
+    }
+
+    // ========== 토큰 ==========
+
+    private String saveRefreshToken(Long userId) {
+        String token = jwtTokenProvider.createRefreshToken();
+        long ttl = jwtTokenProvider.getRefreshTokenTtl();
+        LocalDateTime expiresAt = LocalDateTime.now().plusSeconds(ttl / 1000);
+        refreshTokenRepository.save(new RefreshToken(userId, token, expiresAt));
+        return token;
     }
 
     // ========== 유틸 ==========

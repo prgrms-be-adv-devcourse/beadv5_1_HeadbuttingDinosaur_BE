@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5433/devticket
+    url: jdbc:postgresql://localhost:5433/devticket?currentSchema=member
     username: devticket
     password: devticket
     driver-class-name: org.postgresql.Driver
