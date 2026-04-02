@@ -2,7 +2,7 @@ name: CD - Frontend
 
 on:
   push:
-    branches: [ "devticket-frontend" ]
+    branches: [ "devticket-front" ]
     paths: [ "frontend/**" ]
 
 jobs:
