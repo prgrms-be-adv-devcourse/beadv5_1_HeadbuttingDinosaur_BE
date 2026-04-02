@@ -1,0 +1,44 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5433/devticket?currentSchema=payment
+    username: devticket
+    password: devticket
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        default_schema: payment
+  kafka:
+    bootstrap-servers: localhost:9093
+    consumer:
+      group-id: devticket-payment
+      auto-offset-reset: earliest
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+jwt:
+  secret-key: local-dev-jwt-secret-key-devticket-2025
+  access-token-ttl: 1800000
+  refresh-token-ttl: 604800000
+
+logging:
+  level:
+    org.hibernate.SQL: OFF
+
+internal:
+  commerce:
+    base-url: http://localhost:8083
+  event:
+    base-url: http://localhost:8082
+
+pg:
+  toss:
+    base-url: https://api.tosspayments.com
+    secret-key: ${PG_SECRET_KEY}
+
