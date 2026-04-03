@@ -1,0 +1,60 @@
+name: CD - Member Service
+
+on:
+  push:
+    branches: [ "devticket-member" ]
+    paths: [ "member/**" ]
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x ./member/gradlew
+
+      - name: Build with Gradle
+        run: |
+          cd member
+          ./gradlew clean bootJar
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and Push Docker Image
+        run: |
+          IMAGE_URL=${{ secrets.DOCKERHUB_USERNAME }}/devticket-domain-member:latest
+          docker build -t $IMAGE_URL ./member
+          docker push $IMAGE_URL
+
+      - name: Deploy
+        run: |
+          IMAGE_URL=${{ secrets.DOCKERHUB_USERNAME }}/devticket-domain-member:latest
+          docker pull $IMAGE_URL
+          docker stop devticket-member || true
+          docker rm devticket-member || true
+          docker run -d \
+            --name devticket-member \
+            --network host \
+            --restart always \
+            -e SPRING_PROFILES_ACTIVE=prod \
+            -e DB_URL=jdbc:postgresql://localhost:5432/devticket?currentSchema=member \
+            -e DB_USERNAME=${{ secrets.DB_USERNAME }} \
+            -e DB_PASSWORD=${{ secrets.DB_PASSWORD }} \
+            -e JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }} \
+            -e KAFKA_BOOTSTRAP_SERVERS=localhost:9092 \
+            $IMAGE_URL
+          docker image prune -f
