@@ -1,0 +1,5 @@
+package com.devticket.admin.infrastructure.external.dto.req;
+
+public record InternalDecideSellerApplicationRequest(String decision) {
+
+}
