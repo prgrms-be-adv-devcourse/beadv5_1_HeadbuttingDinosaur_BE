@@ -122,6 +122,9 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
         if (RoutePolicy.matchesAny(RoutePolicy.ACTUATOR_PUBLIC_PATTERNS, path)) {
             return true;
         }
+        if (RoutePolicy.matchesAny(RoutePolicy.OAUTH_PATTERNS, path)) {
+            return true;
+        }
         return RoutePolicy.matchesAny(RoutePolicy.HEALTH_PATTERNS, path);
     }
 
