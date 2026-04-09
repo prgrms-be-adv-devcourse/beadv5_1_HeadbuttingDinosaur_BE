@@ -1,0 +1,66 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push  # loki 컨테이너명으로 변경
+
+scrape_configs:
+  - job_name: gateway
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: gateway
+          __path__: /spring-logs/gateway/*.log
+
+  - job_name: member
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: member
+          __path__: /spring-logs/member/*.log
+
+  - job_name: event
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: event
+          __path__: /spring-logs/event/*.log
+
+  - job_name: commerce
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: commerce
+          __path__: /spring-logs/commerce/*.log
+
+  - job_name: payment
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: payment
+          __path__: /spring-logs/payment/*.log
+
+  - job_name: settlement
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: settlement
+          __path__: /spring-logs/settlement/*.log
+
+  - job_name: admin
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: admin
+          __path__: /spring-logs/admin/*.log
