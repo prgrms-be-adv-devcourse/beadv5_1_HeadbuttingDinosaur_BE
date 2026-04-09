@@ -17,4 +17,14 @@ public class SettlementRestClientConfig {
             .defaultHeader("Content-Type", "application/json")
             .build();
     }
+
+    @Bean
+    public RestClient settlementToMemberRestClient(
+        @Value("${external.member-base-url}") String baseUrl) {
+        return RestClient.builder()
+            .baseUrl(baseUrl)
+            .defaultHeader("Content-Type", "application/json")
+            .build();
+    }
+
 }
