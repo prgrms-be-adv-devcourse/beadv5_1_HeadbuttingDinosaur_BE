@@ -3,6 +3,7 @@ package com.devticket.event.infrastructure.persistence;
 import com.devticket.event.domain.enums.EventCategory;
 import com.devticket.event.domain.enums.EventStatus;
 import com.devticket.event.domain.model.Event;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -19,4 +20,6 @@ public interface EventRepositoryCustom {
     );
 
     List<Event> findEventsBySeller(UUID sellerId, EventStatus status);
+
+    List<Event> findEventsBySellerAndPeriod(UUID sellerId, LocalDateTime periodStart, LocalDateTime periodEnd);
 }

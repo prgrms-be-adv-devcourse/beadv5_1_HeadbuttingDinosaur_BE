@@ -15,6 +15,7 @@ import com.devticket.event.presentation.dto.internal.InternalStockOperationRespo
 import com.devticket.event.presentation.dto.internal.InternalStockRestoreRequest;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -121,6 +122,17 @@ public class EventInternalController {
         @RequestParam(required = false) EventStatus status) {
         return ResponseEntity.ok(SuccessResponse.success(
             eventInternalService.getEventsBySeller(sellerId, status)
+        ));
+    }
+
+    // 기간 별 판매자 이벤트
+    @GetMapping("/by-seller/{sellerId}/settlement")
+    public ResponseEntity<SuccessResponse<List<InternalEventInfoResponse>>> getEventsBySellerForSettlement(
+        @PathVariable UUID sellerId,
+        @RequestParam String periodStart,
+        @RequestParam String periodEnd) {
+        return ResponseEntity.ok(SuccessResponse.success(
+            eventInternalService.getEventsBySellerForSettlement(sellerId, periodStart, periodEnd)
         ));
     }
 }
