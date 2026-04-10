@@ -8,6 +8,8 @@ import com.devticket.event.domain.model.EventImage;
 import com.devticket.event.domain.model.EventTechStack;
 import com.devticket.event.infrastructure.client.MemberClient;
 import com.devticket.event.infrastructure.persistence.EventRepository;
+import com.devticket.event.infrastructure.search.EventDocument;
+import com.devticket.event.infrastructure.search.EventSearchRepository;
 import com.devticket.event.presentation.dto.EventDetailResponse;
 import com.devticket.event.presentation.dto.EventListContentResponse;
 import com.devticket.event.presentation.dto.EventListRequest;
@@ -25,17 +27,20 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class EventService {
 
     private final EventRepository eventRepository;
     private final MemberClient memberClient;
+    private final EventSearchRepository eventSearchRepository;
 
     @Transactional
     public SellerEventCreateResponse createEvent(UUID sellerId, SellerEventCreateRequest request) {
@@ -84,6 +89,8 @@ public class EventService {
             }
             eventRepository.save(savedEvent);  // EventTechStack 반영을 위해 다시 저장
         }
+
+        syncToElasticsearch(savedEvent);
 
         return SellerEventCreateResponse.from(savedEvent);
     }
@@ -235,6 +242,7 @@ public class EventService {
                 throw new BusinessException(EventErrorCode.CANNOT_CHANGE_STATUS);
             }
             event.cancel();
+            syncToElasticsearch(event);
             return SellerEventUpdateResponse.from(event);
         }
 
@@ -300,7 +308,19 @@ public class EventService {
             }
         }
 
+        syncToElasticsearch(event);
+
         return SellerEventUpdateResponse.from(event);
     }
+
+    // ES 동기화 실패가 핵심 비즈니스 흐름에 영향을 주지 않도록 예외 격리
+    private void syncToElasticsearch(Event event) {
+        try {
+            eventSearchRepository.save(EventDocument.from(event));
+        } catch (Exception e) {
+            log.warn("[ES 동기화 실패] eventId: {}", event.getEventId(), e);
+        }
+    }
+
 
 }
