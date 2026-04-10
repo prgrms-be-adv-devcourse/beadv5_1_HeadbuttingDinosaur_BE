@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -50,6 +51,8 @@ public class EventService {
     private final MemberClient memberClient;
     private final EventSearchRepository eventSearchRepository;
     private final ElasticsearchOperations elasticsearchOperations;
+
+    private static final Set<String> ALLOWED_SORT_FIELDS = Set.of("createdAt", "price", "eventDateTime");
 
     @Transactional
     public SellerEventCreateResponse createEvent(UUID sellerId, SellerEventCreateRequest request) {
@@ -365,20 +368,30 @@ public class EventService {
 
         // 기술스택 필터 (Nested)
         if (request.techStacks() != null && !request.techStacks().isEmpty()) {
-            for (Long techStackId : request.techStacks()) {
-                boolQuery.filter(Query.of(q -> q
-                    .nested(n -> n
-                        .path("techStacks")
-                        .query(nq -> nq
-                            .term(t -> t.field("techStacks.techStackId")
-                                .value(techStackId))))));
-            }
+            List<Query> techStackShoulds = request.techStacks().stream()
+                .map(techStackId -> Query.of(q -> q
+                    .nested(n -> n.path("techStacks")
+                        .query(nq -> nq.term(t -> t
+                            .field("techStacks.techStackId").value(techStackId))))))
+                .toList();
+            boolQuery.filter(Query.of(q -> q
+                .bool(b -> b.should(techStackShoulds).minimumShouldMatch("1"))));
         }
 
         // 정렬: 지정 없으면 최신순 기본 적용
-        Sort sort = pageable.getSort().isSorted()
-            ? pageable.getSort()
-            : Sort.by(Sort.Direction.DESC, "createdAt");
+        Sort sort;
+        if (pageable.getSort().isSorted()) {
+            List<Sort.Order> validOrders = pageable.getSort().stream()
+                .filter(order -> ALLOWED_SORT_FIELDS.contains(order.getProperty()))
+                .toList();
+            sort = validOrders.isEmpty()
+                ? Sort.by(Sort.Direction.DESC, "createdAt")
+                : Sort.by(validOrders);
+        } else {
+            sort = Sort.by(Sort.Direction.DESC, "createdAt");
+        }
+
+
 
         return NativeQuery.builder()
             .withQuery(Query.of(q -> q.bool(boolQuery.build())))

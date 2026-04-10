@@ -5,6 +5,8 @@ import com.devticket.event.domain.enums.EventStatus;
 import com.devticket.event.domain.exception.EventErrorCode;
 import com.devticket.event.domain.model.Event;
 import com.devticket.event.infrastructure.persistence.EventRepository;
+import com.devticket.event.infrastructure.search.EventDocument;
+import com.devticket.event.infrastructure.search.EventSearchRepository;
 import com.devticket.event.presentation.dto.internal.InternalBulkEventInfoResponse;
 import com.devticket.event.presentation.dto.internal.InternalBulkStockAdjustmentRequest;
 import com.devticket.event.presentation.dto.internal.InternalEventInfoResponse;
@@ -24,15 +26,18 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class EventInternalService {
 
     private final EventRepository eventRepository;
+    private final EventSearchRepository eventSearchRepository;
 
     /**
      * API 1: 단건 이벤트 정보 조회
@@ -113,7 +118,13 @@ public class EventInternalService {
     public InternalStockOperationResponse deductStock(UUID id, int quantity) {
         Event event = eventRepository.findByEventIdWithLock(id)
             .orElseThrow(() -> new BusinessException(EventErrorCode.EVENT_NOT_FOUND));
+
+        EventStatus statusBefore = event.getStatus();  // deductStock 호출 전으로 이동
         event.deductStock(quantity);
+
+        if (!event.getStatus().equals(statusBefore)) {
+            syncToElasticsearch(id);
+        }
         return new InternalStockOperationResponse(event.getEventId(), true, event.getRemainingQuantity(), event.getTitle());
     }
 
@@ -125,7 +136,13 @@ public class EventInternalService {
     public InternalStockOperationResponse restoreStock(UUID id, int quantity) {
         Event event = eventRepository.findByEventIdWithLock(id)
             .orElseThrow(() -> new BusinessException(EventErrorCode.EVENT_NOT_FOUND));
+
+        EventStatus statusBefore = event.getStatus();  // restoreStock 호출 전으로 이동
         event.restoreStock(quantity);
+
+        if (!event.getStatus().equals(statusBefore)) {
+            syncToElasticsearch(id);
+        }
         return new InternalStockOperationResponse(event.getEventId(), true, event.getRemainingQuantity(), event.getTitle());
     }
 
@@ -175,17 +192,25 @@ public class EventInternalService {
 
         // Step 3: 정렬된 순서로 처리 — 예외 발생 시 전체 롤백
         List<InternalStockAdjustmentResponse.StockAdjustmentResult> sortedResults = new ArrayList<>();
+        List<UUID> statusChangedIds = new ArrayList<>();
+
         for (var itemWithIndex : sortedItems) {
             Event event = eventMap.get(itemWithIndex.item().id());
             if (event == null) {
                 throw new BusinessException(EventErrorCode.EVENT_NOT_FOUND);
             }
 
+            EventStatus statusBefore = event.getStatus();
+
             // 각 처리가 Event 상태를 변경 (같은 id의 다음 item은 변경된 상태를 봄)
             if (itemWithIndex.item().delta() > 0) {
                 event.deductStock(itemWithIndex.item().delta());
             } else if (itemWithIndex.item().delta() < 0) {
                 event.restoreStock(-itemWithIndex.item().delta());
+            }
+
+            if (!event.getStatus().equals(statusBefore)) {
+                statusChangedIds.add(event.getEventId());
             }
 
             sortedResults.add(new InternalStockAdjustmentResponse.StockAdjustmentResult(
@@ -205,6 +230,8 @@ public class EventInternalService {
         for (int i = 0; i < sortedItems.size(); i++) {
             results[sortedItems.get(i).originalIndex()] = sortedResults.get(i);
         }
+
+        statusChangedIds.forEach(this::syncToElasticsearch);
 
         return new InternalStockAdjustmentResponse(Arrays.asList(results));
     }
@@ -243,5 +270,15 @@ public class EventInternalService {
             .map(InternalEventInfoResponse::from)
             .toList();
     }
+
+    private void syncToElasticsearch(UUID eventId) {
+        try {
+            eventRepository.findWithDetailsByEventId(eventId)
+                .ifPresent(event -> eventSearchRepository.save(EventDocument.from(event)));
+        } catch (Exception e) {
+            log.warn("[ES 동기화 실패] eventId: {}", eventId, e);
+        }
+    }
+
 
 }
