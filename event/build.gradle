@@ -53,6 +53,10 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'io.micrometer:micrometer-registry-prometheus'
     implementation 'com.github.loki4j:loki-logback-appender:1.5.2'
+
+    // ES
+    implementation 'org.springframework.boot:spring-boot-starter-data-elasticsearch'
+
 }
 
 tasks.named('test') {
