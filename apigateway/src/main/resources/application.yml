@@ -54,11 +54,15 @@ management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: health, prometheus
       base-path: /actuator
   endpoint:
     health:
       show-details: never
+  prometheus:
+    metrics:
+      export:
+        enabled: true
 
 # Swagger
 springdoc:
@@ -92,4 +96,6 @@ gateway:
         refill-tokens: 10
         refill-duration: 1s
 
-
+logging:
+  file:
+    name: ./spring-logs/gateway/gateway.log
