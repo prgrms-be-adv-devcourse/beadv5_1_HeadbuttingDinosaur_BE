@@ -255,14 +255,47 @@ function WalletTab({ toast }: { toast: any }) {
     const amount = parseInt(chargeAmount)
     if (!amount || amount < 1000) { toast('최소 1,000원 이상 충전 가능합니다', 'error'); return }
     setProcessing(true)
+
+    let transactionId: string | undefined
+    let chargedAmount: number | undefined
+
     try {
-      await startWalletCharge({ amount })
-      toast('충전 요청이 완료되었습니다. 결제창에서 완료해주세요.', 'success')
-      setMode(null)
-      setChargeAmount('')
-      fetchWallet()
-    } catch { toast('충전 실패', 'error') }
-    finally { setProcessing(false) }
+      // 1단계: 충전 요청
+      const res = await startWalletCharge({ amount })
+      const data = res.data
+      transactionId = data.chargeId
+      chargedAmount = data.amount
+    } catch {
+      toast('충전 요청 실패. 잠시 후 다시 시도해주세요.', 'error')
+      setProcessing(false)
+      return
+    }
+
+
+
+    try {
+      // 2단계: Toss 결제창 오픈
+      sessionStorage.setItem('wallet_charge_context', JSON.stringify({ transactionId, amount: chargedAmount }))
+
+      const { loadTossPayments } = await import('@tosspayments/tosspayments-sdk')
+      const tossPayments = await loadTossPayments(import.meta.env.VITE_TOSS_CLIENT_KEY)
+      const payment = tossPayments.payment({ customerKey: `wallet_${transactionId}` })
+
+      await payment.requestPayment({
+        method: 'CARD',
+        amount: { currency: 'KRW', value: chargedAmount! },
+        orderId: transactionId!,
+        orderName: '예치금 충전',
+        successUrl: `${window.location.origin}/wallet/charge/success`,
+        failUrl: `${window.location.origin}/wallet/charge/fail`,
+      })
+      // requestPayment는 성공 시 successUrl로 리다이렉트되므로 이 아래는 실행되지 않음
+    } catch (e: any) {
+      const msg = e?.message ?? '결제창 실행에 실패했습니다.'
+      toast(msg, 'error')
+      sessionStorage.removeItem('wallet_charge_context')
+      setProcessing(false)
+    }
   }
 
   const handleWithdraw = async () => {

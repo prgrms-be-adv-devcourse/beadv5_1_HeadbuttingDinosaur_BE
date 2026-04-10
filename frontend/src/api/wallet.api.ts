@@ -1,4 +1,4 @@
-import { apiClient, ApiResponse } from './client';
+import { apiClient, ApiResponse,idempotencyConfig } from './client';
 import type {
   WalletChargeStartRequest, WalletChargeStartResponse,
   WalletChargeConfirmRequest, WalletChargeConfirmResponse,
@@ -8,10 +8,10 @@ import type {
 } from './types';
 
 export const startWalletCharge = (body: WalletChargeStartRequest) =>
-  apiClient.post<ApiResponse<WalletChargeStartResponse>>('/wallet/charge', body);
+  apiClient.post<WalletChargeStartResponse>('/wallet/charge', body, idempotencyConfig());
 
 export const confirmWalletCharge = (body: WalletChargeConfirmRequest) =>
-  apiClient.post<ApiResponse<WalletChargeConfirmResponse>>('/wallet/charge/confirm', body);
+  apiClient.post<WalletChargeConfirmResponse>('/wallet/charge/confirm', body, idempotencyConfig());
 
 export const getWalletBalance = () =>
   apiClient.get<ApiResponse<WalletBalanceResponse>>('/wallet');
@@ -20,4 +20,4 @@ export const getWalletTransactions = (params?: WalletTransactionListRequest) =>
   apiClient.get<ApiResponse<WalletTransactionListResponse>>('/wallet/transactions', { params });
 
 export const withdrawWallet = (body: WalletWithdrawRequest) =>
-  apiClient.post<ApiResponse<WalletWithdrawResponse>>('/wallet/withdraw', body);
+  apiClient.post<ApiResponse<WalletWithdrawResponse>>('/wallet/withdraw', body, idempotencyConfig());

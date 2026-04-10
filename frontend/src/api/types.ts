@@ -473,14 +473,15 @@ export interface WalletChargeStartRequest {
   amount: number;
 }
 export interface WalletChargeStartResponse {
-  transactionId: string;
+  chargeId: string;
+  userId:string;
   amount: number;
   status: string;
   createdAt: string;
 }
 
 export interface WalletChargeConfirmRequest {
-  transactionId: string;
+  chargeId: string;
   paymentKey: string;
   amount: number;
 }

@@ -75,6 +75,13 @@ export interface ApiResponse<T> {
   data: T;
 }
 
+/** 멱등성 키 헤더를 포함한 axios config를 반환합니다. */
+export function idempotencyConfig() {
+  return {
+    headers: { 'Idempotency-Key': crypto.randomUUID() },
+  };
+}
+
 /** 페이지네이션 공통 타입 */
 export interface Page<T> {
   content: T[];

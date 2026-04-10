@@ -7,21 +7,23 @@ import AdminLayout from './components/AdminLayout'
 import Loading from './components/Loading'
 
 // 즉시 로드 (비로그인 첫 화면)
-import EventList   from './pages/EventList'
-import EventDetail from './pages/EventDetail'
-import Login       from './pages/Login'
-import Signup      from './pages/Signup'
-import NotFound    from './pages/NotFound'
+import EventList         from './pages/EventList'
+import EventDetail       from './pages/EventDetail'
+import Login             from './pages/Login'
+import Signup            from './pages/Signup'
+import NotFound          from './pages/NotFound'
 
 // lazy – 로그인 후 접근
-const SignupComplete  = lazy(() => import('./pages/SignupComplete'))
-const Cart            = lazy(() => import('./pages/Cart'))
-const Payment         = lazy(() => import('./pages/Payment'))
-const PaymentComplete = lazy(() => import('./pages/PaymentComplete'))
-const MyPage          = lazy(() => import('./pages/MyPage'))
-const SellerApply     = lazy(() => import('./pages/SellerApply'))
-const PaymentSuccess = lazy(() => import('./pages/PaymentSuccess'))
-const PaymentFail    = lazy(() => import('./pages/PaymentFail'))
+const SignupComplete      = lazy(() => import('./pages/SignupComplete'))
+const Cart                = lazy(() => import('./pages/Cart'))
+const Payment             = lazy(() => import('./pages/Payment'))
+const PaymentComplete     = lazy(() => import('./pages/PaymentComplete'))
+const MyPage              = lazy(() => import('./pages/MyPage'))
+const SellerApply         = lazy(() => import('./pages/SellerApply'))
+const PaymentSuccess      = lazy(() => import('./pages/PaymentSuccess'))
+const PaymentFail         = lazy(() => import('./pages/PaymentFail'))
+const WalletChargeSuccess = lazy(() => import('./pages/WalletChargeSuccess'))
+const WalletChargeFail    = lazy(() => import('./pages/WalletChargeFail'))
 
 // lazy – 판매자
 const SellerDashboard   = lazy(() => import('./pages/seller/SellerDashboard'))
@@ -65,21 +67,23 @@ export default function App() {
     <Suspense fallback={<Loading fullscreen />}>
       <Routes>
         {/* 공개 */}
-        <Route path="/login"           element={<Login />} />
-        <Route path="/signup"          element={<Signup />} />
-        <Route path="/signup/complete" element={<SignupComplete />} />
+        <Route path="/login"               element={<Login />} />
+        <Route path="/signup"              element={<Signup />} />
+        <Route path="/signup/complete"     element={<SignupComplete />} />
 
         {/* 일반 사용자 */}
         <Route element={<Layout />}>
-          <Route path="/"                 element={<EventList />} />
-          <Route path="/events/:id"       element={<EventDetail />} />
-          <Route path="/cart"             element={<RequireAuth><Cart /></RequireAuth>} />
-          <Route path="/payment"          element={<RequireAuth><Payment /></RequireAuth>} />
-          <Route path="/payment/complete" element={<RequireAuth><PaymentComplete /></RequireAuth>} />
-          <Route path="/mypage"           element={<RequireAuth><MyPage /></RequireAuth>} />
-          <Route path="/seller-apply"     element={<RequireAuth><SellerApply /></RequireAuth>} />
-          <Route path="/payment/success"  element={<RequireAuth><PaymentSuccess /></RequireAuth>} />
-          <Route path="/payment/fail"     element={<RequireAuth><PaymentFail /></RequireAuth>} />
+          <Route path="/"                       element={<EventList />} />
+          <Route path="/events/:id"             element={<EventDetail />} />
+          <Route path="/cart"                   element={<RequireAuth><Cart /></RequireAuth>} />
+          <Route path="/payment"                element={<RequireAuth><Payment /></RequireAuth>} />
+          <Route path="/payment/complete"       element={<RequireAuth><PaymentComplete /></RequireAuth>} />
+          <Route path="/mypage"                 element={<RequireAuth><MyPage /></RequireAuth>} />
+          <Route path="/seller-apply"           element={<RequireAuth><SellerApply /></RequireAuth>} />
+          <Route path="/payment/success"        element={<RequireAuth><PaymentSuccess /></RequireAuth>} />
+          <Route path="/payment/fail"           element={<RequireAuth><PaymentFail /></RequireAuth>} />
+          <Route path="/wallet/charge/success"  element={<RequireAuth><WalletChargeSuccess /></RequireAuth>} />
+          <Route path="/wallet/charge/fail"     element={<RequireAuth><WalletChargeFail /></RequireAuth>} />
         </Route>
 
         {/* 판매자 */}

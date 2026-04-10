@@ -32,7 +32,7 @@ export const createSellerEvent = (body: SellerEventCreateRequest) =>
     apiClient.post<ApiResponse<SellerEventCreateResponse>>('/events', body);
 
 export const getSellerEvents = (params?: SellerEventListRequest) =>
-  apiClient.get<ApiResponse<SellerEventListResponse>>('/seller/events', { params });
+  apiClient.get<ApiResponse<SellerEventListResponse>>('/events', { params });
 
 export const getSellerEventDetail = (eventId: string) =>
   apiClient.get<ApiResponse<SellerEventDetailResponse>>(`/seller/events/${eventId}`);
