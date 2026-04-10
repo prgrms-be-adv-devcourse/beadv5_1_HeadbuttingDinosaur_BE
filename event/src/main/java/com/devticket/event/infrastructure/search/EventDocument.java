@@ -5,9 +5,10 @@ import com.devticket.event.domain.model.EventImage;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.elasticsearch.annotations.DateFormat;
 import org.springframework.data.elasticsearch.annotations.Document;
@@ -15,8 +16,9 @@ import org.springframework.data.elasticsearch.annotations.Field;
 import org.springframework.data.elasticsearch.annotations.FieldType;
 
 @Getter
-@Setter
 @NoArgsConstructor
+@AllArgsConstructor
+@Builder
 @Document(indexName = "event")
 public class EventDocument {
 
@@ -63,8 +65,9 @@ public class EventDocument {
     private List<TechStackDocument> techStacks;
 
     @Getter
-    @Setter
     @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
     public static class TechStackDocument {
 
         @Field(type = FieldType.Long)
@@ -81,29 +84,27 @@ public class EventDocument {
             .orElse(null);
 
         List<TechStackDocument> techStacks = event.getEventTechStacks().stream()
-            .map(ts -> {
-                TechStackDocument doc = new TechStackDocument();
-                doc.setTechStackId(ts.getTechStackId());
-                doc.setTechStackName(ts.getTechStackName());
-                return doc;
-            })
+            .map(ts -> TechStackDocument.builder()
+                .techStackId(ts.getTechStackId())
+                .techStackName(ts.getTechStackName())
+                .build())
             .toList();
 
-        EventDocument doc = new EventDocument();
-        doc.setId(event.getEventId().toString());
-        doc.setTitle(event.getTitle());
-        doc.setDescription(event.getDescription());
-        doc.setLocation(event.getLocation());
-        doc.setCategory(event.getCategory().name());
-        doc.setStatus(event.getStatus().name());
-        doc.setSellerId(event.getSellerId().toString());
-        doc.setPrice(event.getPrice());
-        doc.setEventDateTime(event.getEventDateTime());
-        doc.setSaleStartAt(event.getSaleStartAt());
-        doc.setSaleEndAt(event.getSaleEndAt());
-        doc.setCreatedAt(event.getCreatedAt());
-        doc.setThumbnailUrl(thumbnail);
-        doc.setTechStacks(techStacks);
-        return doc;
+        return EventDocument.builder()
+            .id(event.getEventId().toString())
+            .title(event.getTitle())
+            .description(event.getDescription())
+            .location(event.getLocation())
+            .category(event.getCategory().name())
+            .status(event.getStatus().name())
+            .sellerId(event.getSellerId().toString())
+            .price(event.getPrice())
+            .eventDateTime(event.getEventDateTime())
+            .saleStartAt(event.getSaleStartAt())
+            .saleEndAt(event.getSaleEndAt())
+            .createdAt(event.getCreatedAt())
+            .thumbnailUrl(thumbnail)
+            .techStacks(techStacks)
+            .build();
     }
 }
