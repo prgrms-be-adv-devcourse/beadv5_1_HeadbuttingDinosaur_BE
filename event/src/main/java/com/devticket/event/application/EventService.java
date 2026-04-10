@@ -1,5 +1,8 @@
 package com.devticket.event.application;
 
+import co.elastic.clients.elasticsearch._types.FieldValue;
+import co.elastic.clients.elasticsearch._types.query_dsl.BoolQuery;
+import co.elastic.clients.elasticsearch._types.query_dsl.Query;
 import com.devticket.event.common.exception.BusinessException;
 import com.devticket.event.domain.enums.EventStatus;
 import com.devticket.event.domain.exception.EventErrorCode;
@@ -24,12 +27,17 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.elasticsearch.client.elc.NativeQuery;
+import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
+import org.springframework.data.elasticsearch.core.SearchHits;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,6 +49,7 @@ public class EventService {
     private final EventRepository eventRepository;
     private final MemberClient memberClient;
     private final EventSearchRepository eventSearchRepository;
+    private final ElasticsearchOperations elasticsearchOperations;
 
     @Transactional
     public SellerEventCreateResponse createEvent(UUID sellerId, SellerEventCreateRequest request) {
@@ -128,68 +137,66 @@ public class EventService {
 
         boolean isOwnEventRequest = request.sellerId() != null && request.sellerId().equals(currentUserId);
 
-        // 1. 권한 검증: 비공개 이벤트를 본인이 아닌 사람이 보려는지 차단
         if (request.status() != null && !isPublicStatus(request.status()) && !isOwnEventRequest) {
             throw new BusinessException(EventErrorCode.UNAUTHORIZED_SELLER);
         }
 
-        // 2. 서비스에서 필터링할 '상태값 목록'을 명확히 계산
         List<EventStatus> allowedStatuses = null;
-
         if (request.status() != null) {
-            // 특정 상태를 요청한 경우
             allowedStatuses = List.of(request.status());
         } else if (!isOwnEventRequest) {
-            // 본인 조회가 아닌 일반 전체 검색인 경우 -> 대중에게 공개된 이벤트만 필터링하도록 지시
             allowedStatuses = List.of(EventStatus.ON_SALE, EventStatus.SOLD_OUT, EventStatus.SALE_ENDED);
         }
-        // isOwnEventRequest가 true이면서 status가 null인 경우는 본인의 모든 이벤트를 보는 것이므로 null 유지
 
-        // 3. Repository에 DTO 대신 해체된 파라미터 전달
-        Page<Event> eventPage = eventRepository.searchEvents(
-            request.keyword(),
-            request.category(),
-            request.techStacks(),
-            request.sellerId(),
-            allowedStatuses,
-            pageable
-        );
+        // ES 검색
+        NativeQuery query = buildSearchQuery(request, allowedStatuses, pageable);
+        SearchHits<EventDocument> searchHits = elasticsearchOperations.search(query, EventDocument.class);
 
-        // 4. N+1 방지: 페이지 이벤트 ID로 컬렉션 일괄 로드
-        List<UUID> pageEventIds = eventPage.getContent().stream()
-            .map(Event::getEventId)
+        List<UUID> pageEventIds = searchHits.stream()
+            .map(hit -> UUID.fromString(hit.getContent().getId()))
             .toList();
 
-        List<Event> hydratedEvents = pageEventIds.isEmpty()
-            ? List.of()
-            : eventRepository.findAllWithDetailsByEventIdIn(pageEventIds);  // techStacks
+        if (pageEventIds.isEmpty()) {
+            return new EventListResponse(
+                List.of(),
+                pageable.getPageNumber(),
+                pageable.getPageSize(),
+                0L,
+                0
+            );
+        }
 
-        List<Event> imageEvents = pageEventIds.isEmpty()
-            ? List.of()
-            : eventRepository.findEventImagesByEventIdIn(pageEventIds);  // images
+        // N+1 방지: JPA로 상세 데이터 일괄 로드
+        List<Event> hydratedEvents = eventRepository.findAllWithDetailsByEventIdIn(pageEventIds);
+        List<Event> imageEvents = eventRepository.findEventImagesByEventIdIn(pageEventIds);
 
-        // 두 결과를 합치기
         Map<UUID, Event> hydratedById = hydratedEvents.stream()
             .collect(Collectors.toMap(Event::getEventId, e -> e));
-
         Map<UUID, Event> imagesById = imageEvents.stream()
             .collect(Collectors.toMap(Event::getEventId, e -> e));
 
-        // EventListContentResponse 생성 시 image-hydrated 엔티티 사용
-        List<EventListContentResponse> content = eventPage.getContent().stream()
-            .map(e -> {
-                Event hydrated = hydratedById.getOrDefault(e.getEventId(), e);
-                Event withImages = imagesById.getOrDefault(e.getEventId(), hydrated);
+        // ES 결과 순서 유지
+        List<EventListContentResponse> content = pageEventIds.stream()
+            .map(id -> {
+                Event hydrated = hydratedById.get(id);
+                if (hydrated == null) {
+                    return null;
+                }
+                Event withImages = imagesById.getOrDefault(id, hydrated);
                 return EventListContentResponse.from(withImages);
             })
+            .filter(Objects::nonNull)
             .toList();
+
+        long totalHits = searchHits.getTotalHits();
+        int totalPages = (int) Math.ceil((double) totalHits / pageable.getPageSize());
 
         return new EventListResponse(
             content,
-            eventPage.getNumber(),
-            eventPage.getSize(),
-            eventPage.getTotalElements(),
-            eventPage.getTotalPages()
+            pageable.getPageNumber(),
+            pageable.getPageSize(),
+            totalHits,
+            totalPages
         );
     }
 
@@ -322,5 +329,61 @@ public class EventService {
         }
     }
 
+    private NativeQuery buildSearchQuery(
+        EventListRequest request, List<EventStatus> allowedStatuses, Pageable pageable) {
+
+        BoolQuery.Builder boolQuery = new BoolQuery.Builder();
+
+        // 키워드: title, description 대상 multi_match
+        if (request.keyword() != null && !request.keyword().isBlank()) {
+            boolQuery.must(Query.of(q -> q
+                .multiMatch(m -> m
+                    .fields("title", "description")
+                    .query(request.keyword()))));
+        }
+
+        // 카테고리 필터
+        if (request.category() != null) {
+            boolQuery.filter(Query.of(q -> q
+                .term(t -> t.field("category").value(request.category().name()))));
+        }
+
+        // 상태 필터
+        if (allowedStatuses != null && !allowedStatuses.isEmpty()) {
+            List<FieldValue> statusValues = allowedStatuses.stream()
+                .map(s -> FieldValue.of(s.name()))
+                .toList();
+            boolQuery.filter(Query.of(q -> q
+                .terms(t -> t.field("status").terms(tv -> tv.value(statusValues)))));
+        }
+
+        // 판매자 필터
+        if (request.sellerId() != null) {
+            boolQuery.filter(Query.of(q -> q
+                .term(t -> t.field("sellerId").value(request.sellerId().toString()))));
+        }
+
+        // 기술스택 필터 (Nested)
+        if (request.techStacks() != null && !request.techStacks().isEmpty()) {
+            for (Long techStackId : request.techStacks()) {
+                boolQuery.filter(Query.of(q -> q
+                    .nested(n -> n
+                        .path("techStacks")
+                        .query(nq -> nq
+                            .term(t -> t.field("techStacks.techStackId")
+                                .value(techStackId))))));
+            }
+        }
+
+        // 정렬: 지정 없으면 최신순 기본 적용
+        Sort sort = pageable.getSort().isSorted()
+            ? pageable.getSort()
+            : Sort.by(Sort.Direction.DESC, "createdAt");
+
+        return NativeQuery.builder()
+            .withQuery(Query.of(q -> q.bool(boolQuery.build())))
+            .withPageable(PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sort))
+            .build();
+    }
 
 }

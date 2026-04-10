@@ -86,21 +86,24 @@ public class EventInternalService {
      * status=null이면 해당 판매자의 전체 상태 이벤트 반환
      */
     public InternalSellerEventsResponse getEventsBySeller(UUID sellerId, EventStatus status) {
-        List<InternalSellerEventsResponse.SellerEventSummary> summaries =
-            eventRepository.findEventsBySeller(sellerId, status)
-                .stream()
-                .map(e -> new InternalSellerEventsResponse.SellerEventSummary(
-                    e.getEventId(),
-                    e.getTitle(),
-                    e.getPrice(),
-                    e.getTotalQuantity(),
-                    e.getRemainingQuantity(),
-                    e.getStatus(),
-                    e.getEventDateTime()
-                ))
-                .toList();
+        List<Event> events = (status == null)
+            ? eventRepository.findBySellerIdOrderByCreatedAtDesc(sellerId)
+            : eventRepository.findBySellerIdAndStatusOrderByCreatedAtDesc(sellerId, status);
+
+        List<InternalSellerEventsResponse.SellerEventSummary> summaries = events.stream()
+            .map(e -> new InternalSellerEventsResponse.SellerEventSummary(
+                e.getEventId(),
+                e.getTitle(),
+                e.getPrice(),
+                e.getTotalQuantity(),
+                e.getRemainingQuantity(),
+                e.getStatus(),
+                e.getEventDateTime()
+            ))
+            .toList();
         return new InternalSellerEventsResponse(sellerId, summaries);
     }
+
 
     /**
      * API 5: 단건 재고 차감
