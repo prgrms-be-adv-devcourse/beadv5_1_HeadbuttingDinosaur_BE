@@ -1,24 +1,24 @@
 package com.devticket.event.infrastructure.search;
 
-import com.devticket.event.domain.model.Event;
-import com.devticket.event.domain.model.EventImage;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+
 import org.springframework.data.annotation.Id;
 import org.springframework.data.elasticsearch.annotations.DateFormat;
 import org.springframework.data.elasticsearch.annotations.Document;
 import org.springframework.data.elasticsearch.annotations.Field;
 import org.springframework.data.elasticsearch.annotations.FieldType;
 
+import com.devticket.event.domain.model.Event;
+import com.devticket.event.domain.model.EventImage;
+
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
 @Getter
 @NoArgsConstructor
-@AllArgsConstructor
-@Builder
 @Document(indexName = "event")
 public class EventDocument {
 
@@ -64,10 +64,29 @@ public class EventDocument {
     @Field(type = FieldType.Nested)
     private List<TechStackDocument> techStacks;
 
+    @Builder
+    private EventDocument(String id, String title, String description, String location,
+        String category, String status, String sellerId, Integer price,
+        LocalDateTime eventDateTime, LocalDateTime saleStartAt, LocalDateTime saleEndAt,
+        LocalDateTime createdAt, String thumbnailUrl, List<TechStackDocument> techStacks) {
+        this.id = id;
+        this.title = title;
+        this.description = description;
+        this.location = location;
+        this.category = category;
+        this.status = status;
+        this.sellerId = sellerId;
+        this.price = price;
+        this.eventDateTime = eventDateTime;
+        this.saleStartAt = saleStartAt;
+        this.saleEndAt = saleEndAt;
+        this.createdAt = createdAt;
+        this.thumbnailUrl = thumbnailUrl;
+        this.techStacks = techStacks;
+    }
+
     @Getter
     @NoArgsConstructor
-    @AllArgsConstructor
-    @Builder
     public static class TechStackDocument {
 
         @Field(type = FieldType.Long)
@@ -75,6 +94,12 @@ public class EventDocument {
 
         @Field(type = FieldType.Keyword)
         private String techStackName;
+
+        @Builder
+        private TechStackDocument(Long techStackId, String techStackName) {
+            this.techStackId = techStackId;
+            this.techStackName = techStackName;
+        }
     }
 
     public static EventDocument from(Event event) {
