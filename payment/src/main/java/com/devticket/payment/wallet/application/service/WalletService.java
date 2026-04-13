@@ -16,6 +16,8 @@ public interface WalletService {
 
     WalletChargeConfirmResponse confirmCharge(UUID userId, WalletChargeConfirmRequest request);
 
+    void failCharge(UUID userId, String chargeId);
+
     WalletWithdrawResponse withdraw(UUID userId, WalletWithdrawRequest request);
 
     WalletBalanceResponse getBalance(UUID userId);
