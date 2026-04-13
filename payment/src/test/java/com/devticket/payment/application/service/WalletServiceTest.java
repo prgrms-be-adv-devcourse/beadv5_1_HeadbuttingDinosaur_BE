@@ -456,7 +456,7 @@ class WalletServiceTest {
         }
 
         @Test
-        void Toss_404_미도달_PENDING_→_FAILED() {
+        void Toss_404_미도달_PENDING_to_FAILED() {
             // given: Toss에서 해당 orderId 결제 없음 (결제창 진입 전 중단)
             UUID chargeId = UUID.randomUUID();
             WalletCharge walletCharge = pendingCharge(chargeId, USER_ID, 10_000);
@@ -521,7 +521,7 @@ class WalletServiceTest {
         }
 
         @Test
-        void PG_CANCELED_PENDING_→_FAILED() {
+        void PG_CANCELED_PENDING_to_FAILED() {
             // given
             UUID chargeId = UUID.randomUUID();
             WalletCharge walletCharge = pendingCharge(chargeId, USER_ID, 10_000);
@@ -539,7 +539,7 @@ class WalletServiceTest {
         }
 
         @Test
-        void PG_ABORTED_PENDING_→_FAILED() {
+        void PG_ABORTED_PENDING_to_FAILED() {
             // given
             UUID chargeId = UUID.randomUUID();
             WalletCharge walletCharge = pendingCharge(chargeId, USER_ID, 10_000);
