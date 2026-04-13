@@ -1,5 +1,6 @@
 package com.devticket.member.presentation.domain.repository;
 
+import com.devticket.member.presentation.domain.ProviderType;
 import com.devticket.member.presentation.domain.UserRole;
 import com.devticket.member.presentation.domain.model.User;
 import java.util.List;
@@ -17,6 +18,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     boolean existsByEmail(String email);
 
+    Optional<User> findByProviderTypeAndProviderId(ProviderType providerType, String providerId);
+    
     List<User> findByRole(UserRole role);
 }
 
