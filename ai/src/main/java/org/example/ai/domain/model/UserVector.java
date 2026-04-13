@@ -27,7 +27,7 @@ public class UserVector {
 
     // ============ 구매 의도 벡터 ============ //
     @Field(type = FieldType.Dense_Vector)
-    private float cartVector;
+    private float[] cartVector;
 
     @Field(type = FieldType.Float)
     private float cartWeightSum;
