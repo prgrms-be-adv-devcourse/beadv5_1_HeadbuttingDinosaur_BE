@@ -353,15 +353,19 @@ CREATE TABLE processed_message (
 | `CANCELLED` | 없음 (종단) | PG 자동 취소 보상 흐름에서 사용 |
 | `REFUNDED` | 없음 (종단) | |
 
+> ⚠️ **미구현:** `Payment` 엔티티의 `approve()` / `fail()` / `cancel()` / `refund()` 메서드에 현재 상태 검증 가드가 없음.
+> 현재 상태와 무관하게 호출 시 바로 상태가 변경되므로, `canTransitionTo()` 구현이 필요함.
+
 **Stock** (enum 미구현 — 설계 기준)
 
-| 현재 상태 | 허용 전이 |
-|---|---|
-| `RESERVED` | → `DEDUCTED`, `RELEASED` |
-| `DEDUCTED` | → `RELEASED` |
-| `RELEASED` | 없음 (종단) |
+| 현재 상태 | 허용 전이 | 비고 |
+|---|---|---|
+| `DEDUCTED` | → `RESTORED` | 동기 HTTP 차감 성공 시 |
+| `RESTORED` | 없음 (종단) | `payment.failed` 수신 → 재고 복구 시 |
 
 > Stock 상태 enum은 현재 코드에 없음 — 구현 시 위 설계 기준으로 추가 필요
+>
+> `RESERVED` 상태 미채택 근거: 재고 차감이 Kafka 비동기가 아닌 동기 HTTP 호출(`eventClient.adjustStocks()`)로 구현되어 있어 선점 상태가 생길 틈이 없음. 비관적 락(`PESSIMISTIC_WRITE`)으로 동시성 제어 중. 향후 완전 비동기 전환 시 재검토 필요.
 
 ---
 
@@ -646,6 +650,8 @@ topic: event.force-cancelled  → DLT: event.force-cancelled.DLT
 - [ ] `KafkaConsumerConfig`: FixedBackOff → ExponentialBackOffWithMaxRetries(3, 2→4→8초)
 - [ ] `WalletEventConsumer`: groupId 변경 (`payment-refund.completed`, `payment-event.force-cancelled`)
 - [ ] `WalletEventConsumer`: `markProcessed()` 위치를 `walletService` 트랜잭션 내부로 이동
+- [ ] `WalletServiceImpl.processWalletPayment()`: 결제 완료 후 `commerceInternalClient.completePayment()` 호출 추가 — 현재 Wallet 결제 시 OrderStatus가 `PAYMENT_PENDING`에서 `PAID`로 전이되지 않음
+- [ ] `WalletEventConsumer.consumeEventCancelled()`: 이벤트 강제 취소 시 일괄 환불 미구현 (`walletService.processBatchRefund()` 주석 처리 상태) — Refund 모듈 완성 후 처리 필요
 - [ ] `ProcessedMessage`: `topic VARCHAR(128)` 컬럼 추가
 - [ ] `Outbox`: `aggregate_id` → UUID, `next_retry_at` 컬럼 추가
 - [ ] `OutboxRepository`: `next_retry_at <= now()` 조건 추가
