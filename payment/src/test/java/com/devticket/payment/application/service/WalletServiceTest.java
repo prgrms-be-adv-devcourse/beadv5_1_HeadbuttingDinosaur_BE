@@ -90,7 +90,7 @@ class WalletServiceTest {
             // given
             UUID chargeId = UUID.randomUUID();
             WalletCharge walletCharge = pendingCharge(chargeId, USER_ID, 10_000);
-            given(walletChargeRepository.findByChargeId(chargeId)).willReturn(Optional.of(walletCharge));
+            given(walletChargeRepository.findByChargeIdForUpdate(chargeId)).willReturn(Optional.of(walletCharge));
 
             // when
             walletService.failCharge(USER_ID, chargeId.toString());
@@ -103,7 +103,7 @@ class WalletServiceTest {
         void 존재하지_않는_chargeId이면_실패() {
             // given
             UUID chargeId = UUID.randomUUID();
-            given(walletChargeRepository.findByChargeId(chargeId)).willReturn(Optional.empty());
+            given(walletChargeRepository.findByChargeIdForUpdate(chargeId)).willReturn(Optional.empty());
 
             // when & then
             assertThatThrownBy(() -> walletService.failCharge(USER_ID, chargeId.toString()))
@@ -118,7 +118,7 @@ class WalletServiceTest {
             UUID chargeId = UUID.randomUUID();
             UUID otherUserId = UUID.randomUUID();
             WalletCharge walletCharge = pendingCharge(chargeId, otherUserId, 10_000);
-            given(walletChargeRepository.findByChargeId(chargeId)).willReturn(Optional.of(walletCharge));
+            given(walletChargeRepository.findByChargeIdForUpdate(chargeId)).willReturn(Optional.of(walletCharge));
 
             // when & then
             assertThatThrownBy(() -> walletService.failCharge(USER_ID, chargeId.toString()))
@@ -133,7 +133,7 @@ class WalletServiceTest {
             UUID chargeId = UUID.randomUUID();
             WalletCharge walletCharge = pendingCharge(chargeId, USER_ID, 10_000);
             walletCharge.complete("paymentKey-already-done");
-            given(walletChargeRepository.findByChargeId(chargeId)).willReturn(Optional.of(walletCharge));
+            given(walletChargeRepository.findByChargeIdForUpdate(chargeId)).willReturn(Optional.of(walletCharge));
 
             // when & then
             assertThatThrownBy(() -> walletService.failCharge(USER_ID, chargeId.toString()))
