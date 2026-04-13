@@ -5,9 +5,11 @@ import com.devticket.member.presentation.domain.MemberErrorCode;
 import com.devticket.member.presentation.domain.SellerApplicationDecision;
 import com.devticket.member.presentation.domain.UserRole;
 import com.devticket.member.presentation.domain.model.SellerApplication;
+import com.devticket.member.presentation.domain.model.TechStack;
 import com.devticket.member.presentation.domain.model.User;
 import com.devticket.member.presentation.domain.model.UserProfile;
 import com.devticket.member.presentation.domain.repository.SellerApplicationRepository;
+import com.devticket.member.presentation.domain.repository.TechStackRepository;
 import com.devticket.member.presentation.domain.repository.UserProfileRepository;
 import com.devticket.member.presentation.domain.repository.UserRepository;
 import com.devticket.member.presentation.dto.internal.request.InternalDecideSellerApplicationRequest;
@@ -17,6 +19,7 @@ import com.devticket.member.presentation.dto.internal.response.InternalMemberRol
 import com.devticket.member.presentation.dto.internal.response.InternalMemberStatusResponse;
 import com.devticket.member.presentation.dto.internal.response.InternalSellerApplicationResponse;
 import com.devticket.member.presentation.dto.internal.response.InternalSellerInfoResponse;
+import com.devticket.member.presentation.dto.internal.response.InternalTechStackListResponse;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -32,6 +35,7 @@ public class InternalMemberService {
     private final UserRepository userRepository;
     private final UserProfileRepository userProfileRepository;
     private final SellerApplicationRepository sellerApplicationRepository;
+    private final TechStackRepository techStackRepository;
 
     public InternalMemberInfoResponse getMemberInfo(UUID userId) {
         User user = findUserByUuidOrThrow(userId);
@@ -96,5 +100,10 @@ public class InternalMemberService {
         return userRepository.findByRole(UserRole.SELLER).stream()
             .map(User::getUserId)
             .toList();
+    }
+
+    public InternalTechStackListResponse getAllTechStacks() {
+        List<TechStack> stacks = techStackRepository.findAll();
+        return InternalTechStackListResponse.from(stacks);
     }
 }
