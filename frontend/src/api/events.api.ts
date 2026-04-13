@@ -20,7 +20,6 @@ import type {
   SellerEventParticipantListResponse,
   SellerEventRefundListRequest,
   SellerEventRefundListResponse,
-  TechStackListResponse,
 } from "./types";
 
 // ── 공개 이벤트 ────────────────────────────────────────────────────────────────
@@ -87,6 +86,3 @@ export const getSellerEventRefunds = (
     { params },
   );
 
-// 기술스택 목록 동적 조회
-export const getTechStacks = () =>
-  apiClient.get<TechStackListResponse>("/tech-stacks");

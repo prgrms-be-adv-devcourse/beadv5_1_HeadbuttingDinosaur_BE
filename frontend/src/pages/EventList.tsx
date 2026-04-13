@@ -3,8 +3,8 @@ import {
   getEvents,
   searchEvents,
   filterEvents,
-  getTechStacks,
 } from "../api/events.api";
+import { getTechStacks } from "../api/auth.api";
 import type { EventItem } from "../api/types";
 import EventCard from "../components/EventCard";
 import Pagination from "../components/Pagination";

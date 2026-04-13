@@ -4,8 +4,8 @@ import {
   createSellerEvent,
   getSellerEventDetail,
   updateSellerEvent,
-  getTechStacks,
 } from "../../api/events.api";
+import { getTechStacks } from "../../api/auth.api";
 import { useToast } from "../../contexts/ToastContext";
 
 const CATEGORIES = [
