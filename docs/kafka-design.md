@@ -47,9 +47,9 @@ Kafka는 서비스 간 통신이므로 아래 항목은 반드시 팀 합의 후
 
 | 서비스 | Producer (발행) | Consumer (소비) |
 |---|---|---|
-| Commerce | `order.created` | `stock.deducted`, `stock.failed`, `payment.completed`, `payment.failed`, `ticket.issue-failed`, `refund.completed` |
-| Event | `stock.deducted`, `stock.failed`, `event.force-cancelled`, `event.sale-stopped` | `order.created`, `payment.failed`, `refund.completed` |
-| Payment | `payment.completed`, `payment.failed`, `refund.completed` | `order.created` (결제 처리), `refund.completed` (예치금 복구), `ticket.issue-failed`, `event.force-cancelled`, `event.sale-stopped` |
+| Commerce | `order.created`, `ticket.issue-failed`, `refund.requested` (fan-out), `refund.order.done`, `refund.order.failed`, `refund.ticket.done`, `refund.ticket.failed` | `stock.deducted`, `stock.failed`, `payment.completed`, `payment.failed`, `ticket.issue-failed`, `refund.completed`, `event.force-cancelled`, `refund.order.cancel`, `refund.ticket.cancel`, `refund.order.compensate`, `refund.ticket.compensate` |
+| Event | `stock.deducted`, `stock.failed`, `event.force-cancelled`, `event.sale-stopped`, `refund.stock.done`, `refund.stock.failed` | `order.created`, `payment.failed`, `refund.completed`, `refund.stock.restore` |
+| Payment (Orchestrator 포함) | `payment.completed`, `payment.failed`, `refund.completed`, `refund.order.cancel`, `refund.ticket.cancel`, `refund.stock.restore`, `refund.order.compensate`, `refund.ticket.compensate` | `refund.completed` (예치금 복구), `ticket.issue-failed`, `event.sale-stopped`, `refund.requested`, `refund.order.done`, `refund.order.failed`, `refund.ticket.done`, `refund.ticket.failed`, `refund.stock.done`, `refund.stock.failed` |
 
 ### Producer 발행 시점
 
@@ -61,9 +61,18 @@ Kafka는 서비스 간 통신이므로 아래 항목은 반드시 팀 합의 후
 | `payment.completed` | Payment | `PaymentService.confirmPayment()` | PG 승인 성공 + 내부 상태 반영 커밋 시 |
 | `payment.failed` | Payment | `PaymentService.confirmPayment()` | PG 승인 실패 또는 내부 검증 실패 시 |
 | `ticket.issue-failed` | Commerce | `TicketService.issueTicket()` | 결제 성공 후 티켓 발급 실패 감지 시 |
-| `refund.completed` | Payment | `RefundService.processRefund()` | PG 취소 완료 + 내부 환불 상태 반영 커밋 시 |
+| `refund.completed` | Payment (Orchestrator) | `RefundSagaOrchestrator.completeRefund()` | Saga 마지막 단계 완료 후 Outbox 발행 |
 | `event.force-cancelled` | Event | `EventService.forceCancel()` | Admin 강제 취소 API 호출 시 |
 | `event.sale-stopped` | Event | `EventService.stopSale()` | Admin/Seller 판매 중지 API 호출 시 |
+| `refund.requested` | Commerce | `RefundFanoutService.fanout()` | `event.force-cancelled` 수신 → 대상 orderId별 fan-out 발행 |
+| `refund.order.cancel` | Payment (Orchestrator) | `RefundSagaOrchestrator.start()` / `onTicketFailed()` | Saga 시작 또는 Ticket 취소 실패 보상 시 |
+| `refund.ticket.cancel` | Payment (Orchestrator) | `RefundSagaOrchestrator.onOrderDone()` | Order 취소 완료 수신 시 |
+| `refund.stock.restore` | Payment (Orchestrator) | `RefundSagaOrchestrator.onTicketDone()` | Ticket 취소 완료 수신 시 |
+| `refund.order.compensate` | Payment (Orchestrator) | `RefundSagaOrchestrator.onTicketFailed()` | Ticket 취소 실패 → Order 롤백 시 |
+| `refund.ticket.compensate` | Payment (Orchestrator) | `RefundSagaOrchestrator.onStockFailed()` | Stock 복구 실패 → Ticket 롤백 시 |
+| `refund.order.done` / `refund.order.failed` | Commerce | `OrderRefundConsumer` | Order 취소 처리 성공/실패 시 |
+| `refund.ticket.done` / `refund.ticket.failed` | Commerce | `TicketRefundConsumer` | Ticket 취소 처리 성공/실패 시 |
+| `refund.stock.done` / `refund.stock.failed` | Event | `StockRestoreConsumer` | Stock 복구 처리 성공/실패 시 |
 
 > 위 메서드명은 설계 기준이며, 구현 시 네이밍이 달라질 수 있음.
 > 핵심은 **비즈니스 로직 + Outbox INSERT가 단일 `@Transactional` 안에 있어야 한다**는 것.
@@ -84,12 +93,26 @@ public final class KafkaTopics {
     public static final String PAYMENT_FAILED        = "payment.failed";
     public static final String TICKET_ISSUE_FAILED   = "ticket.issue-failed";
 
-    // 환불
+    // 환불 (Orchestrator)
     public static final String REFUND_COMPLETED      = "refund.completed";
 
     // 이벤트 관리
     public static final String EVENT_FORCE_CANCELLED = "event.force-cancelled";
     public static final String EVENT_SALE_STOPPED    = "event.sale-stopped";
+
+    // 환불 Orchestration (Refund Saga) — Payment Orchestrator 전용
+    public static final String REFUND_REQUESTED          = "refund.requested";
+    public static final String REFUND_ORDER_CANCEL       = "refund.order.cancel";
+    public static final String REFUND_ORDER_DONE         = "refund.order.done";
+    public static final String REFUND_ORDER_FAILED       = "refund.order.failed";
+    public static final String REFUND_TICKET_CANCEL      = "refund.ticket.cancel";
+    public static final String REFUND_TICKET_DONE        = "refund.ticket.done";
+    public static final String REFUND_TICKET_FAILED      = "refund.ticket.failed";
+    public static final String REFUND_STOCK_RESTORE      = "refund.stock.restore";
+    public static final String REFUND_STOCK_DONE         = "refund.stock.done";
+    public static final String REFUND_STOCK_FAILED       = "refund.stock.failed";
+    public static final String REFUND_ORDER_COMPENSATE   = "refund.order.compensate";
+    public static final String REFUND_TICKET_COMPENSATE  = "refund.ticket.compensate";
 
     // -- 이번 스코프 제외 (추후 논의 예정) --
     // public static final String MEMBER_SUSPENDED = "member.suspended";
@@ -129,7 +152,7 @@ public record PaymentCompletedEvent(
     UUID orderId,
     UUID userId,
     UUID paymentId,
-    PaymentMethod paymentMethod,   // enum: WALLET | PG
+    PaymentMethod paymentMethod,   // enum: WALLET | PG | WALLET_PG
     int totalAmount,
     Instant timestamp
 ) {}
@@ -154,7 +177,7 @@ public record RefundCompletedEvent(
     UUID orderId,
     UUID userId,
     UUID paymentId,
-    PaymentMethod paymentMethod,   // enum: WALLET | PG
+    PaymentMethod paymentMethod,   // enum: WALLET | PG | WALLET_PG
     int refundAmount,
     int refundRate,                // 0 | 50 | 100
     Instant timestamp
@@ -206,6 +229,39 @@ public record TicketIssueFailedEvent(
 ) {}
 ```
 
+### RefundRequestedEvent (환불 Saga 진입점)
+
+```java
+public record RefundRequestedEvent(
+    UUID refundId,       // Saga 추적 키 — SagaState PK
+    UUID orderId,
+    UUID userId,
+    UUID paymentId,
+    PaymentMethod paymentMethod,  // enum: WALLET | PG | WALLET_PG
+    int refundAmount,
+    String reason,
+    Instant timestamp
+) {}
+```
+
+> `refundId`는 Orchestrator가 Saga 시작 전 생성 (`UUID.randomUUID()`).
+> Commerce fan-out 시 각 orderId마다 새 `refundId`를 발행한다.
+
+### RefundSagaStepEvent (Orchestrator ↔ 각 서비스 공용)
+
+```java
+// refund.order.done / refund.order.failed
+// refund.ticket.done / refund.ticket.failed
+// refund.stock.done / refund.stock.failed
+public record RefundSagaStepEvent(
+    UUID refundId,
+    UUID orderId,
+    boolean success,
+    String reason,      // 실패 시에만 값 있음
+    Instant timestamp
+) {}
+```
+
 ---
 
 ## 4. Outbox 패턴
@@ -224,7 +280,8 @@ public record TicketIssueFailedEvent(
 |------|------|------|
 | id | BIGSERIAL | PK |
 | message_id | UUID | `UUID.randomUUID()`로 생성 — Kafka 헤더로 전달, Consumer dedup 키로 사용 |
-| aggregate_id | VARCHAR(36) | 비즈니스 키 UUID (orderId, paymentId 등) |
+| aggregate_id | VARCHAR(36) | 비즈니스 키 UUID — 운영 추적용 (orderId, paymentId 등) |
+| partition_key | VARCHAR(36) | Kafka Partition Key — orderId 기준 순서 보장용 (kafka-design.md §6) |
 | event_type | VARCHAR(128) | 이벤트 유형 (ORDER_CREATED, STOCK_DEDUCTED 등) |
 | topic | VARCHAR(128) | Kafka 토픽명 |
 | payload | TEXT | JSON 직렬화된 이벤트 |
@@ -234,10 +291,21 @@ public record TicketIssueFailedEvent(
 | created_at | TIMESTAMP | 생성 시각 |
 | sent_at | TIMESTAMP | 발행 완료 시각 |
 
-> `aggregate_id`가 어떤 엔티티의 UUID인지 토픽별로 명확해야 합니다:
-> - order.created → orderId
-> - payment.completed → paymentId
-> - refund.completed → refundId
+> `aggregate_id`(운영 추적)와 `partition_key`(Kafka 순서 보장)를 분리합니다.
+>
+> | 토픽 | aggregate_id | partition_key |
+> |------|-------------|--------------|
+> | `order.created` | orderId | orderId |
+> | `payment.completed` | paymentId | orderId |
+> | `payment.failed` | paymentId | orderId |
+> | `refund.completed` | refundId | orderId |
+> | `stock.deducted` / `stock.failed` | orderId | orderId |
+> | `event.force-cancelled` / `event.sale-stopped` | eventId | eventId |
+> | `refund.requested` | refundId | orderId |
+> | `refund.order.cancel` / `refund.order.done` / `refund.order.failed` | refundId | orderId |
+> | `refund.ticket.cancel` / `refund.ticket.done` / `refund.ticket.failed` | refundId | orderId |
+> | `refund.stock.restore` / `refund.stock.done` / `refund.stock.failed` | refundId | orderId |
+> | `refund.order.compensate` / `refund.ticket.compensate` | refundId | orderId |
 
 > `event_type` 컬럼은 멱등성 자체에는 필수가 아니지만,
 > 운영 중 "이 aggregate에서 어떤 이벤트가 몇 번 발행됐는지" 추적하는 데 유용합니다.
@@ -246,11 +314,15 @@ public record TicketIssueFailedEvent(
 
 ```sql
 ALTER TABLE outbox
-    ADD COLUMN next_retry_at DATETIME(6) NULL;   -- 지수 백오프 기반 재시도 시각
+    ADD COLUMN next_retry_at DATETIME(6) NULL;         -- 지수 백오프 기반 재시도 시각
 
 -- aggregate_id: DB PK(BIGINT)가 아닌 비즈니스 키(paymentId, orderId 등) UUID 사용
 ALTER TABLE outbox
     MODIFY COLUMN aggregate_id VARCHAR(36) NOT NULL;   -- UUID 문자열
+
+-- partition_key: Kafka 파티션 키 — orderId 기준 Saga 순서 보장 (aggregate_id와 다를 수 있음)
+ALTER TABLE outbox
+    ADD COLUMN partition_key VARCHAR(36) NOT NULL;
 ```
 
 ### 재시도 정책 (지수 백오프)
@@ -337,11 +409,11 @@ CREATE TABLE processed_message (
 |---|---|---|
 | `CREATED` | → `PAYMENT_PENDING` | `pendingPayment()` — 현재 `create()`가 바로 `PAYMENT_PENDING` 설정하므로 실질 미사용 |
 | `PAYMENT_PENDING` | → `PAID`, `FAILED`, `CANCELLED` | `completePayment()` / `failPayment()` / `cancel()` |
-| `PAID` | → `CANCELLED` | `cancel()` |
+| `PAID` | → `CANCELLED` | `cancel()` / ⚠️ `PAID → REFUND_PENDING` 전이 허용 여부는 §4-1 미결사항 해결 전까지 사용 금지 |
 | `FAILED` | 없음 (종단) | |
 | `CANCELLED` | 없음 (종단) | |
-| `REFUND_PENDING` | 미정 | 선언만 있고 미사용 — 향후 사용 여부 별도 결정 필요 (하단 미결사항 참조) |
-| `REFUNDED` | 미정 | 선언만 있고 미사용 — 향후 사용 여부 별도 결정 필요 (하단 미결사항 참조) |
+| `REFUND_PENDING` | 미정 | 선언만 있고 미사용 — `PAID → REFUND_PENDING → REFUNDED` 전이 포함 여부는 §4-1 미결사항 해결 후 결정 |
+| `REFUNDED` | 미정 | 선언만 있고 미사용 — §4-1 미결사항 해결 후 결정 |
 
 **Payment** (`payment.PaymentStatus`)
 
@@ -418,12 +490,14 @@ if (!order.canTransitionTo(targetStatus)) {
 
 `OrderStatus`에 `REFUND_PENDING`, `REFUNDED`가 선언되어 있으나 현재 코드 어디서도 사용되지 않는다.
 
-환불 흐름 구현 시 아래 두 가지 중 선택 필요:
+환불 흐름 구현 시 아래 두 가지 중 선택 필요. **어느 옵션도 확정되지 않았으며, Refund Saga 구현 착수 전 팀 합의 후 결정한다.**
 
-| 옵션 | 내용 |
-|---|---|
-| **Order 상태로 추적** | `PAID → REFUND_PENDING → REFUNDED` 전이 추가, `canTransitionTo()` 에 반영 |
-| **Order 상태 미사용** | 환불은 Payment/Refund 도메인에서만 관리, Order에서 `REFUND_PENDING`·`REFUNDED` 제거 |
+| 옵션 | 내용 | 트레이드오프 |
+|---|---|---|
+| **A. Order 상태로 추적** | `PAID → REFUND_PENDING → REFUNDED` 전이 추가, `canTransitionTo()` 에 반영 | 환불 진행 중 상태를 Order에서 직접 추적 가능. `canTransitionTo()` 및 보상 경로(`REFUND_PENDING → PAID` 롤백) 구현 추가 필요 |
+| **B. Order 상태 미사용** | 환불은 Payment/Refund 도메인에서만 관리, Order에서 `REFUND_PENDING`·`REFUNDED` 제거 | Order 도메인 단순화. 단, `refund.order.cancel` 수신 시 Order 상태 전이 없이 바로 `refund.order.done` 발행하는 구조로 변경 필요 |
+
+> **관련 서비스:** `[Commerce]`, `[Payment]`
 
 ### groupId 네이밍 규칙
 
@@ -440,11 +514,22 @@ if (!order.canTransitionTo(targetStatus)) {
 | Event | `order.created` | `event-order.created` |
 | Event | `payment.failed` | `event-payment.failed` |
 | Event | `refund.completed` | `event-refund.completed` |
-| Payment | `order.created` | `payment-order.created` |
 | Payment | `refund.completed` | `payment-refund.completed` |
 | Payment | `ticket.issue-failed` | `payment-ticket.issue-failed` |
-| Payment | `event.force-cancelled` | `payment-event.force-cancelled` |
+| Commerce | `event.force-cancelled` | `commerce-event.force-cancelled` |
 | Payment | `event.sale-stopped` | `payment-event.sale-stopped` |
+| Payment (Orchestrator) | `refund.requested` | `payment-refund.requested` |
+| Payment (Orchestrator) | `refund.order.done` | `payment-refund.order.done` |
+| Payment (Orchestrator) | `refund.order.failed` | `payment-refund.order.failed` |
+| Payment (Orchestrator) | `refund.ticket.done` | `payment-refund.ticket.done` |
+| Payment (Orchestrator) | `refund.ticket.failed` | `payment-refund.ticket.failed` |
+| Payment (Orchestrator) | `refund.stock.done` | `payment-refund.stock.done` |
+| Payment (Orchestrator) | `refund.stock.failed` | `payment-refund.stock.failed` |
+| Commerce | `refund.order.cancel` | `commerce-refund.order.cancel` |
+| Commerce | `refund.ticket.cancel` | `commerce-refund.ticket.cancel` |
+| Commerce | `refund.order.compensate` | `commerce-refund.order.compensate` |
+| Commerce | `refund.ticket.compensate` | `commerce-refund.ticket.compensate` |
+| Event | `refund.stock.restore` | `event-refund.stock.restore` |
 
 ---
 
@@ -472,6 +557,11 @@ kafkaTemplate.send("order.created", orderId.toString(), payload);
 | `payment.completed` / `payment.failed` | `orderId` | 동일 주문 결제 흐름 순서 보장 |
 | `refund.completed` | `orderId` | 환불-주문 상태 순서 보장 |
 | `event.force-cancelled` / `event.sale-stopped` | `eventId` | 동일 이벤트 취소 중복 방지 |
+| `refund.requested` | `orderId` | 동일 주문의 환불 Saga 진입 순서 보장 |
+| `refund.order.cancel` / `refund.order.done` / `refund.order.failed` | `orderId` | 동일 주문의 Refund Saga 단계 순서 보장 |
+| `refund.ticket.cancel` / `refund.ticket.done` / `refund.ticket.failed` | `orderId` | 동일 주문의 Refund Saga 단계 순서 보장 |
+| `refund.stock.restore` / `refund.stock.done` / `refund.stock.failed` | `orderId` | 동일 주문의 Refund Saga 단계 순서 보장 |
+| `refund.order.compensate` / `refund.ticket.compensate` | `orderId` | 동일 주문의 보상 트랜잭션 순서 보장 |
 
 > 참고: 현재 설계는 상태전이 검증(`canTransitionTo`)으로 순서 역전을 방어하고 있음.
 > Partition Key는 추가 방어선으로, 설정하지 않아도 멱등성은 유지되지만 설정 시 Consumer 재시도 빈도가 줄어든다.
@@ -566,13 +656,18 @@ UNIQUE KEY: processed_message INSERT 중복 방지
     → 재고 차감 처리
     → stock.deducted 발행
     ↓
-[Payment] stock.deducted 소비
-    → 결제 처리 (PG 연동)
+[Commerce] stock.deducted 소비 (groupId: commerce-stock.deducted)
+    → Order 상태 PAYMENT_PENDING 전이
+    ↓
+[User] POST /api/payments/ready    ← 사용자가 결제 수단 선택 후 명시적 HTTP 호출
+[User] POST /api/payments/confirm  ← PG 콜백 후 사용자 최종 승인 HTTP 호출
+    ↓
+[Payment] PG 승인 처리
     → payment.completed 발행
     ↓
 [Commerce] payment.completed 소비
     → Order 상태 PAID 전이
-    → ticket.issued 발행 (티켓 발급)
+    → 티켓 발급 (TicketService 내부 호출 — Kafka 토픽 아님)
 ```
 
 ### 9-2. 보상 흐름 (실패 케이스)
@@ -589,8 +684,8 @@ UNIQUE KEY: processed_message INSERT 중복 방지
 
 **케이스 2 — 결제 실패:**
 ```
-[Payment] stock.deducted 소비
-    → 결제 실패 (PG 거절 등)
+[User] POST /api/payments/confirm  ← 사용자 HTTP 호출
+[Payment] PG 거절 또는 내부 검증 실패
     → payment.failed 발행
     ↓
 [Commerce] payment.failed 소비 (groupId: commerce-payment.failed)
@@ -603,13 +698,131 @@ UNIQUE KEY: processed_message INSERT 중복 방지
 ```
 [Commerce] ticket.issue-failed 소비
     → Order 상태 CANCELLED 전이
-    → 환불 처리 (payment.completed 이후이므로 PG 취소 포함)
+[Payment] ticket.issue-failed 소비
+    → RefundSagaOrchestrator.start() → 환불 Orchestration 진행 (§9-3 참조)
 ```
 
 ### 보상 이벤트 원칙
 
 - 모든 보상 Consumer(`commerce-payment.failed`, `event-payment.failed` 등)에 `processed_message` dedup 적용
 - 보상 Consumer groupId도 `{서비스명}-{topic명}` 규칙을 따른다
+
+---
+
+### 9-3. 환불 Orchestration 플로우 (Refund Saga)
+
+> 환불 흐름은 Choreography 대신 Orchestration 패턴 적용.
+> Payment 서비스 내 `RefundSagaOrchestrator`가 모든 단계를 지휘한다.
+
+**진입점 2가지:**
+
+| 케이스 | 진입 경로 |
+|--------|----------|
+| 단건 환불 (티켓 발급 실패 등) | `ticket.issue-failed` 수신 → `RefundSagaOrchestrator.start()` |
+| 일괄 환불 (이벤트 강제 취소) | `event.force-cancelled` → Commerce fan-out → `refund.requested` → `RefundSagaOrchestrator.start()` |
+
+**정상 흐름:**
+
+```mermaid
+sequenceDiagram
+    participant Orchestrator as Payment (Orchestrator)
+    participant Commerce
+    participant Event
+
+    Note over Orchestrator: refund.requested 수신<br/>SagaState(ORDER_CANCELLING) 저장
+
+    Orchestrator-->>Commerce: refund.order.cancel
+    Commerce->>Commerce: ⚠️ Order 상태 처리 (§4-1 미결 — 하단 경로 분기 참조)
+    Note over Commerce: §4-1 미결: 옵션A=REFUND_PENDING 전이, 옵션B=상태 전이 없이 done 발행<br/>ticket.issue-failed 경로에서는 이미 CANCELLED 상태 → 멱등 스킵
+    Commerce-->>Orchestrator: refund.order.done
+
+    Orchestrator->>Orchestrator: SagaState → TICKET_CANCELLING
+    Orchestrator-->>Commerce: refund.ticket.cancel
+    Commerce->>Commerce: Ticket 취소 처리 + Outbox
+    Commerce-->>Orchestrator: refund.ticket.done
+
+    Orchestrator->>Orchestrator: SagaState → STOCK_RESTORING
+    Orchestrator-->>Event: refund.stock.restore
+    Event->>Event: Stock RESTORED 전이 + Outbox
+    Event-->>Orchestrator: refund.stock.done
+
+    Note over Orchestrator: paymentMethod 분기
+    Orchestrator->>Orchestrator: [PG / WALLET_PG] PG 취소 API 직접 호출
+    Orchestrator->>Orchestrator: [WALLET / WALLET_PG] WalletService.restoreBalance() 직접 호출
+    Orchestrator->>Orchestrator: SagaState → COMPLETED
+    Orchestrator->>Orchestrator: refund.completed Outbox 저장
+    Orchestrator-->>Commerce: refund.completed
+    Orchestrator-->>Event: refund.completed
+```
+
+**경로 분기 — refund.order.cancel 수신 시 Order 상태별 처리:**
+
+```
+일반 환불 경로 (event.force-cancelled → refund.requested):
+  Order 상태 = PAID
+  ⚠️ §4-1 미결 — 구현 시 팀 합의 후 아래 중 하나 선택:
+  [옵션 A] → REFUND_PENDING 전이 + Outbox → refund.order.done 발행
+  [옵션 B] → 상태 전이 없이 바로 refund.order.done 발행
+
+ticket.issue-failed 경로:
+  Order 상태 = CANCELLED (Commerce가 ticket.issue-failed 소비 시 먼저 전이 완료)
+  → 멱등 스킵 (상태 전이 없음) + refund.order.done 발행
+  (Orchestrator는 두 경로 모두 refund.order.done을 정상 수신하므로 구분 불필요)
+```
+
+**보상 흐름 (실패 케이스):**
+
+```
+refund.order.failed  → 첫 단계 실패 → SagaState FAILED (보상 불필요)
+
+refund.ticket.failed → Order 롤백 필요
+    → refund.order.compensate 발행 → Order 취소 해제
+
+refund.stock.failed  → Order + Ticket 롤백 필요
+    → refund.ticket.compensate 발행 → Ticket 취소 해제
+    → refund.order.compensate 발행 → Order 취소 해제
+```
+
+**결제 방식별 Saga Step:**
+
+| Step | WALLET | PG | WALLET_PG |
+|------|--------|----|-----------|
+| 1 | Order 취소 | Order 취소 | Order 취소 |
+| 2 | Ticket 취소 | Ticket 취소 | Ticket 취소 |
+| 3 | Stock 복구 | Stock 복구 | Stock 복구 |
+| 4 | **Wallet 복구** (내부 호출) | **PG 취소** (내부 호출) | **PG 취소** (내부 호출) |
+| 5 | — | — | **Wallet 복구** (내부 호출) |
+
+> Step 4, 5는 Orchestrator가 Payment 내부에 있으므로 별도 Kafka 토픽 없이 직접 메서드 호출로 처리.
+
+**`saga_state` 테이블:**
+
+```sql
+CREATE TABLE saga_state (
+    refund_id       VARCHAR(36)  NOT NULL,
+    order_id        VARCHAR(36)  NOT NULL,
+    payment_method  VARCHAR(20)  NOT NULL,   -- WALLET | PG | WALLET_PG
+    current_step    VARCHAR(30)  NOT NULL,   -- ORDER_CANCELLING | TICKET_CANCELLING | STOCK_RESTORING | PG_CANCELLING | WALLET_RESTORING | COMPLETED | FAILED | COMPENSATING
+    status          VARCHAR(20)  NOT NULL,   -- IN_PROGRESS | COMPLETED | FAILED | COMPENSATING
+    created_at      DATETIME(6)  NOT NULL,
+    updated_at      DATETIME(6)  NOT NULL,
+    PRIMARY KEY (refund_id)
+);
+```
+
+**Orchestrator Consumer groupId:**
+
+| 소비 토픽 | groupId |
+|----------|---------|
+| `refund.requested` | `payment-refund.requested` |
+| `refund.order.done` | `payment-refund.order.done` |
+| `refund.order.failed` | `payment-refund.order.failed` |
+| `refund.ticket.done` | `payment-refund.ticket.done` |
+| `refund.ticket.failed` | `payment-refund.ticket.failed` |
+| `refund.stock.done` | `payment-refund.stock.done` |
+| `refund.stock.failed` | `payment-refund.stock.failed` |
+
+> Orchestrator의 각 `@KafkaListener`는 서로 다른 토픽을 소비하므로 groupId를 토픽별로 분리한다.
 
 ---
 
@@ -657,12 +870,11 @@ topic: event.force-cancelled  → DLT: event.force-cancelled.DLT
 ### Payment (기존 구현 수정)
 
 - [ ] `KafkaConsumerConfig`: FixedBackOff → ExponentialBackOffWithMaxRetries(3, 2→4→8초)
-- [ ] `WalletEventConsumer`: groupId 변경 (`payment-refund.completed`, `payment-event.force-cancelled`)
+- [ ] `WalletEventConsumer`: groupId 변경 (`payment-refund.completed`)
 - [ ] `WalletEventConsumer`: `markProcessed()` 위치를 `walletService` 트랜잭션 내부로 이동
 - [ ] `WalletServiceImpl.processWalletPayment()`: 결제 완료 후 `commerceInternalClient.completePayment()` 호출 추가 — 현재 Wallet 결제 시 OrderStatus가 `PAYMENT_PENDING`에서 `PAID`로 전이되지 않음
-- [ ] `WalletEventConsumer.consumeEventCancelled()`: 이벤트 강제 취소 시 일괄 환불 미구현 (`walletService.processBatchRefund()` 주석 처리 상태) — Refund 모듈 완성 후 처리 필요
 - [ ] `ProcessedMessage`: `topic VARCHAR(128)` 컬럼 추가
-- [ ] `Outbox`: `aggregate_id` → UUID, `next_retry_at` 컬럼 추가
+- [ ] `Outbox`: `aggregate_id` → UUID(비즈니스 키), `next_retry_at` 컬럼 추가, `partition_key VARCHAR(36)` 컬럼 추가 (상세: §4)
 - [ ] `OutboxRepository`: `next_retry_at <= now()` 조건 추가
 - [ ] `OutboxScheduler`: ShedLock 적용, 지수 백오프 재시도 간격 반영
 - [ ] `RefundCompletedEvent`: `refundId(UUID)`, `userId(UUID)`, `paymentId(UUID)`, `timestamp(Instant)`
@@ -671,27 +883,41 @@ topic: event.force-cancelled  → DLT: event.force-cancelled.DLT
 - [ ] `JacksonConfig`: 이미 존재, 설정 내용 검토
 - [ ] 도메인 엔티티 상태 전이 검증 (`canTransitionTo()`)
 - [ ] 도메인 엔티티 낙관적 락 (`@Version`)
+- [ ] `RefundSagaOrchestrator` 클래스 신규 생성, `saga_state` 테이블 및 `SagaStateRepository` 구현
+- [ ] Orchestrator `start()` / `onOrderDone()` / `onTicketDone()` / `onStockDone()` / `onOrderFailed()` / `onTicketFailed()` / `onStockFailed()` 구현
+- [ ] Orchestrator Consumer groupId 등록 (`payment-refund.requested` 외 6개, 상세: §9-3) + dedup 적용
+- [ ] `KafkaTopics` 상수 클래스에 Refund Saga Orchestration 토픽 12개 추가 (상세: §2)
+
+> 전체 구현 체크리스트: kafka-impl-plan.md §3-1 참조
 
 ### Commerce (신규 적용)
 
 - [ ] `JacksonConfig` 추가
-- [ ] `KafkaTopics` 참조 또는 복사
+- [ ] `KafkaTopics` 상수 클래스에 Commerce 발행 토픽 + Orchestration 토픽 추가
 - [ ] Outbox 패턴 구현 (비즈니스 + save 단일 트랜잭션)
 - [ ] `MessageDeduplicationService` 구현 + `processed_message` 테이블
 - [ ] ShedLock 적용
-- [ ] 모든 Consumer에 dedupe 패턴 적용 (Saga + 보상 이벤트 포함)
+- [ ] 모든 Consumer에 dedup 패턴 적용 (`event.force-cancelled` 포함 전체 Consumer)
 - [ ] 상태 전이 검증 구현 (`canTransitionTo()`)
 - [ ] 도메인 엔티티 낙관적 락 (`@Version`)
+- [ ] Refund Saga 연동 — `RefundFanoutService`, `OrderRefundConsumer`, `TicketRefundConsumer`, `OrderCompensateConsumer`, `TicketCompensateConsumer`
+
+> 전체 구현 체크리스트: kafka-impl-plan.md §3-2 참조
 
 ### Event (신규 적용)
 
 - [ ] `JacksonConfig` 추가
+- [ ] `KafkaTopics` 상수 클래스에 Event 발행 토픽 추가
 - [ ] Outbox 패턴 구현 (비즈니스 + save 단일 트랜잭션)
 - [ ] `MessageDeduplicationService` 구현 + `processed_message` 테이블
 - [ ] ShedLock 적용
-- [ ] 모든 Consumer에 dedupe 패턴 적용 (Saga + 보상 이벤트 포함)
+- [ ] 모든 Consumer에 dedup 패턴 적용 (`refund.stock.restore` 포함)
 - [ ] 상태 전이 검증 구현 (`canTransitionTo()`)
 - [ ] 도메인 엔티티 낙관적 락 (`@Version`)
+- [ ] `StockStatus` enum 신규 추가 (`DEDUCTED` → `RESTORED`)
+- [ ] `StockRestoreConsumer`: `refund.stock.restore` 수신 → Stock 복구 → `refund.stock.done/failed` 발행
+
+> 전체 구현 체크리스트: kafka-impl-plan.md §3-3 참조
 
 ---
 
