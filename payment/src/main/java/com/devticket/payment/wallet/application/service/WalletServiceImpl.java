@@ -186,7 +186,8 @@ public class WalletServiceImpl implements WalletService {
     @Override
     @Transactional
     public void failCharge(UUID userId, String chargeId) {
-        WalletCharge walletCharge = walletChargeRepository.findByChargeId(parseUUID(chargeId))
+        // 비관적 락: confirmCharge()와 동시 실행 시 상태 역전 방지
+        WalletCharge walletCharge = walletChargeRepository.findByChargeIdForUpdate(parseUUID(chargeId))
             .orElseThrow(() -> new WalletException(WalletErrorCode.CHARGE_NOT_FOUND));
 
         if (!walletCharge.getUserId().equals(userId)) {
