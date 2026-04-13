@@ -11,7 +11,7 @@ export interface SignUpRequest {
 }
 export interface SignUpResponse {
   userId: string;
-  accessToken: string;   // 백엔드에서 가입 즉시 토큰 발급
+  accessToken: string; // 백엔드에서 가입 즉시 토큰 발급
   refreshToken: string;
 }
 
@@ -25,7 +25,7 @@ export interface LoginResponse {
 }
 
 export interface SocialSignUpOrLoginRequest {
-  providerType: string;   // "GOOGLE"
+  providerType: string; // "GOOGLE"
   idToken: string;
 }
 export interface SocialSignUpOrLoginResponse {
@@ -57,7 +57,7 @@ export interface WithdrawResponse {
 export interface SignUpProfileRequest {
   nickname: string;
   position: string;
-  techStackIds: number[];           // Long[] — tech stack은 공개 마스터 데이터라 Long 사용
+  techStackIds: number[]; // Long[] — tech stack은 공개 마스터 데이터라 Long 사용
   profileImageUrl: string | null;
   bio: string | null;
 }
@@ -118,7 +118,7 @@ export interface SellerApplicationListResponse {
 
 export interface SellerApplicationStatusResponse {
   applicationId: string;
-  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  status: "PENDING" | "APPROVED" | "REJECTED";
   createdAt: string;
   reviewedAt?: string;
   rejectionReason?: string;
@@ -133,7 +133,7 @@ export interface EventItem {
   eventId: string;
   title: string;
   category: string;
-  techStacks: TechStackItem[];
+  techStacks: string[];
   price: number;
   eventDateTime: string;
   remainingQuantity: number;
@@ -174,7 +174,7 @@ export type EventSearchResponse = EventListResponse;
 
 export interface EventFilterRequest {
   category?: string;
-  techStack?: string;
+  techStacks?: string[];
   page?: number;
   size?: number;
 }
@@ -182,18 +182,18 @@ export type EventFilterResponse = EventListResponse;
 
 // ── Seller Events ────────────────────────────────────────────────────────────
 export interface SellerEventCreateRequest {
-  title: string
-  description: string
-  category: string
-  techStackIds: number[]
-  price: number
-  totalQuantity: number
-  maxQuantity: number
-  eventDateTime: string
-  saleStartAt: string
-  saleEndAt: string
-  location: string
-  imageUrls?: string[]
+  title: string;
+  description: string;
+  category: string;
+  techStackIds: number[];
+  price: number;
+  totalQuantity: number;
+  maxQuantity: number;
+  eventDateTime: string;
+  saleStartAt: string;
+  saleEndAt: string;
+  location: string;
+  imageUrls?: string[];
 }
 export interface SellerEventCreateResponse {
   eventId: string;
@@ -314,7 +314,7 @@ export interface SellerEventRefundListResponse {
 
 // 장바구니 아이템 상세 (백엔드 CartItemDetail)
 export interface CartItemDetail {
-  cartItemId: string;   // UUID string
+  cartItemId: string; // UUID string
   eventId: string;
   eventTitle: string;
   price: number;
@@ -323,7 +323,7 @@ export interface CartItemDetail {
 
 // POST /cart/items 요청
 export interface CartItemRequest {
-  eventId: string;      // UUID
+  eventId: string; // UUID
   quantity: number;
 }
 
@@ -343,7 +343,7 @@ export interface CartResponse {
 
 // PATCH /cart/items/{cartItemId} 요청
 export interface CartItemQuantityRequest {
-  quantity: number;     // 증감 delta (+1, -1)
+  quantity: number; // 증감 delta (+1, -1)
 }
 
 // PATCH /cart/items/{cartItemId} 응답 (백엔드 CartItemQuantityResponse)
@@ -443,7 +443,7 @@ export interface TicketDetailResponse {
 // ── Payments ─────────────────────────────────────────────────────────────────
 export interface PaymentRequest {
   orderId: string;
-  paymentMethod: 'PG' | 'WALLET';
+  paymentMethod: "PG" | "WALLET";
 }
 export interface PaymentResponse {
   paymentId: string;
@@ -504,7 +504,7 @@ export interface WalletTransactionListRequest {
 export interface WalletTransactionItem {
   transactionId: string;
   transactionKey: string;
-  type: 'CHARGE' | 'USE' | 'REFUND' | 'WITHDRAW';
+  type: "CHARGE" | "USE" | "REFUND" | "WITHDRAW";
   amount: number;
   balanceAfter: number;
   relatedOrderId?: string;
@@ -699,7 +699,7 @@ export interface AdminUserDetailResponse {
 }
 
 export interface UserStatusRequest {
-  status: 'ACTIVE' | 'SUSPENDED';
+  status: "ACTIVE" | "SUSPENDED";
   reason?: string;
 }
 export interface UserStatusResponse {
@@ -708,7 +708,7 @@ export interface UserStatusResponse {
 }
 
 export interface UserRoleRequest {
-  role: 'USER' | 'SELLER' | 'ADMIN';
+  role: "USER" | "SELLER" | "ADMIN";
 }
 export interface UserRoleResponse {
   userId: string;
@@ -732,7 +732,7 @@ export interface SellerApplicationListResponse {
 
 // ── Tech Stack ────────────────────────────────────────────────────────────────
 export interface TechStackItem {
-  techStackId: number;    // Long PK — 공개 마스터 데이터라 UUID 안 씀
+  techStackId: number; // Long PK — 공개 마스터 데이터라 UUID 안 씀
   name: string;
 }
 export interface TechStackListResponse {

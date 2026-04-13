@@ -1,50 +1,73 @@
-import { apiClient, ApiResponse } from './client';
+import { apiClient, ApiResponse } from "./client";
 import type {
-  EventListRequest, EventListResponse,
+  EventListRequest,
+  EventListResponse,
   EventDetailResponse,
-  EventSearchRequest, EventSearchResponse,
-  EventFilterRequest, EventFilterResponse,
-  SellerEventCreateRequest, SellerEventCreateResponse,
-  SellerEventListRequest, SellerEventListResponse,
+  EventSearchRequest,
+  EventSearchResponse,
+  EventFilterRequest,
+  EventFilterResponse,
+  SellerEventCreateRequest,
+  SellerEventCreateResponse,
+  SellerEventListRequest,
+  SellerEventListResponse,
   SellerEventDetailResponse,
-  SellerEventUpdateRequest, SellerEventUpdateResponse,
+  SellerEventUpdateRequest,
+  SellerEventUpdateResponse,
   SellerEventStopResponse,
   SellerEventSummaryResponse,
-  SellerEventParticipantListRequest, SellerEventParticipantListResponse,
-  SellerEventRefundListRequest, SellerEventRefundListResponse,
-} from './types';
+  SellerEventParticipantListRequest,
+  SellerEventParticipantListResponse,
+  SellerEventRefundListRequest,
+  SellerEventRefundListResponse,
+  TechStackListResponse,
+} from "./types";
 
 // ── 공개 이벤트 ────────────────────────────────────────────────────────────────
 export const getEvents = (params?: EventListRequest) =>
-  apiClient.get<ApiResponse<EventListResponse>>('/events', { params });
+  apiClient.get<ApiResponse<EventListResponse>>("/events", { params });
 
 export const getEventDetail = (eventId: string) =>
   apiClient.get<ApiResponse<EventDetailResponse>>(`/events/${eventId}`);
 
 export const searchEvents = (params: EventSearchRequest) =>
-  apiClient.get<ApiResponse<EventSearchResponse>>('/events/search', { params });
+  apiClient.get<ApiResponse<EventSearchResponse>>("/events", { params });
 
 export const filterEvents = (params: EventFilterRequest) =>
-  apiClient.get<ApiResponse<EventFilterResponse>>('/events', { params });
+  apiClient.get<ApiResponse<EventFilterResponse>>("/events", { params });
 
 // ── 판매자 이벤트 ──────────────────────────────────────────────────────────────
 export const createSellerEvent = (body: SellerEventCreateRequest) =>
-    apiClient.post<ApiResponse<SellerEventCreateResponse>>('/events', body);
+  apiClient.post<ApiResponse<SellerEventCreateResponse>>("/events", body);
 
 export const getSellerEvents = (params?: SellerEventListRequest) =>
-  apiClient.get<ApiResponse<SellerEventListResponse>>('/seller/events', { params });
+  apiClient.get<ApiResponse<SellerEventListResponse>>("/seller/events", {
+    params,
+  });
 
 export const getSellerEventDetail = (eventId: string) =>
-  apiClient.get<ApiResponse<SellerEventDetailResponse>>(`/seller/events/${eventId}`);
+  apiClient.get<ApiResponse<SellerEventDetailResponse>>(
+    `/seller/events/${eventId}`,
+  );
 
-export const updateSellerEvent = (eventId: string, body: SellerEventUpdateRequest) =>
-  apiClient.patch<ApiResponse<SellerEventUpdateResponse>>(`/seller/events/${eventId}`, body);
+export const updateSellerEvent = (
+  eventId: string,
+  body: SellerEventUpdateRequest,
+) =>
+  apiClient.patch<ApiResponse<SellerEventUpdateResponse>>(
+    `/seller/events/${eventId}`,
+    body,
+  );
 
 export const stopSellerEvent = (eventId: string) =>
-  apiClient.patch<ApiResponse<SellerEventStopResponse>>(`/seller/events/${eventId}/cancel`);
+  apiClient.patch<ApiResponse<SellerEventStopResponse>>(
+    `/seller/events/${eventId}/cancel`,
+  );
 
 export const getSellerEventSummary = (eventId: string) =>
-  apiClient.get<ApiResponse<SellerEventSummaryResponse>>(`/seller/events/${eventId}/statistics`);
+  apiClient.get<ApiResponse<SellerEventSummaryResponse>>(
+    `/seller/events/${eventId}/statistics`,
+  );
 
 export const getSellerEventParticipants = (
   eventId: string,
@@ -63,3 +86,7 @@ export const getSellerEventRefunds = (
     `/seller/events/${eventId}/refunds`,
     { params },
   );
+
+// 기술스택 목록 동적 조회
+export const getTechStacks = () =>
+  apiClient.get<TechStackListResponse>("/tech-stacks");
