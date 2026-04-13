@@ -1,0 +1,28 @@
+spring:
+  kafka:
+    bootstrap-servers: localhost:9093
+    consumer:
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+
+  elasticsearch:
+    uris: http://localhost:9200
+    connection-timeout: 5s
+    socket-timeout: 30s
+
+openai:
+  api-key: ${OPENAI_API_KEY}
+  embedding:
+    url: https://api.openai.com/v1/embeddings
+    model: text-embedding-3-small
+
+internal:
+  log-service:
+    url: http://localhost:8086
+
+logging:
+  level:
+    com.devticket: DEBUG
