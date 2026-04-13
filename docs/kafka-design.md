@@ -360,12 +360,12 @@ CREATE TABLE processed_message (
 
 | 현재 상태 | 허용 전이 | 비고 |
 |---|---|---|
-| `DEDUCTED` | → `RESTORED` | 동기 HTTP 차감 성공 시 |
+| `DEDUCTED` | → `RESTORED` | Event Consumer가 `order.created` 수신 후 재고 차감 성공 시 (Kafka 구현 전: 동기 HTTP 차감 성공 시) |
 | `RESTORED` | 없음 (종단) | `payment.failed` 수신 → 재고 복구 시 |
 
 > Stock 상태 enum은 현재 코드에 없음 — 구현 시 위 설계 기준으로 추가 필요
 >
-> `RESERVED` 상태 미채택 근거: 재고 차감이 Kafka 비동기가 아닌 동기 HTTP 호출(`eventClient.adjustStocks()`)로 구현되어 있어 선점 상태가 생길 틈이 없음. 비관적 락(`PESSIMISTIC_WRITE`)으로 동시성 제어 중. 향후 완전 비동기 전환 시 재검토 필요.
+> `RESERVED` 상태 미채택 근거: Event Consumer 내에서 재고 차감이 원자적으로 즉시 발생하므로 "차감 중" 중간 상태가 생길 틈이 없음. RESERVED는 차감과 확정 사이에 시간 간격이 있는 2단계 구조일 때만 필요 — 이 프로젝트는 1단계 즉시 차감 방식 채택. 비관적 락(`PESSIMISTIC_WRITE`)으로 동시성 제어.
 
 ---
 
@@ -549,6 +549,14 @@ UNIQUE KEY: processed_message INSERT 중복 방지
 ## 9. Saga 플로우
 
 ### 9-1. Happy Path (정상 흐름)
+
+> ⚠️ **구현 전환 주의 (현재 → Kafka 이후)**
+>
+> **현재 코드:** 재고 차감이 Kafka 없이 주문 생성 시점에 동기 HTTP로 처리됨
+> (`OrderService.createOrderByCart()` → `orderToEventClient.adjustStocks()` → Order 생성)
+>
+> **Kafka 구현 후:** 아래 흐름으로 전환됨 — Order 생성이 먼저, 재고 차감은 Event가 `order.created`를 수신한 뒤 처리.
+> Kafka 구현 시 `OrderService` 내 동기 HTTP 재고 차감 코드(`orderToEventClient.adjustStocks()`)를 반드시 제거해야 한다.
 
 ```
 [Commerce] POST /orders 처리
