@@ -29,4 +29,6 @@ public interface WalletService {
     void restoreBalance(UUID userId, int amount, UUID refundId, UUID orderId);
 
     void processBatchRefund(UUID eventId);
+
+    void recoverStalePendingCharge(UUID chargeId);
 }

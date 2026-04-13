@@ -10,11 +10,13 @@ import com.devticket.payment.payment.infrastructure.external.dto.TossPaymentCanc
 import com.devticket.payment.payment.infrastructure.external.dto.TossPaymentCancelResponse;
 import com.devticket.payment.payment.infrastructure.external.dto.TossPaymentConfirmRequest;
 import com.devticket.payment.payment.infrastructure.external.dto.TossPaymentConfirmResponse;
+import com.devticket.payment.payment.infrastructure.external.dto.TossPaymentStatusResponse;
 import com.devticket.payment.refund.domain.exception.RefundErrorCode;
 import com.devticket.payment.refund.domain.exception.RefundException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -33,6 +35,7 @@ public class PgPaymentClient {
 
     private static final String CONFIRM_PATH = "/v1/payments/confirm";
     private static final String CANCEL_PATH = "/v1/payments/{paymentKey}/cancel";
+    private static final String STATUS_BY_ORDER_PATH = "/v1/payments/orders/{orderId}";
 
     private final RestClient restClient;
 
@@ -164,6 +167,47 @@ public class PgPaymentClient {
                 e.getResponseBodyAsString()
             );
             throw new PaymentException(PaymentErrorCode.PG_CANCEL_FAILED);
+        }
+    }
+
+    /**
+     * orderId(=chargeId)로 Toss 결제 상태 조회 — 사후 보정 스케줄러용
+     * @return DONE/CANCELED/ABORTED 등 상태가 담긴 응답. 404(Toss 미도달)이면 Optional.empty()
+     */
+    public Optional<TossPaymentStatusResponse> findPaymentByOrderId(String orderId) {
+        try {
+            TossPaymentStatusResponse response = restClient.get()
+                .uri(STATUS_BY_ORDER_PATH, orderId)
+                .retrieve()
+                .onStatus(status -> status == HttpStatus.NOT_FOUND, (req, res) -> {
+                    // Toss에 해당 orderId 결제 없음 → 빈 Optional 반환을 위해 커스텀 예외 사용
+                    throw new PaymentException(PaymentErrorCode.INVALID_PAYMENT_REQUEST);
+                })
+                .onStatus(HttpStatusCode::is4xxClientError, (req, res) -> {
+                    throw new PaymentException(PaymentErrorCode.PG_CONFIRM_FAILED);
+                })
+                .onStatus(HttpStatusCode::is5xxServerError, (req, res) -> {
+                    throw new PaymentException(PaymentErrorCode.PG_CONFIRM_FAILED);
+                })
+                .body(TossPaymentStatusResponse.class);
+
+            return Optional.ofNullable(response);
+
+        } catch (PaymentException e) {
+            if (e.getErrorCode() == PaymentErrorCode.INVALID_PAYMENT_REQUEST) {
+                // 404 케이스 — Toss에 결제 없음
+                log.warn("[PG] orderId 조회 404 — orderId={}", orderId);
+                return Optional.empty();
+            }
+            throw e;
+
+        } catch (ResourceAccessException e) {
+            log.error("[PG] orderId 조회 타임아웃 — orderId={}, message={}", orderId, e.getMessage());
+            throw new PaymentException(PaymentErrorCode.PG_TIMEOUT);
+
+        } catch (RestClientResponseException e) {
+            log.error("[PG] orderId 조회 실패 — orderId={}, status={}", orderId, e.getStatusCode());
+            throw new PaymentException(PaymentErrorCode.PG_CONFIRM_FAILED);
         }
     }
 
