@@ -10,6 +10,7 @@ import com.devticket.event.domain.model.Event;
 import com.devticket.event.domain.model.EventImage;
 import com.devticket.event.domain.model.EventTechStack;
 import com.devticket.event.infrastructure.client.MemberClient;
+import com.devticket.event.infrastructure.client.dto.TechStackItem;
 import com.devticket.event.infrastructure.persistence.EventRepository;
 import com.devticket.event.infrastructure.search.EventDocument;
 import com.devticket.event.infrastructure.search.EventSearchRepository;
@@ -24,7 +25,6 @@ import com.devticket.event.presentation.dto.SellerEventSummaryResponse;
 import com.devticket.event.presentation.dto.SellerEventUpdateRequest;
 import com.devticket.event.presentation.dto.SellerEventUpdateResponse;
 import java.time.LocalDateTime;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -94,12 +94,13 @@ public class EventService {
 
         // 4. techStackIds 저장 로직
         if (request.techStackIds() != null && !request.techStackIds().isEmpty()) {
+            Map<Long, String> techStackMap = buildTechStackMap();  // 추가
             for (Long techStackId : request.techStackIds()) {
-                String techStackName = getTechStackName(techStackId);
+                String techStackName = techStackMap.getOrDefault(techStackId, "Unknown");  // 변경
                 EventTechStack techStack = EventTechStack.of(savedEvent, techStackId, techStackName);
                 savedEvent.getEventTechStacks().add(techStack);
             }
-            eventRepository.save(savedEvent);  // EventTechStack 반영을 위해 다시 저장
+            eventRepository.save(savedEvent);
         }
 
         syncToElasticsearch(savedEvent);
@@ -107,22 +108,9 @@ public class EventService {
         return SellerEventCreateResponse.from(savedEvent);
     }
 
-    /**
-     * TechStack ID를 실제 name으로 매핑 (더미 데이터)
-     * 향후 Member 서비스 API 호출로 교체 예정
-     */
-    private String getTechStackName(Long techStackId) {
-        Map<Long, String> TECH_STACK_NAMES = new HashMap<>();
-        TECH_STACK_NAMES.put(1L, "Spring");
-        TECH_STACK_NAMES.put(2L, "React");
-        TECH_STACK_NAMES.put(3L, "Vue");
-        TECH_STACK_NAMES.put(4L, "Django");
-        TECH_STACK_NAMES.put(5L, "FastAPI");
-        TECH_STACK_NAMES.put(6L, "Node.js");
-        TECH_STACK_NAMES.put(7L, "Python");
-        TECH_STACK_NAMES.put(8L, "Kotlin");
-
-        return TECH_STACK_NAMES.getOrDefault(techStackId, "Unknown");
+    private Map<Long, String> buildTechStackMap() {
+        return memberClient.getTechStacks().stream()
+            .collect(Collectors.toMap(TechStackItem::techStackId, TechStackItem::name));
     }
 
     @Transactional(readOnly = true)
@@ -305,9 +293,10 @@ public class EventService {
 
         // TechStack 교체
         event.getEventTechStacks().clear();
+        Map<Long, String> techStackMap = buildTechStackMap();  // 추가
         for (Long techStackId : request.techStackIds()) {
             event.getEventTechStacks().add(
-                EventTechStack.of(event, techStackId, getTechStackName(techStackId)));
+                EventTechStack.of(event, techStackId, techStackMap.getOrDefault(techStackId, "Unknown")));  // 변경
         }
 
         // Image 교체
@@ -369,10 +358,10 @@ public class EventService {
         // 기술스택 필터 (Nested)
         if (request.techStacks() != null && !request.techStacks().isEmpty()) {
             List<Query> techStackShoulds = request.techStacks().stream()
-                .map(techStackId -> Query.of(q -> q
+                .map(name -> Query.of(q -> q
                     .nested(n -> n.path("techStacks")
                         .query(nq -> nq.term(t -> t
-                            .field("techStacks.techStackId").value(techStackId))))))
+                            .field("techStacks.techStackName").value(name))))))
                 .toList();
             boolQuery.filter(Query.of(q -> q
                 .bool(b -> b.should(techStackShoulds).minimumShouldMatch("1"))));
