@@ -54,7 +54,14 @@ async function handleMessage(payload: EachMessagePayload): Promise<void> {
     );
   }
 
-  await commitOffset(payload);
+  try {
+    await commitOffset(payload);
+  } catch (error) {
+    logger.error(
+      { error, topic, partition, offset: message.offset },
+      'Kafka offset commit 실패 — skip',
+    );
+  }
 }
 
 async function commitOffset(payload: EachMessagePayload): Promise<void> {
