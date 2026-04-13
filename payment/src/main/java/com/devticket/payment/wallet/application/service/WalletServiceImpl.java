@@ -75,16 +75,16 @@ public class WalletServiceImpl implements WalletService {
             return WalletChargeResponse.from(existing.get());
         }
 
-        //예치금 지갑 조회
-        Wallet wallet = walletRepository.findByUserId(userId)
-            .orElseGet(() -> {
-                    try {
-                        return walletRepository.save(Wallet.create(userId));
-                    } catch (DataIntegrityViolationException e) {
-                        return walletRepository.findByUserId(userId)
-                            .orElseThrow(() -> e);
-                    }
-                });
+        //예치금 지갑 조회 — 비관적 락으로 한도 체크 구간 직렬화
+        // 동일 사용자의 동시 충전 요청이 같은 todayTotal을 읽고 모두 한도를 통과하는 오류 수정
+        Wallet wallet;
+        try {
+            wallet = walletRepository.findByUserIdForUpdate(userId)
+                .orElseGet(() -> walletRepository.save(Wallet.create(userId)));
+        } catch (DataIntegrityViolationException e) {
+            wallet = walletRepository.findByUserIdForUpdate(userId)
+                .orElseThrow(() -> e);
+        }
 
         //일일 충전 한도 체크
         LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
