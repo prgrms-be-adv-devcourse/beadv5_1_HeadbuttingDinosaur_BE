@@ -8,6 +8,7 @@ import com.devticket.member.presentation.dto.internal.response.InternalMemberRol
 import com.devticket.member.presentation.dto.internal.response.InternalMemberStatusResponse;
 import com.devticket.member.presentation.dto.internal.response.InternalSellerApplicationResponse;
 import com.devticket.member.presentation.dto.internal.response.InternalSellerInfoResponse;
+import com.devticket.member.presentation.dto.internal.response.InternalTechStackListResponse;
 import com.devticket.member.presentation.dto.internal.response.InternalUpdateStatusResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -31,6 +32,48 @@ import org.springframework.web.bind.annotation.RestController;
 public class InternalMemberController {
 
     private final InternalMemberService internalMemberService;
+
+    // 판매자 등록 신청자 리스트
+    @Operation(summary = "판매자 신청 목록 조회", description = "내부 서비스용 — 판매자 신청 목록 조회")
+    @ApiResponse(responseCode = "200", description = "조회 성공")
+    @GetMapping("/seller-applications")
+    public ResponseEntity<List<InternalSellerApplicationResponse>> getSellerApplications(){
+        List<InternalSellerApplicationResponse> response = internalMemberService.getSellerApplications();
+        return ResponseEntity.ok(response);
+    }
+
+    // 판매자 승인 결정
+    @Operation(summary = "판매자 신청 승인/반려", description = "내부 서비스용 — 판매자 신청 승인/반려")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "처리 성공"),
+        @ApiResponse(responseCode = "404", description = "신청 없음")
+    })
+    @PatchMapping("/seller-applications/{applicationId}")
+    public ResponseEntity<InternalDecideSellerApplicationResponse> decideSellerApplication(
+        @PathVariable UUID applicationId,
+        @RequestBody InternalDecideSellerApplicationRequest request
+    ){
+        InternalDecideSellerApplicationResponse response=internalMemberService.decideSellerApplication(applicationId, request);
+        return ResponseEntity.ok(response);
+    }
+
+    @Operation(summary = "판매자 ID 목록 조회", description = "내부 서비스용 — 전체 판매자 ID 목록 조회")
+    @ApiResponse(responseCode = "200", description = "조회 성공")
+    @GetMapping("/sellers")
+    public ResponseEntity<List<UUID>> getSellerId(){
+        List<UUID> response = internalMemberService.getSellerIds();
+        return ResponseEntity.ok(response);
+    }
+
+    @Operation(summary = "기술 스택 목록 조회", description = "내부 서비스용 — 전체 기술 스택 목록 조회")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "조회 성공")
+    })
+    @GetMapping("/tech-stacks")
+    public ResponseEntity<InternalTechStackListResponse> getTechStacks() {
+        InternalTechStackListResponse response = internalMemberService.getAllTechStacks();
+        return ResponseEntity.ok(response);
+    }
 
     @Operation(summary = "유저 기본 정보 조회", description = "내부 서비스용 — 유저 ID로 기본 정보 조회")
     @ApiResponses({
@@ -89,36 +132,4 @@ public class InternalMemberController {
 //    public ResponseEntity<InternalUpdateStatusResponse> updateMemberStatus(){
 //
 //    }
-
-    // 판매자 등록 신청자 리스트
-    @Operation(summary = "판매자 신청 목록 조회", description = "내부 서비스용 — 판매자 신청 목록 조회")
-    @ApiResponse(responseCode = "200", description = "조회 성공")
-    @GetMapping("/seller-applications")
-    public ResponseEntity<List<InternalSellerApplicationResponse>> getSellerApplications(){
-        List<InternalSellerApplicationResponse> response = internalMemberService.getSellerApplications();
-        return ResponseEntity.ok(response);
-    }
-
-    // 판매자 승인 결정
-    @Operation(summary = "판매자 신청 승인/반려", description = "내부 서비스용 — 판매자 신청 승인/반려")
-    @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "처리 성공"),
-        @ApiResponse(responseCode = "404", description = "신청 없음")
-    })
-    @PatchMapping("/seller-applications/{applicationId}")
-    public ResponseEntity<InternalDecideSellerApplicationResponse> decideSellerApplication(
-        @PathVariable UUID applicationId,
-        @RequestBody InternalDecideSellerApplicationRequest request
-    ){
-        InternalDecideSellerApplicationResponse response=internalMemberService.decideSellerApplication(applicationId, request);
-        return ResponseEntity.ok(response);
-    }
-
-    @Operation(summary = "판매자 ID 목록 조회", description = "내부 서비스용 — 전체 판매자 ID 목록 조회")
-    @ApiResponse(responseCode = "200", description = "조회 성공")
-    @GetMapping("/sellers")
-    public ResponseEntity<List<UUID>> getSellerId(){
-        List<UUID> response = internalMemberService.getSellerIds();
-        return ResponseEntity.ok(response);
-    }
 }
