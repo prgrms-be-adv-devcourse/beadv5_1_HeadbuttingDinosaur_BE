@@ -25,7 +25,7 @@ jobs:
           cache: 'gradle' # 의존성 다운로드 캐싱 (빌드 속도 최적화)
 
       - name: 3. Grant execute permission for gradlew
-        run: chmod +x admin/gradlew
+        run: chmod +x ai/gradlew
 
       - name: 4. Gradle Test
         run: cd ai && ./gradlew test
