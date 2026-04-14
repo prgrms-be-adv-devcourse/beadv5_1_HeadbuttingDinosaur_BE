@@ -138,11 +138,15 @@ public final class KafkaTopics {
 public record OrderCreatedEvent(
     UUID orderId,
     UUID userId,
-    UUID eventId,
-    int quantity,
+    List<OrderItem> orderItems,   // 리스트 — 다중 이벤트 티켓 지원
     int totalAmount,
     Instant timestamp
-) {}
+) {
+    public record OrderItem(
+        UUID eventId,
+        int quantity
+    ) {}
+}
 ```
 
 ### PaymentCompletedEvent
@@ -164,9 +168,15 @@ public record PaymentCompletedEvent(
 public record PaymentFailedEvent(
     UUID orderId,
     UUID userId,
+    List<OrderItem> orderItems,   // 재고 복구 대상 목록
     String reason,
     Instant timestamp
-) {}
+) {
+    public record OrderItem(
+        UUID eventId,
+        int quantity
+    ) {}
+}
 ```
 
 ### RefundCompletedEvent
@@ -314,11 +324,11 @@ public record RefundSagaStepEvent(
 
 ```sql
 ALTER TABLE outbox
-    ADD COLUMN next_retry_at DATETIME(6) NULL;         -- 지수 백오프 기반 재시도 시각
+    ADD COLUMN next_retry_at TIMESTAMP NULL;           -- 지수 백오프 기반 재시도 시각
 
 -- aggregate_id: DB PK(BIGINT)가 아닌 비즈니스 키(paymentId, orderId 등) UUID 사용
 ALTER TABLE outbox
-    MODIFY COLUMN aggregate_id VARCHAR(36) NOT NULL;   -- UUID 문자열
+    ALTER COLUMN aggregate_id TYPE VARCHAR(36) USING aggregate_id::text;  -- UUID 문자열
 
 -- partition_key: Kafka 파티션 키 — orderId 기준 Saga 순서 보장 (aggregate_id와 다를 수 있음)
 ALTER TABLE outbox
@@ -389,12 +399,12 @@ List<Outbox> findTop50ByStatusAndNextRetryAtBeforeOrNextRetryAtIsNullOrderByCrea
 
 ```sql
 CREATE TABLE processed_message (
-    id           BIGINT       NOT NULL AUTO_INCREMENT,
+    id           BIGSERIAL    NOT NULL,
     message_id   VARCHAR(36)  NOT NULL,   -- Outbox message_id (Kafka 헤더 X-Message-Id에서 추출)
     topic        VARCHAR(128) NOT NULL,   -- 운영 디버깅용
-    processed_at DATETIME(6)  NOT NULL,
+    processed_at TIMESTAMP    NOT NULL,
     PRIMARY KEY (id),
-    UNIQUE KEY uk_message_id (message_id)
+    CONSTRAINT uk_message_id UNIQUE (message_id)
 );
 ```
 
@@ -804,8 +814,8 @@ CREATE TABLE saga_state (
     payment_method  VARCHAR(20)  NOT NULL,   -- WALLET | PG | WALLET_PG
     current_step    VARCHAR(30)  NOT NULL,   -- ORDER_CANCELLING | TICKET_CANCELLING | STOCK_RESTORING | PG_CANCELLING | WALLET_RESTORING | COMPLETED | FAILED | COMPENSATING
     status          VARCHAR(20)  NOT NULL,   -- IN_PROGRESS | COMPLETED | FAILED | COMPENSATING
-    created_at      DATETIME(6)  NOT NULL,
-    updated_at      DATETIME(6)  NOT NULL,
+    created_at      TIMESTAMP    NOT NULL,
+    updated_at      TIMESTAMP    NOT NULL,
     PRIMARY KEY (refund_id)
 );
 ```
@@ -861,7 +871,7 @@ topic: event.force-cancelled  → DLT: event.force-cancelled.DLT
 | 7 | 보상 이벤트 중복 처리 | processed_message dedup + 보상 Consumer별 비즈니스 상태 확인 이중 방어 (이미 보상 완료 상태면 성공으로 간주 스킵) — 상태 확인은 별도 플래그 없이 기존 상태 전이 검증(`canTransitionTo()`)으로 커버 | 모든 보상 Consumer에 dedupe 강제 + `canTransitionTo()` (Case 3과 동일) | 원칙 미수립 |
 | 8 | 상태 전이 검증 없음 | processed_message + 상태 전이 검증 두 방어선 필수 | Case 3 동일, 예외 타입 분리 | 미구현 |
 | 9 | 스케줄러·Consumer 충돌 | ShedLock + processed_message + 상태 전이 검증 + 낙관적 락 4레이어 | `@Version` 추가 | 미구현 |
-| 10 | 동일 계정 멀티 세션 동시 주문 (같은 장바구니를 여러 탭·기기에서 동시 주문) | userId + cartId SELECT FOR UPDATE 직렬화 후, 서버가 장바구니 내용 해시(cartHash) 계산 → 활성 주문 조회 시 userId + cartId + cartHash 3개 일치 여부 기준으로 중복 판단. cartHash 불일치(내용 변경)면 새 주문 허용. Orders 테이블에 `cart_hash VARCHAR(64)` 컬럼 추가 필요 | `SELECT FOR UPDATE` + cartHash 서버 계산(itemId 정렬 후 SHA-256) + 활성 주문 조회 기준 변경 | 미구현 |
+| 10 | 동일 계정 멀티 세션 동시 주문 (같은 장바구니를 여러 탭·기기에서 동시 주문) | userId + cartId SELECT FOR UPDATE 직렬화 후, 서버가 장바구니 내용 해시(cartHash) 계산 → 활성 주문 조회 시 userId + cartId + cartHash 3개 일치 여부 기준으로 중복 판단. cartHash 불일치(내용 변경)면 새 주문 허용. Orders 테이블에 `cart_hash VARCHAR(64)` 컬럼 추가 필요 | `SELECT FOR UPDATE` + cartHash 서버 계산((itemId, quantity) 정렬 후 SHA-256 — unitPrice 미포함, 팀 합의) + 활성 주문 조회 기준 변경 | 미구현 |
 
 ---
 

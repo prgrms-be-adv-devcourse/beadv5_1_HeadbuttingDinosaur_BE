@@ -255,8 +255,21 @@ sequenceDiagram
 **기반 인프라**
 - [ ] `JacksonConfig`: 기존 설정 검토 — `JavaTimeModule`, `WRITE_DATES_AS_TIMESTAMPS=false` 적용 여부 확인 (전 서비스 공통 필수)
 
+**DB 스키마**
+- [ ] `outbox` 테이블 수정 — 수동 SQL 실행 필요
+  - `aggregate_id` BIGINT → VARCHAR(36) 타입 변경 (`ALTER COLUMN`)
+  - `aggregate_type` 컬럼 제거 (`DROP COLUMN`) — kafka-design.md §4 설계에 없는 컬럼
+  - `topic VARCHAR(128)` 컬럼 추가
+  - `partition_key VARCHAR(36)` 컬럼 추가
+  - `next_retry_at TIMESTAMP` 컬럼 추가
+  - `sent_at TIMESTAMP` 컬럼 추가
+- [ ] `processed_message` 테이블 수정: `topic VARCHAR(128)` 컬럼 추가
+- [ ] `shedlock` 테이블 생성 — 수동 SQL 실행 필요 (OutboxScheduler ShedLock 적용 전제)
+- [ ] `payment` 엔티티 `version BIGINT` 컬럼 추가 (`@Version` — 낙관적 락)
+
 **Outbox / 스케줄러**
-- [ ] `Outbox`: `aggregate_id` → UUID(비즈니스 키), `next_retry_at` 컬럼 추가, `partition_key VARCHAR(36)` 컬럼 추가 — `aggregate_id`(운영 추적용)와 분리 (DB 마이그레이션 필요, 상세: kafka-design.md §4)
+- [ ] `Outbox`: 위 DB 스키마 변경에 맞춰 엔티티 필드 수정, `create()` 파라미터에 `topic` / `partitionKey` 추가
+- [ ] `OutboxScheduler`: `outbox.getEventType()` → `outbox.getTopic()` 사용으로 수정 — 현재 topic 자리에 eventType을 전달하는 버그
 - [ ] `OutboxRepository`: 스케줄러 쿼리에 `next_retry_at <= now()` 조건 추가
 - [ ] `OutboxScheduler`: ShedLock 적용 (분산 환경 중복 실행 방지), 지수 백오프 재시도 간격 반영 (6회, 즉시→1→2→4→8→16초, 총 최대 31초 — 상세: kafka-design.md §4)
 - [ ] Outbox 발행 시 Partition Key 설정 — `payment.completed` / `payment.failed` / `refund.completed` 및 Refund Saga Orchestration 토픽 전체(`refund.order.cancel`, `refund.ticket.cancel`, `refund.stock.restore`, `refund.order.compensate`, `refund.ticket.compensate`) 모두 `orderId`를 Key로 지정 (상세: kafka-design.md §6)
@@ -298,6 +311,17 @@ sequenceDiagram
 > 설계 기준: kafka-design.md §12 참조 (이 문서가 상세 구현 체크리스트)
 
 ### 3-2. Commerce (신규 적용)
+
+**DB 스키마**
+- [ ] `Order` 엔티티 필드 추가 (ddl-auto 자동 반영)
+  - `cart_hash VARCHAR(64)` — 장바구니 내용 해시 (itemId 정렬 후 SHA-256), 중복 주문 판단 기준
+  - `expires_at DATETIME` — 주문 만료 시각 (생성 시 created_at + 10분, 시간 리밋 팀 합의 필요)
+  - `version BIGINT` — 낙관적 락 (`@Version`)
+- [ ] `Order` 엔티티 인덱스 추가: `(user_id, cart_hash)` — 활성 주문 중복 판단 조회용
+- [ ] `Order.create()` 수정: 초기 status `PAYMENT_PENDING` → `CREATED` 변경, `expires_at = now() + 10분` 설정 추가
+- [ ] `outbox` 테이블 신규 생성 — JPA `@Entity` 추가 시 ddl-auto 자동 생성
+- [ ] `processed_message` 테이블 신규 생성 — JPA `@Entity` 추가 시 ddl-auto 자동 생성
+- [ ] `shedlock` 테이블 생성 — 수동 SQL 실행 필요
 
 **기반 인프라**
 - [ ] `JacksonConfig` 추가 (JavaTimeModule + WRITE_DATES_AS_TIMESTAMPS=false)
@@ -346,13 +370,22 @@ sequenceDiagram
 
 ### 3-3. Event (신규 적용)
 
+**DB 스키마**
+- [ ] `event` 엔티티 `version BIGINT` 컬럼 추가 (`@Version` — 낙관적 락)
+- [ ] `outbox` 테이블 신규 생성 — JPA `@Entity` 추가 시 ddl-auto 자동 생성
+- [ ] `processed_message` 테이블 신규 생성 — JPA `@Entity` 추가 시 ddl-auto 자동 생성
+- [ ] `shedlock` 테이블 생성 — 수동 SQL 실행 필요
+- [x] ✅ **합의 완료 (2026-04-14)**: `OrderCreatedEvent` · `PaymentFailedEvent` 모두 `List<OrderItem>` 구조 채택 — Stock 신규 엔티티 추가 없음, 기존 event 테이블 `quantity` 컬럼 사용
+
 **기반 인프라**
 - [ ] `JacksonConfig` 추가 (JavaTimeModule + WRITE_DATES_AS_TIMESTAMPS=false)
 - [ ] `KafkaTopics` 상수 클래스에 Event 발행 토픽 추가 — `stock.deducted`, `stock.failed`, `event.force-cancelled`, `event.sale-stopped` (현재 Payment 서비스 KafkaTopics에 미포함)
 
 **이벤트 DTO** *(신규 생성 — 현재 코드에 없음)*
-- [ ] `StockDeductedEvent` record 신규 생성 — `orderId(UUID)`, `eventId(UUID)`, `quantity(int)`, `timestamp(Instant)`
-- [ ] `StockFailedEvent` record 신규 생성 — `orderId(UUID)`, `eventId(UUID)`, `reason(String)`, `timestamp(Instant)`
+- [ ] `StockDeductedEvent` record 신규 생성 — `orderId(UUID)`, `eventId(UUID)`, `quantity(int)`, `timestamp(Instant)` *(단건 유지 — 차감 성공 시 eventId 단위로 발행)*
+- [ ] `StockFailedEvent` record 신규 생성 — `orderId(UUID)`, `eventId(UUID)`, `reason(String)`, `timestamp(Instant)` *(단건 유지 — 실패 시 eventId 단위로 발행)*
+- [ ] `OrderCreatedEvent` record 수정 — `List<OrderItem>(eventId, quantity)` 리스트 구조, 기존 `UUID eventId` / `int quantity` 단건 필드 제거
+- [ ] `PaymentFailedEvent` record 수정 — `List<OrderItem>(eventId, quantity)` 재고 복구 목록 추가
 
 **Outbox 패턴**
 - [ ] Outbox 패턴 구현 — 비즈니스 로직 + `outboxService.save()` 반드시 단일 `@Transactional` 경계 안에 위치

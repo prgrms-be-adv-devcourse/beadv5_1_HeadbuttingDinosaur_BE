@@ -129,12 +129,12 @@
 **cartHash 생성 규칙:**
 
 - 생성 주체: **서버** (클라이언트 전달값 신뢰 금지 — 조작 가능)
-- 해시 대상: 장바구니 내 `(itemId, quantity, unitPrice)` 리스트
+- 해시 대상: 장바구니 내 `(itemId, quantity)` 리스트 — unitPrice 미포함 (팀 합의)
 - 생성 방법: itemId 기준 오름차순 정렬 → JSON 직렬화 → SHA-256
 
 ```
-예시 입력: [{"itemId":3,"qty":1,"price":15000},{"itemId":1,"qty":2,"price":9000}]
-정렬 후:  [{"itemId":1,"qty":2,"price":9000},{"itemId":3,"qty":1,"price":15000}]
+예시 입력: [{"itemId":3,"qty":1},{"itemId":1,"qty":2}]
+정렬 후:  [{"itemId":1,"qty":2},{"itemId":3,"qty":1}]
 결과:     SHA-256(직렬화 문자열) → cart_hash 컬럼에 저장
 ```
 
@@ -151,7 +151,7 @@
 ```
 0. 장바구니 내용 해시 생성 (서버 사이드)
    → cartId로 현재 장바구니 상품 목록 조회
-   → (itemId, quantity, unitPrice) 리스트를 itemId 기준 정렬
+   → (itemId, quantity) 리스트를 itemId 기준 정렬 — unitPrice 미포함 (팀 합의)
    → JSON 직렬화 후 SHA-256 해시 생성 → cartHash 확보
    → 이후 모든 중복 판단에 cartHash 포함
  
