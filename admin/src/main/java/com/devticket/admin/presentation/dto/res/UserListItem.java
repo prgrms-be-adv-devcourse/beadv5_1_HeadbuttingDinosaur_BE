@@ -1,7 +1,9 @@
-package com.devticket.admin.infrastructure.external.dto.res;
+package com.devticket.admin.presentation.dto.res;
 
+import java.time.LocalDateTime;
+import java.util.UUID;
 
-public record InternalMemberInfoResponse(
+public record UserListItem(
     String userId,
     String email,
     String nickname,

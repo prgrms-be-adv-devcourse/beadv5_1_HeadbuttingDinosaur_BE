@@ -13,7 +13,7 @@ public record AdminSettlementSearchRequest(
     String sellerId,
 
     @Schema(description = "정산 시작일 범위 시작 (YYYY-MM-DD)", example = "2026-03-01")
-    String stardDate,
+    String startDate,
 
     @Schema(description = "정산 시작일 범위 종료 (YYYY-MM-DD)", example = "2026-03-31")
     String endDate,
