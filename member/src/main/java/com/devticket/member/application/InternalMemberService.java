@@ -4,6 +4,7 @@ import com.devticket.member.common.exception.BusinessException;
 import com.devticket.member.presentation.domain.MemberErrorCode;
 import com.devticket.member.presentation.domain.SellerApplicationDecision;
 import com.devticket.member.presentation.domain.UserRole;
+import com.devticket.member.presentation.domain.UserStatus;
 import com.devticket.member.presentation.domain.model.SellerApplication;
 import com.devticket.member.presentation.domain.model.TechStack;
 import com.devticket.member.presentation.domain.model.User;
@@ -13,17 +14,23 @@ import com.devticket.member.presentation.domain.repository.TechStackRepository;
 import com.devticket.member.presentation.domain.repository.UserProfileRepository;
 import com.devticket.member.presentation.domain.repository.UserRepository;
 import com.devticket.member.presentation.dto.internal.request.InternalDecideSellerApplicationRequest;
+import com.devticket.member.presentation.dto.internal.request.InternalUpdateUserRoleRequest;
+import com.devticket.member.presentation.dto.internal.request.InternalUpdateUserStatusRequest;
 import com.devticket.member.presentation.dto.internal.response.InternalDecideSellerApplicationResponse;
 import com.devticket.member.presentation.dto.internal.response.InternalMemberInfoResponse;
 import com.devticket.member.presentation.dto.internal.response.InternalMemberRoleResponse;
 import com.devticket.member.presentation.dto.internal.response.InternalMemberStatusResponse;
+import com.devticket.member.presentation.dto.internal.response.InternalPagedMemberResponse;
 import com.devticket.member.presentation.dto.internal.response.InternalSellerApplicationResponse;
 import com.devticket.member.presentation.dto.internal.response.InternalSellerInfoResponse;
 import com.devticket.member.presentation.dto.internal.response.InternalTechStackListResponse;
+import com.devticket.member.presentation.dto.internal.response.InternalUpdateRoleResponse;
+import com.devticket.member.presentation.dto.internal.response.InternalUpdateStatusResponse;
 import java.util.List;
-import java.util.Optional;
+import org.springframework.data.domain.Pageable;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,6 +50,45 @@ public class InternalMemberService {
             .map(UserProfile::getNickname)
             .orElse(null);
         return InternalMemberInfoResponse.from(user, nickname);
+    }
+
+    // 관리자 회원 목록 조회 (paged)
+    public InternalPagedMemberResponse searchMembers(
+        UserRole role, UserStatus status, String keyword, Pageable pageable
+    ) {
+        Page<InternalMemberInfoResponse> page = userRepository
+            .searchMembers(role, status, keyword, pageable)
+            .map(user -> {
+                String nickname = userProfileRepository.findByUserId(user.getId())
+                    .map(UserProfile::getNickname)
+                    .orElse("");  // FE가 nickname.charAt(0) 호출 → null 금지
+                return InternalMemberInfoResponse.from(user, nickname);
+            });
+        return InternalPagedMemberResponse.from(page);
+    }
+
+    // 관리자 회원 상태 변경
+    @Transactional
+    public InternalUpdateStatusResponse updateMemberStatus(
+        UUID userId, InternalUpdateUserStatusRequest request
+    ) {
+        User user = findUserByUuidOrThrow(userId);
+        switch (request.status()) {
+            case ACTIVE -> user.reactivate();
+            case SUSPENDED -> user.suspend();
+            case WITHDRAWN -> user.withdraw();
+        }
+        return InternalUpdateStatusResponse.from(user);
+    }
+
+    // 관리자 회원 권한 변경
+    @Transactional
+    public InternalUpdateRoleResponse updateMemberRole(
+        UUID userId, InternalUpdateUserRoleRequest request
+    ) {
+        User user = findUserByUuidOrThrow(userId);
+        user.changeRole(request.role());
+        return InternalUpdateRoleResponse.from(user);
     }
 
     public InternalMemberStatusResponse getMemberStatus(UUID userId) {
