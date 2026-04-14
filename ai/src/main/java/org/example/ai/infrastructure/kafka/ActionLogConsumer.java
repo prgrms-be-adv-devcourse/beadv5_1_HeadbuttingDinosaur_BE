@@ -2,6 +2,7 @@ package org.example.ai.infrastructure.kafka;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.example.ai.application.service.VectorService;
 import org.example.ai.presentation.dto.req.ActionLogMessage;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
@@ -10,6 +11,8 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 public class ActionLogConsumer {
+
+    private final VectorService vectorService;
 
     @KafkaListener(
         topics = "action.log",
@@ -20,14 +23,12 @@ public class ActionLogConsumer {
         log.info("Action Log 수신 - actionType : {}, userId : {}", message.actionType(), message.userId());
 
         switch (message.actionType()) {
-            case "PURCHASE"     -> log.info("preference_vector 갱신 예정 - eventId: {}", message.eventId());
-            case "CART_ADD"     -> log.info("cart_vector 갱신 예정 - eventId: {}", message.eventId());
-            case "CART_REMOVE"  -> log.info("negative_vector 갱신 예정 - eventId: {}", message.eventId());
-            case "REFUND"       -> log.info("negative_vector 갱신 + preference_vector 역보정 예정 - eventId: {}", message.eventId());
-            case "DETAIL_VIEW"  -> log.info("recent_vector 갱신 예정 - eventId: {}", message.eventId());
-            case "DWELL_TIME"   -> log.info("recent_vector 갱신 예정 - eventId: {}, dwellTime: {}", message.eventId(), message.dwellTimeSeconds());
-            case "VIEW"         -> log.info("recent_vector 갱신 예정 - eventIds: {}", message.eventIds());
-            default             -> log.warn("알 수 없는 actionType: {}", message.actionType());
+            case "PURCHASE"     -> vectorService.updatePreferenceVector(message.userId(), message.eventId());
+            case "REFUND"       -> vectorService.updateRefund(message.userId(), message.eventId());
+            case "CART_ADD"     -> vectorService.updateCartVector(message.userId(), message.eventId());
+            case "CART_REMOVE"  -> vectorService.updateNegativeVector(message.userId(), message.eventId());
+            case "DETAIL_VIEW", "DWELL_TIME", "VIEW" -> log.info("[ActionLog] Spring Batch 대상 - actionType: {}", message.actionType());
+            default             -> log.warn("[ActionLog] 알 수 없는 actionType: {}", message.actionType());
         }
     }
 
