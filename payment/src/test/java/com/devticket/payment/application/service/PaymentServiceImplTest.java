@@ -57,7 +57,9 @@ public class PaymentServiceImplTest {
 
     private static final UUID USER_ID = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
     private static final UUID OTHER_USER_ID = UUID.fromString("550e8400-e29b-41d4-a716-446655440001");
-    private static final String EXTERNAL_ORDER_ID = "order-uuid-123";
+    private static final UUID ORDER_ID = UUID.fromString("550e8400-e29b-41d4-a716-446655440002");
+    private static final UUID EXTERNAL_ORDER_ID = UUID.fromString("550e8400-e29b-41d4-a716-446655440003");
+    private static final UUID PAYMENT_ID = UUID.fromString("550e8400-e29b-41d4-a716-446655440004");
     private static final String PAYMENT_KEY = "toss_pg_key_123";
     private static final String APPROVED_AT = "2024-01-01T00:00:00+09:00";
 
@@ -66,7 +68,7 @@ public class PaymentServiceImplTest {
     @BeforeEach
     void setUp() {
         orderInfo = new InternalOrderInfoResponse(
-            123L,
+            ORDER_ID,
             USER_ID,
             "ORD-20250815-001",
             130000,
@@ -82,7 +84,7 @@ public class PaymentServiceImplTest {
     private PgPaymentConfirmResult createPgConfirmResult() {
         return new PgPaymentConfirmResult(
             PAYMENT_KEY,
-            EXTERNAL_ORDER_ID,
+            EXTERNAL_ORDER_ID.toString(),
             "카드",
             "DONE",
             orderInfo.totalAmount(),
@@ -141,7 +143,7 @@ public class PaymentServiceImplTest {
             // given
             PaymentReadyRequest request = new PaymentReadyRequest(EXTERNAL_ORDER_ID, PaymentMethod.PG);
             InternalOrderInfoResponse paidOrder = new InternalOrderInfoResponse(
-                123L, USER_ID, "ORD-001", 130000, "PAID",
+                ORDER_ID, USER_ID, "ORD-001", 130000, "PAID",
                 LocalDateTime.of(2025, 8, 15, 14, 30).toString()
             );
 
@@ -233,7 +235,7 @@ public class PaymentServiceImplTest {
             // given
             Payment payment = createReadyPayment();
             PaymentConfirmRequest request = new PaymentConfirmRequest(
-                PAYMENT_KEY, EXTERNAL_ORDER_ID, orderInfo.totalAmount());
+                PAYMENT_KEY, PAYMENT_ID, EXTERNAL_ORDER_ID, orderInfo.totalAmount());
 
             given(commerceInternalClient.getOrderInfo(EXTERNAL_ORDER_ID)).willReturn(orderInfo);
             given(paymentRepository.findByOrderId(orderInfo.id())).willReturn(Optional.of(payment));
@@ -256,7 +258,7 @@ public class PaymentServiceImplTest {
         void 결제_정보_미존재() {
             // given
             PaymentConfirmRequest request = new PaymentConfirmRequest(
-                PAYMENT_KEY, EXTERNAL_ORDER_ID, orderInfo.totalAmount());
+                PAYMENT_KEY, PAYMENT_ID, EXTERNAL_ORDER_ID, orderInfo.totalAmount());
 
             given(commerceInternalClient.getOrderInfo(EXTERNAL_ORDER_ID)).willReturn(orderInfo);
             given(paymentRepository.findByOrderId(orderInfo.id())).willReturn(Optional.empty());
@@ -276,7 +278,7 @@ public class PaymentServiceImplTest {
             // given
             Payment payment = createReadyPayment();
             PaymentConfirmRequest request = new PaymentConfirmRequest(
-                PAYMENT_KEY, EXTERNAL_ORDER_ID, orderInfo.totalAmount());
+                PAYMENT_KEY, PAYMENT_ID, EXTERNAL_ORDER_ID, orderInfo.totalAmount());
 
             given(commerceInternalClient.getOrderInfo(EXTERNAL_ORDER_ID)).willReturn(orderInfo);
             given(paymentRepository.findByOrderId(orderInfo.id())).willReturn(Optional.of(payment));
@@ -297,7 +299,7 @@ public class PaymentServiceImplTest {
             Payment payment = createReadyPayment();
             payment.approve(PAYMENT_KEY);
             PaymentConfirmRequest request = new PaymentConfirmRequest(
-                PAYMENT_KEY, EXTERNAL_ORDER_ID, orderInfo.totalAmount());
+                PAYMENT_KEY, PAYMENT_ID, EXTERNAL_ORDER_ID, orderInfo.totalAmount());
 
             given(commerceInternalClient.getOrderInfo(EXTERNAL_ORDER_ID)).willReturn(orderInfo);
             given(paymentRepository.findByOrderId(orderInfo.id())).willReturn(Optional.of(payment));
@@ -317,7 +319,7 @@ public class PaymentServiceImplTest {
             // given
             Payment payment = createReadyPayment();
             PaymentConfirmRequest request = new PaymentConfirmRequest(
-                PAYMENT_KEY, EXTERNAL_ORDER_ID, 99999);
+                PAYMENT_KEY, PAYMENT_ID, EXTERNAL_ORDER_ID, 99999);
 
             given(commerceInternalClient.getOrderInfo(EXTERNAL_ORDER_ID)).willReturn(orderInfo);
             given(paymentRepository.findByOrderId(orderInfo.id())).willReturn(Optional.of(payment));
@@ -337,7 +339,7 @@ public class PaymentServiceImplTest {
             // given
             Payment payment = createReadyPayment();
             PaymentConfirmRequest request = new PaymentConfirmRequest(
-                PAYMENT_KEY, EXTERNAL_ORDER_ID, orderInfo.totalAmount());
+                PAYMENT_KEY, PAYMENT_ID, EXTERNAL_ORDER_ID, orderInfo.totalAmount());
 
             given(commerceInternalClient.getOrderInfo(EXTERNAL_ORDER_ID)).willReturn(orderInfo);
             given(paymentRepository.findByOrderId(orderInfo.id())).willReturn(Optional.of(payment));
@@ -359,7 +361,7 @@ public class PaymentServiceImplTest {
             // given
             Payment payment = createReadyPayment();
             PaymentConfirmRequest request = new PaymentConfirmRequest(
-                PAYMENT_KEY, EXTERNAL_ORDER_ID, orderInfo.totalAmount());
+                PAYMENT_KEY, PAYMENT_ID, EXTERNAL_ORDER_ID, orderInfo.totalAmount());
 
             given(commerceInternalClient.getOrderInfo(EXTERNAL_ORDER_ID)).willReturn(orderInfo);
             given(paymentRepository.findByOrderId(orderInfo.id())).willReturn(Optional.of(payment));
@@ -385,7 +387,7 @@ public class PaymentServiceImplTest {
             // given
             Payment payment = createReadyPayment();
             PaymentConfirmRequest request = new PaymentConfirmRequest(
-                PAYMENT_KEY, EXTERNAL_ORDER_ID, orderInfo.totalAmount());
+                PAYMENT_KEY, PAYMENT_ID, EXTERNAL_ORDER_ID, orderInfo.totalAmount());
 
             given(commerceInternalClient.getOrderInfo(EXTERNAL_ORDER_ID)).willReturn(orderInfo);
             given(paymentRepository.findByOrderId(orderInfo.id())).willReturn(Optional.of(payment));

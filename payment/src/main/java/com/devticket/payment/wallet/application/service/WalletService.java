@@ -16,6 +16,8 @@ public interface WalletService {
 
     WalletChargeConfirmResponse confirmCharge(UUID userId, WalletChargeConfirmRequest request);
 
+    void failCharge(UUID userId, String chargeId);
+
     WalletWithdrawResponse withdraw(UUID userId, WalletWithdrawRequest request);
 
     WalletBalanceResponse getBalance(UUID userId);
@@ -27,4 +29,6 @@ public interface WalletService {
     void restoreBalance(UUID userId, int amount, UUID refundId, UUID orderId);
 
     void processBatchRefund(UUID eventId);
+
+    void recoverStalePendingCharge(UUID chargeId);
 }

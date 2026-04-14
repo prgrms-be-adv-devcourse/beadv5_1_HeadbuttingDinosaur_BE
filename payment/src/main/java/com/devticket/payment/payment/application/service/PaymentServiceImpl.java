@@ -137,6 +137,7 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
         //잔액 차감
+        //TODO : 재시도 로직 추가 OR Atomic Update메서드 사용방식으로 변경하기
         wallet.use(payment.getAmount());
 
         //wallet transaction 생성
