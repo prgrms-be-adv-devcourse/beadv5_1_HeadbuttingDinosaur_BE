@@ -37,7 +37,10 @@ public class MemberClient {
         try {
             String url = memberServiceUrl + "/internal/members/tech-stacks";
             TechStackListResponse response = restTemplate.getForObject(url, TechStackListResponse.class);
-            return response != null ? response.techStacks() : List.of();
+            if (response == null) {
+                return List.of();
+            }
+            return response.techStacks() != null ? response.techStacks() : List.of();
         } catch (Exception e) {
             log.warn("[기술스택 조회 실패] Member 서비스 호출 오류", e);
             return List.of();

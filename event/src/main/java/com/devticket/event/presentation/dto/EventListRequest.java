@@ -8,7 +8,7 @@ import java.util.UUID;
 public record EventListRequest(
     String keyword,
     EventCategory category,
-    List<String> techStacks,
+    List<Long> techStacks,
     UUID sellerId,
     EventStatus status
 ) {

@@ -358,10 +358,11 @@ public class EventService {
         // 기술스택 필터 (Nested)
         if (request.techStacks() != null && !request.techStacks().isEmpty()) {
             List<Query> techStackShoulds = request.techStacks().stream()
-                .map(name -> Query.of(q -> q
+                .map(techStackId -> Query.of(q -> q
                     .nested(n -> n.path("techStacks")
                         .query(nq -> nq.term(t -> t
-                            .field("techStacks.techStackName").value(name))))))
+                            .field("techStacks.techStackId")
+                            .value(techStackId))))))
                 .toList();
             boolQuery.filter(Query.of(q -> q
                 .bool(b -> b.should(techStackShoulds).minimumShouldMatch("1"))));
