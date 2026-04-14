@@ -52,14 +52,20 @@ public class EventInternalService {
         UUID sellerId,
         Pageable pageable
     ) {
-        Page<InternalAdminEventResponse> page = eventRepository
-            .searchEvents(keyword, status, sellerId, pageable)
-            .map(event -> {
-                String sellerNickname = memberClient.getNickname(event.getSellerId());
-                return InternalAdminEventResponse.of(event, sellerNickname);
-            });
+        Page<Event> page = eventRepository.searchEvents(keyword, status, sellerId, pageable);
 
-        return InternalPagedEventResponse.from(page);
+        List<UUID> sellerIds = page.getContent().stream()
+            .map(Event::getSellerId)
+            .distinct()
+            .toList();
+
+        Map<UUID, String> nicknameMap = memberClient.getNicknames(sellerIds);
+
+        return InternalPagedEventResponse.from(
+            page.map(event -> InternalAdminEventResponse.of(
+                event, nicknameMap.getOrDefault(event.getSellerId(), "")
+            ))
+        );
     }
 
     /**

@@ -23,7 +23,8 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     WHERE (:keyword IS NULL OR e.title LIKE CONCAT('%', :keyword, '%'))
       AND (:status IS NULL OR e.status = :status)
       AND (:sellerId IS NULL OR e.sellerId = :sellerId)
-""")
+    ORDER BY e.createdAt DESC
+    """)
     Page<Event> searchEvents(
         @Param("keyword") String keyword,
         @Param("status") EventStatus status,
