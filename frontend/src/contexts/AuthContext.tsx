@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import axios from 'axios'
 import { getProfile } from '@/api/auth.api'
 import type { GetProfileResponse } from '@/api/types'
 
@@ -40,7 +41,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading: false,
         role: user.role as AuthState['role'],
       })
-    } catch {
+    } catch (err) {
+      // 403: 프로필 미완성 → 토큰은 유지하되 미로그인 상태로 유지 (프로필 설정 페이지로 이동 처리는 각 페이지에서)
+      if (axios.isAxiosError(err) && err.response?.status === 403) {
+        setState({ user: null, isLoggedIn: false, isLoading: false, role: null })
+        return
+      }
       localStorage.removeItem('accessToken')
       localStorage.removeItem('refreshToken')
       setState({ user: null, isLoggedIn: false, isLoading: false, role: null })

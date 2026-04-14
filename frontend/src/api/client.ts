@@ -29,6 +29,15 @@ apiClient.interceptors.response.use(
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
+    // 403: 프로필 미완성 → 프로필 설정 페이지로 리다이렉트
+    if (error.response?.status === 403) {
+      const currentPath = window.location.pathname
+      if (currentPath !== '/social/profile-setup' && currentPath !== '/oauth/callback') {
+        window.location.href = '/social/profile-setup'
+      }
+      return Promise.reject(error)
+    }
+
     if (error.response?.status !== 401 || originalRequest._retry) {
       return Promise.reject(error);
     }
