@@ -3,7 +3,18 @@ import { useNavigate, Link } from 'react-router-dom'
 import { getProfile } from '../api/auth.api'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
-import axios from 'axios'
+import axios, { AxiosError } from 'axios'
+
+const PROFILE_INCOMPLETE_CODE = 'PROFILE_NOT_COMPLETED'
+
+function isProfileIncomplete(err: unknown): boolean {
+  if (!axios.isAxiosError(err)) return false
+  const axiosErr = err as AxiosError<{ code?: string }>
+  return (
+    axiosErr.response?.status === 403 &&
+    axiosErr.response.data?.code === PROFILE_INCOMPLETE_CODE
+  )
+}
 
 const ERROR_MESSAGES: Record<string, string> = {
   SOCIAL_EMAIL_CONFLICT: '이미 해당 이메일로 가입된 로컬 계정이 있습니다. 이메일/비밀번호로 로그인해주세요.',
@@ -32,7 +43,9 @@ export default function OAuthCallback() {
       return
     }
 
-    // 토큰 저장 후 프로필 조회
+    // 이전 세션 토큰 완전 초기화 후 새 accessToken만 저장
+    // refreshToken을 남기면 이전 계정의 토큰으로 재발급될 수 있음
+    localStorage.removeItem('refreshToken')
     localStorage.setItem('accessToken', token)
 
     getProfile()
@@ -53,8 +66,8 @@ export default function OAuthCallback() {
         }
       })
       .catch((err) => {
-        // 403: 프로필 미완성 상태 → 토큰은 유지하고 프로필 설정 페이지로
-        if (axios.isAxiosError(err) && err.response?.status === 403) {
+        // PROFILE_NOT_COMPLETED(403): 토큰은 유지하고 프로필 설정 페이지로
+        if (isProfileIncomplete(err)) {
           navigate('/social/profile-setup', { replace: true })
           return
         }

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { createProfile, getTechStacks, reissueToken } from '../api/auth.api'
+import { createProfile, getTechStacks } from '../api/auth.api'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 
@@ -68,24 +68,10 @@ export default function SocialProfileSetup() {
         bio: null,
       })
 
-      // accessToken만 있으므로 reissue 시도, 실패해도 현재 토큰으로 진행
+      // 콜백에서 저장한 소셜 accessToken으로 바로 로그인
+      // refreshToken은 콜백에서 이미 초기화되어 있으므로 사용하지 않음
       const accessToken = localStorage.getItem('accessToken')!
-      let finalAccess = accessToken
-      let finalRefresh = ''
-
-      try {
-        const refreshToken = localStorage.getItem('refreshToken') ?? ''
-        if (refreshToken) {
-          const reissueRes = await reissueToken({ refreshToken })
-          const newData = reissueRes.data.data ?? (reissueRes.data as any)
-          finalAccess = newData.accessToken
-          finalRefresh = newData.refreshToken
-        }
-      } catch {
-        // reissue 실패 시 기존 토큰 유지
-      }
-
-      await login(finalAccess, finalRefresh)
+      await login(accessToken, '')
       navigate('/signup/complete', {
         replace: true,
         state: {

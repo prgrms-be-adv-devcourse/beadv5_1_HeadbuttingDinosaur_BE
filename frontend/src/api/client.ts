@@ -2,6 +2,18 @@ import axios, { AxiosInstance, InternalAxiosRequestConfig, AxiosResponse, AxiosE
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080';
 
+/**
+ * 백엔드가 프로필 미완성 사용자에게 반환하는 403 에러 코드.
+ * 백엔드 ErrorCode enum 값과 일치해야 함.
+ */
+const PROFILE_INCOMPLETE_CODE = 'PROFILE_NOT_COMPLETED';
+
+/** 403 응답이 "프로필 미완성" 에러인지 판별 */
+function isProfileIncomplete(error: AxiosError): boolean {
+  const data = error.response?.data as { code?: string } | undefined;
+  return data?.code === PROFILE_INCOMPLETE_CODE;
+}
+
 export const apiClient: AxiosInstance = axios.create({
   baseURL: "/api",
   timeout: 10_000,
@@ -29,13 +41,14 @@ apiClient.interceptors.response.use(
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
-    // 403: 프로필 미완성 → 프로필 설정 페이지로 리다이렉트
-    if (error.response?.status === 403) {
-      const currentPath = window.location.pathname
+    // 403 + PROFILE_NOT_COMPLETED: 프로필 미완성 → 프로필 설정 페이지로 리다이렉트
+    // 다른 이유의 403(권한 부족, 비즈니스 규칙 등)은 여기서 처리하지 않음
+    if (error.response?.status === 403 && isProfileIncomplete(error)) {
+      const currentPath = window.location.pathname;
       if (currentPath !== '/social/profile-setup' && currentPath !== '/oauth/callback') {
-        window.location.href = '/social/profile-setup'
+        window.location.href = '/social/profile-setup';
       }
-      return Promise.reject(error)
+      return Promise.reject(error);
     }
 
     if (error.response?.status !== 401 || originalRequest._retry) {
