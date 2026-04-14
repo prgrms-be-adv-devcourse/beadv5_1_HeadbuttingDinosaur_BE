@@ -7,6 +7,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -15,6 +17,19 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface EventRepository extends JpaRepository<Event, Long> {
+
+    @Query("""
+    SELECT e FROM Event e
+    WHERE (:keyword IS NULL OR e.title LIKE CONCAT('%', :keyword, '%'))
+      AND (:status IS NULL OR e.status = :status)
+      AND (:sellerId IS NULL OR e.sellerId = :sellerId)
+""")
+    Page<Event> searchEvents(
+        @Param("keyword") String keyword,
+        @Param("status") EventStatus status,
+        @Param("sellerId") UUID sellerId,
+        Pageable pageable
+    );
 
     // 외부 API
     List<Event> findAllByEventIdIn(List<UUID> eventIds);
