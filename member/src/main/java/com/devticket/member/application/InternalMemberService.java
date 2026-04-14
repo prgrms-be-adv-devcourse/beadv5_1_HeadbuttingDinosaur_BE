@@ -27,6 +27,7 @@ import com.devticket.member.presentation.dto.internal.response.InternalTechStack
 import com.devticket.member.presentation.dto.internal.response.InternalUpdateRoleResponse;
 import com.devticket.member.presentation.dto.internal.response.InternalUpdateStatusResponse;
 import java.util.List;
+import java.util.Objects;
 import org.springframework.data.domain.Pageable;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -84,6 +85,21 @@ public class InternalMemberService {
         User user = findUserByUuidOrThrow(userId);
         user.changeRole(request.role());
         return InternalUpdateRoleResponse.from(user);
+    }
+
+    public List<InternalMemberInfoResponse> getMemberInfoBatch(List<UUID> userIds) {
+        return userIds.stream()
+            .distinct()
+            .map(userId -> userRepository.findByUserId(userId)
+                .map(user -> {
+                    String nickname = userProfileRepository.findByUserId(user.getId())
+                        .map(UserProfile::getNickname)
+                        .orElse("");
+                    return InternalMemberInfoResponse.from(user, nickname);
+                })
+                .orElse(null))
+            .filter(Objects::nonNull)
+            .toList();
     }
 
     public InternalMemberStatusResponse getMemberStatus(UUID userId) {

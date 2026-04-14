@@ -17,6 +17,7 @@ import com.devticket.member.presentation.dto.internal.response.InternalTechStack
 import com.devticket.member.presentation.dto.internal.response.InternalUpdateRoleResponse;
 import com.devticket.member.presentation.dto.internal.response.InternalUpdateStatusResponse;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -172,5 +173,18 @@ public class InternalMemberController {
         @Valid @RequestBody InternalUpdateUserRoleRequest request
     ) {
         return ResponseEntity.ok(internalMemberService.updateMemberRole(userId, request));
+    }
+
+    @Operation(summary = "배치 회원 정보 조회", description = "내부 서비스용 — 여러 회원의 정보를 한 번에 조회")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "조회 성공"),
+        @ApiResponse(responseCode = "400", description = "유효하지 않은 요청 파라미터")
+    })
+    @GetMapping("/internal/members/batch")
+    public ResponseEntity<List<InternalMemberInfoResponse>> getMemberInfoBatch(
+        @Parameter(description = "조회할 회원 UUID 목록", example = "uuid1,uuid2,uuid3")
+        @RequestParam List<UUID> userIds
+    ) {
+        return ResponseEntity.ok(internalMemberService.getMemberInfoBatch(userIds));
     }
 }
