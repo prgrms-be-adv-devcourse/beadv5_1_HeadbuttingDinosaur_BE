@@ -57,13 +57,8 @@ public class InternalMemberService {
         UserRole role, UserStatus status, String keyword, Pageable pageable
     ) {
         Page<InternalMemberInfoResponse> page = userRepository
-            .searchMembers(role, status, keyword, pageable)
-            .map(user -> {
-                String nickname = userProfileRepository.findByUserId(user.getId())
-                    .map(UserProfile::getNickname)
-                    .orElse("");  // FE가 nickname.charAt(0) 호출 → null 금지
-                return InternalMemberInfoResponse.from(user, nickname);
-            });
+            .searchMembersWithNickname(role, status, keyword, pageable)
+            .map(row -> InternalMemberInfoResponse.from((User) row[0], (String) row[1]));
         return InternalPagedMemberResponse.from(page);
     }
 

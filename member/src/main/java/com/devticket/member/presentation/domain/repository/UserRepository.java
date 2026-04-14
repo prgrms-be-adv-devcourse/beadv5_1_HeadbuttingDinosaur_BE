@@ -21,25 +21,25 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     @Query(
         value = """
-        SELECT u FROM User u
-        LEFT JOIN UserProfile p ON p.userId = u.id
-        WHERE (:role IS NULL OR u.role = :role)
-          AND (:status IS NULL OR u.status = :status)
-          AND (:keyword IS NULL OR :keyword = ''
-               OR LOWER(u.email) LIKE LOWER(CONCAT('%', :keyword, '%'))
-               OR LOWER(p.nickname) LIKE LOWER(CONCAT('%', :keyword, '%')))
-    """,
+    SELECT u, COALESCE(p.nickname, '') FROM User u
+    LEFT JOIN UserProfile p ON p.userId = u.id
+    WHERE (:role IS NULL OR u.role = :role)
+      AND (:status IS NULL OR u.status = :status)
+      AND (:keyword IS NULL OR :keyword = ''
+           OR LOWER(u.email) LIKE LOWER(CONCAT('%', :keyword, '%'))
+           OR LOWER(p.nickname) LIKE LOWER(CONCAT('%', :keyword, '%')))
+""",
         countQuery = """
-        SELECT COUNT(u) FROM User u
-        LEFT JOIN UserProfile p ON p.userId = u.id
-        WHERE (:role IS NULL OR u.role = :role)
-          AND (:status IS NULL OR u.status = :status)
-          AND (:keyword IS NULL OR :keyword = ''
-               OR LOWER(u.email) LIKE LOWER(CONCAT('%', :keyword, '%'))
-               OR LOWER(p.nickname) LIKE LOWER(CONCAT('%', :keyword, '%')))
-    """
+    SELECT COUNT(u) FROM User u
+    LEFT JOIN UserProfile p ON p.userId = u.id
+    WHERE (:role IS NULL OR u.role = :role)
+      AND (:status IS NULL OR u.status = :status)
+      AND (:keyword IS NULL OR :keyword = ''
+           OR LOWER(u.email) LIKE LOWER(CONCAT('%', :keyword, '%'))
+           OR LOWER(p.nickname) LIKE LOWER(CONCAT('%', :keyword, '%')))
+"""
     )
-    Page<User> searchMembers(
+    Page<Object[]> searchMembersWithNickname(
         @Param("role") UserRole role,
         @Param("status") UserStatus status,
         @Param("keyword") String keyword,
