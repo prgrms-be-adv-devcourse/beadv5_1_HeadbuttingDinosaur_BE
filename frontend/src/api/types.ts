@@ -174,7 +174,7 @@ export type EventSearchResponse = EventListResponse;
 
 export interface EventFilterRequest {
   category?: string;
-  techStacks?: string[];
+  techStacks?: number[];
   page?: number;
   size?: number;
 }

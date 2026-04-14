@@ -24,7 +24,7 @@ const CATEGORY_MAP: Record<string, string> = {
 export default function EventList() {
   const [keyword, setKeyword] = useState("");
   const [category, setCategory] = useState("전체");
-  const [selectedStack, setSelectedStack] = useState("");
+  const [selectedStackId, setSelectedStackId] = useState<number | null>(null);
   const [techStacks, setTechStacks] = useState<
     { techStackId: number; name: string }[]
   >([]);
@@ -40,17 +40,17 @@ export default function EventList() {
       if (debouncedKeyword) {
         return searchEvents({ keyword: debouncedKeyword, page, size: 12 });
       }
-      if (category !== "전체" || selectedStack) {
+      if (category !== "전체" || selectedStackId) {
         return filterEvents({
           category: category !== "전체" ? CATEGORY_MAP[category] : undefined,
-          techStacks: selectedStack ? [selectedStack] : undefined, // 이름 그대로 전달
+          techStacks: selectedStackId ? [selectedStackId] : undefined,
           page,
           size: 12,
         });
       }
       return getEvents({ page, size: 12 });
     },
-    [debouncedKeyword, category, selectedStack],
+    [debouncedKeyword, category, selectedStackId],
   );
 
   const { items, page, totalPages, totalElements, loading, changePage } =
@@ -59,10 +59,10 @@ export default function EventList() {
   const reset = () => {
     setKeyword("");
     setCategory("전체");
-    setSelectedStack("");
+    setSelectedStackId(null);
   };
 
-  const hasFilter = category !== "전체" || selectedStack || keyword;
+  const hasFilter = category !== "전체" || selectedStackId || keyword;
 
   return (
     <div className="container" style={{ paddingTop: 44, paddingBottom: 72 }}>
@@ -213,31 +213,31 @@ export default function EventList() {
       >
         {techStacks.map((stack) => (
           <button
-            key={stack.techStackId} // stack → stack.techStackId
+            key={stack.techStackId}
             onClick={() => {
-              setSelectedStack((s) => (s === stack.name ? "" : stack.name)); // stack → stack.name
+              setSelectedStackId((id) => (id === stack.techStackId ? null : stack.techStackId));
               changePage(0);
             }}
             className="tag"
             style={{
               cursor: "pointer",
               background:
-                selectedStack === stack.name
+                selectedStackId === stack.techStackId
                   ? "var(--brand-light)"
-                  : "var(--surface-2)", // stack → stack.name
+                  : "var(--surface-2)",
               color:
-                selectedStack === stack.name ? "var(--brand)" : "var(--text-2)",
-              border: `1px solid ${selectedStack === stack.name ? "var(--brand-muted)" : "var(--border)"}`,
+                selectedStackId === stack.techStackId ? "var(--brand)" : "var(--text-2)",
+              border: `1px solid ${selectedStackId === stack.techStackId ? "var(--brand-muted)" : "var(--border)"}`,
               transition: "all 0.12s",
             }}
           >
             {stack.name}
-          </button> // stack → stack.name
+          </button>
         ))}
       </div>
 
       {/* Active filter chips */}
-      {(keyword || selectedStack) && (
+      {(keyword || selectedStackId) && (
         <div
           style={{
             display: "flex",
@@ -254,10 +254,10 @@ export default function EventList() {
               onRemove={() => setKeyword("")}
             />
           )}
-          {selectedStack && (
+          {selectedStackId && (
             <ActiveChip
-              label={selectedStack}
-              onRemove={() => setSelectedStack("")}
+              label={techStacks.find((s) => s.techStackId === selectedStackId)?.name ?? ""}
+              onRemove={() => setSelectedStackId(null)}
             />
           )}
         </div>
