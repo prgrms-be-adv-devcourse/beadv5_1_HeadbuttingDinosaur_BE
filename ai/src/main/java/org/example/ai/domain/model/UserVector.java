@@ -41,7 +41,7 @@ public class UserVector {
     private float recentWeightSum;
     // ===================================== //
 
-    // ============ 부정 신호 벡터 ============ //
+    // ============ 부정 신호 vector ============ //
     @Field(type = FieldType.Dense_Vector)
     private float[] negativeVector;
 
