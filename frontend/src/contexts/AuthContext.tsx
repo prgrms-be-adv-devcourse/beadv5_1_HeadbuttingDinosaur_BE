@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import axios from 'axios'
 import { getProfile } from '@/api/auth.api'
 import type { GetProfileResponse } from '@/api/types'
 
@@ -40,7 +41,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading: false,
         role: user.role as AuthState['role'],
       })
-    } catch {
+    } catch (err) {
+      // PROFILE_NOT_COMPLETED(403): 토큰은 유지하되 미로그인 상태로 둠
+      // → Axios 인터셉터가 다음 API 호출 시 /social/profile-setup 으로 리다이렉트
+      if (
+        axios.isAxiosError(err) &&
+        err.response?.status === 403 &&
+        (err.response.data as { code?: string })?.code === 'PROFILE_NOT_COMPLETED'
+      ) {
+        setState({ user: null, isLoggedIn: false, isLoading: false, role: null })
+        return
+      }
       localStorage.removeItem('accessToken')
       localStorage.removeItem('refreshToken')
       setState({ user: null, isLoggedIn: false, isLoading: false, role: null })
