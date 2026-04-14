@@ -6,5 +6,6 @@ public enum AdminActionType {
     CHANGE_ROLE,
     APPROVE_SELLER,
     REJECT_SELLER,
-    FORCE_CANCEL_EVENT
+    FORCE_CANCEL_EVENT,
+    RUN_SETTLEMENT
 }

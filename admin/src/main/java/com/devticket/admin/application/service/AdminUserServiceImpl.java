@@ -13,9 +13,9 @@ import com.devticket.admin.presentation.dto.req.UserStatusRequest;
 import com.devticket.admin.presentation.dto.res.AdminActionHistorySummary;
 import com.devticket.admin.presentation.dto.res.AdminUserListResponse;
 import com.devticket.admin.presentation.dto.res.InternalMemberDetailResponse;
+import com.devticket.admin.presentation.dto.res.InternalMemberPageResponse;
 import com.devticket.admin.presentation.dto.res.UserDetailResponse;
 import com.devticket.admin.presentation.dto.res.UserListItem;
-import com.devticket.admin.presentation.dto.res.UserListResponse;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -34,8 +34,9 @@ public class AdminUserServiceImpl implements AdminUserService {
 
     @Override
     public AdminUserListResponse getMembers(UserSearchCondition condition) {
+        InternalMemberPageResponse page = memberInternalClient.getMembers(condition);
 
-        List<UserListItem> content = memberInternalClient.getMembers(condition).stream()
+        List<UserListItem> content = page.content().stream()
             .map(member -> new UserListItem(
                 member.userId(),
                 member.email(),
@@ -50,10 +51,10 @@ public class AdminUserServiceImpl implements AdminUserService {
 
         return new AdminUserListResponse(
             content,
-            condition.page() == null ? 0 : condition.page(),
-            condition.size() == null ? 50 : condition.size(),
-            content.size(), // 임시
-            1               // 임시
+            page.page(),
+            page.size(),
+            page.totalElements(),
+            page.totalPages()
         );
     }
 

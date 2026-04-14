@@ -35,16 +35,16 @@ public class AdminSettlementServiceImpl implements AdminSettlementService {
         return new AdminSettelmentListResponse(content, page.page(), page.size(), page.totalElements(), page.totalPage());
     }
 
-    @Override
     @Transactional
     public void runSettlement(UUID adminId) {
-        settlementInternalClient.runSettlement();      // 중복이면 409(SETTLEMENT_002) → 전역 핸들러 변환
+        settlementInternalClient.runSettlement();
+
         adminActionRepository.save(
             AdminActionHistory.builder()
                 .adminId(adminId)
                 .targetType(AdminTargetType.SETTLEMENT)
-                .targetId(adminId)                     // run은 특정 대상이 없으니 논의 필요
-                .actionType(AdminActionType.FORCE_CANCEL_EVENT /* or 신규 RUN_SETTLEMENT */)
+                .targetId(null)                          // 특정 대상 없음
+                .actionType(AdminActionType.RUN_SETTLEMENT)
                 .build()
         );
     }

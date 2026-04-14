@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "관리자 정산 내역 관리 API")
 public class AdminSettlementController {
 
-    AdminSettlementService adminSettlementService;
+    private final AdminSettlementService adminSettlementService;
 
     @Operation(summary = "관리자 정산 내역 조회 API")
     @ApiResponse(responseCode = "200", description = "정산 목록 조회 성공")

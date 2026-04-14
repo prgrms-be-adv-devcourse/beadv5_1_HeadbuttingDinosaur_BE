@@ -2,7 +2,6 @@ package com.devticket.admin.infrastructure.external.client;
 
 import com.devticket.admin.infrastructure.external.dto.req.InternalDecideSellerApplicationRequest;
 import com.devticket.admin.infrastructure.external.dto.res.InternalDecideSellerApplicationResponse;
-import com.devticket.admin.infrastructure.external.dto.res.InternalMemberInfoResponse;
 import com.devticket.admin.infrastructure.external.dto.res.InternalSellerApplicationResponse;
 import com.devticket.admin.presentation.dto.req.UserRoleRequest;
 import com.devticket.admin.presentation.dto.req.UserSearchCondition;
@@ -10,7 +9,6 @@ import com.devticket.admin.presentation.dto.req.UserStatusRequest;
 import com.devticket.admin.presentation.dto.res.InternalMemberDetailResponse;
 import com.devticket.admin.presentation.dto.res.InternalMemberPageResponse;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -31,16 +29,15 @@ public class RestClientMemberInternalClientImpl implements MemberInternalClient 
     private String memberServerUrl;
 
     @Override
-    public List<InternalMemberInfoResponse> getMembers(UserSearchCondition condition) {
+    public InternalMemberPageResponse getMembers(UserSearchCondition condition) {
         InternalMemberPageResponse page = restClient.get()
             .uri(memberServerUrl + "/internal/members?role={role}&status={status}&keyword={keyword}",
                 condition.role(),
                 condition.status(),
                 condition.keyword())
             .retrieve()
-            .body(new ParameterizedTypeReference<>() {});
-
-        return page != null ? page.content() : List.of();
+            .body(new ParameterizedTypeReference<InternalMemberPageResponse>() {});
+        return page != null ? page : new InternalMemberPageResponse(List.of(), 0, 0, 0, 0);
     }
 
 
