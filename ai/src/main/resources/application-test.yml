@@ -2,3 +2,7 @@ jwt:
   secret-key: test-jwt-secret-key
   access-token-ttl: 1800000
   refresh-token-ttl: 604800000
+
+spring:
+  elasticsearch:
+    uris: http://localhost:9200
