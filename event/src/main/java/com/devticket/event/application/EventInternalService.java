@@ -4,12 +4,15 @@ import com.devticket.event.common.exception.BusinessException;
 import com.devticket.event.domain.enums.EventStatus;
 import com.devticket.event.domain.exception.EventErrorCode;
 import com.devticket.event.domain.model.Event;
+import com.devticket.event.infrastructure.client.MemberClient;
 import com.devticket.event.infrastructure.persistence.EventRepository;
 import com.devticket.event.infrastructure.search.EventDocument;
 import com.devticket.event.infrastructure.search.EventSearchRepository;
+import com.devticket.event.presentation.dto.internal.InternalAdminEventResponse;
 import com.devticket.event.presentation.dto.internal.InternalBulkEventInfoResponse;
 import com.devticket.event.presentation.dto.internal.InternalBulkStockAdjustmentRequest;
 import com.devticket.event.presentation.dto.internal.InternalEventInfoResponse;
+import com.devticket.event.presentation.dto.internal.InternalPagedEventResponse;
 import com.devticket.event.presentation.dto.internal.InternalPurchaseValidationResponse;
 import com.devticket.event.presentation.dto.internal.InternalSellerEventsResponse;
 import com.devticket.event.presentation.dto.internal.InternalStockAdjustmentResponse;
@@ -27,6 +30,8 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,6 +43,30 @@ public class EventInternalService {
 
     private final EventRepository eventRepository;
     private final EventSearchRepository eventSearchRepository;
+    private final MemberClient memberClient;
+
+    @Transactional(readOnly = true)
+    public InternalPagedEventResponse searchEvents(
+        String keyword,
+        EventStatus status,
+        UUID sellerId,
+        Pageable pageable
+    ) {
+        Page<Event> page = eventRepository.searchEvents(keyword, status, sellerId, pageable);
+
+        List<UUID> sellerIds = page.getContent().stream()
+            .map(Event::getSellerId)
+            .distinct()
+            .toList();
+
+        Map<UUID, String> nicknameMap = memberClient.getNicknames(sellerIds);
+
+        return InternalPagedEventResponse.from(
+            page.map(event -> InternalAdminEventResponse.of(
+                event, nicknameMap.getOrDefault(event.getSellerId(), "")
+            ))
+        );
+    }
 
     /**
      * API 1: 단건 이벤트 정보 조회
