@@ -38,9 +38,6 @@ public class SettlementServiceImpl implements SettlementService {
     @Override
     public List<SettlementResponse> getSellerSettlements(UUID sellerId) {
         List<Settlement> settlements = settlementRepository.findBySellerId(sellerId);
-        if (settlements.isEmpty()) {
-            throw new BusinessException(SettlementErrorCode.SETTLEMENT_NOT_FOUND);
-        }
         return settlements.stream()
             .map(this::toResponse)
             .toList();
