@@ -32,7 +32,7 @@ public class AdminSettlementServiceImpl implements AdminSettlementService {
                 s.totalSalesAmount(), s.totalRefundAmount(), s.totalFeeAmount(),
                 s.finalSettlementAmount(), s.status(), s.settledAt()))
             .toList();
-        return new AdminSettelmentListResponse(content, page.page(), page.size(), page.totalElements(), page.totalPage());
+        return new AdminSettelmentListResponse(content, page.page(), page.size(), page.totalElements(), page.totalPages());
     }
 
     @Transactional

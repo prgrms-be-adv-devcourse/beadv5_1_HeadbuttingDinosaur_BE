@@ -7,6 +7,6 @@ public record InternalSettlementPageResponse(
     int page,
     int size,
     long totalElements,
-    int totalPage
+    int totalPages
 ) {
 }
