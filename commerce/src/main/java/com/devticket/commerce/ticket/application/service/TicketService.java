@@ -144,7 +144,7 @@ public class TicketService implements TicketUsecase {
         SellerEventParticipantListRequest request) {
         // 0단계 : 사용자 소유권 검증
         InternalEventInfoResponse eventInfo = ticketToEventClient.getSingleEventInfo(eventId);
-        if (eventInfo.sellerId().equals(userId)) {
+        if (!eventInfo.sellerId().equals(userId)) {
             throw new BusinessException(TicketErrorCode.UNAUTHORIZED_EVENT_ACCESS);
         }
 
@@ -171,6 +171,7 @@ public class TicketService implements TicketUsecase {
                     order.getOrderId().toString(),
                     ticket.getUserId().toString(),
                     memberInfo.email(),
+                    memberInfo.nickname(),
                     ticket.getIssuedAt().toString(),
                     order.getOrderNumber()
                 );
