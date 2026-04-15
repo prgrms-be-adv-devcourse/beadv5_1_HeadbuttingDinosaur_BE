@@ -14,10 +14,12 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequiredArgsConstructor
+@RequestMapping("/api/admin")
 @Tag(name = "SELLER(판매자) 신청 관리 API")
 public class AdminSellerController {
 
@@ -26,7 +28,7 @@ public class AdminSellerController {
     @Operation(summary = "판매자 신청 리스트 조회 API")
     @ApiResponse(responseCode = "200", description = "판매자 신청 리스트 조회 성공")
     @ApiResponse(responseCode = "403", description = "접근 권한 없음 (COMMON_005)")
-    @GetMapping("/api/admin/seller-applications")
+    @GetMapping("/seller-applications")
     public List<SellerApplicationListResponse> getSellerApplicationList() {
         return adminSellerService.getSellerApplicationList();
     }
@@ -36,7 +38,7 @@ public class AdminSellerController {
     @ApiResponse(responseCode = "404", description = "존재하지 않는 회원 (MEMBER_009)")
     @ApiResponse(responseCode = "409", description = "이미 처리된 판매자 신청 건 (ADMIN_003)")
     @ApiResponse(responseCode = "403", description = "접근 권한 없음 (COMMON_005)")
-    @PatchMapping("/api/admin/seller-applications/{applicationId}")
+    @PatchMapping("/seller-applications/{applicationId}")
     public void decideApplication(
         @RequestHeader("X-User-Id") UUID adminId,
         @PathVariable UUID applicationId,

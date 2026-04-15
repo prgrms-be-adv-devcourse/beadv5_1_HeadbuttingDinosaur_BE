@@ -1,10 +1,8 @@
-package com.devticket.admin.presentation.dto.res;
+package com.devticket.admin.infrastructure.external.dto.res;
 
-import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
 
-public record SettlementResponse(
-
+public record InternalSettlementResponse(
     Long settlementId,
     LocalDateTime periodStart,
     LocalDateTime periodEnd,
@@ -14,8 +12,5 @@ public record SettlementResponse(
     Long finalSettlementAmount,
     String status,
     LocalDateTime settledAt
-
 ) {
-
-
 }

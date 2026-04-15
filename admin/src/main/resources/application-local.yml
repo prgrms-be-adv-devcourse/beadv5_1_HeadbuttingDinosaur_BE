@@ -34,3 +34,7 @@ logging:
 internal:
   member-service:
     url: http://localhost:8081
+  event-service:
+    url: http://localhost:8082
+  settlement-service:
+    url: http://localhost:8085
