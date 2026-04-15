@@ -5,8 +5,9 @@ public record SellerEventParticipantResponse(
     String ticketId,
     String orderId,
     String userId,
-//    String userName, 차후 entity 수정 후 결정
+    String userName,
     String email,
+    int quantity,
     String purchasedAt,
     String orderNumber
 ) {
@@ -15,12 +16,13 @@ public record SellerEventParticipantResponse(
         String ticketId,
         String orderId,
         String userId,
-//        String userName,
+        String userName,
         String email,
+        int quantity,
         String purchasedAt,
         String orderNumber) {
         return new SellerEventParticipantResponse(
-            ticketId, orderId, userId, email, purchasedAt, orderNumber
+            ticketId, orderId, userId, userName, email, quantity, purchasedAt, orderNumber
         );
     }
 
