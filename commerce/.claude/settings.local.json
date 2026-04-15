@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(./gradlew cleanTest test --info)",
-      "Bash(./gradlew cleanTest test)"
-    ]
-  }
-}
