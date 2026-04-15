@@ -3,6 +3,8 @@ package com.devticket.payment.payment.domain.model;
 import com.devticket.payment.common.entity.BaseEntity;
 import com.devticket.payment.payment.domain.enums.PaymentMethod;
 import com.devticket.payment.payment.domain.enums.PaymentStatus;
+import com.devticket.payment.payment.domain.exception.PaymentErrorCode;
+import com.devticket.payment.payment.domain.exception.PaymentException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -11,6 +13,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.time.LocalDateTime;
 import java.util.UUID;
 import lombok.AccessLevel;
@@ -26,6 +29,10 @@ public class Payment extends BaseEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Version
+    @Column(name = "version")
+    private Long version;
 
     @Column(name = "payment_id", nullable = false, unique = true)
     private UUID paymentId;
@@ -84,28 +91,43 @@ public class Payment extends BaseEntity {
        ======================= */
 
     public void approve(String paymentKey) {
+        validateTransition(PaymentStatus.SUCCESS);
         this.paymentKey = paymentKey;
         this.status = PaymentStatus.SUCCESS;
         this.approvedAt = LocalDateTime.now();
     }
 
     public void approve(String paymentKey, LocalDateTime approvedAt) {
+        validateTransition(PaymentStatus.SUCCESS);
         this.paymentKey = paymentKey;
         this.status = PaymentStatus.SUCCESS;
         this.approvedAt = approvedAt;
     }
 
     public void fail(String reason) {
+        validateTransition(PaymentStatus.FAILED);
         this.status = PaymentStatus.FAILED;
         this.failureReason = reason;
     }
 
     public void cancel() {
+        validateTransition(PaymentStatus.CANCELLED);
         this.status = PaymentStatus.CANCELLED;
     }
 
     public void refund() {
+        validateTransition(PaymentStatus.REFUNDED);
         this.status = PaymentStatus.REFUNDED;
+    }
+
+    public boolean canTransitionTo(PaymentStatus target) {
+        return this.status.canTransitionTo(target);
+    }
+
+    private void validateTransition(PaymentStatus target) {
+        if (!this.status.canTransitionTo(target)) {
+            throw new PaymentException(PaymentErrorCode.INVALID_STATUS_TRANSITION);
+        }
     }
 
     public void softDelete() {

@@ -1,15 +1,33 @@
 package com.devticket.payment.wallet.application.service;
 
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.devticket.payment.common.messaging.KafkaTopics;
 import com.devticket.payment.common.outbox.OutboxService;
 import com.devticket.payment.payment.application.dto.PgPaymentConfirmCommand;
 import com.devticket.payment.payment.application.dto.PgPaymentConfirmResult;
-import com.devticket.payment.payment.infrastructure.external.dto.TossPaymentStatusResponse;
+import com.devticket.payment.payment.domain.enums.PaymentMethod;
 import com.devticket.payment.payment.domain.enums.PaymentStatus;
 import com.devticket.payment.payment.domain.model.Payment;
 import com.devticket.payment.payment.domain.repository.PaymentRepository;
 import com.devticket.payment.payment.infrastructure.client.CommerceInternalClient;
 import com.devticket.payment.payment.infrastructure.external.PgPaymentClient;
+import com.devticket.payment.payment.infrastructure.external.dto.TossPaymentStatusResponse;
 import com.devticket.payment.wallet.application.event.PaymentCompletedEvent;
 import com.devticket.payment.wallet.domain.WalletPolicyConstants;
 import com.devticket.payment.wallet.domain.exception.WalletErrorCode;
@@ -29,19 +47,6 @@ import com.devticket.payment.wallet.presentation.dto.WalletChargeResponse;
 import com.devticket.payment.wallet.presentation.dto.WalletTransactionListResponse;
 import com.devticket.payment.wallet.presentation.dto.WalletWithdrawRequest;
 import com.devticket.payment.wallet.presentation.dto.WalletWithdrawResponse;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Service
@@ -140,7 +145,6 @@ public class WalletServiceImpl implements WalletService {
             ));
         } catch (Exception e) {
             log.error("[WalletCharge] PG 승인 실패 — chargeId={}, error={}", chargeId, e.getMessage());
-            //PG결제승인 실패시 기존에 생성된 WalletCharge의 상태값 FAILED로 변경
             walletCharge.fail();
             return WalletChargeConfirmResponse.from(
                 walletCharge.getChargeId().toString(), walletCharge.getAmount(),
@@ -306,13 +310,19 @@ public class WalletServiceImpl implements WalletService {
 
         PaymentCompletedEvent event = PaymentCompletedEvent.builder()
             .orderId(orderId)
-            .userId(userId.toString())
-            .paymentId(payment.getPaymentId().toString())
-            .paymentMethod("WALLET")
+            .userId(userId)
+            .paymentId(payment.getPaymentId())
+            .paymentMethod(PaymentMethod.WALLET)
             .totalAmount(amount)
-            .timestamp(LocalDateTime.now())
+            .timestamp(Instant.now())
             .build();
-        outboxService.save("PAYMENT", payment.getId(), KafkaTopics.PAYMENT_COMPLETED, event);
+        outboxService.save(
+            payment.getPaymentId().toString(),
+            KafkaTopics.PAYMENT_COMPLETED,
+            KafkaTopics.PAYMENT_COMPLETED,
+            orderId.toString(),
+            event
+        );
 
         log.info("[WalletPayment] 예치금 결제 완료 — orderId={}, amount={}, balanceAfter={}",
             orderId, amount, wallet.getBalance());
@@ -397,14 +407,14 @@ public class WalletServiceImpl implements WalletService {
             // }
 
             // RefundCompletedEvent event = RefundCompletedEvent.builder()
-            // .refundId(refund.getRefundId().toString())
+            // .refundId(refund.getRefundId())
             // .orderId(orderId)
-            // .userId(userId.toString())
-            // .paymentId(payment.getPaymentId().toString())
-            // .paymentMethod(orderInfo.getPaymentMethod())
+            // .userId(userId)
+            // .paymentId(payment.getPaymentId())
+            // .paymentMethod(payment.getPaymentMethod())
             // .refundAmount(refundAmount)
             // .refundRate(100)
-            // .timestamp(LocalDateTime.now())
+            // .timestamp(Instant.now())
             // .build();
             // outboxService.save("REFUND", refund.getId(), KafkaTopics.REFUND_COMPLETED, event);
 

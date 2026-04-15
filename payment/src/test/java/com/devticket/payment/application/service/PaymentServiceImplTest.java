@@ -8,6 +8,7 @@ import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import com.devticket.payment.common.outbox.OutboxService;
 import com.devticket.payment.payment.application.dto.PgPaymentConfirmResult;
 import com.devticket.payment.payment.application.service.PaymentServiceImpl;
 import com.devticket.payment.payment.domain.enums.PaymentMethod;
@@ -26,10 +27,8 @@ import com.devticket.payment.payment.presentation.dto.PaymentFailRequest;
 import com.devticket.payment.payment.presentation.dto.PaymentFailResponse;
 import com.devticket.payment.payment.presentation.dto.PaymentReadyRequest;
 import com.devticket.payment.payment.presentation.dto.PaymentReadyResponse;
-import com.devticket.payment.wallet.domain.exception.WalletException;
-import com.devticket.payment.wallet.domain.model.Wallet;
-import com.devticket.payment.wallet.domain.repository.WalletRepository;
-import com.devticket.payment.wallet.domain.repository.WalletTransactionRepository;
+import com.devticket.payment.wallet.application.service.WalletService;
+import java.util.List;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
@@ -47,10 +46,10 @@ public class PaymentServiceImplTest {
 
     @Mock
     private PaymentRepository paymentRepository;
-    @Mock private WalletRepository walletRepository;
-    @Mock private WalletTransactionRepository walletTransactionRepository;
     @Mock private CommerceInternalClient commerceInternalClient;
     @Mock private PgPaymentClient pgPaymentClient;
+    @Mock private OutboxService outboxService;
+    @Mock private WalletService walletService;
 
     @InjectMocks
     private PaymentServiceImpl paymentService;
@@ -73,7 +72,8 @@ public class PaymentServiceImplTest {
             "ORD-20250815-001",
             130000,
             "PAYMENT_PENDING",
-            LocalDateTime.of(2025, 8, 15, 14, 30).toString()
+            LocalDateTime.of(2025, 8, 15, 14, 30).toString(),
+            List.of()
         );
     }
 
@@ -144,7 +144,8 @@ public class PaymentServiceImplTest {
             PaymentReadyRequest request = new PaymentReadyRequest(EXTERNAL_ORDER_ID, PaymentMethod.PG);
             InternalOrderInfoResponse paidOrder = new InternalOrderInfoResponse(
                 ORDER_ID, USER_ID, "ORD-001", 130000, "PAID",
-                LocalDateTime.of(2025, 8, 15, 14, 30).toString()
+                LocalDateTime.of(2025, 8, 15, 14, 30).toString(),
+                List.of()
             );
 
             given(commerceInternalClient.getOrderInfo(EXTERNAL_ORDER_ID)).willReturn(paidOrder);
@@ -157,67 +158,24 @@ public class PaymentServiceImplTest {
         }
 
         @Test
-        @DisplayName("예치금 결제 준비 성공 — SUCCESS 상태, 잔액 차감")
+        @DisplayName("예치금 결제 준비 성공 — WalletService로 위임")
         void 예치금_결제_준비_성공() {
             // given
             PaymentReadyRequest request = new PaymentReadyRequest(EXTERNAL_ORDER_ID, PaymentMethod.WALLET);
-            Wallet wallet = Wallet.create(USER_ID);
-            wallet.charge(200000);
+            Payment savedPayment = createReadyPayment();
+            savedPayment.approve("WALLET-" + savedPayment.getPaymentId());
 
             given(commerceInternalClient.getOrderInfo(EXTERNAL_ORDER_ID)).willReturn(orderInfo);
             given(paymentRepository.save(any(Payment.class)))
                 .willAnswer(invocation -> invocation.getArgument(0));
-            given(walletRepository.findByUserId(USER_ID)).willReturn(Optional.of(wallet));
-            given(walletTransactionRepository.existsByTransactionKey("WALLET:PAY:" + EXTERNAL_ORDER_ID))
-                .willReturn(false);
+            given(paymentRepository.findByOrderId(orderInfo.id())).willReturn(Optional.of(savedPayment));
 
             // when
             PaymentReadyResponse response = paymentService.readyPayment(USER_ID, request);
 
             // then
+            verify(walletService).processWalletPayment(USER_ID, EXTERNAL_ORDER_ID, orderInfo.totalAmount());
             assertThat(response.paymentStatus()).isEqualTo(PaymentStatus.SUCCESS);
-            assertThat(response.approvedAt()).isNotNull();
-            assertThat(wallet.getBalance()).isEqualTo(70000);
-        }
-
-        @Test
-        @DisplayName("예치금 잔액 부족 — 예외")
-        void 예치금_잔액_부족() {
-            // given
-            PaymentReadyRequest request = new PaymentReadyRequest(EXTERNAL_ORDER_ID, PaymentMethod.WALLET);
-            Wallet wallet = Wallet.create(USER_ID);
-            wallet.charge(10000);
-
-            given(commerceInternalClient.getOrderInfo(EXTERNAL_ORDER_ID)).willReturn(orderInfo);
-            given(paymentRepository.save(any(Payment.class)))
-                .willAnswer(invocation -> invocation.getArgument(0));
-            given(walletRepository.findByUserId(USER_ID)).willReturn(Optional.of(wallet));
-            given(walletTransactionRepository.existsByTransactionKey("WALLET:PAY:" + EXTERNAL_ORDER_ID))
-                .willReturn(false);
-
-            // when & then
-            assertThatThrownBy(() -> paymentService.readyPayment(USER_ID, request))
-                .isInstanceOf(WalletException.class);
-        }
-
-        @Test
-        @DisplayName("이미_처리된_예치금_거래 — 예외")
-        void 이미_처리된_예치금_거래() {
-            // given
-            PaymentReadyRequest request = new PaymentReadyRequest(EXTERNAL_ORDER_ID, PaymentMethod.WALLET);
-            Wallet wallet = Wallet.create(USER_ID);
-            wallet.charge(200000);
-
-            given(commerceInternalClient.getOrderInfo(EXTERNAL_ORDER_ID)).willReturn(orderInfo);
-            given(paymentRepository.save(any(Payment.class)))
-                .willAnswer(invocation -> invocation.getArgument(0));
-            given(walletRepository.findByUserId(USER_ID)).willReturn(Optional.of(wallet));
-            given(walletTransactionRepository.existsByTransactionKey("WALLET:PAY:" + EXTERNAL_ORDER_ID))
-                .willReturn(true);
-
-            // when & then
-            assertThatThrownBy(() -> paymentService.readyPayment(USER_ID, request))
-                .isInstanceOf(PaymentException.class);
         }
     }
 
@@ -250,7 +208,7 @@ public class PaymentServiceImplTest {
             assertThat(response.status()).isEqualTo(PaymentStatus.SUCCESS);
             assertThat(payment.getPaymentKey()).isEqualTo(PAYMENT_KEY);
             assertThat(payment.getApprovedAt()).isNotNull();
-            verify(commerceInternalClient).completePayment(orderInfo.id());
+            verify(outboxService).save(any(), any(), any(), any(), any());
         }
 
         @Test
@@ -352,12 +310,12 @@ public class PaymentServiceImplTest {
                 .extracting(e -> ((PaymentException) e).getErrorCode())
                 .isEqualTo(PaymentErrorCode.PG_CONFIRM_FAILED);
 
-            verify(commerceInternalClient, never()).completePayment(any());
+            verify(outboxService, never()).save(any(), any(), any(), any(), any());
         }
 
         @Test
-        @DisplayName("Commerce 주문 완료 실패 + PG 취소 성공 — ORDER_COMPLETE_FAILED 예외, payment FAILED 저장")
-        void Commerce_실패_PG_취소_성공() {
+        @DisplayName("PG 승인 성공 후 Outbox에 payment.completed 이벤트 저장")
+        void PG_승인_성공_후_Outbox_저장() {
             // given
             Payment payment = createReadyPayment();
             PaymentConfirmRequest request = new PaymentConfirmRequest(
@@ -368,44 +326,13 @@ public class PaymentServiceImplTest {
             given(pgPaymentClient.confirm(any())).willReturn(createPgConfirmResult());
             given(paymentRepository.save(any(Payment.class)))
                 .willAnswer(invocation -> invocation.getArgument(0));
-            willThrow(new RuntimeException("Commerce 오류"))
-                .given(commerceInternalClient).completePayment(orderInfo.id());
 
-            // when & then
-            assertThatThrownBy(() -> paymentService.confirmPgPayment(USER_ID, request))
-                .isInstanceOf(PaymentException.class)
-                .extracting(e -> ((PaymentException) e).getErrorCode())
-                .isEqualTo(PaymentErrorCode.ORDER_COMPLETE_FAILED);
+            // when
+            paymentService.confirmPgPayment(USER_ID, request);
 
-            assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED);
-            verify(pgPaymentClient).cancel(any(), any());
-        }
-
-        @Test
-        @DisplayName("Commerce 주문 완료 실패 + PG 취소도 실패 — PG_REFUND_FAILED 예외, payment FAILED 저장")
-        void Commerce_실패_PG_취소_실패() {
-            // given
-            Payment payment = createReadyPayment();
-            PaymentConfirmRequest request = new PaymentConfirmRequest(
-                PAYMENT_KEY, PAYMENT_ID, EXTERNAL_ORDER_ID, orderInfo.totalAmount());
-
-            given(commerceInternalClient.getOrderInfo(EXTERNAL_ORDER_ID)).willReturn(orderInfo);
-            given(paymentRepository.findByOrderId(orderInfo.id())).willReturn(Optional.of(payment));
-            given(pgPaymentClient.confirm(any())).willReturn(createPgConfirmResult());
-            given(paymentRepository.save(any(Payment.class)))
-                .willAnswer(invocation -> invocation.getArgument(0));
-            willThrow(new RuntimeException("Commerce 오류"))
-                .given(commerceInternalClient).completePayment(orderInfo.id());
-            willThrow(new PaymentException(PaymentErrorCode.PG_CANCEL_FAILED))
-                .given(pgPaymentClient).cancel(any(), any());
-
-            // when & then
-            assertThatThrownBy(() -> paymentService.confirmPgPayment(USER_ID, request))
-                .isInstanceOf(PaymentException.class)
-                .extracting(e -> ((PaymentException) e).getErrorCode())
-                .isEqualTo(PaymentErrorCode.PG_REFUND_FAILED);
-
-            assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED);
+            // then
+            assertThat(payment.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
+            verify(outboxService).save(any(), any(), any(), any(), any());
         }
     }
 
@@ -418,7 +345,7 @@ public class PaymentServiceImplTest {
     class FailPgPaymentTest {
 
         @Test
-        @DisplayName("성공 — payment가 FAILED 상태, failureReason 저장, Commerce failOrder 호출")
+        @DisplayName("성공 — payment가 FAILED 상태, failureReason 저장, Outbox에 payment.failed 저장")
         void 성공() {
             // given
             Payment payment = createReadyPayment();
@@ -437,7 +364,7 @@ public class PaymentServiceImplTest {
             assertThat(response.status()).isEqualTo(PaymentStatus.FAILED);
             assertThat(response.failureReason()).isEqualTo("[PAY_PROCESS_CANCELED] 사용자가 결제를 취소했습니다.");
             assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED);
-            verify(commerceInternalClient).failOrder(orderInfo.id());
+            verify(outboxService).save(any(), any(), any(), any(), any());
         }
 
         @Test
@@ -493,28 +420,6 @@ public class PaymentServiceImplTest {
                 .isEqualTo(PaymentErrorCode.ALREADY_PROCESSED_PAYMENT);
 
             verify(paymentRepository, never()).save(any());
-        }
-
-        @Test
-        @DisplayName("Commerce failOrder 실패 — 예외 없이 FAILED 상태 정상 반환")
-        void Commerce_failOrder_실패_시_정상_완료() {
-            // given
-            Payment payment = createReadyPayment();
-            PaymentFailRequest request = new PaymentFailRequest(EXTERNAL_ORDER_ID, null, null);
-
-            given(commerceInternalClient.getOrderInfo(EXTERNAL_ORDER_ID)).willReturn(orderInfo);
-            given(paymentRepository.findByOrderId(orderInfo.id())).willReturn(Optional.of(payment));
-            given(paymentRepository.save(any(Payment.class)))
-                .willAnswer(invocation -> invocation.getArgument(0));
-            willThrow(new RuntimeException("Commerce 오류"))
-                .given(commerceInternalClient).failOrder(orderInfo.id());
-
-            // when
-            PaymentFailResponse response = paymentService.failPgPayment(USER_ID, request);
-
-            // then — Commerce 연동 실패와 무관하게 결제 실패 처리는 완료
-            assertThat(response.status()).isEqualTo(PaymentStatus.FAILED);
-            assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED);
         }
 
         @Nested
@@ -595,6 +500,66 @@ public class PaymentServiceImplTest {
                 // then
                 assertThat(response.failureReason()).isEqualTo("PG 결제 실패");
             }
+        }
+    }
+
+    // =========================================================
+    // failPgPayment — orderItems 매핑
+    // =========================================================
+
+    @Nested
+    @DisplayName("PG 결제 실패 — orderItems 매핑")
+    class FailPgPaymentOrderItemsTest {
+
+        @Test
+        @DisplayName("orderItems가 있으면 PaymentFailedEvent에 매핑")
+        void orderItems_매핑_성공() {
+            // given
+            Payment payment = createReadyPayment();
+            InternalOrderInfoResponse orderWithItems = new InternalOrderInfoResponse(
+                ORDER_ID, USER_ID, "ORD-001", 130000, "PAYMENT_PENDING",
+                LocalDateTime.of(2025, 8, 15, 14, 30).toString(),
+                List.of(
+                    new InternalOrderInfoResponse.OrderItem(UUID.randomUUID(), 2),
+                    new InternalOrderInfoResponse.OrderItem(UUID.randomUUID(), 1)
+                )
+            );
+            PaymentFailRequest request = new PaymentFailRequest(
+                EXTERNAL_ORDER_ID, "STOCK_FAIL", "stock shortage");
+
+            given(commerceInternalClient.getOrderInfo(EXTERNAL_ORDER_ID)).willReturn(orderWithItems);
+            given(paymentRepository.findByOrderId(orderWithItems.id())).willReturn(Optional.of(payment));
+            given(paymentRepository.save(any())).willAnswer(i -> i.getArgument(0));
+
+            // when
+            paymentService.failPgPayment(USER_ID, request);
+
+            // then
+            verify(outboxService).save(any(), any(), any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("orderItems가 null이면 빈 리스트로 매핑")
+        void orderItems_null이면_빈_리스트() {
+            // given
+            Payment payment = createReadyPayment();
+            InternalOrderInfoResponse orderWithNullItems = new InternalOrderInfoResponse(
+                ORDER_ID, USER_ID, "ORD-001", 130000, "PAYMENT_PENDING",
+                LocalDateTime.of(2025, 8, 15, 14, 30).toString(),
+                null
+            );
+            PaymentFailRequest request = new PaymentFailRequest(
+                EXTERNAL_ORDER_ID, "ERROR", "internal error");
+
+            given(commerceInternalClient.getOrderInfo(EXTERNAL_ORDER_ID)).willReturn(orderWithNullItems);
+            given(paymentRepository.findByOrderId(orderWithNullItems.id())).willReturn(Optional.of(payment));
+            given(paymentRepository.save(any())).willAnswer(i -> i.getArgument(0));
+
+            // when
+            paymentService.failPgPayment(USER_ID, request);
+
+            // then
+            verify(outboxService).save(any(), any(), any(), any(), any());
         }
     }
 

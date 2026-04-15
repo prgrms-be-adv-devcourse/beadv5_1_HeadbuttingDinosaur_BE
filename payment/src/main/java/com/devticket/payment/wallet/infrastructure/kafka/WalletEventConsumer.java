@@ -2,6 +2,7 @@ package com.devticket.payment.wallet.infrastructure.kafka;
 
 import com.devticket.payment.common.messaging.KafkaTopics;
 import com.devticket.payment.common.messaging.MessageDeduplicationService;
+import com.devticket.payment.payment.domain.enums.PaymentMethod;
 import com.devticket.payment.wallet.application.event.EventCancelledEvent;
 import com.devticket.payment.wallet.application.event.RefundCompletedEvent;
 import com.devticket.payment.wallet.application.service.WalletService;
@@ -45,16 +46,16 @@ public class WalletEventConsumer {
             RefundCompletedEvent event = objectMapper.readValue(record.value(), RefundCompletedEvent.class);
 
             // 예치금 결제건만 복구 처리 (PG는 이미 PG 취소로 처리됨)
-            if ("WALLET".equals(event.paymentMethod())) {
+            if (PaymentMethod.WALLET == event.paymentMethod()) {
                 walletService.restoreBalance(
-                    UUID.fromString(event.userId()),
+                    event.userId(),
                     event.refundAmount(),
-                    UUID.fromString(event.refundId()),
+                    event.refundId(),
                     event.orderId()
                 );
             }
 
-            deduplicationService.markProcessed(toMessageUUID(messageId));
+            deduplicationService.markProcessed(toMessageUUID(messageId), record.topic());
             ack.acknowledge();
 
         } catch (Exception e) {
@@ -86,14 +87,14 @@ public class WalletEventConsumer {
             EventCancelledEvent event = objectMapper.readValue(record.value(), EventCancelledEvent.class);
 
             log.info("[Consumer] 이벤트 취소 수신 — eventId={}, cancelledBy={}",
-                event.getEventId(), event.getCancelledBy());
+                event.eventId(), event.cancelledBy());
 
             // TODO: Refund 모듈 완성 전까지 일괄 환불 미처리 — ACK하지 않고 예외로 DLT 보존
             // Refund 모듈 완성 후 아래 주석 해제하고 이 예외 블록 제거
             throw new UnsupportedOperationException(
-                "event.cancelled 일괄 환불 미구현 — Refund 모듈 완성 후 처리 예정. eventId=" + event.getEventId());
+                "event.cancelled 일괄 환불 미구현 — Refund 모듈 완성 후 처리 예정. eventId=" + event.eventId());
 
-            // walletService.processBatchRefund(event.getEventId());
+            // walletService.processBatchRefund(event.eventId());
             // deduplicationService.markProcessed(toMessageUUID(messageId));
             // ack.acknowledge();
 

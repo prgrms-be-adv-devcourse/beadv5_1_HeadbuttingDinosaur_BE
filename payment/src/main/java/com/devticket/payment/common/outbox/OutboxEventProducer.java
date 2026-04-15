@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.concurrent.ExecutionException;
 import lombok.RequiredArgsConstructor;
+import org.apache.kafka.common.KafkaException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
@@ -35,7 +36,7 @@ public class OutboxEventProducer {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new OutboxPublishException("Kafka 발행 중 인터럽트 발생", e);
-        } catch (ExecutionException e) {
+        } catch (ExecutionException | KafkaException e) {
             throw new OutboxPublishException("Kafka 발행 실패", e);
         }
     }

@@ -1,8 +1,10 @@
 package com.devticket.payment.common.outbox;
 
+import java.time.Instant;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,10 +18,11 @@ public class OutboxScheduler {
     private final OutboxEventProducer outboxEventProducer;
 
     @Scheduled(fixedDelay = 3000)
+    @SchedulerLock(name = "outbox-scheduler", lockAtMostFor = "25s", lockAtLeastFor = "5s")
     @Transactional
     public void publishPendingEvents() {
         List<Outbox> pendingList =
-            outboxRepository.findTop50ByStatusOrderByCreatedAtAsc(OutboxStatus.PENDING);
+            outboxRepository.findPendingForRetry(OutboxStatus.PENDING, Instant.now());
 
         if (pendingList.isEmpty()) {
             return;
@@ -30,9 +33,11 @@ public class OutboxScheduler {
         for (Outbox outbox : pendingList) {
             try {
                 OutboxEventMessage message = OutboxEventMessage.from(outbox);
-                String key = outbox.getAggregateId().toString();
+                String key = outbox.getPartitionKey() != null
+                    ? outbox.getPartitionKey()
+                    : outbox.getAggregateId();
 
-                outboxEventProducer.send(outbox.getEventType(), key, message);
+                outboxEventProducer.send(outbox.getTopic(), key, message);
                 outbox.markSent();
             } catch (OutboxPublishException e) {
                 log.warn("[OutboxScheduler] 이벤트 발행 실패 — outboxId={}, eventType={}, retry={}, error={}",
