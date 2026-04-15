@@ -180,7 +180,7 @@ public class InternalMemberController {
         @ApiResponse(responseCode = "200", description = "조회 성공"),
         @ApiResponse(responseCode = "400", description = "유효하지 않은 요청 파라미터")
     })
-    @GetMapping("/internal/members/batch")
+    @GetMapping("/batch")
     public ResponseEntity<List<InternalMemberInfoResponse>> getMemberInfoBatch(
         @Parameter(description = "조회할 회원 UUID 목록", example = "uuid1,uuid2,uuid3")
         @RequestParam List<UUID> userIds
