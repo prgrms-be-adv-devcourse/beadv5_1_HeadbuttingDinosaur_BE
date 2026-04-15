@@ -444,7 +444,7 @@ class WalletServiceTest {
             UUID chargeId = UUID.randomUUID();
             WalletCharge walletCharge = pendingCharge(chargeId, USER_ID, 10_000);
             given(walletChargeRepository.findByChargeIdForUpdate(chargeId)).willReturn(Optional.of(walletCharge));
-
+            given(walletChargeRepository.findByChargeId(chargeId)).willReturn(Optional.of(walletCharge));
             given(pgPaymentClient.findPaymentByOrderId(chargeId.toString()))
                 .willThrow(new RuntimeException("PG timeout"));
 
@@ -462,7 +462,7 @@ class WalletServiceTest {
             UUID chargeId = UUID.randomUUID();
             WalletCharge walletCharge = pendingCharge(chargeId, USER_ID, 10_000);
             given(walletChargeRepository.findByChargeIdForUpdate(chargeId)).willReturn(Optional.of(walletCharge));
-
+            given(walletChargeRepository.findByChargeId(chargeId)).willReturn(Optional.of(walletCharge));
             given(pgPaymentClient.findPaymentByOrderId(chargeId.toString())).willReturn(Optional.empty());
 
             // when
@@ -482,7 +482,7 @@ class WalletServiceTest {
             Wallet wallet = walletWithBalance(60_000); // 충전 후 잔액
 
             given(walletChargeRepository.findByChargeIdForUpdate(chargeId)).willReturn(Optional.of(walletCharge));
-
+            given(walletChargeRepository.findByChargeId(chargeId)).willReturn(Optional.of(walletCharge));
             given(pgPaymentClient.findPaymentByOrderId(chargeId.toString()))
                 .willReturn(Optional.of(new TossPaymentStatusResponse(
                     paymentKey, chargeId.toString(), "DONE", 10_000, "2024-01-01T12:00:00")));
@@ -509,7 +509,7 @@ class WalletServiceTest {
             WalletCharge walletCharge = pendingCharge(chargeId, USER_ID, 10_000);
 
             given(walletChargeRepository.findByChargeIdForUpdate(chargeId)).willReturn(Optional.of(walletCharge));
-
+            given(walletChargeRepository.findByChargeId(chargeId)).willReturn(Optional.of(walletCharge));
             given(pgPaymentClient.findPaymentByOrderId(chargeId.toString()))
                 .willReturn(Optional.of(new TossPaymentStatusResponse(
                     paymentKey, chargeId.toString(), "DONE", 10_000, "2024-01-01T12:00:00")));
@@ -530,7 +530,7 @@ class WalletServiceTest {
             UUID chargeId = UUID.randomUUID();
             WalletCharge walletCharge = pendingCharge(chargeId, USER_ID, 10_000);
             given(walletChargeRepository.findByChargeIdForUpdate(chargeId)).willReturn(Optional.of(walletCharge));
-
+            given(walletChargeRepository.findByChargeId(chargeId)).willReturn(Optional.of(walletCharge));
             given(pgPaymentClient.findPaymentByOrderId(chargeId.toString()))
                 .willReturn(Optional.of(new TossPaymentStatusResponse(
                     null, chargeId.toString(), "CANCELED", 10_000, null)));
@@ -549,7 +549,7 @@ class WalletServiceTest {
             UUID chargeId = UUID.randomUUID();
             WalletCharge walletCharge = pendingCharge(chargeId, USER_ID, 10_000);
             given(walletChargeRepository.findByChargeIdForUpdate(chargeId)).willReturn(Optional.of(walletCharge));
-
+            given(walletChargeRepository.findByChargeId(chargeId)).willReturn(Optional.of(walletCharge));
             given(pgPaymentClient.findPaymentByOrderId(chargeId.toString()))
                 .willReturn(Optional.of(new TossPaymentStatusResponse(
                     null, chargeId.toString(), "ABORTED", 10_000, null)));
