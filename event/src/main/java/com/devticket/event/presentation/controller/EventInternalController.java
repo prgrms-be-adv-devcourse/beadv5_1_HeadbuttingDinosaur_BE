@@ -6,6 +6,7 @@ import com.devticket.event.domain.enums.EventStatus;
 import com.devticket.event.presentation.dto.internal.InternalBulkEventInfoRequest;
 import com.devticket.event.presentation.dto.internal.InternalBulkEventInfoResponse;
 import com.devticket.event.presentation.dto.internal.InternalBulkStockAdjustmentRequest;
+import com.devticket.event.presentation.dto.internal.InternalPagedEventResponse;
 import com.devticket.event.presentation.dto.internal.InternalStockAdjustmentResponse;
 import com.devticket.event.presentation.dto.internal.InternalEventInfoResponse;
 import com.devticket.event.presentation.dto.internal.InternalPurchaseValidationResponse;
@@ -18,6 +19,7 @@ import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -35,6 +37,18 @@ import org.springframework.web.bind.annotation.RestController;
 public class EventInternalController {
 
     private final EventInternalService eventInternalService;
+
+    @GetMapping
+    public ResponseEntity<SuccessResponse<InternalPagedEventResponse>> getEvents(
+        @RequestParam(required = false) String keyword,
+        @RequestParam(required = false) EventStatus status,
+        @RequestParam(required = false) UUID sellerId,
+        Pageable pageable
+    ) {
+        return ResponseEntity.ok(SuccessResponse.success(
+            eventInternalService.searchEvents(keyword, status, sellerId, pageable)
+        ));
+    }
 
     /**
      * API 1: 단건 이벤트 정보 조회

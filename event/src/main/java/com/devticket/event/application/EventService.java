@@ -73,8 +73,7 @@ public class EventService {
             throw new BusinessException(EventErrorCode.INVALID_EVENT_DATE);
         }
 
-        LocalDateTime deadline = request.saleStartAt().minusDays(3);
-        if (LocalDateTime.now().isAfter(deadline)) {
+        if (request.saleStartAt().isBefore(LocalDateTime.now())) {
             throw new BusinessException(EventErrorCode.REGISTRATION_TIME_EXCEEDED);
         }
 
