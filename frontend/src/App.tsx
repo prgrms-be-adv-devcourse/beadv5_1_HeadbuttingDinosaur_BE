@@ -13,6 +13,10 @@ import Login             from './pages/Login'
 import Signup            from './pages/Signup'
 import NotFound          from './pages/NotFound'
 
+// lazy – 소셜 로그인
+const OAuthCallback       = lazy(() => import('./pages/OAuthCallback'))
+const SocialProfileSetup  = lazy(() => import('./pages/SocialProfileSetup'))
+
 // lazy – 로그인 후 접근
 const SignupComplete      = lazy(() => import('./pages/SignupComplete'))
 const Cart                = lazy(() => import('./pages/Cart'))
@@ -70,6 +74,10 @@ export default function App() {
         <Route path="/login"               element={<Login />} />
         <Route path="/signup"              element={<Signup />} />
         <Route path="/signup/complete"     element={<SignupComplete />} />
+
+        {/* 소셜 로그인 */}
+        <Route path="/oauth/callback"      element={<OAuthCallback />} />
+        <Route path="/social/profile-setup" element={<SocialProfileSetup />} />
 
         {/* 일반 사용자 */}
         <Route element={<Layout />}>

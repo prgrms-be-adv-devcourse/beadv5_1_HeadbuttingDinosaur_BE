@@ -5,15 +5,15 @@ import type { SellerEventItem } from '../../api/types'
 import { useToast } from '../../contexts/ToastContext'
 
 const STATUS_MAP: Record<string, { label: string; cls: string }> = {
-  DRAFT:     { label: '초안',    cls: 'badge-gray' },
-  ON_SALE:   { label: '판매중',  cls: 'badge-green' },
-  SOLD_OUT:  { label: '매진',    cls: 'badge-red' },
-  ENDED:     { label: '종료',    cls: 'badge-gray' },
-  CANCELLED: { label: '취소됨',  cls: 'badge-gray' },
+  DRAFT:          { label: '초안',    cls: 'badge-gray' },
+  ON_SALE:        { label: '판매중',  cls: 'badge-green' },
+  SOLD_OUT:       { label: '매진',    cls: 'badge-red' },
+  SALE_ENDED:     { label: '종료',    cls: 'badge-gray' },
+  CANCELLED:      { label: '취소됨',  cls: 'badge-gray' },
 }
 
-const STATUS_TABS = ['전체', 'ON_SALE', 'ENDED', 'CANCELLED']
-const TAB_LABELS: Record<string, string> = { '전체': '전체', ON_SALE: '판매중', ENDED: '종료', CANCELLED: '취소됨' }
+const STATUS_TABS = ['전체', 'ON_SALE', 'SALE_ENDED', 'CANCELLED']
+const TAB_LABELS: Record<string, string> = { '전체': '전체', ON_SALE: '판매중', SALE_ENDED: '종료', CANCELLED: '취소됨' }
 
 export default function SellerDashboard() {
   const { toast } = useToast()

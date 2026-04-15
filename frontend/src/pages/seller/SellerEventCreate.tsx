@@ -90,11 +90,10 @@ function EventForm({
       if (new Date(form.saleEndAt) >= new Date(form.eventDateTime))
         e.saleEndAt = "판매 종료일은 행사 일시 이전이어야 합니다";
     }
+    
     if (form.saleStartAt) {
-      const minStart = new Date();
-      minStart.setDate(minStart.getDate() + 3);
-      if (new Date(form.saleStartAt) < minStart)
-        e.saleStartAt = "판매 시작일은 오늘로부터 3일 이후여야 합니다";
+      if (new Date(form.saleStartAt) < new Date())
+        e.saleStartAt = '판매 시작일은 현재 시간 이후여야 합니다'
     }
 
     setErrors(e);
@@ -485,6 +484,8 @@ export function SellerEventEdit() {
     await updateSellerEvent(id, {
       title: form.title,
       description: form.description,
+      category: form.category,
+      techStackIds: form.techStacks.map(s => TECH_STACK_MAP[s]).filter(Boolean),
       price: parseInt(form.price) || 0,
       totalQuantity: parseInt(form.totalQuantity),
       maxQuantity: parseInt(form.maxQuantityPerUser) || 1,

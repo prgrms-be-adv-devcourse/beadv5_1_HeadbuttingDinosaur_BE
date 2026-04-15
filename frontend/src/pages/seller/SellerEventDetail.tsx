@@ -23,7 +23,7 @@ export default function SellerEventDetail() {
     ]).then(([ev, sum, part]) => {
       setEvent(ev.data.data)
       setSummary(sum.data.data)
-      setParticipants(part.data.data.content)
+      setParticipants(part.data.content)
     }).catch(() => toast('로드 실패', 'error'))
     .finally(() => setLoading(false))
   }, [id])
@@ -67,7 +67,7 @@ export default function SellerEventDetail() {
           </div>
           <div className="stat-card">
             <div className="stat-label">예상 매출</div>
-            <div className="stat-value">{(summary.totalRevenue / 10000).toFixed(1)}만원</div>
+            {Math.floor(summary.totalSalesAmount * 0.95).toLocaleString()}원
           </div>
         </div>
       )}
@@ -125,11 +125,11 @@ export default function SellerEventDetail() {
             <tbody>
               {filtered.map((p, i) => (
                 <tr key={i}>
-                  <td style={{ fontWeight: 500 }}>{p.nickname}</td>
-                  <td style={{ color: 'var(--text-3)' }}>{p.email}</td>
+                  <td style={{ fontWeight: 500 }}>{p.email}</td> 
+                  <td style={{ fontWeight: 500 }}>{p.userName}</td>
                   <td>{p.quantity}장</td>
                   <td style={{ fontSize: 13, color: 'var(--text-3)' }}>
-                    {new Date(p.orderedAt).toLocaleDateString('ko-KR')}
+                    {new Date(p.purchasedAt).toLocaleDateString('ko-KR')}
                   </td>
                 </tr>
               ))}

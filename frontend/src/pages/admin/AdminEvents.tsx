@@ -24,7 +24,7 @@ export function AdminEvents() {
     setLoading(true)
     try {
       const res = await getAdminEvents({ keyword: keyword || undefined, page: 0, size: 50 })
-      setEvents(res.data.data.content)
+      setEvents(res.data.content)
     } catch { toast('로드 실패', 'error') }
     finally { setLoading(false) }
   }, [keyword])
@@ -234,7 +234,7 @@ export function AdminSettlements() {
     setLoading(true)
     try {
       const res = await getAdminSettlements()
-      setSettlements(res.data.data.content)
+      setSettlements(res.data.content)
     } catch { toast('로드 실패', 'error') }
     finally { setLoading(false) }
   }

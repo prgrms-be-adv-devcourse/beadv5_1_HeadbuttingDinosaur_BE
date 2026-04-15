@@ -269,13 +269,15 @@ export interface SellerEventStopResponse {
   status: string;
 }
 
-export interface SellerEventSummaryResponse {
-  eventId: string;
-  title: string;
-  totalQuantity: number;
-  soldQuantity: number;
-  remainingQuantity: number;
-  totalRevenue: number;
+export interface ParticipantItem {
+  ticketId: string
+  orderId: string
+  userId: string
+  nickname: string
+  email: string
+  quantity: number
+  purchasedAt: string
+  orderNumber: string
 }
 
 export interface SellerEventParticipantListRequest {
@@ -284,11 +286,13 @@ export interface SellerEventParticipantListRequest {
   keyword?: string;
 }
 export interface ParticipantItem {
-  userId: string;
-  nickname: string;
-  email: string;
-  quantity: number;
-  orderedAt: string;
+  ticketId: string
+  orderId: string
+  userId: string
+  userName: string
+  email: string
+  purchasedAt: string
+  orderNumber: string
 }
 export interface SellerEventParticipantListResponse {
   content: ParticipantItem[];
@@ -592,15 +596,17 @@ export interface RefundDetailResponse {
 
 // ── Seller Settlement ─────────────────────────────────────────────────────────
 export interface SettlementItem {
-  settlementId: string;
-  eventId: string;
-  eventTitle: string;
-  settledAmount: number;
-  feeAmount: number;
-  netAmount: number;
-  status: string;
-  settledAt: string;
+  settlementId: string
+  periodStart: string
+  periodEnd: string
+  totalSalesAmount: number
+  totalRefundAmount: number
+  totalFeeAmount: number
+  finalSettlementAmount: number
+  status: string
+  settledAt: string | null
 }
+
 export interface SettlementResponse {
   content: SettlementItem[];
   page: number;

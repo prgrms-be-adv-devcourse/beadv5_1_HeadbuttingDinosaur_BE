@@ -27,7 +27,7 @@ export default function AdminUsers() {
     setLoading(true)
     try {
       const res = await getAdminUsers({ keyword: keyword || undefined, role: roleFilter || undefined, page: 0, size: 50 })
-      setUsers(res.data.data.content)
+      setUsers(res.data.content)
     } catch { toast('로드 실패', 'error') }
     finally { setLoading(false) }
   }, [keyword, roleFilter])
