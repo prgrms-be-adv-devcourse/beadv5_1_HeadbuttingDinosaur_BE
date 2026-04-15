@@ -592,15 +592,17 @@ export interface RefundDetailResponse {
 
 // ── Seller Settlement ─────────────────────────────────────────────────────────
 export interface SettlementItem {
-  settlementId: string;
-  eventId: string;
-  eventTitle: string;
-  settledAmount: number;
-  feeAmount: number;
-  netAmount: number;
-  status: string;
-  settledAt: string;
+  settlementId: string
+  periodStart: string
+  periodEnd: string
+  totalSalesAmount: number
+  totalRefundAmount: number
+  totalFeeAmount: number
+  finalSettlementAmount: number
+  status: string
+  settledAt: string | null
 }
+
 export interface SettlementResponse {
   content: SettlementItem[];
   page: number;

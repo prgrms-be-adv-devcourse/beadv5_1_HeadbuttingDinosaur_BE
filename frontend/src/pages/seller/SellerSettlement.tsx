@@ -15,15 +15,15 @@ export default function SellerSettlement() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    getSellerSettlements()
-      .then(r => setSettlements(r.data.data.content))
-      .catch(() => toast('로드 실패', 'error'))
-      .finally(() => setLoading(false))
-  }, [])
+  getSellerSettlements()
+    .then(r => setSettlements(r.data))  // 직접 배열 반환
+    .catch(() => toast('로드 실패', 'error'))
+    .finally(() => setLoading(false))
+}, [])
 
-  const totalNet = settlements.reduce((acc, s) => acc + s.netAmount, 0)
-  const totalFee = settlements.reduce((acc, s) => acc + s.feeAmount, 0)
-  const totalGross = settlements.reduce((acc, s) => acc + s.settledAmount, 0)
+const totalGross = settlements.reduce((acc, s) => acc + s.totalSalesAmount, 0)
+const totalFee = settlements.reduce((acc, s) => acc + s.totalFeeAmount, 0)
+const totalNet = settlements.reduce((acc, s) => acc + s.finalSettlementAmount, 0)
 
   return (
     <div style={{ padding: '32px 36px' }}>
@@ -79,14 +79,11 @@ export default function SellerSettlement() {
                 return (
                   <tr key={s.settlementId}>
                     <td>
-                      <div style={{ fontWeight: 500 }}>{s.eventTitle}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text-4)', fontFamily: 'var(--font-mono)' }}>
-                        #{s.eventId.slice(0, 10)}
-                      </div>
+                      <div style={{ fontWeight: 500 }}>{s.periodStart} ~ {s.periodEnd}</div>
                     </td>
-                    <td style={{ textAlign: 'right', fontWeight: 500 }}>{s.settledAmount.toLocaleString()}원</td>
-                    <td style={{ textAlign: 'right', color: 'var(--danger)' }}>−{s.feeAmount.toLocaleString()}원</td>
-                    <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--brand)' }}>{s.netAmount.toLocaleString()}원</td>
+                    <td style={{ textAlign: 'right', fontWeight: 500 }}>{s.totalSalesAmount.toLocaleString()}원</td>
+                    <td style={{ textAlign: 'right', color: 'var(--danger)' }}>−{s.totalFeeAmount.toLocaleString()}원</td>
+                    <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--brand)' }}>{s.finalSettlementAmount.toLocaleString()}원</td>
                     <td><span className={`badge ${status.cls}`}>{status.label}</span></td>
                     <td style={{ fontSize: 13, color: 'var(--text-3)' }}>
                       {s.settledAt ? new Date(s.settledAt).toLocaleDateString('ko-KR') : '—'}
