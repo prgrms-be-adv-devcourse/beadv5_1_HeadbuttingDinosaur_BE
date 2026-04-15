@@ -33,11 +33,7 @@ class OutboxRepositoryTest {
 
         // when
         List<Outbox> found = outboxRepository
-                .findTop50ByStatusAndNextRetryAtIsNullOrStatusAndNextRetryAtBeforeOrderByCreatedAtAsc(
-                        OutboxStatus.PENDING,
-                        OutboxStatus.PENDING,
-                        now
-                );
+                .findPendingToPublish(OutboxStatus.PENDING, now);
 
         // then
         assertThat(found).hasSize(2);
