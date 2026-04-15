@@ -1,5 +1,6 @@
 package com.devticket.event.application;
 
+import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch._types.FieldValue;
 import co.elastic.clients.elasticsearch._types.query_dsl.BoolQuery;
 import co.elastic.clients.elasticsearch._types.query_dsl.Query;
@@ -10,6 +11,7 @@ import com.devticket.event.domain.model.Event;
 import com.devticket.event.domain.model.EventImage;
 import com.devticket.event.domain.model.EventTechStack;
 import com.devticket.event.infrastructure.client.MemberClient;
+import com.devticket.event.infrastructure.client.OpenAiEmbeddingClient;
 import com.devticket.event.infrastructure.client.dto.TechStackItem;
 import com.devticket.event.infrastructure.persistence.EventRepository;
 import com.devticket.event.infrastructure.search.EventDocument;
@@ -24,7 +26,13 @@ import com.devticket.event.presentation.dto.SellerEventDetailResponse;
 import com.devticket.event.presentation.dto.SellerEventSummaryResponse;
 import com.devticket.event.presentation.dto.SellerEventUpdateRequest;
 import com.devticket.event.presentation.dto.SellerEventUpdateResponse;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.StringReader;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -33,9 +41,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.data.elasticsearch.client.elc.NativeQuery;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.SearchHits;
@@ -51,6 +57,8 @@ public class EventService {
     private final MemberClient memberClient;
     private final EventSearchRepository eventSearchRepository;
     private final ElasticsearchOperations elasticsearchOperations;
+    private final ElasticsearchClient esClient;
+    private final OpenAiEmbeddingClient openAiEmbeddingClient;
 
     private static final Set<String> ALLOWED_SORT_FIELDS = Set.of("createdAt", "price", "eventDateTime");
 
@@ -143,11 +151,12 @@ public class EventService {
         NativeQuery query = buildSearchQuery(request, allowedStatuses, pageable);
         SearchHits<EventDocument> searchHits = elasticsearchOperations.search(query, EventDocument.class);
 
-        List<UUID> pageEventIds = searchHits.stream()
-            .map(hit -> UUID.fromString(hit.getContent().getId()))
+        // ES 결과를 String ID 기준으로 순서 유지
+        List<String> rawIds = searchHits.stream()
+            .map(hit -> hit.getContent().getId())
             .toList();
 
-        if (pageEventIds.isEmpty()) {
+        if (rawIds.isEmpty()) {
             return new EventListResponse(
                 List.of(),
                 pageable.getPageNumber(),
@@ -157,24 +166,44 @@ public class EventService {
             );
         }
 
-        // N+1 방지: JPA로 상세 데이터 일괄 로드
-        List<Event> hydratedEvents = eventRepository.findAllWithDetailsByEventIdIn(pageEventIds);
-        List<Event> imageEvents = eventRepository.findEventImagesByEventIdIn(pageEventIds);
-
-        Map<UUID, Event> hydratedById = hydratedEvents.stream()
-            .collect(Collectors.toMap(Event::getEventId, e -> e));
-        Map<UUID, Event> imagesById = imageEvents.stream()
-            .collect(Collectors.toMap(Event::getEventId, e -> e));
-
-        // ES 결과 순서 유지
-        List<EventListContentResponse> content = pageEventIds.stream()
+        // UUID로 변환 가능한 ID만 DB 조회에 사용
+        List<UUID> uuidIds = rawIds.stream()
             .map(id -> {
-                Event hydrated = hydratedById.get(id);
-                if (hydrated == null) {
-                    return null;
-                }
-                Event withImages = imagesById.getOrDefault(id, hydrated);
-                return EventListContentResponse.from(withImages);
+                try { return UUID.fromString(id); }
+                catch (IllegalArgumentException e) { return null; }
+            })
+            .filter(id -> id != null)
+            .toList();
+
+        Map<UUID, Event> hydratedById = Collections.emptyMap();
+        Map<UUID, Event> imagesById = Collections.emptyMap();
+        if (!uuidIds.isEmpty()) {
+            hydratedById = eventRepository.findAllWithDetailsByEventIdIn(uuidIds).stream()
+                .collect(Collectors.toMap(Event::getEventId, e -> e));
+            imagesById = eventRepository.findEventImagesByEventIdIn(uuidIds).stream()
+                .collect(Collectors.toMap(Event::getEventId, e -> e));
+        }
+
+        // ES 문서 Map (DB fallback용)
+        Map<String, EventDocument> esDocById = searchHits.stream()
+            .collect(Collectors.toMap(hit -> hit.getContent().getId(), hit -> hit.getContent()));
+
+        final Map<UUID, Event> finalHydratedById = hydratedById;
+        final Map<UUID, Event> finalImagesById = imagesById;
+
+        // ES 결과 순서 유지, DB에 있으면 DB 우선 / 없으면 ES fallback
+        List<EventListContentResponse> content = rawIds.stream()
+            .map(rawId -> {
+                try {
+                    UUID uuid = UUID.fromString(rawId);
+                    Event hydrated = finalHydratedById.get(uuid);
+                    if (hydrated != null) {
+                        Event withImages = finalImagesById.getOrDefault(uuid, hydrated);
+                        return EventListContentResponse.from(withImages);
+                    }
+                } catch (IllegalArgumentException ignored) {}
+                EventDocument doc = esDocById.get(rawId);
+                return doc != null ? EventListContentResponse.from(doc) : null;
             })
             .filter(Objects::nonNull)
             .toList();
@@ -312,10 +341,71 @@ public class EventService {
         return SellerEventUpdateResponse.from(event);
     }
 
-    // ES 동기화 실패가 핵심 비즈니스 흐름에 영향을 주지 않도록 예외 격리
+    /**
+     * Spring Data ES 컨버터를 완전히 우회하고 esClient.index()로 직접 인덱싱.
+     * dense_vector(embedding)은 Spring Data ES 컨버터가 직렬화하지 못하므로
+     * Map<String, Object>로 전체 문서를 구성해서 ES REST API에 직접 전송.
+     */
     private void syncToElasticsearch(Event event) {
         try {
-            eventSearchRepository.save(EventDocument.from(event));
+            List<String> techStackNames = event.getEventTechStacks().stream()
+                .map(EventTechStack::getTechStackName)
+                .toList();
+
+            String embeddingText = techStackNames.isEmpty()
+                ? event.getTitle() + ". Category: " + event.getCategory().name()
+                : event.getTitle() + ". Category: " + event.getCategory().name()
+                    + ". Tech Stacks: " + String.join(", ", techStackNames);
+
+            Map<String, Object> doc = new HashMap<>();
+            doc.put("id", event.getEventId().toString());
+            doc.put("title", event.getTitle());
+            doc.put("category", event.getCategory().name());
+            doc.put("techStacks", techStackNames);
+            doc.put("status", event.getStatus().name());
+            // mapping의 date_hour_minute_second 형식에 맞춤 (나노초 제외)
+            doc.put("indexedAt", LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")));
+
+            float[] vector = openAiEmbeddingClient.embed(embeddingText);
+            if (vector != null) {
+                log.debug("[1] Vector 생성 완료: 차원={}, 첫 5개 값={}", vector.length,
+                    java.util.Arrays.toString(java.util.Arrays.copyOf(vector, Math.min(5, vector.length))));
+
+                List<Float> vectorList = new ArrayList<>(vector.length);
+                for (float v : vector) vectorList.add(v);
+
+                log.debug("[2] vectorList 생성 완료: 크기={}, 첫 5개 값={}", vectorList.size(),
+                    vectorList.subList(0, Math.min(5, vectorList.size())));
+
+                doc.put("embedding", vectorList);
+                log.debug("[3] doc에 embedding 추가 완료. doc 키들: {}", doc.keySet());
+            } else {
+                log.warn("[Embedding 생략] eventId: {}", event.getEventId());
+            }
+
+            // Jackson으로 직렬화 후 withJson()으로 전송
+            ObjectMapper objectMapper = new ObjectMapper();
+            String json = objectMapper.writeValueAsString(doc);
+
+            log.debug("[4] JSON 직렬화 완료: 길이={}", json.length());
+            log.debug("[4-1] JSON (처음 500자): {}", json.substring(0, Math.min(500, json.length())));
+
+            // embedding이 JSON에 포함되어 있는지 확인
+            if (json.contains("\"embedding\"")) {
+                log.debug("[5] ✓ JSON에 embedding 필드 포함됨");
+                int embeddingStart = json.indexOf("\"embedding\"");
+                int embeddingEnd = json.indexOf("]", embeddingStart) + 1;
+                log.debug("[5-1] embedding 값: {}", json.substring(embeddingStart, Math.min(embeddingEnd + 100, json.length())));
+            } else {
+                log.warn("[5] ✗ JSON에 embedding 필드가 없음!");
+            }
+
+            esClient.index(i -> i
+                .index("event")
+                .id(event.getEventId().toString())
+                .withJson(new StringReader(json)));
+
+            log.debug("[ES 동기화 완료] eventId: {}", event.getEventId());
         } catch (Exception e) {
             log.warn("[ES 동기화 실패] eventId: {}", event.getEventId(), e);
         }
@@ -324,69 +414,46 @@ public class EventService {
     private NativeQuery buildSearchQuery(
         EventListRequest request, List<EventStatus> allowedStatuses, Pageable pageable) {
 
-        BoolQuery.Builder boolQuery = new BoolQuery.Builder();
+        var queryBuilder = NativeQuery.builder();
 
-        // 키워드: title, description 대상 multi_match
+        // kNN 벡터 검색 (키워드가 있을 때)
         if (request.keyword() != null && !request.keyword().isBlank()) {
-            boolQuery.must(Query.of(q -> q
-                .multiMatch(m -> m
-                    .fields("title", "description")
-                    .query(request.keyword()))));
+            float[] queryVector = openAiEmbeddingClient.embed(request.keyword());
+            if (queryVector != null) {
+                List<Float> vectorList = new ArrayList<>();
+                for (float v : queryVector) vectorList.add(v);
+                queryBuilder.withQuery(Query.of(q -> q
+                    .knn(k -> k
+                        .field("embedding")
+                        .queryVector(vectorList)
+                        .k(30)
+                        .numCandidates(50))));
+            }
         }
 
-        // 카테고리 필터
-        if (request.category() != null) {
-            boolQuery.filter(Query.of(q -> q
-                .term(t -> t.field("category").value(request.category().name()))));
-        }
+        // 필터 (category, status)
+        var filterQuery = new BoolQuery.Builder();
 
-        // 상태 필터
         if (allowedStatuses != null && !allowedStatuses.isEmpty()) {
             List<FieldValue> statusValues = allowedStatuses.stream()
                 .map(s -> FieldValue.of(s.name()))
                 .toList();
-            boolQuery.filter(Query.of(q -> q
+            filterQuery.filter(Query.of(q -> q
                 .terms(t -> t.field("status").terms(tv -> tv.value(statusValues)))));
         }
 
-        // 판매자 필터
-        if (request.sellerId() != null) {
-            boolQuery.filter(Query.of(q -> q
-                .term(t -> t.field("sellerId").value(request.sellerId().toString()))));
+        if (request.category() != null) {
+            filterQuery.filter(Query.of(q -> q
+                .term(t -> t.field("category").value(request.category().name()))));
         }
 
-        // 기술스택 필터 (Nested)
-        if (request.techStacks() != null && !request.techStacks().isEmpty()) {
-            List<Query> techStackShoulds = request.techStacks().stream()
-                .map(techStackId -> Query.of(q -> q
-                    .nested(n -> n.path("techStacks")
-                        .query(nq -> nq.term(t -> t
-                            .field("techStacks.techStackId")
-                            .value(techStackId))))))
-                .toList();
-            boolQuery.filter(Query.of(q -> q
-                .bool(b -> b.should(techStackShoulds).minimumShouldMatch("1"))));
-        }
+        queryBuilder
+            .withFilter(Query.of(q -> q.bool(filterQuery.build())))
+            .withPageable(pageable);
 
-        // 정렬: 지정 없으면 최신순 기본 적용
-        Sort sort;
-        if (pageable.getSort().isSorted()) {
-            List<Sort.Order> validOrders = pageable.getSort().stream()
-                .filter(order -> ALLOWED_SORT_FIELDS.contains(order.getProperty()))
-                .toList();
-            sort = validOrders.isEmpty()
-                ? Sort.by(Sort.Direction.DESC, "createdAt")
-                : Sort.by(validOrders);
-        } else {
-            sort = Sort.by(Sort.Direction.DESC, "createdAt");
-        }
-
-
-
-        return NativeQuery.builder()
-            .withQuery(Query.of(q -> q.bool(boolQuery.build())))
-            .withPageable(PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sort))
-            .build();
+        return queryBuilder.build();
     }
+
+
 
 }

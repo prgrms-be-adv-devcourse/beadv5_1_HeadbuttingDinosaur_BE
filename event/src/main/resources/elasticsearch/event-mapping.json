@@ -1,0 +1,25 @@
+{
+  "properties": {
+    "title": {
+      "type": "text"
+    },
+    "category": {
+      "type": "keyword"
+    },
+    "techStacks": {
+      "type": "keyword"
+    },
+    "status": {
+      "type": "keyword"
+    },
+    "embedding": {
+      "type": "dense_vector",
+      "dims": 1536,
+      "index": true,
+      "similarity": "cosine"
+    },
+    "indexedAt": {
+      "type": "date"
+    }
+  }
+}

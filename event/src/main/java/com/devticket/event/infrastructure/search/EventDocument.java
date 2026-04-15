@@ -1,17 +1,16 @@
 package com.devticket.event.infrastructure.search;
 
 import java.time.LocalDateTime;
-import java.util.Comparator;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.data.annotation.Id;
-import org.springframework.data.elasticsearch.annotations.DateFormat;
 import org.springframework.data.elasticsearch.annotations.Document;
 import org.springframework.data.elasticsearch.annotations.Field;
 import org.springframework.data.elasticsearch.annotations.FieldType;
+import org.springframework.data.elasticsearch.annotations.Mapping;
 
 import com.devticket.event.domain.model.Event;
-import com.devticket.event.domain.model.EventImage;
 
 import lombok.Builder;
 import lombok.Getter;
@@ -19,7 +18,8 @@ import lombok.NoArgsConstructor;
 
 @Getter
 @NoArgsConstructor
-@Document(indexName = "event")
+@Document(indexName = "event", createIndex = false)
+@Mapping(mappingPath = "elasticsearch/event-mapping.json")
 public class EventDocument {
 
     @Id
@@ -28,108 +28,58 @@ public class EventDocument {
     @Field(type = FieldType.Text)
     private String title;
 
-    @Field(type = FieldType.Text)
-    private String description;
-
-    @Field(type = FieldType.Keyword)
-    private String location;
-
     @Field(type = FieldType.Keyword)
     private String category;
 
     @Field(type = FieldType.Keyword)
+    private List<String> techStacks;
+
+    @Field(type = FieldType.Keyword)
     private String status;
 
-    @Field(type = FieldType.Keyword)
-    private String sellerId;
+    /**
+     * 1536차원 embedding 벡터.
+     * Spring Data ES 컨버터가 dense_vector를 직렬화하지 못하므로
+     * EventService.updateEmbeddingField()에서 esClient partial update로 저장.
+     */
+    private List<Float> embedding;
 
-    @Field(type = FieldType.Integer)
-    private Integer price;
-
-    @Field(type = FieldType.Date, format = DateFormat.date_hour_minute_second)
-    private LocalDateTime eventDateTime;
-
-    @Field(type = FieldType.Date, format = DateFormat.date_hour_minute_second)
-    private LocalDateTime saleStartAt;
-
-    @Field(type = FieldType.Date, format = DateFormat.date_hour_minute_second)
-    private LocalDateTime saleEndAt;
-
-    @Field(type = FieldType.Date, format = DateFormat.date_hour_minute_second)
-    private LocalDateTime createdAt;
-
-    @Field(type = FieldType.Keyword)
-    private String thumbnailUrl;
-
-    @Field(type = FieldType.Nested)
-    private List<TechStackDocument> techStacks;
+    @Field(type = FieldType.Date, format = {}, pattern = "yyyy-MM-dd'T'HH:mm:ss[.SSSSSS]")
+    private LocalDateTime indexedAt;
 
     @Builder
-    private EventDocument(String id, String title, String description, String location,
-        String category, String status, String sellerId, Integer price,
-        LocalDateTime eventDateTime, LocalDateTime saleStartAt, LocalDateTime saleEndAt,
-        LocalDateTime createdAt, String thumbnailUrl, List<TechStackDocument> techStacks) {
+    private EventDocument(String id, String title, String category, List<String> techStacks,
+        String status, LocalDateTime indexedAt) {
         this.id = id;
         this.title = title;
-        this.description = description;
-        this.location = location;
         this.category = category;
-        this.status = status;
-        this.sellerId = sellerId;
-        this.price = price;
-        this.eventDateTime = eventDateTime;
-        this.saleStartAt = saleStartAt;
-        this.saleEndAt = saleEndAt;
-        this.createdAt = createdAt;
-        this.thumbnailUrl = thumbnailUrl;
         this.techStacks = techStacks;
-    }
-
-    @Getter
-    @NoArgsConstructor
-    public static class TechStackDocument {
-
-        @Field(type = FieldType.Long)
-        private Long techStackId;
-
-        @Field(type = FieldType.Keyword)
-        private String techStackName;
-
-        @Builder
-        private TechStackDocument(Long techStackId, String techStackName) {
-            this.techStackId = techStackId;
-            this.techStackName = techStackName;
-        }
+        this.status = status;
+        this.indexedAt = indexedAt;
     }
 
     public static EventDocument from(Event event) {
-        String thumbnail = event.getEventImages().stream()
-            .min(Comparator.comparingInt(EventImage::getSortOrder))
-            .map(EventImage::getImageUrl)
-            .orElse(null);
-
-        List<TechStackDocument> techStacks = event.getEventTechStacks().stream()
-            .map(ts -> TechStackDocument.builder()
-                .techStackId(ts.getTechStackId())
-                .techStackName(ts.getTechStackName())
-                .build())
+        List<String> techStackNames = event.getEventTechStacks().stream()
+            .map(ts -> ts.getTechStackName())
             .toList();
 
         return EventDocument.builder()
             .id(event.getEventId().toString())
             .title(event.getTitle())
-            .description(event.getDescription())
-            .location(event.getLocation())
             .category(event.getCategory().name())
+            .techStacks(techStackNames)
             .status(event.getStatus().name())
-            .sellerId(event.getSellerId().toString())
-            .price(event.getPrice())
-            .eventDateTime(event.getEventDateTime())
-            .saleStartAt(event.getSaleStartAt())
-            .saleEndAt(event.getSaleEndAt())
-            .createdAt(event.getCreatedAt())
-            .thumbnailUrl(thumbnail)
-            .techStacks(techStacks)
+            .indexedAt(LocalDateTime.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS))
             .build();
+    }
+
+    public void setEmbedding(float[] vector) {
+        if (vector == null) {
+            this.embedding = null;
+            return;
+        }
+        List<Float> list = new ArrayList<>(vector.length);
+        for (float v : vector) list.add(v);
+        this.embedding = list;
     }
 }

@@ -21,7 +21,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/events")
+@RequestMapping({"/api/events", "/api/seller/events"})
 @RequiredArgsConstructor
 public class EventController {
 
