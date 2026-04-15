@@ -15,7 +15,7 @@ import org.springframework.data.elasticsearch.annotations.FieldType;
 public class UserVector {
 
     @Id
-    private String id;
+    private String userId;
 
     // ============ 장기 취향 벡터 ============ //
     private float[] preferenceVector;
