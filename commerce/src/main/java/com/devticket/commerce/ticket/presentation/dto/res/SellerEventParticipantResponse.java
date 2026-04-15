@@ -7,6 +7,7 @@ public record SellerEventParticipantResponse(
     String userId,
     String userName,
     String email,
+    int quantity,
     String purchasedAt,
     String orderNumber
 ) {
@@ -17,10 +18,11 @@ public record SellerEventParticipantResponse(
         String userId,
         String userName,
         String email,
+        int quantity,
         String purchasedAt,
         String orderNumber) {
         return new SellerEventParticipantResponse(
-            ticketId, orderId, userId, userName, email, purchasedAt, orderNumber
+            ticketId, orderId, userId, userName, email, quantity, purchasedAt, orderNumber
         );
     }
 
