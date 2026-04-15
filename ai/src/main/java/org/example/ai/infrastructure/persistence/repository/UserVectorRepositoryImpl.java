@@ -1,5 +1,7 @@
 package org.example.ai.infrastructure.persistence.repository;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.example.ai.domain.model.UserVector;
@@ -21,5 +23,12 @@ public class UserVectorRepositoryImpl implements UserVectorRepository {
     @Override
     public UserVector save(UserVector userVector) {
         return userVectorESRepository.save(userVector);
+    }
+
+    @Override
+    public List<UserVector> findAll() {
+        List<UserVector> result = new ArrayList<>();
+        userVectorESRepository.findAll().forEach(result::add);
+        return result;
     }
 }
