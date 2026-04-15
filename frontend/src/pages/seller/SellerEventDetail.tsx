@@ -23,7 +23,7 @@ export default function SellerEventDetail() {
     ]).then(([ev, sum, part]) => {
       setEvent(ev.data.data)
       setSummary(sum.data.data)
-      setParticipants(part.data.data.content)
+      setParticipants(part.data.content)
     }).catch(() => toast('로드 실패', 'error'))
     .finally(() => setLoading(false))
   }, [id])
@@ -67,7 +67,7 @@ export default function SellerEventDetail() {
           </div>
           <div className="stat-card">
             <div className="stat-label">예상 매출</div>
-            <div className="stat-value">{(summary.totalRevenue / 10000).toFixed(1)}만원</div>
+            <div className="stat-value">{summary.totalSalesAmount >= 1 ? `${Number.isInteger(summary.totalSalesAmount) ? summary.totalSalesAmount : summary.totalSalesAmount.toFixed(1)}만` : summary.totalSalesAmount.toLocaleString()}만원</div>
           </div>
         </div>
       )}

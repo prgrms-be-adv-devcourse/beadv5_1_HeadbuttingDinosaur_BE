@@ -287,6 +287,8 @@ export function SellerEventEdit() {
     await updateSellerEvent(id, {
       title: form.title,
       description: form.description,
+      category: form.category,
+      techStackIds: form.techStacks.map(s => TECH_STACK_MAP[s]).filter(Boolean),
       price: parseInt(form.price) || 0,
       totalQuantity: parseInt(form.totalQuantity),
       maxQuantity: parseInt(form.maxQuantityPerUser) || 1,
