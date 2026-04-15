@@ -55,7 +55,7 @@ public class EventEmbeddingRepositoryImpl implements EventEmbeddingRepository {
 
         } catch (Exception e) {
             log.error("[ES] event embedding 조회 실패 - eventId: {}", eventId, e);
-            return Optional.empty();
+            throw new RuntimeException("[ES] event embedding 조회 실패 - eventId: " + eventId, e);
         }
 
 

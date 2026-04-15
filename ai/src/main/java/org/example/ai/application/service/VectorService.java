@@ -73,8 +73,8 @@ public class VectorService {
             weight
         );
 
-        // 가중합
-        float newWeightSum = getWeightSum(userVector, vectorType) + weight;
+        // 가중합(0 이하가 되지 않게 처리)
+        float newWeightSum = Math.max(0, getWeightSum(userVector, vectorType) + weight);
 
         // 갱신된 벡터로 저장
         UserVector updated = buildUpdatedUserVector(userVector, vectorType, updatedVector, newWeightSum);
@@ -88,6 +88,11 @@ public class VectorService {
         float[] result = new float[current.length];
         float totalWeight = currentWeightSum + weight;
 
+        // totalWeight가 0 이하 -> vector 초기화
+        if(totalWeight <= 0){
+            return new float[current.length];
+        }
+
         for(int i = 0; i < current.length; i++){
             result[i] = (current[i] * currentWeightSum + eventEmbedding[i] * weight) / totalWeight;
         }
@@ -96,9 +101,12 @@ public class VectorService {
 
     private float[] getVector(UserVector userVector, String vectorType){
         return switch (vectorType){
-            case "preference" -> userVector.getPreferenceVector();
-            case "cart"       -> userVector.getCartVector();
-            case "negative"   -> userVector.getNegativeVector();
+            case "preference" -> userVector.getPreferenceVector() != null
+                ? userVector.getPreferenceVector() : new float[1536];
+            case "cart"       -> userVector.getCartVector() != null
+                ? userVector.getCartVector() : new float[1536];
+            case "negative"   -> userVector.getNegativeVector() != null
+                ? userVector.getNegativeVector() : new float[1536];
             default -> throw new IllegalArgumentException("알 수 없는 vectorType: " + vectorType);
         };
     }
