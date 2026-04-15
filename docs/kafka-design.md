@@ -370,17 +370,23 @@ CREATE TABLE shedlock (
 
 ```java
 @Scheduled(fixedDelay = 3000)
-@SchedulerLock(name = "outbox-scheduler", lockAtMostFor = "25s", lockAtLeastFor = "5s")
+@SchedulerLock(name = "outbox-scheduler", lockAtMostFor = "30s", lockAtLeastFor = "5s")
 public void publishPendingEvents() { ... }
 ```
 
-스케줄러 쿼리: `next_retry_at <= now()` 조건 추가
+스케줄러 쿼리: `next_retry_at IS NULL OR next_retry_at < now` 조건을 `@Query`로 명시
 
 ```java
 // OutboxRepository
-List<Outbox> findTop50ByStatusAndNextRetryAtBeforeOrNextRetryAtIsNullOrderByCreatedAtAsc(
-    OutboxStatus status, Instant now
-);
+// 메서드명 기반 쿼리는 OR 절에 status 조건이 누락되어 SENT 레코드까지 포함되는 버그 발생 — @Query로 명시
+@Query("""
+        SELECT o FROM Outbox o
+        WHERE o.status = :status
+          AND (o.nextRetryAt IS NULL OR o.nextRetryAt < :now)
+        ORDER BY o.createdAt ASC
+        LIMIT 50
+        """)
+List<Outbox> findPendingToPublish(@Param("status") OutboxStatus status, @Param("now") Instant now);
 ```
 
 ---
