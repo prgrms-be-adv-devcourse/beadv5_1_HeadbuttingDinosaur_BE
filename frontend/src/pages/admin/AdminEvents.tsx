@@ -234,7 +234,7 @@ export function AdminSettlements() {
     setLoading(true)
     try {
       const res = await getAdminSettlements()
-      setSettlements(res.data.data.content)
+      setSettlements(res.data.content)
     } catch { toast('로드 실패', 'error') }
     finally { setLoading(false) }
   }
