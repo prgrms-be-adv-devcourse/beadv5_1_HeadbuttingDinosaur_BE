@@ -5,6 +5,8 @@ import static org.awaitility.Awaitility.await;
 
 import java.time.Duration;
 import java.util.Map;
+import java.util.Optional;
+import net.javacrumbs.shedlock.core.LockProvider;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -15,6 +17,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.test.EmbeddedKafkaBroker;
 import org.springframework.kafka.test.context.EmbeddedKafka;
@@ -22,7 +27,7 @@ import org.springframework.kafka.test.utils.KafkaTestUtils;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 
-@SpringBootTest
+@SpringBootTest(properties = "spring.main.allow-bean-definition-overriding=true")
 @ActiveProfiles("test")
 @DirtiesContext
 @EmbeddedKafka(
@@ -31,6 +36,16 @@ import org.springframework.test.context.ActiveProfiles;
         bootstrapServersProperty = "spring.kafka.bootstrap-servers"
 )
 class OutboxSchedulerIntegrationTest {
+
+    @TestConfiguration
+    static class TestConfig {
+        @Bean
+        @Primary
+        public LockProvider lockProvider() {
+            // 테스트에서는 ShedLock 테이블 없이 항상 lock 획득 성공
+            return lockConfig -> Optional.of(() -> {});
+        }
+    }
 
     @Autowired
     private OutboxRepository outboxRepository;
