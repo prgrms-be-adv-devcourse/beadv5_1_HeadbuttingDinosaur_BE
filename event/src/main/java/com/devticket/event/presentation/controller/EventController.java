@@ -27,23 +27,10 @@ public class EventController {
 
     private final EventService eventService;
 
-    @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public SuccessResponse<SellerEventCreateResponse> createEvent(
-        @RequestHeader("X-User-Id") UUID sellerId,
-        @Valid @RequestBody SellerEventCreateRequest request) {
-
-        SellerEventCreateResponse response = eventService.createEvent(sellerId, request);
-
-        return SuccessResponse.success(response);
-    }
-
     @GetMapping("/{eventId}")
     public ResponseEntity<SuccessResponse<EventDetailResponse>> getEvent(
         @PathVariable("eventId") UUID eventId) {
-
         EventDetailResponse response = eventService.getEvent(eventId);
-
         return ResponseEntity.ok(SuccessResponse.success(response));
     }
 
@@ -52,36 +39,7 @@ public class EventController {
         @RequestHeader(value = "X-User-Id", required = false) UUID currentUserId,
         @ModelAttribute EventListRequest request,
         @PageableDefault(size = 20) Pageable pageable) {
-
         EventListResponse response = eventService.getEventList(request, currentUserId, pageable);
-        return ResponseEntity.ok(SuccessResponse.success(response));
-    }
-
-    @GetMapping("/seller/{eventId}")
-    public ResponseEntity<SuccessResponse<SellerEventDetailResponse>> getSellerEventDetail(
-        @RequestHeader("X-User-Id") UUID sellerId,
-        @PathVariable UUID eventId) {
-
-        SellerEventDetailResponse response = eventService.getSellerEventDetail(sellerId, eventId);
-        return ResponseEntity.ok(SuccessResponse.success(response));
-    }
-
-    @GetMapping("/{eventId}/statistics")
-    public ResponseEntity<SuccessResponse<SellerEventSummaryResponse>> getEventSummary(
-        @RequestHeader("X-User-Id") UUID sellerId,
-        @PathVariable("eventId") UUID eventId) {
-
-        SellerEventSummaryResponse response = eventService.getEventSummary(sellerId, eventId);
-        return ResponseEntity.ok(SuccessResponse.success(response));
-    }
-
-    @PatchMapping("/{eventId}")
-    public ResponseEntity<SuccessResponse<SellerEventUpdateResponse>> updateEvent(
-        @RequestHeader("X-User-Id") UUID sellerId,
-        @PathVariable("eventId") UUID eventId,
-        @RequestBody SellerEventUpdateRequest request) {
-
-        SellerEventUpdateResponse response = eventService.updateEvent(sellerId, eventId, request);
         return ResponseEntity.ok(SuccessResponse.success(response));
     }
 

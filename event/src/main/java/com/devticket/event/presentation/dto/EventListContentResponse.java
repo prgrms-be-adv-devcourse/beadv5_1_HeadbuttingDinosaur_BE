@@ -19,18 +19,18 @@ public record EventListContentResponse(
     Integer price,
     EventStatus status,
     List<String> techStacks,
-    LocalDateTime saleEndAt
+    LocalDateTime saleEndAt,
+    Integer totalQuantity,
+    Integer remainingQuantity
 ) {
     public static EventListContentResponse from(Event event) {
         String thumbnailUrl = event.getEventImages().stream()
             .min(Comparator.comparingInt(EventImage::getSortOrder))
             .map(EventImage::getImageUrl)
             .orElse(null);
-
         List<String> techStacks = event.getEventTechStacks().stream()
             .map(EventTechStack::getTechStackName)
             .toList();
-
         return new EventListContentResponse(
             event.getEventId(),
             event.getTitle(),
@@ -40,7 +40,9 @@ public record EventListContentResponse(
             event.getPrice(),
             event.getStatus(),
             techStacks,
-            event.getSaleEndAt()
+            event.getSaleEndAt(),
+            event.getTotalQuantity(),
+            event.getRemainingQuantity()
         );
     }
 }
