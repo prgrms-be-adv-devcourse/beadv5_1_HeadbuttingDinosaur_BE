@@ -75,18 +75,16 @@ export default function PaymentModal({ open, orderId, totalAmount, onClose, onSu
           totalAmount,
         }))
 
-        const customerKey = user?.userId || `guest_${Date.now()}`
-        const tossPayments = window.TossPayments(TOSS_CLIENT_KEY)
-        const tossPayment = tossPayments.payment({ customerKey })
+      const tossPayments = window.TossPayments("test_ck_GjLJoQ1aVZplbR1KB0MW8w6KYe2R")
 
-        await tossPayment.requestPayment({
-          method: 'CARD',
-          amount: { currency: 'KRW', value: totalAmount },
-          orderId: payment.paymentId,  // Toss orderId = 우리 paymentId
-          orderName: '이벤트 티켓',
-          successUrl: `${window.location.origin}/payment/success`,
-          failUrl: `${window.location.origin}/payment/fail`,
-        })
+      
+      await tossPayments.requestPayment('카드', {
+        amount: totalAmount,
+        orderId: payment.paymentId,
+        orderName: '이벤트 티켓',
+        successUrl: `${window.location.origin}/payment/success`,
+        failUrl: `${window.location.origin}/payment/fail`,
+      })
       }
     } catch (e: any) {
       // Toss SDK 취소 시에도 여기로 옴 (사용자가 결제창 닫은 경우)

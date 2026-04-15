@@ -9,7 +9,6 @@ import { ThemeProvider } from './contexts/ThemeContext'
 import './styles/globals.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
     <ErrorBoundary>
       <ThemeProvider>
         <BrowserRouter>
@@ -21,5 +20,4 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         </BrowserRouter>
       </ThemeProvider>
     </ErrorBoundary>
-  </React.StrictMode>,
 )

@@ -277,13 +277,10 @@ function WalletTab({ toast }: { toast: any }) {
       // 2단계: Toss 결제창 오픈
       sessionStorage.setItem('wallet_charge_context', JSON.stringify({ transactionId, amount: chargedAmount }))
 
-      const { loadTossPayments } = await import('@tosspayments/tosspayments-sdk')
-      const tossPayments = await loadTossPayments(import.meta.env.VITE_TOSS_CLIENT_KEY)
-      const payment = tossPayments.payment({ customerKey: `wallet_${transactionId}` })
+      const tossPayments = window.TossPayments("test_ck_GjLJoQ1aVZplbR1KB0MW8w6KYe2R")
 
-      await payment.requestPayment({
-        method: 'CARD',
-        amount: { currency: 'KRW', value: chargedAmount! },
+      await tossPayments.requestPayment('카드', {
+        amount: chargedAmount!,
         orderId: transactionId!,
         orderName: '예치금 충전',
         successUrl: `${window.location.origin}/wallet/charge/success`,
@@ -313,7 +310,7 @@ function WalletTab({ toast }: { toast: any }) {
     finally { setProcessing(false) }
   }
 
-  const QUICK_AMOUNTS = [10000, 30000, 50000, 100000]
+  const QUICK_AMOUNTS = [10000, 30000, 50000]
 
   if (loading) return <LoadingSpinner />
 
