@@ -84,6 +84,14 @@ public class User {
         this.createdAt = LocalDateTime.now();
     }
 
+    public void reactivate() {
+        if (this.status == UserStatus.WITHDRAWN) {
+            throw new BusinessException(MemberErrorCode.ACCOUNT_WITHDRAWN);
+        }
+        this.status = UserStatus.ACTIVE;
+        this.updatedAt = LocalDateTime.now();
+    }
+
     public void suspend() {
         if (this.status == UserStatus.WITHDRAWN) {
             throw new BusinessException(MemberErrorCode.ACCOUNT_WITHDRAWN);
