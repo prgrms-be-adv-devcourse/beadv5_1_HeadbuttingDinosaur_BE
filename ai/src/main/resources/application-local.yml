@@ -41,7 +41,7 @@ openai:
 
 internal:
   log-service:
-    url: http://localhost:8086
+    url: http://localhost:8085
 
 logging:
   level:

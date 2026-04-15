@@ -26,6 +26,11 @@ public class RecentVectorService {
         // 1. Log Service에서 최근 7 일 조회
         ActionLogResponse response = logServiceClient.getRecentActionLog(userId);
 
+        if (response == null || response.logs() == null || response.logs().isEmpty()) {
+            log.info("[RecentVector] 로그 없음 - userId: {}", userId);
+            return;
+        }
+
         // 2. eventId 별 가중치 합산
         // VIEW/DETAIL_VIEW : eventId 3 회 이상 -> 무시
         Map<String, Integer> detailViewCount = new HashMap<>();
