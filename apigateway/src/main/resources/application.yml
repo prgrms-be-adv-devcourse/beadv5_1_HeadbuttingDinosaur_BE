@@ -20,15 +20,14 @@ spring:
             - id: member-service
               uri: http://localhost:8081
               predicates:
-                - Path=/api/auth/**, /api/users/**, /api/seller-applications, /api/seller-applications/**, /api/mypage/**, /api/tech-stacks
+                - Path=/api/auth/**, /api/users/**, /api/seller-applications, /api/seller-applications/**, /api/mypage/**, /api/tech-stack            - id: commerce-service
+              uri: http://localhost:8083
+              predicates:
+                - Path=/api/cart, /api/cart/**, /api/orders, /api/orders/**, /api/tickets, /api/tickets/**, /api/seller/events/{eventId}/participants
             - id: event-service
               uri: http://localhost:8082
               predicates:
                 - Path=/api/events, /api/events/**, /api/seller/events, /api/seller/events/**
-            - id: commerce-service
-              uri: http://localhost:8083
-              predicates:
-                - Path=/api/cart, /api/cart/**, /api/orders, /api/orders/**, /api/tickets, /api/tickets/**
             - id: payment-service
               uri: http://localhost:8084
               predicates:
