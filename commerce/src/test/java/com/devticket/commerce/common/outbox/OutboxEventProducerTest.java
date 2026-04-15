@@ -40,7 +40,7 @@ class OutboxEventProducerTest {
         );
         ArgumentCaptor<ProducerRecord<String, String>> recordCaptor = ArgumentCaptor.forClass(ProducerRecord.class);
         given(kafkaTemplate.send(recordCaptor.capture())).willReturn(sendFuture);
-        given(sendFuture.get(5L, TimeUnit.SECONDS)).willReturn(null);
+        given(sendFuture.get(2L, TimeUnit.SECONDS)).willReturn(null);
 
         // when
         outboxEventProducer.publish(message);
@@ -61,7 +61,7 @@ class OutboxEventProducerTest {
         // given
         OutboxEventMessage message = new OutboxEventMessage(1L, "message-1", "payment.completed", "order-1", "{}");
         given(kafkaTemplate.send(any(ProducerRecord.class))).willReturn(sendFuture);
-        given(sendFuture.get(5L, TimeUnit.SECONDS)).willThrow(new ExecutionException(new RuntimeException("fail")));
+        given(sendFuture.get(2L, TimeUnit.SECONDS)).willThrow(new ExecutionException(new RuntimeException("fail")));
 
         // when & then
         assertThatThrownBy(() -> outboxEventProducer.publish(message))
@@ -74,7 +74,7 @@ class OutboxEventProducerTest {
         // given
         OutboxEventMessage message = new OutboxEventMessage(1L, "message-1", "payment.completed", "order-1", "{}");
         given(kafkaTemplate.send(any(ProducerRecord.class))).willReturn(sendFuture);
-        given(sendFuture.get(5L, TimeUnit.SECONDS)).willThrow(new TimeoutException("timeout"));
+        given(sendFuture.get(2L, TimeUnit.SECONDS)).willThrow(new TimeoutException("timeout"));
 
         // when & then
         assertThatThrownBy(() -> outboxEventProducer.publish(message))
@@ -87,7 +87,7 @@ class OutboxEventProducerTest {
         // given
         OutboxEventMessage message = new OutboxEventMessage(1L, "message-1", "payment.completed", "order-1", "{}");
         given(kafkaTemplate.send(any(ProducerRecord.class))).willReturn(sendFuture);
-        given(sendFuture.get(5L, TimeUnit.SECONDS)).willThrow(new InterruptedException("interrupted"));
+        given(sendFuture.get(2L, TimeUnit.SECONDS)).willThrow(new InterruptedException("interrupted"));
 
         // when
         Throwable thrown = null;

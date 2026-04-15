@@ -8,7 +8,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 
 @EnableJpaAuditing
 @EnableScheduling
-@EnableSchedulerLock(defaultLockAtMostFor = "PT25S")
+@EnableSchedulerLock(defaultLockAtMostFor = "PT45S")
 @SpringBootApplication
 public class CommerceApplication {
 
