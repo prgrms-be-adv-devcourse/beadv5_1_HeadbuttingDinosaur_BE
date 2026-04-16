@@ -15,7 +15,6 @@ import com.devticket.event.infrastructure.client.OpenAiEmbeddingClient;
 import com.devticket.event.infrastructure.client.dto.TechStackItem;
 import com.devticket.event.infrastructure.persistence.EventRepository;
 import com.devticket.event.infrastructure.search.EventDocument;
-import com.devticket.event.infrastructure.search.EventSearchRepository;
 import com.devticket.event.presentation.dto.EventDetailResponse;
 import com.devticket.event.presentation.dto.EventListContentResponse;
 import com.devticket.event.presentation.dto.EventListRequest;
@@ -31,12 +30,10 @@ import java.io.StringReader;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -55,12 +52,9 @@ public class EventService {
 
     private final EventRepository eventRepository;
     private final MemberClient memberClient;
-    private final EventSearchRepository eventSearchRepository;
     private final ElasticsearchOperations elasticsearchOperations;
     private final ElasticsearchClient esClient;
     private final OpenAiEmbeddingClient openAiEmbeddingClient;
-
-    private static final Set<String> ALLOWED_SORT_FIELDS = Set.of("createdAt", "price", "eventDateTime");
 
     @Transactional
     public SellerEventCreateResponse createEvent(UUID sellerId, SellerEventCreateRequest request) {
@@ -150,12 +144,11 @@ public class EventService {
         NativeQuery query = buildSearchQuery(request, allowedStatuses, pageable);
         SearchHits<EventDocument> searchHits = elasticsearchOperations.search(query, EventDocument.class);
 
-        // ES 결과를 String ID 기준으로 순서 유지
-        List<String> rawIds = searchHits.stream()
-            .map(hit -> hit.getContent().getId())
+        List<UUID> pageEventIds = searchHits.stream()
+            .map(hit -> UUID.fromString(hit.getContent().getId()))
             .toList();
 
-        if (rawIds.isEmpty()) {
+        if (pageEventIds.isEmpty()) {
             return new EventListResponse(
                 List.of(),
                 pageable.getPageNumber(),
@@ -165,44 +158,19 @@ public class EventService {
             );
         }
 
-        // UUID로 변환 가능한 ID만 DB 조회에 사용
-        List<UUID> uuidIds = rawIds.stream()
+        // N+1 방지: JPA로 상세 데이터 일괄 로드
+        Map<UUID, Event> hydratedById = eventRepository.findAllWithDetailsByEventIdIn(pageEventIds).stream()
+            .collect(Collectors.toMap(Event::getEventId, e -> e));
+        Map<UUID, Event> imagesById = eventRepository.findEventImagesByEventIdIn(pageEventIds).stream()
+            .collect(Collectors.toMap(Event::getEventId, e -> e));
+
+        // ES 결과 순서 유지
+        List<EventListContentResponse> content = pageEventIds.stream()
             .map(id -> {
-                try { return UUID.fromString(id); }
-                catch (IllegalArgumentException e) { return null; }
-            })
-            .filter(id -> id != null)
-            .toList();
-
-        Map<UUID, Event> hydratedById = Collections.emptyMap();
-        Map<UUID, Event> imagesById = Collections.emptyMap();
-        if (!uuidIds.isEmpty()) {
-            hydratedById = eventRepository.findAllWithDetailsByEventIdIn(uuidIds).stream()
-                .collect(Collectors.toMap(Event::getEventId, e -> e));
-            imagesById = eventRepository.findEventImagesByEventIdIn(uuidIds).stream()
-                .collect(Collectors.toMap(Event::getEventId, e -> e));
-        }
-
-        // ES 문서 Map (DB fallback용)
-        Map<String, EventDocument> esDocById = searchHits.stream()
-            .collect(Collectors.toMap(hit -> hit.getContent().getId(), hit -> hit.getContent()));
-
-        final Map<UUID, Event> finalHydratedById = hydratedById;
-        final Map<UUID, Event> finalImagesById = imagesById;
-
-        // ES 결과 순서 유지, DB에 있으면 DB 우선 / 없으면 ES fallback
-        List<EventListContentResponse> content = rawIds.stream()
-            .map(rawId -> {
-                try {
-                    UUID uuid = UUID.fromString(rawId);
-                    Event hydrated = finalHydratedById.get(uuid);
-                    if (hydrated != null) {
-                        Event withImages = finalImagesById.getOrDefault(uuid, hydrated);
-                        return EventListContentResponse.from(withImages);
-                    }
-                } catch (IllegalArgumentException ignored) {}
-                EventDocument doc = esDocById.get(rawId);
-                return doc != null ? EventListContentResponse.from(doc) : null;
+                Event hydrated = hydratedById.get(id);
+                if (hydrated == null) return null;
+                Event withImages = imagesById.getOrDefault(id, hydrated);
+                return EventListContentResponse.from(withImages);
             })
             .filter(Objects::nonNull)
             .toList();
@@ -321,10 +289,10 @@ public class EventService {
 
         // TechStack 교체
         event.getEventTechStacks().clear();
-        Map<Long, String> techStackMap = buildTechStackMap();  // 추가
+        Map<Long, String> techStackMap = buildTechStackMap();
         for (Long techStackId : request.techStackIds()) {
             event.getEventTechStacks().add(
-                EventTechStack.of(event, techStackId, techStackMap.getOrDefault(techStackId, "Unknown")));  // 변경
+                EventTechStack.of(event, techStackId, techStackMap.getOrDefault(techStackId, "Unknown")));
         }
 
         // Image 교체
@@ -345,7 +313,7 @@ public class EventService {
      * dense_vector(embedding)은 Spring Data ES 컨버터가 직렬화하지 못하므로
      * Map<String, Object>로 전체 문서를 구성해서 ES REST API에 직접 전송.
      */
-    private void syncToElasticsearch(Event event) {
+    public void syncToElasticsearch(Event event) {
         try {
             List<String> techStackNames = event.getEventTechStacks().stream()
                 .map(EventTechStack::getTechStackName)
@@ -362,42 +330,20 @@ public class EventService {
             doc.put("category", event.getCategory().name());
             doc.put("techStacks", techStackNames);
             doc.put("status", event.getStatus().name());
+            doc.put("sellerId", event.getSellerId().toString());
             // mapping의 date_hour_minute_second 형식에 맞춤 (나노초 제외)
             doc.put("indexedAt", LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")));
 
             float[] vector = openAiEmbeddingClient.embed(embeddingText);
             if (vector != null) {
-                log.debug("[1] Vector 생성 완료: 차원={}, 첫 5개 값={}", vector.length,
-                    java.util.Arrays.toString(java.util.Arrays.copyOf(vector, Math.min(5, vector.length))));
-
                 List<Float> vectorList = new ArrayList<>(vector.length);
                 for (float v : vector) vectorList.add(v);
-
-                log.debug("[2] vectorList 생성 완료: 크기={}, 첫 5개 값={}", vectorList.size(),
-                    vectorList.subList(0, Math.min(5, vectorList.size())));
-
                 doc.put("embedding", vectorList);
-                log.debug("[3] doc에 embedding 추가 완료. doc 키들: {}", doc.keySet());
             } else {
-                log.warn("[Embedding 생략] eventId: {}", event.getEventId());
+                log.warn("[ES 동기화] embedding 생성 실패 - eventId: {}", event.getEventId());
             }
 
-            // Jackson으로 직렬화 후 withJson()으로 전송
-            ObjectMapper objectMapper = new ObjectMapper();
-            String json = objectMapper.writeValueAsString(doc);
-
-            log.debug("[4] JSON 직렬화 완료: 길이={}", json.length());
-            log.debug("[4-1] JSON (처음 500자): {}", json.substring(0, Math.min(500, json.length())));
-
-            // embedding이 JSON에 포함되어 있는지 확인
-            if (json.contains("\"embedding\"")) {
-                log.debug("[5] ✓ JSON에 embedding 필드 포함됨");
-                int embeddingStart = json.indexOf("\"embedding\"");
-                int embeddingEnd = json.indexOf("]", embeddingStart) + 1;
-                log.debug("[5-1] embedding 값: {}", json.substring(embeddingStart, Math.min(embeddingEnd + 100, json.length())));
-            } else {
-                log.warn("[5] ✗ JSON에 embedding 필드가 없음!");
-            }
+            String json = new ObjectMapper().writeValueAsString(doc);
 
             esClient.index(i -> i
                 .index("event")
@@ -427,10 +373,17 @@ public class EventService {
                         .queryVector(vectorList)
                         .k(30)
                         .numCandidates(50))));
+            } else {
+                // embedding 생성 실패 시 title 기반 multi_match 폴백
+                log.warn("[검색 폴백] embedding 실패 → multi_match 사용. keyword: {}", request.keyword());
+                queryBuilder.withQuery(Query.of(q -> q
+                    .multiMatch(m -> m
+                        .query(request.keyword())
+                        .fields("title"))));
             }
         }
 
-        // 필터 (category, status)
+        // 필터 (status, category, techStacks)
         var filterQuery = new BoolQuery.Builder();
 
         if (allowedStatuses != null && !allowedStatuses.isEmpty()) {
@@ -446,13 +399,29 @@ public class EventService {
                 .term(t -> t.field("category").value(request.category().name()))));
         }
 
+        if (request.techStacks() != null && !request.techStacks().isEmpty()) {
+            Map<Long, String> techStackMap = buildTechStackMap();
+            List<FieldValue> techStackNames = request.techStacks().stream()
+                .map(id -> techStackMap.get(id))
+                .filter(name -> name != null)
+                .map(FieldValue::of)
+                .toList();
+            if (!techStackNames.isEmpty()) {
+                filterQuery.filter(Query.of(q -> q
+                    .terms(t -> t.field("techStacks").terms(tv -> tv.value(techStackNames)))));
+            }
+        }
+
+        if (request.sellerId() != null) {
+            filterQuery.filter(Query.of(q -> q
+                .term(t -> t.field("sellerId").value(request.sellerId().toString()))));
+        }
+
         queryBuilder
             .withFilter(Query.of(q -> q.bool(filterQuery.build())))
             .withPageable(pageable);
 
         return queryBuilder.build();
     }
-
-
 
 }

@@ -1,9 +1,9 @@
 package com.devticket.event.common.config;
 
+import com.devticket.event.application.EventService;
 import com.devticket.event.domain.model.Event;
 import com.devticket.event.infrastructure.persistence.EventRepository;
 import com.devticket.event.infrastructure.search.EventDocument;
-import com.devticket.event.infrastructure.search.EventSearchRepository;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +20,7 @@ public class ElasticsearchIndexInitializer {
 
     private final ElasticsearchOperations elasticsearchOperations;
     private final EventRepository eventRepository;
-    private final EventSearchRepository eventSearchRepository;
+    private final EventService eventService;
 
     @EventListener(ApplicationReadyEvent.class)
     public void initializeIndex() {
@@ -52,7 +52,7 @@ public class ElasticsearchIndexInitializer {
 
     /**
      * DB의 모든 이벤트를 ES에 재색인.
-     * embedding은 저장하지 않음 (이벤트 생성/수정 시 syncToElasticsearch에서 저장됨)
+     * embedding 포함 저장 (syncToElasticsearch 재사용)
      */
     private void reindexAllEvents() {
         List<UUID> allEventIds = eventRepository.findAll().stream()
@@ -70,7 +70,7 @@ public class ElasticsearchIndexInitializer {
         int count = 0;
         for (Event event : events) {
             try {
-                eventSearchRepository.save(EventDocument.from(event));
+                eventService.syncToElasticsearch(event);
                 count++;
             } catch (Exception e) {
                 log.warn("[ES 재색인 실패] eventId: {}", event.getEventId(), e);

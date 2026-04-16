@@ -4,7 +4,6 @@ import com.devticket.event.domain.enums.EventStatus;
 import com.devticket.event.domain.model.Event;
 import com.devticket.event.domain.model.EventImage;
 import com.devticket.event.domain.model.EventTechStack;
-import com.devticket.event.infrastructure.search.EventDocument;
 
 import java.time.LocalDateTime;
 import java.util.Comparator;
@@ -44,20 +43,6 @@ public record EventListContentResponse(
             event.getSaleEndAt(),
             event.getTotalQuantity(),
             event.getRemainingQuantity()
-        );
-    }
-
-    public static EventListContentResponse fromELS(EventDocument doc) {
-        return new EventListContentResponse(
-            UUID.fromString(doc.getId()),
-            doc.getTitle(),
-            null,
-            null,
-            null,
-            0,
-            doc.getStatus() != null ? EventStatus.valueOf(doc.getStatus()) : null,
-            doc.getTechStacks() != null ? doc.getTechStacks() : List.of(),
-            null
         );
     }
 

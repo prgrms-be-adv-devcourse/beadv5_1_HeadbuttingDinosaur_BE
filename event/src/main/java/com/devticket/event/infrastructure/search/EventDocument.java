@@ -18,7 +18,7 @@ import lombok.NoArgsConstructor;
 
 @Getter
 @NoArgsConstructor
-@Document(indexName = "event", createIndex = false)
+@Document(indexName = "event")
 @Mapping(mappingPath = "elasticsearch/event-mapping.json")
 public class EventDocument {
 
@@ -37,10 +37,13 @@ public class EventDocument {
     @Field(type = FieldType.Keyword)
     private String status;
 
+    @Field(type = FieldType.Keyword)
+    private String sellerId;
+
     /**
      * 1536차원 embedding 벡터.
      * Spring Data ES 컨버터가 dense_vector를 직렬화하지 못하므로
-     * EventService.updateEmbeddingField()에서 esClient partial update로 저장.
+     * syncToElasticsearch()에서 esClient.index()로 직접 저장.
      */
     private List<Float> embedding;
 
@@ -49,12 +52,13 @@ public class EventDocument {
 
     @Builder
     private EventDocument(String id, String title, String category, List<String> techStacks,
-        String status, LocalDateTime indexedAt) {
+        String status, String sellerId, LocalDateTime indexedAt) {
         this.id = id;
         this.title = title;
         this.category = category;
         this.techStacks = techStacks;
         this.status = status;
+        this.sellerId = sellerId;
         this.indexedAt = indexedAt;
     }
 
@@ -69,6 +73,7 @@ public class EventDocument {
             .category(event.getCategory().name())
             .techStacks(techStackNames)
             .status(event.getStatus().name())
+            .sellerId(event.getSellerId().toString())
             .indexedAt(LocalDateTime.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS))
             .build();
     }
