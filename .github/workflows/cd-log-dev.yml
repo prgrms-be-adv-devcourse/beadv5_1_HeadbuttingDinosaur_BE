@@ -2,7 +2,7 @@ name: CD - Log (Dev)
 on:
   push:
     branches: ["develop/log"]
-    paths: ["log/**"]
+    paths: ["fastify-log/**"]
 
 jobs:
   deploy:
