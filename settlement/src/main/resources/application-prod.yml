@@ -17,6 +17,9 @@ spring:
       group-id: devticket-settlement
       auto-offset-reset: latest
 
+external:
+  commerce-base-url: http://commerce:8083
+
 logging:
   level:
     com.devticket: INFO
