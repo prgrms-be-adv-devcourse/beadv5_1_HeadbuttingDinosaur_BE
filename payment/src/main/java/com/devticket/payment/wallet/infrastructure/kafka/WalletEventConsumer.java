@@ -5,7 +5,6 @@ import com.devticket.payment.common.messaging.MessageDeduplicationService;
 import com.devticket.payment.payment.domain.enums.PaymentMethod;
 import com.devticket.payment.wallet.application.event.EventCancelledEvent;
 import com.devticket.payment.wallet.application.event.RefundCompletedEvent;
-import com.devticket.payment.wallet.application.service.WalletService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
@@ -22,7 +21,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class WalletEventConsumer {
 
-    private final WalletService walletService;
+    private final RefundCompletedHandler refundCompletedHandler;
     private final MessageDeduplicationService deduplicationService;
     private final ObjectMapper objectMapper;
 
@@ -46,19 +45,19 @@ public class WalletEventConsumer {
         try {
             RefundCompletedEvent event = objectMapper.readValue(record.value(), RefundCompletedEvent.class);
 
-            // 예치금 결제건만 복구 처리 (PG는 이미 PG 취소로 처리됨)
             if (PaymentMethod.WALLET == event.paymentMethod()) {
                 // restoreBalance + markProcessed를 하나의 @Transactional에서 처리
-                walletService.restoreBalanceWithDedup(
+                refundCompletedHandler.restoreBalanceAndMarkProcessed(
                     event.userId(),
                     event.refundAmount(),
                     event.refundId(),
                     event.orderId(),
-                    messageUUID
+                    messageUUID,
+                    record.topic()
                 );
             } else {
                 // PG 결제건은 복구 불필요 — dedup만 기록
-                deduplicationService.markProcessed(messageUUID, record.topic());
+                refundCompletedHandler.markProcessedOnly(messageUUID, record.topic());
             }
 
             ack.acknowledge();
@@ -99,7 +98,7 @@ public class WalletEventConsumer {
                 "event.cancelled 일괄 환불 미구현 — Refund 모듈 완성 후 처리 예정. eventId=" + event.eventId());
 
             // walletService.processBatchRefund(event.eventId());
-            // deduplicationService.markProcessed(messageUUID);
+            // refundCompletedHandler.markProcessedOnly(messageUUID, record.topic());
             // ack.acknowledge();
 
         } catch (Exception e) {
@@ -111,14 +110,19 @@ public class WalletEventConsumer {
 
     /**
      * Kafka 헤더에서 X-Message-Id를 추출한다.
-     * 헤더가 없으면 topic:partition:offset 기반 결정적 UUID(v3)로 폴백한다.
+     * 헤더가 없거나 파싱 실패 시 topic:partition:offset 기반 결정적 UUID(v3)로 폴백한다.
      */
     private UUID extractMessageId(ConsumerRecord<String, String> record) {
         Header header = record.headers().lastHeader("X-Message-Id");
         if (header != null) {
-            return UUID.fromString(new String(header.value(), StandardCharsets.UTF_8));
+            try {
+                return UUID.fromString(new String(header.value(), StandardCharsets.UTF_8));
+            } catch (IllegalArgumentException e) {
+                log.warn("[Consumer] X-Message-Id 파싱 실패, 레거시 폴백 사용 — topic={}, offset={}",
+                    record.topic(), record.offset());
+            }
         }
-        // 폴백: 헤더 없는 레거시 메시지 대응
+        // 폴백: 헤더 없거나 파싱 실패 시 topic:partition:offset 기반 결정적 UUID
         String fallback = record.topic() + ":" + record.partition() + ":" + record.offset();
         return UUID.nameUUIDFromBytes(fallback.getBytes(StandardCharsets.UTF_8));
     }
