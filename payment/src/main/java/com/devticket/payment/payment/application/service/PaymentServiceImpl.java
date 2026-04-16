@@ -61,9 +61,9 @@ public class PaymentServiceImpl implements PaymentService {
         validateOrderOwner(userId, order.userId());
         validateOrderPayable(order);
 
-        // 중복 요청: 동일 orderId의 Payment가 이미 존재하면 기존 레코드 재사용
+        // 중복 요청: 동일 orderId + 동일 결제수단의 Payment가 이미 존재하면 기존 레코드 재사용
         Optional<Payment> existing = paymentRepository.findByOrderId(order.id());
-        if (existing.isPresent()) {
+        if (existing.isPresent() && existing.get().getPaymentMethod() == request.paymentMethod()) {
             return PaymentReadyResponse.from(
                 existing.get(), request.orderId(), order.orderNumber(), order.status());
         }
