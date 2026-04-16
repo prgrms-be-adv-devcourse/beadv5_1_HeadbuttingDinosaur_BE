@@ -18,7 +18,7 @@ public class OutboxScheduler {
     private final OutboxEventProducer outboxEventProducer;
 
     @Scheduled(fixedDelay = 3000)
-    @SchedulerLock(name = "outbox-scheduler", lockAtMostFor = "25s", lockAtLeastFor = "5s")
+    @SchedulerLock(name = "outbox-scheduler", lockAtMostFor = "30s", lockAtLeastFor = "5s")
     @Transactional
     public void publishPendingEvents() {
         List<Outbox> pendingList =
