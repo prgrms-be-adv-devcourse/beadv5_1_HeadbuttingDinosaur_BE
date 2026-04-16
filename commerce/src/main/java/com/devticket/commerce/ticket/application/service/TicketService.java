@@ -8,6 +8,7 @@ import com.devticket.commerce.order.domain.model.OrderItem;
 import com.devticket.commerce.order.domain.repository.OrderItemRepository;
 import com.devticket.commerce.order.domain.repository.OrderRepository;
 import com.devticket.commerce.ticket.application.usecase.TicketUsecase;
+import com.devticket.commerce.ticket.domain.enums.TicketStatus;
 import com.devticket.commerce.ticket.domain.exception.TicketErrorCode;
 import com.devticket.commerce.ticket.domain.model.Ticket;
 import com.devticket.commerce.ticket.domain.repository.TicketRepository;
@@ -19,11 +20,14 @@ import com.devticket.commerce.ticket.infrastructure.external.client.dto.Internal
 import com.devticket.commerce.ticket.presentation.dto.req.SellerEventParticipantListRequest;
 import com.devticket.commerce.ticket.presentation.dto.req.TicketListRequest;
 import com.devticket.commerce.ticket.presentation.dto.req.TicketRequest;
+import com.devticket.commerce.ticket.presentation.dto.res.InternalTicketSettlementDataResponse;
+import com.devticket.commerce.ticket.presentation.dto.res.InternalTicketSettlementItemResponse;
 import com.devticket.commerce.ticket.presentation.dto.res.SellerEventParticipantListResponse;
 import com.devticket.commerce.ticket.presentation.dto.res.SellerEventParticipantResponse;
 import com.devticket.commerce.ticket.presentation.dto.res.TicketDetailResponse;
 import com.devticket.commerce.ticket.presentation.dto.res.TicketListResponse;
 import com.devticket.commerce.ticket.presentation.dto.res.TicketResponse;
+import java.util.AbstractMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -143,6 +147,53 @@ public class TicketService implements TicketUsecase {
 
         //응답데이터 구성
         return TicketResponse.of(request.orderId(), savedTickets);
+    }
+
+    /**
+     * 호출 Settlement -> Commerce ㅎgig*
+     */
+    @Override
+    public InternalTicketSettlementDataResponse getSettlementData(List<UUID> eventIds) {
+        if (eventIds.isEmpty()) {
+            return new InternalTicketSettlementDataResponse(List.of());
+        }
+
+        // eventIds로 티켓 전체 조회
+        List<Ticket> tickets = ticketRepository.findAllByEventIdIn(eventIds);
+        if (tickets.isEmpty()) {
+            return new InternalTicketSettlementDataResponse(List.of());
+        }
+
+        // eventIds로 OrderItem 조회 → orderItemId별 단가 맵
+        Map<UUID, Integer> priceByOrderItemId = orderItemRepository.findSettlementItems(eventIds).stream()
+            .collect(Collectors.toMap(
+                OrderItem::getOrderItemId,
+                OrderItem::getPrice,
+                (existing, duplicate) -> existing
+            ));
+
+        // (eventId, orderItemId) 기준으로 티켓 그룹핑 후 정산 집계
+        List<InternalTicketSettlementItemResponse> items = tickets.stream()
+            .collect(Collectors.groupingBy(
+                t -> new AbstractMap.SimpleEntry<>(t.getEventId(), t.getOrderItemId())
+            ))
+            .entrySet().stream()
+            .map(entry -> {
+                UUID eventId = entry.getKey().getKey();
+                UUID orderItemId = entry.getKey().getValue();
+                List<Ticket> group = entry.getValue();
+
+                int price = priceByOrderItemId.getOrDefault(orderItemId, 0);
+                int salesAmount = price * group.size();
+                int refundAmount = price * (int) group.stream()
+                    .filter(t -> t.getStatus() == TicketStatus.REFUNDED)
+                    .count();
+
+                return new InternalTicketSettlementItemResponse(eventId, orderItemId, salesAmount, refundAmount);
+            })
+            .toList();
+
+        return new InternalTicketSettlementDataResponse(items);
     }
 
     public SellerEventParticipantListResponse getParticipantList(UUID userId, UUID eventId,
