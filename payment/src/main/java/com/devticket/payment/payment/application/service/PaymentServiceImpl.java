@@ -95,13 +95,13 @@ public class PaymentServiceImpl implements PaymentService {
 
     private PaymentReadyResponse readyWalletPgPayment(UUID userId, PaymentReadyRequest request, InternalOrderInfoResponse order) {
         int totalAmount = order.totalAmount();
-        int walletAmount = request.walletAmount();
 
         // 입력값 검증
-        if (walletAmount <= 0 || walletAmount >= totalAmount) {
+        if (request.walletAmount() == null || request.walletAmount() <= 0 || request.walletAmount() >= totalAmount) {
             throw new PaymentException(PaymentErrorCode.INVALID_PAYMENT_REQUEST);
         }
 
+        int walletAmount = request.walletAmount();
         int pgAmount = totalAmount - walletAmount;
 
         // 예치금 차감 (WalletTransaction USE 기록 포함)
