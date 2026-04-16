@@ -1,7 +1,7 @@
 # DevTicket Kafka 설계 문서
 
-> 최종 업데이트: 2026-04-10  
-> 브랜치: semi-integration
+> 최종 업데이트: 2026-04-16  
+> 브랜치: feat/payment-kafka
 
 ---
 
@@ -370,23 +370,17 @@ CREATE TABLE shedlock (
 
 ```java
 @Scheduled(fixedDelay = 3000)
-@SchedulerLock(name = "outbox-scheduler", lockAtMostFor = "30s", lockAtLeastFor = "5s")
+@SchedulerLock(name = "outbox-scheduler", lockAtMostFor = "25s", lockAtLeastFor = "5s")
 public void publishPendingEvents() { ... }
 ```
 
-스케줄러 쿼리: `next_retry_at IS NULL OR next_retry_at < now` 조건을 `@Query`로 명시
+스케줄러 쿼리: `next_retry_at <= now()` 조건 추가
 
 ```java
 // OutboxRepository
-// 메서드명 기반 쿼리는 OR 절에 status 조건이 누락되어 SENT 레코드까지 포함되는 버그 발생 — @Query로 명시
-@Query("""
-        SELECT o FROM Outbox o
-        WHERE o.status = :status
-          AND (o.nextRetryAt IS NULL OR o.nextRetryAt < :now)
-        ORDER BY o.createdAt ASC
-        LIMIT 50
-        """)
-List<Outbox> findPendingToPublish(@Param("status") OutboxStatus status, @Param("now") Instant now);
+List<Outbox> findTop50ByStatusAndNextRetryAtBeforeOrNextRetryAtIsNullOrderByCreatedAtAsc(
+    OutboxStatus status, Instant now
+);
 ```
 
 ---
@@ -441,8 +435,8 @@ CREATE TABLE processed_message (
 | `CANCELLED` | 없음 (종단) | PG 자동 취소 보상 흐름에서 사용 |
 | `REFUNDED` | 없음 (종단) | |
 
-> ⚠️ **미구현:** `Payment` 엔티티의 `approve()` / `fail()` / `cancel()` / `refund()` 메서드에 현재 상태 검증 가드가 없음.
-> 현재 상태와 무관하게 호출 시 바로 상태가 변경되므로, `canTransitionTo()` 구현이 필요함.
+> ✅ `PaymentStatus.canTransitionTo()` 구현 완료. 
+> ⚠️ **부분 미구현:** `approve()` / `fail()` / `cancel()` / `refund()` 메서드 내부에서 `canTransitionTo()` 가드를 호출하지 않음. 메서드 진입 시 검증 로직 추가 필요.
 
 **Stock** (enum 미구현 — 설계 기준)
 
@@ -885,20 +879,28 @@ topic: event.force-cancelled  → DLT: event.force-cancelled.DLT
 
 ### Payment (기존 구현 수정)
 
+**구현 완료**
+- [x] ✅ `JacksonConfig`: `JavaTimeModule`, `WRITE_DATES_AS_TIMESTAMPS=false` 적용 확인 완료
+- [x] ✅ `ShedLockConfig`: JDBC provider 기반 ShedLock 설정 완료
+- [x] ✅ `Outbox`: 엔티티 필드 수정 완료 — `aggregate_id` VARCHAR(36), `topic`, `partitionKey`, `nextRetryAt`, `sentAt`
+- [x] ✅ `OutboxRepository`: `next_retry_at IS NULL OR next_retry_at <= :now` 조건 추가 완료
+- [x] ✅ `OutboxScheduler`: ShedLock 적용 + `getTopic()` / `getPartitionKey()` 사용 완료
+- [x] ✅ `ProcessedMessage`: `topic VARCHAR(128)` 컬럼 추가 완료
+- [x] ✅ `PaymentCompletedEvent`: record, `UUID` / `PaymentMethod enum` / `Instant` 적용 완료
+- [x] ✅ `RefundCompletedEvent`: record, `UUID` / `PaymentMethod enum` / `Instant` 적용 완료
+- [x] ✅ `EventCancelledEvent`: record, `UUID` / `CancelledBy enum` / `Instant` 적용 완료
+- [x] ✅ `PaymentFailedEvent`: record 신규 생성 완료
+- [x] ✅ `PaymentStatus.canTransitionTo()` 상태 전이 검증 구현 완료
+- [x] ✅ Payment 엔티티 낙관적 락 (`@Version`) 적용 완료
+- [x] ✅ `WalletServiceImpl.processWalletPayment()`: `payment.completed` Outbox 이벤트 발행으로 전환 완료
+
+**미구현**
+- [ ] `OutboxEventProducer`: Kafka 발행 시 `X-Message-Id` 헤더 세팅 — Consumer dedup 필수 (§4, kafka-idempotency-guide.md §3-5)
 - [ ] `KafkaConsumerConfig`: FixedBackOff → ExponentialBackOffWithMaxRetries(3, 2→4→8초)
-- [ ] `WalletEventConsumer`: groupId 변경 (`payment-refund.completed`)
+- [ ] `WalletEventConsumer`: groupId 변경 (`payment-refund.completed`) — 현재 `payment-wallet-group`
 - [ ] `WalletEventConsumer`: `markProcessed()` 위치를 `walletService` 트랜잭션 내부로 이동
-- [ ] `WalletServiceImpl.processWalletPayment()`: 결제 완료 후 `commerceInternalClient.completePayment()` 호출 추가 — 현재 Wallet 결제 시 OrderStatus가 `PAYMENT_PENDING`에서 `PAID`로 전이되지 않음
-- [ ] `ProcessedMessage`: `topic VARCHAR(128)` 컬럼 추가
-- [ ] `Outbox`: `aggregate_id` → UUID(비즈니스 키), `next_retry_at` 컬럼 추가, `partition_key VARCHAR(36)` 컬럼 추가 (상세: §4)
-- [ ] `OutboxRepository`: `next_retry_at <= now()` 조건 추가
-- [ ] `OutboxScheduler`: ShedLock 적용, 지수 백오프 재시도 간격 반영
-- [ ] `RefundCompletedEvent`: `refundId(UUID)`, `userId(UUID)`, `paymentId(UUID)`, `timestamp(Instant)`
-- [ ] `PaymentCompletedEvent`: `userId(UUID)`, `paymentId(UUID)`, `paymentMethod(enum)`, `timestamp(Instant)`
-- [ ] `EventCancelledEvent`: `eventId(UUID)`, `sellerId(UUID)`, `adminId(UUID)`, `CancelledBy enum`, record로 변환
-- [ ] `JacksonConfig`: 이미 존재, 설정 내용 검토
-- [ ] 도메인 엔티티 상태 전이 검증 (`canTransitionTo()`)
-- [ ] 도메인 엔티티 낙관적 락 (`@Version`)
+- [ ] Payment 엔티티 `approve()` / `fail()` / `cancel()` / `refund()` 내부에 `canTransitionTo()` 가드 호출 추가
+- [ ] Consumer 순서 역전 3분류 처리 구현 (§5)
 - [ ] `RefundSagaOrchestrator` 클래스 신규 생성, `saga_state` 테이블 및 `SagaStateRepository` 구현
 - [ ] Orchestrator `start()` / `onOrderDone()` / `onTicketDone()` / `onStockDone()` / `onOrderFailed()` / `onTicketFailed()` / `onStockFailed()` 구현
 - [ ] Orchestrator Consumer groupId 등록 (`payment-refund.requested` 외 6개, 상세: §9-3) + dedup 적용

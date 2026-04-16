@@ -208,18 +208,32 @@ Orders 테이블에 cart_hash 컬럼 추가 필요
 
 결제 준비는 **비즈니스 상태 가드가 주력**, Idempotency-Key는 응답 재전송 최적화용 보조로 사용한다.
 
+**결제 방식별 요청/응답 차이:**
+
+| 결제 방식 | PaymentReadyRequest 추가 필드 | 서버 처리 | PaymentReadyResponse 추가 필드 |
+|-----------|------------------------------|----------|-------------------------------|
+| PG | 없음 | Payment READY 생성 | 없음 (amount = totalAmount) |
+| WALLET | 없음 | Payment 생성 + 즉시 예치금 차감 + SUCCESS | 없음 |
+| WALLET_PG | `walletAmount` (사용자 지정 예치금 사용 금액) | 예치금 차감 + Payment READY 생성 | `walletAmount`, `pgAmount` |
+
+> **WALLET_PG 주의사항:**
+> - readyPayment에서 예치금이 **즉시 차감**된다. 따라서 중복 호출 시 이중 차감이 발생할 수 있으므로, orderId 기준 기존 Payment 조회 가드가 **필수**다.
+> - 프론트는 응답의 `pgAmount`를 Toss SDK에 넘겨야 한다 (totalAmount가 아닌 pgAmount 기준).
+> - 예치금 차감 후 PG 결제를 진행하지 않고 방치하면, 타임아웃 스케줄러가 FAILED 처리 + 예치금 자동 복구한다.
+
 **어디서 막는가:**
 
 | 레이어 | 역할 |
 |--------|------|
 | 서비스 레이어 | orderId 기준 기존 Payment 존재 여부 확인 |
-| DB 레이어 | Payment 생성 시 중복 생성 방지 |
+| DB 레이어 | Payment 생성 시 중복 생성 방지 + WalletTransaction transactionKey UNIQUE 제약 (WALLET_PG 2차 방어선) |
 | Idempotency 저장소 | 같은 키 재요청 시 응답 재사용 (보조) |
 | Gateway | 짧은 시간 반복 호출 차단 |
 
 **무엇을 기준으로 중복 판단하는가:**
 - 1차 기준: orderId 기준 기존 Payment 존재 여부
 - 2차 기준: 같은 Idempotency-Key 재요청 여부
+- WALLET_PG 동시성 방어: WalletTransaction transactionKey("USE_" + orderId) UNIQUE 제약
 
 **팀원이 구현해야 하는 순서:**
 
@@ -230,22 +244,40 @@ Orders 테이블에 cart_hash 컬럼 추가 필요
 2. 먼저 orderId 기준으로 기존 Payment 조회
    → 이미 존재하면 새로 만들지 않는다
    → 서버의 첫 판단은 항상 orderId다
+   → ⚠️ WALLET_PG에서 이 단계가 누락되면 예치금 이중 차감 발생
 
    상태별 처리:
      READY면      → 기존 Payment 반환
      SUCCESS면    → 이미 결제 완료 에러
+     FAILED면     → 이미 실패한 건 에러 (새 주문으로 재시도 유도)
      그 외 진행 중 → 현재 상태에 맞는 기존 결과 반환
 
-3. 기존 Payment가 없을 때만 새 Payment 생성
+3. WALLET_PG인 경우 입력값 검증
+   → walletAmount > 0
+   → walletAmount < totalAmount (전액이면 WALLET 결제를 써야 함)
+   → 잔액 >= walletAmount (useBalanceAtomic이 0 반환으로도 잡히지만 사전 검증이 UX상 좋음)
+
+4. 기존 Payment가 없을 때만 새 Payment 생성
    → 새 Payment 생성
+   → WALLET_PG: 예치금 차감 + WalletTransaction 기록 (같은 트랜잭션)
    → 필요하면 idempotency_record도 함께 같은 트랜잭션에 저장
 
-4. 같은 Idempotency-Key 재요청이면 저장된 응답 반환
+5. 같은 Idempotency-Key 재요청이면 저장된 응답 반환
    → 이 기능은 "응답 유실" 대응용
    → 같은 키로 재전송된 요청을 빠르게 복구하기 위한 것
 
-5. 같은 키인데 payload가 다르면 → 409 Conflict
+6. 같은 키인데 payload가 다르면 → 409 Conflict
    → 멱등 재요청이 아니라 잘못된 재사용
+```
+
+**WALLET_PG 동시성 극단 케이스:**
+
+```
+두 요청이 동시에 orderId 기준 조회 통과 (둘 다 "없음")
+→ 둘 다 Payment INSERT + 예치금 차감 시도
+→ WalletTransaction transactionKey("USE_" + orderId) UNIQUE 제약
+→ 먼저 INSERT한 쪽만 성공, 나머지는 UNIQUE 위반 → 트랜잭션 롤백
+→ 프론트 재시도 → orderId 조회에서 기존 Payment 발견 → 반환
 ```
 
 > 핵심: 클라이언트 키가 바뀌어도 orderId 기준으로 기존 Payment를 반환할 수 있어야 한다.

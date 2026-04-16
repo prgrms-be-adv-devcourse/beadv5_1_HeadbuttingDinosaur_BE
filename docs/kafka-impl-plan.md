@@ -1,6 +1,6 @@
 # DevTicket Kafka 구현 계획
 
-> 최종 업데이트: 2026-04-13
+> 최종 업데이트: 2026-04-16
 > 목적: PO 기준 문서 — 이 파일을 기준으로 /docs 내 다른 문서를 수정할 것
 > 원본 참조: kafka-design.md / kafka-idempotency-guide.md
 
@@ -253,40 +253,80 @@ sequenceDiagram
 ### 3-1. Payment (기존 구현 수정)
 
 **기반 인프라**
-- [ ] `JacksonConfig`: 기존 설정 검토 — `JavaTimeModule`, `WRITE_DATES_AS_TIMESTAMPS=false` 적용 여부 확인 (전 서비스 공통 필수)
+- [x] ✅ `JacksonConfig`: `JavaTimeModule`, `WRITE_DATES_AS_TIMESTAMPS=false` 적용 확인 완료
+- [x] ✅ `ShedLockConfig`: JDBC provider 기반 ShedLock 설정 완료
 
 **DB 스키마**
-- [ ] `outbox` 테이블 수정 — 수동 SQL 실행 필요
-  - `aggregate_id` BIGINT → VARCHAR(36) 타입 변경 (`ALTER COLUMN`)
-  - `aggregate_type` 컬럼 제거 (`DROP COLUMN`) — kafka-design.md §4 설계에 없는 컬럼
-  - `topic VARCHAR(128)` 컬럼 추가
-  - `partition_key VARCHAR(36)` 컬럼 추가
-  - `next_retry_at TIMESTAMP` 컬럼 추가
-  - `sent_at TIMESTAMP` 컬럼 추가
-- [ ] `processed_message` 테이블 수정: `topic VARCHAR(128)` 컬럼 추가
-- [ ] `shedlock` 테이블 생성 — 수동 SQL 실행 필요 (OutboxScheduler ShedLock 적용 전제)
-- [ ] `payment` 엔티티 `version BIGINT` 컬럼 추가 (`@Version` — 낙관적 락)
+- [x] ✅ `outbox` 테이블 수정 완료
+  - `aggregate_id` VARCHAR(36) 타입 변경, `aggregate_type` 컬럼 제거
+  - `topic VARCHAR(128)`, `partition_key VARCHAR(36)`, `next_retry_at TIMESTAMP`, `sent_at TIMESTAMP` 추가
+- [x] ✅ `processed_message` 테이블 수정: `topic VARCHAR(128)` 컬럼 추가 완료
+- [x] ✅ `shedlock` 테이블 생성 완료
+- [x] ✅ `payment` 엔티티 `version BIGINT` 컬럼 추가 (`@Version` — 낙관적 락)
 
 **Outbox / 스케줄러**
-- [ ] `Outbox`: 위 DB 스키마 변경에 맞춰 엔티티 필드 수정, `create()` 파라미터에 `topic` / `partitionKey` 추가
-- [ ] `OutboxScheduler`: `outbox.getEventType()` → `outbox.getTopic()` 사용으로 수정 — 현재 topic 자리에 eventType을 전달하는 버그
-- [ ] `OutboxRepository`: 스케줄러 쿼리에 `next_retry_at <= now()` 조건 추가
-- [ ] `OutboxScheduler`: ShedLock 적용 (분산 환경 중복 실행 방지), 지수 백오프 재시도 간격 반영 (6회, 즉시→1→2→4→8→16초, 총 최대 31초 — 상세: kafka-design.md §4)
-- [ ] Outbox 발행 시 Partition Key 설정 — `payment.completed` / `payment.failed` / `refund.completed` 및 Refund Saga Orchestration 토픽 전체(`refund.order.cancel`, `refund.ticket.cancel`, `refund.stock.restore`, `refund.order.compensate`, `refund.ticket.compensate`) 모두 `orderId`를 Key로 지정 (상세: kafka-design.md §6)
+- [x] ✅ `Outbox`: 엔티티 필드 수정 완료 — `topic`, `partitionKey`, `nextRetryAt`, `sentAt` 포함, `create()` 파라미터 반영
+- [x] ✅ `OutboxScheduler`: `outbox.getTopic()` + `outbox.getPartitionKey()` 사용으로 수정 완료
+- [x] ✅ `OutboxRepository`: 스케줄러 쿼리에 `next_retry_at IS NULL OR next_retry_at <= :now` 조건 추가 완료
+- [x] ✅ `OutboxScheduler`: ShedLock 적용 완료 (`@SchedulerLock(name = "outbox-scheduler", lockAtMostFor = "30s", lockAtLeastFor = "5s")`)
+- [x] ✅ Outbox 발행 시 Partition Key 설정 완료 — `outbox.getPartitionKey()` (fallback: aggregateId)
+- [ ] `OutboxEventProducer`: Kafka 발행 시 `X-Message-Id` 헤더 세팅 추가 필요 — 현재 헤더 미세팅, Consumer dedup이 깨짐 (kafka-design.md §4, kafka-idempotency-guide.md §3-5 참조)
 
 **Consumer 멱등성**
-- [ ] `KafkaConsumerConfig`: FixedBackOff → ExponentialBackOff(3회, 2→4→8초) 변경
-- [ ] `WalletEventConsumer`: groupId를 `payment-refund.completed` 로 수정
+- [ ] `KafkaConsumerConfig`: FixedBackOff → ExponentialBackOff(3회, 2→4→8초) 변경 — 현재 `FixedBackOff(2000L, 3L)` 사용 중
+- [ ] `WalletEventConsumer`: groupId를 `payment-refund.completed` 로 수정 — 현재 `payment-wallet-group` 사용 중
 - [ ] `WalletEventConsumer`: `markProcessed()` 위치를 `walletService` 트랜잭션 내부로 이동
-- [ ] `ProcessedMessage`: `topic VARCHAR(128)` 컬럼 추가
+- [x] ✅ `ProcessedMessage`: `topic VARCHAR(128)` 컬럼 추가 완료
 
-**이벤트 DTO** *(현재 코드 타입 불일치 — 역직렬화 실패 유발)*
-- [ ] `PaymentCompletedEvent`: 필드 타입 수정 — `userId` / `paymentId` String→UUID, `paymentMethod` String→enum, `timestamp` LocalDateTime→Instant
-- [ ] `RefundCompletedEvent`: 필드 타입 수정 — `refundId` / `userId` / `paymentId` String→UUID, `paymentMethod` String→enum, `timestamp` LocalDateTime→Instant
-- [ ] `EventCancelledEvent`: 구조 전환 — `@Getter class` → `record`, `eventId` / `sellerId` / `adminId` Long→UUID, `timestamp` LocalDateTime→Instant
+**이벤트 DTO** *(타입 수정 완료)*
+- [x] ✅ `PaymentCompletedEvent`: record 타입, `UUID` / `PaymentMethod enum` / `Instant` 적용 완료
+- [x] ✅ `RefundCompletedEvent`: record 타입, `UUID` / `PaymentMethod enum` / `Instant` 적용 완료
+- [x] ✅ `EventCancelledEvent`: record 타입, `UUID` / `CancelledBy enum` / `Instant` 적용 완료
+- [x] ✅ `PaymentFailedEvent`: record 신규 생성 완료
 
-**미구현 비즈니스 로직**
-- [ ] `WalletServiceImpl.processWalletPayment()`: 결제 완료 후 `commerceInternalClient.completePayment()` 호출 추가 — 현재 Wallet 결제 시 Order가 `PAYMENT_PENDING` → `PAID` 전이되지 않음
+**비즈니스 로직**
+- [x] ✅ `WalletServiceImpl.processWalletPayment()`: Wallet 결제 완료 시 `payment.completed` Outbox 이벤트 발행으로 전환 — Commerce가 이벤트 수신하여 Order 상태 전이 처리 (Saga 설계 §9-1 기준)
+
+**WALLET_PG 복합결제 (신규 구현)**
+
+> 사용자가 지정한 예치금 금액을 먼저 차감하고 나머지 금액을 PG(토스)로 결제하는 방식.
+> 예: 주문 10만원 → 예치금 3만원 차감 + PG 7만원 결제.
+
+*도메인 변경*
+- [ ] `PaymentMethod` enum에 `WALLET_PG` 추가
+- [ ] `Payment` 엔티티에 `walletAmount(Integer)`, `pgAmount(Integer)` 필드 추가 — PG/WALLET 단독결제 시 각각 0 저장, WALLET_PG 시 양쪽 모두 값 저장. 기존 `amount`는 총 결제금액 유지
+- [ ] `Payment.create()` 오버로딩 팩토리 추가 — `create(orderId, userId, method, amount, walletAmount, pgAmount)` (기존 PG/WALLET 호출부는 수정 불필요)
+- [ ] `PaymentReadyRequest`에 `walletAmount(Integer)` 필드 추가 — WALLET_PG일 때만 사용, PG/WALLET일 때는 null
+- [ ] `PaymentReadyResponse`에 `walletAmount(Integer)`, `pgAmount(Integer)` 필드 추가 — 프론트가 결제 구성 표시 + Toss SDK에 pgAmount 전달용
+
+*readyPayment 멱등성 가드 (PG/WALLET/WALLET_PG 공통)*
+- [ ] `readyPayment()` 진입 시 orderId 기준 기존 Payment 조회 → READY면 기존 결과 반환, SUCCESS/FAILED면 에러 — 현재 코드에 미구현, WALLET_PG에서 누락 시 예치금 이중 차감 발생 (상세: front-server-idempotency-guide.md §4-2)
+- [ ] WALLET_PG 동시성 2차 방어선: WalletTransaction transactionKey("USE_" + orderId) UNIQUE 제약 — 극단적 경쟁 조건에서 두 요청이 동시에 Payment 조회를 통과하더라도 하나만 성공
+
+*readyPayment WALLET_PG 분기*
+- [ ] `readyPayment()` 내 `PaymentMethod.WALLET_PG` 분기 추가
+- [ ] 입력값 검증: `walletAmount > 0`, `walletAmount < totalAmount`, 잔액 >= walletAmount
+- [ ] `pgAmount = totalAmount - walletAmount` 계산
+- [ ] `WalletService.deductForWalletPg(userId, orderId, walletAmount)` 호출 — 예치금 차감 + WalletTransaction(USE, "USE_" + orderId) 기록
+- [ ] Payment 생성 (READY, WALLET_PG, walletAmount/pgAmount 저장)
+- [ ] 응답에 pgAmount 포함하여 반환 → 프론트에서 pgAmount로 Toss 결제창 오픈
+
+*confirmPgPayment 수정*
+- [ ] `validatePaymentAmount()`: WALLET_PG이면 `payment.getPgAmount()` 기준으로 검증 (기존 PG는 `payment.getAmount()` 유지)
+
+*failPgPayment 수정*
+- [ ] `failPgPayment()` 내 WALLET_PG 분기 추가: `WalletService.restoreForWalletPgFail(userId, walletAmount, orderId)` 호출 — 예치금 복구 + WalletTransaction(REFUND, "PG_WALLET_RESTORE_" + orderId) 기록
+
+*WalletService 메서드 추가*
+- [ ] `WalletService` 인터페이스에 `deductForWalletPg(UUID userId, UUID orderId, int walletAmount)` 추가 — 차감만 수행, Payment approve/Outbox 발행 안 함 (processWalletPayment과 구분)
+- [ ] `WalletService` 인터페이스에 `restoreForWalletPgFail(UUID userId, int walletAmount, UUID orderId)` 추가 — 기존 restoreBalance와 용도/transactionKey가 다르므로 별도 메서드
+- [ ] `WalletServiceImpl` 위 두 메서드 구현
+
+*타임아웃 스케줄러 (WALLET_PG READY 방치 대응)*
+- [ ] READY 상태 WALLET_PG 결제가 일정 시간(팀 합의 필요, 예: 30분) 경과 시 자동 FAILED 처리 + 예치금 복구
+- [ ] ShedLock 기반 스케줄러로 구현 (기존 OutboxScheduler 패턴 참고)
+- [ ] 예치금 복구는 `restoreForWalletPgFail()` 재사용, transactionKey 멱등성으로 중복 복구 방지
+- [ ] `payment.failed` Outbox 발행 (Commerce 주문 상태 FAILED 전이 + Event 재고 복구용)
 
 **Refund Saga Orchestrator (신규 구현)**
 - [ ] `RefundSagaOrchestrator` 클래스 신규 생성 — Payment 서비스 내 `@Service`
@@ -303,8 +343,9 @@ sequenceDiagram
 - [ ] `KafkaTopics` 상수 클래스에 Orchestration 토픽 12개 추가 (상세: kafka-design.md §2)
 
 **도메인 안전장치**
-- [ ] Payment 엔티티 `approve()` / `fail()` / `cancel()` / `refund()` 메서드에 `canTransitionTo()` 상태 검증 가드 추가
-- [ ] Payment / Order 엔티티 낙관적 락 (`@Version`) 적용
+- [x] ✅ `PaymentStatus.canTransitionTo()` 상태 전이 검증 구현 완료 — READY→(SUCCESS,FAILED,CANCELLED), SUCCESS→(REFUNDED,CANCELLED), 나머지 종단
+- [ ] Payment 엔티티 `approve()` / `fail()` / `cancel()` / `refund()` 메서드 내부에 `canTransitionTo()` 가드 호출 추가 — 메서드는 존재하나 상태 변경 시 호출하지 않음
+- [x] ✅ Payment 엔티티 낙관적 락 (`@Version`) 적용 완료
 - [ ] Consumer 순서 역전 3분류 처리 구현 — ①이미 목표 상태(멱등 스킵+ACK) ②설명 가능한 역전(정책적 스킵+ACK) ③설명 불가능한 상태(throw→재시도→DLT) — 상세: kafka-design.md §5
 - [ ] Outbox 스케줄러와 Consumer 동시 처리 충돌 방지 — `@Version` 낙관적 락 + 상태 전이 검증 양쪽 적용 (상세: kafka-design.md §11 Case 9)
 
