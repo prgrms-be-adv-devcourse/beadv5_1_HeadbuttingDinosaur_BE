@@ -1,7 +1,37 @@
-jwt:
-  secret-key: ${JWT_SECRET_KEY}
-
 spring:
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+            - id: member-service
+              uri: http://member:8081
+              predicates:
+                - Path=/api/auth/**, /api/users/**, /api/seller-applications, /api/seller-applications/**, /api/mypage/**, /api/tech-stacks
+            - id: commerce-service
+              uri: http://commerce:8083
+              predicates:
+                - Path=/api/cart, /api/cart/**, /api/orders, /api/orders/**, /api/tickets, /api/tickets/**, /api/seller/events/{eventId}/participants
+            - id: event-service
+              uri: http://event:8082
+              predicates:
+                - Path=/api/events, /api/events/**, /api/seller/events, /api/seller/events/**
+            - id: payment-service
+              uri: http://payment:8084
+              predicates:
+                - Path=/api/payments/**, /api/wallet, /api/wallet/**, /api/wallets/**, /api/refunds, /api/refunds/**
+            - id: settlement-service
+              uri: http://settlement:8085
+              predicates:
+                - Path=/api/settlements/**, /api/seller/settlements, /api/seller/settlements/**
+            - id: log-service
+              uri: http://log:8086
+              predicates:
+                - Path=/api/logs/**
+            - id: admin-service
+              uri: http://admin:8087
+              predicates:
+                - Path=/api/admin/**
   security:
     oauth2:
       client:
@@ -10,20 +40,22 @@ spring:
             client-id: ${GOOGLE_CLIENT_ID}
             client-secret: ${GOOGLE_CLIENT_SECRET}
 
+jwt:
+  secret-key: ${JWT_SECRET_KEY}
+  access-token-ttl: 1800000
+  refresh-token-ttl: 604800000
+
 services:
   member:
-    url: ${MEMBER_SERVICE_URL}
+    url: http://member:8081
 
 oauth2:
   redirect-uri: ${OAUTH_REDIRECT_URI}
-  access-token-ttl: 1800000
-  refresh-token-ttl: 604800000
 
 logging:
   level:
     com.devticket: INFO
 
-# 운영 환경 Swagger 비활성화
 springdoc:
   api-docs:
     enabled: false
