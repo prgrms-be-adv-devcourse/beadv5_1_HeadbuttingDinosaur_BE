@@ -5,13 +5,13 @@ import com.devticket.payment.common.messaging.MessageDeduplicationService;
 import com.devticket.payment.payment.domain.enums.PaymentMethod;
 import com.devticket.payment.wallet.application.event.EventCancelledEvent;
 import com.devticket.payment.wallet.application.event.RefundCompletedEvent;
-import com.devticket.payment.wallet.application.service.WalletService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.common.header.Header;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Component;
@@ -21,7 +21,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class WalletEventConsumer {
 
-    private final WalletService walletService;
+    private final RefundCompletedHandler refundCompletedHandler;
     private final MessageDeduplicationService deduplicationService;
     private final ObjectMapper objectMapper;
 
@@ -30,13 +30,13 @@ public class WalletEventConsumer {
      */
     @KafkaListener(
         topics = KafkaTopics.REFUND_COMPLETED,
-        groupId = "payment-wallet-group",
+        groupId = "payment-refund.completed",
         containerFactory = "kafkaListenerContainerFactory"
     )
     public void consumeRefundCompleted(ConsumerRecord<String, String> record, Acknowledgment ack) {
-        String messageId = buildMessageId(record);
+        UUID messageUUID = extractMessageId(record);
 
-        if (deduplicationService.isDuplicate(toMessageUUID(messageId))) {
+        if (deduplicationService.isDuplicate(messageUUID)) {
             log.info("[Consumer] 중복 메시지 스킵 — topic={}, offset={}", record.topic(), record.offset());
             ack.acknowledge();
             return;
@@ -45,23 +45,26 @@ public class WalletEventConsumer {
         try {
             RefundCompletedEvent event = objectMapper.readValue(record.value(), RefundCompletedEvent.class);
 
-            // 예치금 결제건만 복구 처리 (PG는 이미 PG 취소로 처리됨)
             if (PaymentMethod.WALLET == event.paymentMethod()) {
-                walletService.restoreBalance(
+                // restoreBalance + markProcessed를 하나의 @Transactional에서 처리
+                refundCompletedHandler.restoreBalanceAndMarkProcessed(
                     event.userId(),
                     event.refundAmount(),
                     event.refundId(),
-                    event.orderId()
+                    event.orderId(),
+                    messageUUID,
+                    record.topic()
                 );
+            } else {
+                // PG 결제건은 복구 불필요 — dedup만 기록
+                refundCompletedHandler.markProcessedOnly(messageUUID, record.topic());
             }
 
-            deduplicationService.markProcessed(toMessageUUID(messageId), record.topic());
             ack.acknowledge();
 
         } catch (Exception e) {
             log.error("[Consumer] refund.completed 처리 실패 — messageId={}, error={}",
-                messageId, e.getMessage(), e);
-            // DefaultErrorHandler가 3회 재시도 후 DLT(refund.completed.DLT)로 이동
+                messageUUID, e.getMessage(), e);
             throw new RuntimeException("refund.completed 처리 실패", e);
         }
     }
@@ -75,9 +78,9 @@ public class WalletEventConsumer {
         containerFactory = "kafkaListenerContainerFactory"
     )
     public void consumeEventCancelled(ConsumerRecord<String, String> record, Acknowledgment ack) {
-        String messageId = buildMessageId(record);
+        UUID messageUUID = extractMessageId(record);
 
-        if (deduplicationService.isDuplicate(toMessageUUID(messageId))) {
+        if (deduplicationService.isDuplicate(messageUUID)) {
             log.info("[Consumer] 중복 메시지 스킵 — topic={}, offset={}", record.topic(), record.offset());
             ack.acknowledge();
             return;
@@ -95,25 +98,32 @@ public class WalletEventConsumer {
                 "event.cancelled 일괄 환불 미구현 — Refund 모듈 완성 후 처리 예정. eventId=" + event.eventId());
 
             // walletService.processBatchRefund(event.eventId());
-            // deduplicationService.markProcessed(toMessageUUID(messageId));
+            // refundCompletedHandler.markProcessedOnly(messageUUID, record.topic());
             // ack.acknowledge();
 
         } catch (Exception e) {
             log.error("[Consumer] event.cancelled 처리 실패 — messageId={}, error={}",
-                messageId, e.getMessage(), e);
+                messageUUID, e.getMessage(), e);
             throw new RuntimeException("event.cancelled 처리 실패", e);
         }
     }
 
-    private String buildMessageId(ConsumerRecord<String, String> record) {
-        return record.topic() + ":" + record.partition() + ":" + record.offset();
-    }
-
     /**
-     * topic:partition:offset 형식의 messageId를 결정적 UUID로 변환 MessageDeduplicationService가 UUID를 요구하므로 name-based UUID(v3)
-     * 사용
+     * Kafka 헤더에서 X-Message-Id를 추출한다.
+     * 헤더가 없거나 파싱 실패 시 topic:partition:offset 기반 결정적 UUID(v3)로 폴백한다.
      */
-    private UUID toMessageUUID(String messageId) {
-        return UUID.nameUUIDFromBytes(messageId.getBytes(StandardCharsets.UTF_8));
+    private UUID extractMessageId(ConsumerRecord<String, String> record) {
+        Header header = record.headers().lastHeader("X-Message-Id");
+        if (header != null) {
+            try {
+                return UUID.fromString(new String(header.value(), StandardCharsets.UTF_8));
+            } catch (IllegalArgumentException e) {
+                log.warn("[Consumer] X-Message-Id 파싱 실패, 레거시 폴백 사용 — topic={}, offset={}",
+                    record.topic(), record.offset());
+            }
+        }
+        // 폴백: 헤더 없거나 파싱 실패 시 topic:partition:offset 기반 결정적 UUID
+        String fallback = record.topic() + ":" + record.partition() + ":" + record.offset();
+        return UUID.nameUUIDFromBytes(fallback.getBytes(StandardCharsets.UTF_8));
     }
 }

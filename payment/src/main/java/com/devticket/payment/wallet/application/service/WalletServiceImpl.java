@@ -392,6 +392,7 @@ public class WalletServiceImpl implements WalletService {
             refundId, amount, wallet.getBalance());
     }
 
+
     // =====================================================================
     // event.force-cancelled / event.sale-stopped — 일괄 환불
     // =====================================================================
