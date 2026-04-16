@@ -30,6 +30,10 @@ public interface WalletService {
 
     void restoreBalanceWithDedup(UUID userId, int amount, UUID refundId, UUID orderId, UUID messageId);
 
+    void deductForWalletPg(UUID userId, UUID orderId, int walletAmount);
+
+    void restoreForWalletPgFail(UUID userId, int walletAmount, UUID orderId);
+
     void processBatchRefund(UUID eventId);
 
     void recoverStalePendingCharge(UUID chargeId);
