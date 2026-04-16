@@ -24,7 +24,7 @@ jwt:
 
 internal:
   member-service:
-    url: http://localhost:8081
+    url: http://member:8081
 
 logging:
   level:
