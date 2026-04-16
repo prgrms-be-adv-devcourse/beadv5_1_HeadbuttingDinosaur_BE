@@ -1,7 +1,7 @@
 name: CD - Gateway (Dev)
 on:
   push:
-    branches: ["develop"]
+    branches: ["develop/gateway"]
     paths: ["apigateway/**"]
 
 jobs:
