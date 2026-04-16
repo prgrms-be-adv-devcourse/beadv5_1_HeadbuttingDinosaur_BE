@@ -494,4 +494,91 @@ class WalletChargeConcurrencyIntegrationTest {
 
         executor.shutdown();
     }
+
+    // =========================================================================
+    // 테스트 confirm-2: 기존 유저 — 다른 chargeId들 동시 confirm (여러 기기)
+    //
+    // 시나리오: 기존 Wallet 유저가 5건의 충전 인증을 각기 다른 기기에서 동시에 confirm
+    // 방어: 각 chargeId별 비관적 락 → 서로 독립적 처리
+    // 검증: 5건 모두 COMPLETED + 잔액 = 5 × 충전금액 + WalletTransaction 5건
+    // =========================================================================
+    @Test
+    @DisplayName(" 다른 chargeId로 동시 confirm 5건 시 모두 잔액에 반영된다")
+    void 다른_chargeId_동시_confirm_모두_반영() throws InterruptedException {
+        // given — PENDING 상태 WalletCharge 5건 생성
+        int threadCount = 5;
+        int chargeAmount = 20_000;
+
+        List<String> chargeIds = new ArrayList<>();
+        for (int i = 0; i < threadCount; i++) {
+            WalletChargeResponse r = walletService.charge(
+                userId, new WalletChargeRequest(chargeAmount), "confirm2-" + i + "-" + UUID.randomUUID()
+            );
+            chargeIds.add(r.chargeId());
+        }
+
+        // PG Mock: 호출마다 고유한 paymentKey 반환
+        Mockito.when(pgPaymentClient.confirm(Mockito.any()))
+            .thenAnswer(inv -> new PgPaymentConfirmResult(
+                "pk_" + UUID.randomUUID(), null, "카드", "DONE", chargeAmount, "2026-04-15T15:00:00"
+            ));
+
+        int beforeBalance = walletRepository.findByUserId(userId).orElseThrow().getBalance();
+
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        CountDownLatch ready = new CountDownLatch(threadCount);
+        CountDownLatch start = new CountDownLatch(1);
+        CountDownLatch done = new CountDownLatch(threadCount);
+
+        AtomicInteger completedCount = new AtomicInteger(0);
+        AtomicInteger failedCount = new AtomicInteger(0);
+        AtomicInteger errorCount = new AtomicInteger(0);
+
+        // when — 각 스레드가 서로 다른 chargeId를 confirm
+        for (int i = 0; i < threadCount; i++) {
+            final String chargeId = chargeIds.get(i);
+            executor.submit(() -> {
+                ready.countDown();
+                try {
+                    start.await();
+                    WalletChargeConfirmResponse response = walletService.confirmCharge(
+                        userId,
+                        new WalletChargeConfirmRequest("dummy_pk_" + chargeId, chargeId, chargeAmount)
+                    );
+                    if ("COMPLETED".equals(response.status())) {
+                        completedCount.incrementAndGet();
+                    } else {
+                        failedCount.incrementAndGet();
+                    }
+                } catch (Exception e) {
+                    errorCount.incrementAndGet();
+                    System.out.println("  에러: " + e.getMessage());
+                } finally {
+                    done.countDown();
+                }
+            });
+        }
+
+        ready.await();
+        start.countDown();
+        done.await();
+
+        // then
+        int afterBalance = walletRepository.findByUserId(userId).orElseThrow().getBalance();
+        int increased = afterBalance - beforeBalance;
+
+        System.out.println("========== 기존 유저 다른 chargeId 동시 confirm 테스트 결과 ==========");
+        System.out.println("COMPLETED: " + completedCount.get() + "건");
+        System.out.println("FAILED: " + failedCount.get() + "건");
+        System.out.println("에러: " + errorCount.get() + "건");
+        System.out.println("잔액 변화: " + beforeBalance + " → " + afterBalance + " (+" + increased + "원)");
+
+        assertThat(completedCount.get()).isEqualTo(threadCount);
+        assertThat(errorCount.get()).isEqualTo(0);
+        assertThat(increased).isEqualTo(chargeAmount * threadCount);
+
+        executor.shutdown();
+    }
+
+
 }
