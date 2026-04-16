@@ -19,7 +19,7 @@ jobs:
       - name: Build and Push
         run: |
           IMAGE=${{ secrets.DOCKERHUB_USERNAME }}/devticket-domain-log:dev
-          docker build -t $IMAGE ./log
+          docker build -t $IMAGE ./fastify-log
           docker push $IMAGE
 
       - name: Deploy to k3s
