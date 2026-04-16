@@ -25,6 +25,10 @@ jwt:
 internal:
   member-service:
     url: http://member:8081
+  event-service:
+    url: http://event:8082
+  settlement-service:
+    url: http://settlement:8085
 
 logging:
   level:
