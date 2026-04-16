@@ -1,4 +1,4 @@
-package org.example.ai.presentation.dto.controller;
+package org.example.ai.presentation.controller;
 
 import lombok.RequiredArgsConstructor;
 
