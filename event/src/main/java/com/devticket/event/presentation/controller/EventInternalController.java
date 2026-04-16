@@ -7,6 +7,7 @@ import com.devticket.event.presentation.dto.internal.InternalBulkEventInfoReques
 import com.devticket.event.presentation.dto.internal.InternalBulkEventInfoResponse;
 import com.devticket.event.presentation.dto.internal.InternalBulkStockAdjustmentRequest;
 import com.devticket.event.presentation.dto.internal.InternalPagedEventResponse;
+import com.devticket.event.presentation.dto.internal.InternalEndedEventsResponse;
 import com.devticket.event.presentation.dto.internal.InternalStockAdjustmentResponse;
 import com.devticket.event.presentation.dto.internal.InternalEventInfoResponse;
 import com.devticket.event.presentation.dto.internal.InternalPurchaseValidationResponse;
@@ -16,6 +17,7 @@ import com.devticket.event.presentation.dto.internal.InternalStockOperationRespo
 import com.devticket.event.presentation.dto.internal.InternalStockRestoreRequest;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -136,6 +138,18 @@ public class EventInternalController {
         @RequestParam(required = false) EventStatus status) {
         return ResponseEntity.ok(SuccessResponse.success(
             eventInternalService.getEventsBySeller(sellerId, status)
+        ));
+    }
+
+    /**
+     * API 8: 특정 날짜에 개최된 이벤트 목록 조회
+     * eventDateTime의 날짜가 date와 일치하는 이벤트의 id, eventId, sellerId 반환
+     */
+    @GetMapping("/ended")
+    public ResponseEntity<SuccessResponse<InternalEndedEventsResponse>> getEndedEventsByDate(
+        @RequestParam LocalDate date) {
+        return ResponseEntity.ok(SuccessResponse.success(
+            eventInternalService.getEndedEventsByDate(date)
         ));
     }
 
