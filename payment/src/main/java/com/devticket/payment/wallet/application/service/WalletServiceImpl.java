@@ -15,7 +15,10 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import com.devticket.payment.common.messaging.KafkaTopics;
 import com.devticket.payment.common.outbox.OutboxService;
@@ -62,6 +65,7 @@ public class WalletServiceImpl implements WalletService {
     private final PgPaymentClient pgPaymentClient;
     private final OutboxService outboxService;
     private final CommerceInternalClient commerceInternalClient;
+    private final PlatformTransactionManager txManager;
 
     // =====================================================================
     // 충전 시작(결제인증에 필요한 WalletCharge생성-chargeId)
@@ -73,7 +77,7 @@ public class WalletServiceImpl implements WalletService {
     public WalletChargeResponse charge(UUID userId, WalletChargeRequest request,
         String idempotencyKey) {
 
-        //멱등성 체크
+        //1차 멱등성 체크 : 이미 Wallet이 존재하는 경우(기존 사용자)
         Optional<WalletCharge> existing =
             walletChargeRepository.findByUserIdAndIdempotencyKey(userId, idempotencyKey);
         if (existing.isPresent()) {
@@ -81,14 +85,30 @@ public class WalletServiceImpl implements WalletService {
         }
 
         //예치금 지갑 조회 — 비관적 락으로 한도 체크 구간 직렬화
-        // 동일 사용자의 동시 충전 요청이 같은 todayTotal을 읽고 모두 한도를 통과하는 오류 수정
+        Optional<Wallet> existingWallet = walletRepository.findByUserIdForUpdate(userId);
         Wallet wallet;
-        try {
+        //Wallet이 존재
+        if (existingWallet.isPresent()) {
+            wallet = existingWallet.get();
+        } else {
+            //wallet이 존재하지 않는 경우 내부에서 새로운 세션으로 wallet생성 진행
+            //지갑중복생성 예외가 발행해도 메인 트랜잭션은 롤백되지 않고 로직을 이어갈수 있음.
+            TransactionTemplate requiresNew = new TransactionTemplate(txManager);
+            requiresNew.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+            try {
+                requiresNew.executeWithoutResult(s -> walletRepository.save(Wallet.create(userId)));
+            } catch (DataIntegrityViolationException ignored) {
+            }
+            //wallet생성시 중복오류가 발생한경우_외부 세션은 살아있으므로 wallet 조회 진행
             wallet = walletRepository.findByUserIdForUpdate(userId)
-                .orElseGet(() -> walletRepository.save(Wallet.create(userId)));
-        } catch (DataIntegrityViolationException e) {
-            wallet = walletRepository.findByUserIdForUpdate(userId)
-                .orElseThrow(() -> e);
+                .orElseThrow(() -> new WalletException(WalletErrorCode.WALLET_NOT_FOUND));
+        }
+
+        //2차 멱등성 체크 : 기존에 Wallet이 존재하지 않았고 이번에 새롭게 생성한 경우(신규사용자)
+        Optional<WalletCharge> reCheckExisting =
+            walletChargeRepository.findByUserIdAndIdempotencyKey(userId, idempotencyKey);
+        if (reCheckExisting.isPresent()) {
+            return WalletChargeResponse.from(reCheckExisting.get());
         }
 
         //일일 충전 한도 체크
@@ -98,18 +118,13 @@ public class WalletServiceImpl implements WalletService {
             throw new WalletException(WalletErrorCode.DAILY_CHARGE_LIMIT_EXCEEDED);
         }
 
-        //WalletCharge생성(PG결제를 위한 chargeId생성됨)
-        try {
-            WalletCharge walletCharge = WalletCharge.create(
-                wallet.getId(), userId, request.amount(), idempotencyKey);
-            walletChargeRepository.save(walletCharge);
-            return WalletChargeResponse.from(walletCharge);
-        } catch (DataIntegrityViolationException e) {
-            return walletChargeRepository.findByUserIdAndIdempotencyKey(userId, idempotencyKey)
-                .map(WalletChargeResponse::from)
-                .orElseThrow(() -> e);
-        }
+        // WalletCharge 생성
+        WalletCharge walletCharge = WalletCharge.create(
+            wallet.getId(), userId, request.amount(), idempotencyKey);
+        walletChargeRepository.save(walletCharge);
+        return WalletChargeResponse.from(walletCharge);
     }
+
 
     // =====================================================================
     // 충전 승인
