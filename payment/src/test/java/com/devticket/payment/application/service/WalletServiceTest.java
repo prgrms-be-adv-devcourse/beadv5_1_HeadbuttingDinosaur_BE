@@ -301,7 +301,7 @@ class WalletServiceTest {
 
             // then
             then(walletRepository).should(times(1)).useBalanceAtomic(USER_ID, 50_000);
-            then(outboxService).should(times(1)).save(anyString(), anyLong(), eq(KafkaTopics.PAYMENT_COMPLETED), any());
+            then(outboxService).should(times(1)).save(anyString(), eq(KafkaTopics.PAYMENT_COMPLETED), eq(KafkaTopics.PAYMENT_COMPLETED), anyString(), any());
         }
 
         @Test
@@ -314,7 +314,7 @@ class WalletServiceTest {
 
             // then: atomic update 및 이벤트 발행 없음
             then(walletRepository).should(never()).useBalanceAtomic(any(), anyInt());
-            then(outboxService).should(never()).save(anyString(), anyLong(), anyString(), any());
+            then(outboxService).should(never()).save(anyString(), anyString(), anyString(), anyString(), any());
         }
 
         @Test
@@ -330,7 +330,7 @@ class WalletServiceTest {
                 .extracting(e -> ((WalletException) e).getErrorCode())
                 .isEqualTo(WalletErrorCode.INSUFFICIENT_BALANCE);
 
-            then(outboxService).should(never()).save(anyString(), anyLong(), anyString(), any());
+            then(outboxService).should(never()).save(anyString(), anyString(), anyString(), anyString(), any());
         }
 
         @Test
@@ -444,6 +444,7 @@ class WalletServiceTest {
             UUID chargeId = UUID.randomUUID();
             WalletCharge walletCharge = pendingCharge(chargeId, USER_ID, 10_000);
             given(walletChargeRepository.findByChargeIdForUpdate(chargeId)).willReturn(Optional.of(walletCharge));
+
             given(pgPaymentClient.findPaymentByOrderId(chargeId.toString()))
                 .willThrow(new RuntimeException("PG timeout"));
 
@@ -461,6 +462,7 @@ class WalletServiceTest {
             UUID chargeId = UUID.randomUUID();
             WalletCharge walletCharge = pendingCharge(chargeId, USER_ID, 10_000);
             given(walletChargeRepository.findByChargeIdForUpdate(chargeId)).willReturn(Optional.of(walletCharge));
+
             given(pgPaymentClient.findPaymentByOrderId(chargeId.toString())).willReturn(Optional.empty());
 
             // when
@@ -480,6 +482,7 @@ class WalletServiceTest {
             Wallet wallet = walletWithBalance(60_000); // 충전 후 잔액
 
             given(walletChargeRepository.findByChargeIdForUpdate(chargeId)).willReturn(Optional.of(walletCharge));
+
             given(pgPaymentClient.findPaymentByOrderId(chargeId.toString()))
                 .willReturn(Optional.of(new TossPaymentStatusResponse(
                     paymentKey, chargeId.toString(), "DONE", 10_000, "2024-01-01T12:00:00")));
@@ -506,6 +509,7 @@ class WalletServiceTest {
             WalletCharge walletCharge = pendingCharge(chargeId, USER_ID, 10_000);
 
             given(walletChargeRepository.findByChargeIdForUpdate(chargeId)).willReturn(Optional.of(walletCharge));
+
             given(pgPaymentClient.findPaymentByOrderId(chargeId.toString()))
                 .willReturn(Optional.of(new TossPaymentStatusResponse(
                     paymentKey, chargeId.toString(), "DONE", 10_000, "2024-01-01T12:00:00")));
@@ -526,6 +530,7 @@ class WalletServiceTest {
             UUID chargeId = UUID.randomUUID();
             WalletCharge walletCharge = pendingCharge(chargeId, USER_ID, 10_000);
             given(walletChargeRepository.findByChargeIdForUpdate(chargeId)).willReturn(Optional.of(walletCharge));
+
             given(pgPaymentClient.findPaymentByOrderId(chargeId.toString()))
                 .willReturn(Optional.of(new TossPaymentStatusResponse(
                     null, chargeId.toString(), "CANCELED", 10_000, null)));
@@ -544,6 +549,7 @@ class WalletServiceTest {
             UUID chargeId = UUID.randomUUID();
             WalletCharge walletCharge = pendingCharge(chargeId, USER_ID, 10_000);
             given(walletChargeRepository.findByChargeIdForUpdate(chargeId)).willReturn(Optional.of(walletCharge));
+
             given(pgPaymentClient.findPaymentByOrderId(chargeId.toString()))
                 .willReturn(Optional.of(new TossPaymentStatusResponse(
                     null, chargeId.toString(), "ABORTED", 10_000, null)));

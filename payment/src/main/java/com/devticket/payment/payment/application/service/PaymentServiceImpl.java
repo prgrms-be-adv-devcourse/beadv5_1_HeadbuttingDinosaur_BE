@@ -1,7 +1,9 @@
 package com.devticket.payment.payment.application.service;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.UUID;
 
 import lombok.RequiredArgsConstructor;
@@ -11,6 +13,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.devticket.payment.common.exception.BusinessException;
+import com.devticket.payment.common.messaging.KafkaTopics;
+import com.devticket.payment.common.outbox.OutboxService;
 import com.devticket.payment.payment.application.dto.PgPaymentConfirmCommand;
 import com.devticket.payment.payment.application.dto.PgPaymentConfirmResult;
 import com.devticket.payment.payment.domain.enums.PaymentMethod;
@@ -29,12 +33,9 @@ import com.devticket.payment.payment.presentation.dto.PaymentFailRequest;
 import com.devticket.payment.payment.presentation.dto.PaymentFailResponse;
 import com.devticket.payment.payment.presentation.dto.PaymentReadyRequest;
 import com.devticket.payment.payment.presentation.dto.PaymentReadyResponse;
-import com.devticket.payment.wallet.domain.exception.WalletErrorCode;
-import com.devticket.payment.wallet.domain.exception.WalletException;
-import com.devticket.payment.wallet.domain.model.Wallet;
-import com.devticket.payment.wallet.domain.model.WalletTransaction;
-import com.devticket.payment.wallet.domain.repository.WalletRepository;
-import com.devticket.payment.wallet.domain.repository.WalletTransactionRepository;
+import com.devticket.payment.wallet.application.event.PaymentCompletedEvent;
+import com.devticket.payment.wallet.application.event.PaymentFailedEvent;
+import com.devticket.payment.wallet.application.service.WalletService;
 
 @Service
 @RequiredArgsConstructor
@@ -45,10 +46,10 @@ public class PaymentServiceImpl implements PaymentService {
     private static final int MAX_FAILURE_REASON_LENGTH = 255;
 
     private final PaymentRepository paymentRepository;
-    private final WalletRepository walletRepository;
-    private final WalletTransactionRepository walletTransactionRepository;
     private final CommerceInternalClient commerceInternalClient;
     private final PgPaymentClient pgPaymentClient;
+    private final OutboxService outboxService;
+    private final WalletService walletService;
 
     //결제 준비
     @Override
@@ -69,9 +70,12 @@ public class PaymentServiceImpl implements PaymentService {
 
         Payment savedPayment = paymentRepository.save(payment);
 
-        //예치금 결제일 경우 - 바로 결제
+        //예치금 결제일 경우 - WalletService로 위임 (원자적 UPDATE + Outbox 발행)
         if (request.paymentMethod() == PaymentMethod.WALLET) {
-            return processWalletPayment(userId, order, request.orderId(), savedPayment);
+            walletService.processWalletPayment(userId, request.orderId(), order.totalAmount());
+            Payment updated = paymentRepository.findByOrderId(order.id())
+                .orElseThrow(() -> new PaymentException(PaymentErrorCode.INVALID_PAYMENT_REQUEST));
+            return PaymentReadyResponse.from(updated, request.orderId(), order.orderNumber(), order.status());
         }
 
         return PaymentReadyResponse.from(
@@ -91,9 +95,9 @@ public class PaymentServiceImpl implements PaymentService {
         Payment payment = paymentRepository.findByOrderId(order.id())
             .orElseThrow(() -> new PaymentException(PaymentErrorCode.INVALID_PAYMENT_REQUEST));
 
-        validateOrderOwner(payment.getUserId(), userId); // 올바른 사용자인지 확인
-        validatePaymentStatus(payment, request.paymentId()); // 결제 상태 검증 (중복 승인 방지)
-        validatePaymentAmount(payment, request); // 금액 검증
+        validateOrderOwner(payment.getUserId(), userId);
+        validatePaymentStatus(payment, request.paymentId());
+        validatePaymentAmount(payment, request);
 
         // PG 승인 요청
         PgPaymentConfirmResult result = confirmWithPg(request);
@@ -102,72 +106,24 @@ public class PaymentServiceImpl implements PaymentService {
         payment.approve(result.paymentKey(), parseApprovedAt(result.approvedAt()));
         paymentRepository.save(payment);
 
-        // 주문 완료 처리 — 실패 시 PG 취소 후 보상
-        try {
-            commerceInternalClient.completePayment(payment.getOrderId());
-        } catch (Exception e) {
-            log.error(
-                "주문 완료 처리 실패. PG 취소 보상 트랜잭션 시도: orderId={}, paymentKey={}",
-                payment.getOrderId(),
-                payment.getPaymentKey(),
-                e
-            );
-            cancelPgPayment(payment);
-
-            throw new PaymentException(PaymentErrorCode.ORDER_COMPLETE_FAILED);
-        }
+        // payment.completed Outbox 발행 (트랜잭션 내)
+        PaymentCompletedEvent event = PaymentCompletedEvent.builder()
+            .orderId(payment.getOrderId())
+            .userId(payment.getUserId())
+            .paymentId(payment.getPaymentId())
+            .paymentMethod(payment.getPaymentMethod())
+            .totalAmount(payment.getAmount())
+            .timestamp(Instant.now())
+            .build();
+        outboxService.save(
+            payment.getPaymentId().toString(),
+            KafkaTopics.PAYMENT_COMPLETED,
+            KafkaTopics.PAYMENT_COMPLETED,
+            payment.getOrderId().toString(),
+            event
+        );
 
         return PaymentConfirmResponse.from(payment);
-    }
-
-    //예치금 결제
-    private PaymentReadyResponse processWalletPayment(
-        UUID userId,
-        InternalOrderInfoResponse order,
-        UUID orderId,
-        Payment payment
-    ) {
-        Wallet wallet = walletRepository.findByUserId(userId)
-            .orElseThrow(() -> new WalletException(WalletErrorCode.WALLET_NOT_FOUND));
-
-        String transactionKey = "WALLET:PAY:" + orderId;
-
-        boolean exists = walletTransactionRepository.existsByTransactionKey(transactionKey);
-        if (exists) {
-            throw new PaymentException(PaymentErrorCode.ALREADY_PROCESSED_PAYMENT);
-        }
-
-        if (wallet.getBalance() < order.totalAmount()) {
-            throw new WalletException(WalletErrorCode.INSUFFICIENT_BALANCE);
-        }
-
-        //잔액 차감
-        //TODO : 재시도 로직 추가 OR Atomic Update메서드 사용방식으로 변경하기
-        wallet.use(payment.getAmount());
-
-        //wallet transaction 생성
-        WalletTransaction walletTransaction = WalletTransaction.createUse(
-            wallet.getId(),
-            userId,
-            transactionKey,
-            payment.getAmount(),
-            wallet.getBalance(),
-            payment.getOrderId()
-        );
-
-        walletTransactionRepository.save(walletTransaction);
-
-        //결제 상태 SUCCESS로 변경
-        payment.approve("WALLET-" + payment.getPaymentId());
-
-        //TODO: 주문 완료 처리 추가
-
-        return PaymentReadyResponse.from(
-            payment,
-            orderId,
-            order.orderNumber(),
-            order.status()
-        );
     }
 
     //올바른 사용자인지 확인
@@ -219,11 +175,27 @@ public class PaymentServiceImpl implements PaymentService {
         log.info("PG 결제 실패 처리 완료: orderId={}, code={}, message={}",
             request.orderId(), request.code(), request.message());
 
-        try {
-            commerceInternalClient.failOrder(order.id());
-        } catch (Exception e) {
-            log.error("주문 실패 처리 중 Commerce 연동 오류: orderId={}", order.id(), e);
-        }
+        // payment.failed Outbox 발행 (트랜잭션 내)
+        List<PaymentFailedEvent.OrderItem> orderItems = order.orderItems() == null
+            ? List.of()
+            : order.orderItems().stream()
+                .map(item -> new PaymentFailedEvent.OrderItem(item.eventId(), item.quantity()))
+                .toList();
+
+        PaymentFailedEvent event = PaymentFailedEvent.builder()
+            .orderId(payment.getOrderId())
+            .userId(payment.getUserId())
+            .orderItems(orderItems)
+            .reason(reason)
+            .timestamp(Instant.now())
+            .build();
+        outboxService.save(
+            payment.getPaymentId().toString(),
+            KafkaTopics.PAYMENT_FAILED,
+            KafkaTopics.PAYMENT_FAILED,
+            payment.getOrderId().toString(),
+            event
+        );
 
         return PaymentFailResponse.from(payment);
     }
@@ -268,32 +240,6 @@ public class PaymentServiceImpl implements PaymentService {
         );
     }
 
-    private void cancelPgPayment(Payment payment) {
-        try {
-            pgPaymentClient.cancel(payment.getPaymentKey(), "주문 완료 처리 실패로 인한 자동 취소");
-
-            payment.fail("주문 완료 처리 실패로 승인 후 자동 취소됨");
-            paymentRepository.save(payment);
-
-            log.warn(
-                "PG 자동 취소 성공: orderId={}, paymentKey={}",
-                payment.getOrderId(),
-                payment.getPaymentKey()
-            );
-        } catch (Exception e) {
-            log.error(
-                "PG 자동 취소 실패 - 수동 확인 필요: orderId={}, paymentKey={}",
-                payment.getOrderId(),
-                payment.getPaymentKey(),
-                e
-            );
-
-            payment.fail("주문 완료 처리 실패 및 PG 자동 취소 실패");
-            paymentRepository.save(payment);
-
-            throw new PaymentException(PaymentErrorCode.PG_REFUND_FAILED);
-        }
-    }
 
 
     private LocalDateTime parseApprovedAt(String approvedAt) {

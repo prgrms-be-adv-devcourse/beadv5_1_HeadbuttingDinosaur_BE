@@ -1,13 +1,13 @@
 package com.devticket.payment.common.outbox;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 public record OutboxEventMessage(
     UUID messageId,
     String eventType,
     String payload,
-    LocalDateTime timestamp
+    Instant timestamp
 ) {
 
     public static OutboxEventMessage from(Outbox outbox) {
@@ -15,7 +15,7 @@ public record OutboxEventMessage(
             outbox.getMessageId(),
             outbox.getEventType(),
             outbox.getPayload(),
-            LocalDateTime.now()
+            Instant.now()
         );
     }
 }

@@ -1,17 +1,18 @@
 package com.devticket.payment.wallet.application.event;
 
-import java.time.LocalDateTime;
+import com.devticket.payment.payment.domain.enums.PaymentMethod;
+import java.time.Instant;
 import java.util.UUID;
 import lombok.Builder;
 
 @Builder
 public record PaymentCompletedEvent(
     UUID orderId,
-    String userId,
-    String paymentId,
-    String paymentMethod, // "WALLET" | "PG"
+    UUID userId,
+    UUID paymentId,
+    PaymentMethod paymentMethod,
     int totalAmount,
-    LocalDateTime timestamp
+    Instant timestamp
 ) {
 
 }

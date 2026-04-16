@@ -1,5 +1,6 @@
 package com.devticket.payment.wallet.application.service;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -20,6 +21,7 @@ import com.devticket.payment.common.messaging.KafkaTopics;
 import com.devticket.payment.common.outbox.OutboxService;
 import com.devticket.payment.payment.application.dto.PgPaymentConfirmCommand;
 import com.devticket.payment.payment.application.dto.PgPaymentConfirmResult;
+import com.devticket.payment.payment.domain.enums.PaymentMethod;
 import com.devticket.payment.payment.domain.enums.PaymentStatus;
 import com.devticket.payment.payment.domain.model.Payment;
 import com.devticket.payment.payment.domain.repository.PaymentRepository;
@@ -143,7 +145,6 @@ public class WalletServiceImpl implements WalletService {
             ));
         } catch (Exception e) {
             log.error("[WalletCharge] PG 승인 실패 — chargeId={}, error={}", chargeId, e.getMessage());
-            //PG결제승인 실패시 기존에 생성된 WalletCharge의 상태값 FAILED로 변경
             walletCharge.fail();
             return WalletChargeConfirmResponse.from(
                 walletCharge.getChargeId().toString(), walletCharge.getAmount(),
@@ -309,13 +310,19 @@ public class WalletServiceImpl implements WalletService {
 
         PaymentCompletedEvent event = PaymentCompletedEvent.builder()
             .orderId(orderId)
-            .userId(userId.toString())
-            .paymentId(payment.getPaymentId().toString())
-            .paymentMethod("WALLET")
+            .userId(userId)
+            .paymentId(payment.getPaymentId())
+            .paymentMethod(PaymentMethod.WALLET)
             .totalAmount(amount)
-            .timestamp(LocalDateTime.now())
+            .timestamp(Instant.now())
             .build();
-        outboxService.save("PAYMENT", payment.getId(), KafkaTopics.PAYMENT_COMPLETED, event);
+        outboxService.save(
+            payment.getPaymentId().toString(),
+            KafkaTopics.PAYMENT_COMPLETED,
+            KafkaTopics.PAYMENT_COMPLETED,
+            orderId.toString(),
+            event
+        );
 
         log.info("[WalletPayment] 예치금 결제 완료 — orderId={}, amount={}, balanceAfter={}",
             orderId, amount, wallet.getBalance());
@@ -400,14 +407,14 @@ public class WalletServiceImpl implements WalletService {
             // }
 
             // RefundCompletedEvent event = RefundCompletedEvent.builder()
-            // .refundId(refund.getRefundId().toString())
+            // .refundId(refund.getRefundId())
             // .orderId(orderId)
-            // .userId(userId.toString())
-            // .paymentId(payment.getPaymentId().toString())
-            // .paymentMethod(orderInfo.getPaymentMethod())
+            // .userId(userId)
+            // .paymentId(payment.getPaymentId())
+            // .paymentMethod(payment.getPaymentMethod())
             // .refundAmount(refundAmount)
             // .refundRate(100)
-            // .timestamp(LocalDateTime.now())
+            // .timestamp(Instant.now())
             // .build();
             // outboxService.save("REFUND", refund.getId(), KafkaTopics.REFUND_COMPLETED, event);
 
