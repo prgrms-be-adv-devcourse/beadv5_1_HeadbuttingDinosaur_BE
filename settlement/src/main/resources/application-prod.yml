@@ -19,6 +19,7 @@ spring:
 
 external:
   commerce-base-url: http://commerce:8083
+  member-base-url: http://member:8081
 
 logging:
   level:
