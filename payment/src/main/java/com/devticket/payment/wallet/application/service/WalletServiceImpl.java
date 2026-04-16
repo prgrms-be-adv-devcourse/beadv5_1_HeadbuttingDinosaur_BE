@@ -10,6 +10,8 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -17,6 +19,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -66,6 +69,11 @@ public class WalletServiceImpl implements WalletService {
     private final OutboxService outboxService;
     private final CommerceInternalClient commerceInternalClient;
     private final PlatformTransactionManager txManager;
+
+    //this.claimChargeForProcessing() 같은 Self-call이 프록시를 우회하는 문제를 해결하려면 자기 참조 주입(self-injection) 이 필요
+    @Lazy
+    @Autowired
+    private WalletServiceImpl self;
 
     // =====================================================================
     // 충전 시작(결제인증에 필요한 WalletCharge생성-chargeId)
@@ -134,12 +142,14 @@ public class WalletServiceImpl implements WalletService {
     // 비관적 락 구간을 최소화하기 위해 3단계로 트랜잭션 분리:
     // 1) 락 + 선점(PENDING→PROCESSING)  2) PG 호출(락 없음)  3) 결과 반영
     @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)  //클래스 레벨에 @Transactional(readOnly = true)가 붙어 있는 상황에서, confirmCharge 메서드만 트랜잭션 없이 실행하도록 설정.
     public WalletChargeConfirmResponse confirmCharge(UUID userId,
         WalletChargeConfirmRequest request) {
 
         // ── 1단계: 비관적 락으로 상태 선점 (PENDING → PROCESSING) ──
+        // self를 통해 호출 → 프록시 경유 → @Transactional 실제 적용
         UUID chargeId = parseUUID(request.chargeId());
-        claimChargeForProcessing(userId, chargeId, request.amount());
+        self.claimChargeForProcessing(userId, chargeId, request.amount());
 
         // ── 2단계: 락 해제 후 PG 호출 (DB 커넥션 점유 없음) ──
         PgPaymentConfirmResult pgResult;
@@ -149,7 +159,7 @@ public class WalletServiceImpl implements WalletService {
             ));
         } catch (Exception e) {
             log.error("[WalletCharge] PG 승인 실패 — chargeId={}, error={}", chargeId, e.getMessage());
-            failProcessingCharge(chargeId);
+            self.failProcessingCharge(chargeId);
             return WalletChargeConfirmResponse.from(
                 chargeId.toString(), request.amount(),
                 null, "FAILED", null
@@ -157,7 +167,7 @@ public class WalletServiceImpl implements WalletService {
         }
 
         // ── 3단계: 새 트랜잭션에서 결과 반영 ──
-        return completeChargeAfterPg(userId, chargeId, pgResult);
+        return self.completeChargeAfterPg(userId, chargeId, pgResult);
     }
 
     /**
