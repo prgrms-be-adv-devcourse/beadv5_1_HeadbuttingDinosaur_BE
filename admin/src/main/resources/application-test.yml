@@ -1,4 +1,4 @@
 jwt:
   secret-key: test-jwt-secret-key
-  access-token-ttl: 1800000
+  access-token-ttl: 1800001
   refresh-token-ttl: 604800000
