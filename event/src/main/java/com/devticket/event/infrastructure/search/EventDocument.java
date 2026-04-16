@@ -1,20 +1,16 @@
 package com.devticket.event.infrastructure.search;
 
+import com.devticket.event.domain.model.Event;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
-
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.elasticsearch.annotations.Document;
 import org.springframework.data.elasticsearch.annotations.Field;
 import org.springframework.data.elasticsearch.annotations.FieldType;
 import org.springframework.data.elasticsearch.annotations.Mapping;
-
-import com.devticket.event.domain.model.Event;
-
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
 
 @Getter
 @NoArgsConstructor
@@ -78,13 +74,4 @@ public class EventDocument {
             .build();
     }
 
-    public void setEmbedding(float[] vector) {
-        if (vector == null) {
-            this.embedding = null;
-            return;
-        }
-        List<Float> list = new ArrayList<>(vector.length);
-        for (float v : vector) list.add(v);
-        this.embedding = list;
-    }
 }
