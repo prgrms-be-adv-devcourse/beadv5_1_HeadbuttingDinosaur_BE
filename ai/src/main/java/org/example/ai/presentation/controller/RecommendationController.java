@@ -1,5 +1,6 @@
 package org.example.ai.presentation.controller;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.ai.application.service.RecommendationService;
 import org.example.ai.presentation.dto.req.RecommendationRequest;
@@ -16,7 +17,7 @@ public class RecommendationController {
     private final RecommendationService recommendationService;
 
     @PostMapping("/recommendation")
-    public RecommendationResponse recommend(@RequestBody RecommendationRequest request){
+    public RecommendationResponse recommend(@Valid @RequestBody RecommendationRequest request){
         return recommendationService.recommendByUserVector(request);
     }
 }
