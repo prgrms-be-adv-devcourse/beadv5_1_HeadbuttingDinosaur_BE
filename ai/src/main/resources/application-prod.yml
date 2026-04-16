@@ -14,17 +14,31 @@ spring:
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
     consumer:
-      group-id: devticket-admin
+      group-id: devticket-ai
       auto-offset-reset: latest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+  batch:
+    job:
+      enabled: false
+    jdbc:
+      initialize-schema: always
+  elasticsearch:
+    uris: ${ELASTICSEARCH_URI}
+    connection-timeout: 5s
+    socket-timeout: 30s
 
-jwt:
-  secret-key: ${JWT_SECRET_KEY}
-  access-token-ttl: 1800000
-  refresh-token-ttl: 604800000
+openai:
+  api-key: ${OPENAI_API_KEY}
+  embedding:
+    url: https://api.openai.com/v1/embeddings
+    model: text-embedding-3-small
 
 internal:
-  member-service:
-    url: http://localhost:8081
+  log-service:
+    url: http://log:8086
 
 logging:
   level:
