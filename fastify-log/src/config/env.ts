@@ -31,7 +31,7 @@ export const env = {
   KAFKA_TOPIC: optionalEnv('KAFKA_TOPIC', 'action.log'),
 
   // Server
-  PORT: parseInt(optionalEnv('PORT', '8085'), 10),
+  PORT: parseInt(optionalEnv('PORT', '8086'), 10),
   NODE_ENV: optionalEnv('NODE_ENV', 'development'),
   LOG_LEVEL: optionalEnv('LOG_LEVEL', 'info'),
 } as const;
