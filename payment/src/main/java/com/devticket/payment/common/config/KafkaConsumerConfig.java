@@ -15,7 +15,7 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.listener.ContainerProperties;
 import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
-import org.springframework.util.backoff.FixedBackOff;
+import org.springframework.util.backoff.ExponentialBackOff;
 
 @Configuration
 public class KafkaConsumerConfig {
@@ -54,7 +54,8 @@ public class KafkaConsumerConfig {
             }
         );
 
-        FixedBackOff backOff = new FixedBackOff(2000L, 3L); // 2초 간격, 최대 3회
+        ExponentialBackOff backOff = new ExponentialBackOff(2000L, 2.0); // 2→4→8초
+        backOff.setMaxAttempts(3); // 최대 3회 재시도
         return new DefaultErrorHandler(recoverer, backOff);
     }
 
