@@ -28,8 +28,6 @@ public interface WalletService {
 
     void restoreBalance(UUID userId, int amount, UUID refundId, UUID orderId);
 
-    void restoreBalanceWithDedup(UUID userId, int amount, UUID refundId, UUID orderId, UUID messageId);
-
     void processBatchRefund(UUID eventId);
 
     void recoverStalePendingCharge(UUID chargeId);

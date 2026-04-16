@@ -18,7 +18,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.devticket.payment.common.messaging.KafkaTopics;
-import com.devticket.payment.common.messaging.MessageDeduplicationService;
 import com.devticket.payment.common.outbox.OutboxService;
 import com.devticket.payment.payment.application.dto.PgPaymentConfirmCommand;
 import com.devticket.payment.payment.application.dto.PgPaymentConfirmResult;
@@ -63,7 +62,6 @@ public class WalletServiceImpl implements WalletService {
     private final PgPaymentClient pgPaymentClient;
     private final OutboxService outboxService;
     private final CommerceInternalClient commerceInternalClient;
-    private final MessageDeduplicationService deduplicationService;
 
     // =====================================================================
     // 충전 시작(결제인증에 필요한 WalletCharge생성-chargeId)
@@ -394,12 +392,6 @@ public class WalletServiceImpl implements WalletService {
             refundId, amount, wallet.getBalance());
     }
 
-    @Override
-    @Transactional
-    public void restoreBalanceWithDedup(UUID userId, int amount, UUID refundId, UUID orderId, UUID messageId) {
-        restoreBalance(userId, amount, refundId, orderId);
-        deduplicationService.markProcessed(messageId, KafkaTopics.REFUND_COMPLETED);
-    }
 
     // =====================================================================
     // event.force-cancelled / event.sale-stopped — 일괄 환불
