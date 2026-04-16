@@ -21,6 +21,7 @@ public interface WalletChargeJpaRepository extends JpaRepository<WalletCharge, L
     @Query("SELECT COALESCE(SUM(wc.amount), 0) FROM WalletCharge wc "
         + "WHERE wc.userId = :userId "
         + "AND wc.status IN (com.devticket.payment.wallet.domain.enums.WalletChargeStatus.PENDING, "
+        + "com.devticket.payment.wallet.domain.enums.WalletChargeStatus.PROCESSING, "
         + "com.devticket.payment.wallet.domain.enums.WalletChargeStatus.COMPLETED) "
         + "AND wc.createdAt >= :startOfDay")
     int sumTodayChargeAmount(@Param("userId") UUID userId,
