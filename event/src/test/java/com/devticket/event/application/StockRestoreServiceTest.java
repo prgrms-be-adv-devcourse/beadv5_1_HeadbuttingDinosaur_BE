@@ -15,17 +15,17 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import com.devticket.event.common.config.JacksonConfig;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.util.ReflectionTestUtils;
-import tools.jackson.databind.json.JsonMapper;
 
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @ActiveProfiles("test")
-@Import({StockRestoreService.class, MessageDeduplicationService.class, JsonMapper.class})
+@Import({StockRestoreService.class, MessageDeduplicationService.class, JacksonConfig.class})
 class StockRestoreServiceTest {
 
     @Autowired
