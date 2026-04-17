@@ -1,0 +1,20 @@
+package com.devticket.event.common.messaging;
+
+public final class KafkaTopics {
+
+    private KafkaTopics() {}
+
+    // Event 서비스가 소비하는 토픽
+    public static final String ORDER_CREATED = "order.created";
+    public static final String PAYMENT_FAILED = "payment.failed";
+    public static final String REFUND_COMPLETED = "refund.completed";
+    public static final String REFUND_STOCK_RESTORE = "refund.stock.restore";
+
+    // Event 서비스가 발행하는 토픽
+    public static final String STOCK_DEDUCTED = "stock.deducted";
+    public static final String STOCK_FAILED = "stock.failed";
+    public static final String EVENT_FORCE_CANCELLED = "event.force-cancelled";
+    public static final String EVENT_SALE_STOPPED = "event.sale-stopped";
+    public static final String REFUND_STOCK_DONE = "refund.stock.done";
+    public static final String REFUND_STOCK_FAILED = "refund.stock.failed";
+}
