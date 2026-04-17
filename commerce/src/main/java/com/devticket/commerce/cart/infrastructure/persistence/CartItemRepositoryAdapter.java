@@ -30,6 +30,11 @@ public class CartItemRepositoryAdapter implements CartItemRepository {
     }
 
     @Override
+    public List<CartItem> findAllByCartItemIdWithLock(List<UUID> cartItemIds) {
+        return cartItemJpaRepository.findAllByCartItemIdInWithLock(cartItemIds);
+    }
+
+    @Override
     public Optional<CartItem> findByCartIdAndEventId(Long cartId, UUID eventId) {
         return cartItemJpaRepository.findByCartIdAndEventId(cartId, eventId);
     }

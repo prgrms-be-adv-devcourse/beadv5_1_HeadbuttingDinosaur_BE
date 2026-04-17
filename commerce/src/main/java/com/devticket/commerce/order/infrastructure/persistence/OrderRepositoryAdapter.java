@@ -50,4 +50,9 @@ public class OrderRepositoryAdapter implements OrderRepository {
         return orderJpaRepository.findAllByUserIdAndStatus(userId, status, pageable);
     }
 
+    @Override
+    public Optional<Order> findActiveOrder(UUID userId, String cartHash, List<OrderStatus> activeStatuses) {
+        return orderJpaRepository.findActiveOrder(userId, cartHash, activeStatuses);
+    }
+
 }
