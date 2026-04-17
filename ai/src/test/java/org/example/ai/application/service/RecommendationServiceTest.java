@@ -6,11 +6,13 @@ import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.example.ai.common.exception.BusinessException;
+import org.example.ai.domain.exception.AiErrorCode;
 import org.example.ai.domain.model.UserVector;
 import org.example.ai.domain.repository.UserVectorRepository;
 import org.example.ai.presentation.dto.req.RecommendationRequest;
@@ -55,7 +57,6 @@ public class RecommendationServiceTest {
     @Test
     @DisplayName("searchKnn 실패 → BusinessException")
     void searchKnn_실패시_예외_던지기() {
-        float[] normalizedVector = new float[1536];
         // given
         UserVector userVector = UserVector.builder()
             .userId("user-1")
@@ -73,7 +74,8 @@ public class RecommendationServiceTest {
         given(userVectorRepository.findById("user-1"))
             .willReturn(Optional.of(userVector));
 
-        doReturn(null).when(recommendationService).searchKnn(any());
+        doThrow(new BusinessException(AiErrorCode.EVENT_INDEX_SEARCH_FAILED))
+            .when(recommendationService).searchKnn(any());
 
         // when & then
         assertThatThrownBy(() -> recommendationService
