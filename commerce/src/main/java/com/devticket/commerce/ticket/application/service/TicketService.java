@@ -150,11 +150,11 @@ public class TicketService implements TicketUsecase {
     }
 
     /**
-     * 호출 Settlement -> Commerce ㅎgig*
+     * 호출 Settlement -> Commerce
      */
     @Override
     public InternalTicketSettlementDataResponse getSettlementData(List<UUID> eventIds) {
-        if (eventIds.isEmpty()) {
+        if (eventIds == null || eventIds.isEmpty()) {
             return new InternalTicketSettlementDataResponse(List.of());
         }
 
@@ -183,9 +183,9 @@ public class TicketService implements TicketUsecase {
                 UUID orderItemId = entry.getKey().getValue();
                 List<Ticket> group = entry.getValue();
 
-                int price = priceByOrderItemId.getOrDefault(orderItemId, 0);
-                int salesAmount = price * group.size();
-                int refundAmount = price * (int) group.stream()
+                Long price = Long.valueOf(priceByOrderItemId.getOrDefault(orderItemId, 0));
+                Long salesAmount = price * group.size();
+                Long refundAmount = price * (int) group.stream()
                     .filter(t -> t.getStatus() == TicketStatus.REFUNDED)
                     .count();
 
