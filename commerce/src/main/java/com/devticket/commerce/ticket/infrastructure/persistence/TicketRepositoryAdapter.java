@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Repository;
 
+
 @Repository
 @RequiredArgsConstructor
 public class TicketRepositoryAdapter implements TicketRepository {
@@ -45,5 +46,10 @@ public class TicketRepositoryAdapter implements TicketRepository {
     @Override
     public Page<Ticket> findAllByEventId(UUID eventId, SellerEventParticipantListRequest request) {
         return ticketJpaRepository.findAllByEventId(eventId, request.toPageable());
+    }
+
+    @Override
+    public List<Ticket> findAllByEventIdIn(List<UUID> eventIds) {
+        return ticketJpaRepository.findAllByEventIdIn(eventIds);
     }
 }
