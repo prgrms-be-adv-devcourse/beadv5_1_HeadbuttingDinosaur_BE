@@ -386,7 +386,7 @@ CREATE TABLE shedlock (
 
 ```java
 @Scheduled(fixedDelay = 3000)
-@SchedulerLock(name = "outbox-scheduler", lockAtMostFor = "25s", lockAtLeastFor = "5s")
+@SchedulerLock(name = "outbox-scheduler", lockAtMostFor = "30s", lockAtLeastFor = "5s")
 public void publishPendingEvents() { ... }
 ```
 
@@ -911,12 +911,6 @@ topic: event.force-cancelled  → DLT: event.force-cancelled.DLT
 - [x] ✅ `PaymentStatus.canTransitionTo()` 상태 전이 검증 구현 완료
 - [x] ✅ Payment 엔티티 낙관적 락 (`@Version`) 적용 완료
 - [x] ✅ `WalletServiceImpl.processWalletPayment()`: `payment.completed` Outbox 이벤트 발행으로 전환 완료
-- [x] ✅ `OutboxEventProducer`: Kafka 발행 시 `X-Message-Id` 헤더 세팅 완료
-- [x] ✅ `KafkaConsumerConfig`: FixedBackOff → ExponentialBackOff(2→4→8초, 3회) 변경 완료
-- [x] ✅ `WalletEventConsumer`: groupId `payment-wallet-group` → `payment-refund.completed` 수정 완료
-- [x] ✅ `WalletEventConsumer`: `markProcessed()`를 `RefundCompletedHandler`의 단일 `@Transactional`로 이동 완료
-- [x] ✅ Payment 엔티티 `approve()` / `fail()` / `cancel()` / `refund()` 내부에 `validateTransition()` 가드 호출 추가 완료
-
 - [x] ✅ `OutboxEventProducer`: Kafka 발행 시 `X-Message-Id` 헤더 세팅 완료
 - [x] ✅ `KafkaConsumerConfig`: FixedBackOff → ExponentialBackOff(2→4→8초, 3회) 변경 완료
 - [x] ✅ `WalletEventConsumer`: groupId `payment-wallet-group` → `payment-refund.completed` 수정 완료
