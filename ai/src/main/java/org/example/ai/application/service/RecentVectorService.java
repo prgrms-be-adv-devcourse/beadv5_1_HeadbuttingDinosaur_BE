@@ -22,6 +22,7 @@ public class RecentVectorService {
     private final LogServiceClient logServiceClient;
 
 
+    // =========== UserVector 중  recentVector 갱신 메서드 =========== //
     public void recalculateRecentVector(String userId){
         // 1. Log Service에서 최근 7 일 조회
         ActionLogResponse response = logServiceClient.getRecentActionLog(userId);
@@ -37,6 +38,7 @@ public class RecentVectorService {
         Map<String, Integer> viewCount = new HashMap<>();
         Map<String, Float> eventWeightMap = new HashMap<>();
 
+        // 한 user의 7 일치 로그 모두를 모두 돌며, 관련된 모든 이벤트에 log 가중치를 더하는 과정
         for(ActionLogResponse.ActionLogEntry log : response.logs()){
             String eventId = log.eventId();
             float weight = 0f;
@@ -74,6 +76,7 @@ public class RecentVectorService {
         float[] newRecentVector = new float[1536];
         float totalWeight = 0f;
 
+        // List<이벤트ID : 가중치>를 Set 타입으로 하나씩 반환
         for(Map.Entry<String, Float> entry : eventWeightMap.entrySet()){
             float[] embedding = eventEmbeddingRepository.findEmbeddingById(entry.getKey())
                 .orElse(null);
@@ -83,12 +86,13 @@ public class RecentVectorService {
                 continue;
             }
 
+            // 이벤트에 대한 가중치 반환
             float w = entry.getValue();
 
+            // 가중합 벡터(방향 + 크기) 연산
             for(int i = 0; i < 1536; i++){
                 newRecentVector[i] += embedding[i] * w;
             }
-
             totalWeight += w;
         }
 
@@ -97,10 +101,12 @@ public class RecentVectorService {
             return;
         }
 
+        // 정규화 벡터(가중합 벡터/가중값 합 -> 크기 제거)
         for (int i = 0; i < 1536; i++) {
             newRecentVector[i] /= totalWeight;
         }
 
+        // 4. UserVector 내 recentVector 갱신
         UserVector userVector = userVectorRepository.findById(userId)
             .orElse(UserVector.builder()
                 .userId(userId)

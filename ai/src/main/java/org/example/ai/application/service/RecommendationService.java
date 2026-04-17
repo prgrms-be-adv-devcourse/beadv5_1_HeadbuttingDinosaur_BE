@@ -12,6 +12,8 @@ import java.util.Objects;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.example.ai.common.exception.BusinessException;
+import org.example.ai.domain.exception.AiErrorCode;
 import org.example.ai.domain.model.UserVector;
 import org.example.ai.domain.repository.UserVectorRepository;
 import org.example.ai.presentation.dto.req.RecommendationRequest;
@@ -30,8 +32,10 @@ public class RecommendationService {
 
 
 
+    // ================ 실질적인 Service단 유일 메서드(추천 기능) ================= //
     public RecommendationResponse recommendByUserVector(RecommendationRequest request){
 
+        // 1. 추천 요청한 UserId 기준으로 UserVector 조회
         String userId = request.userId();
         UserVector userVector = userVectorRepository.findById(userId)
             .orElse(null);
@@ -41,17 +45,23 @@ public class RecommendationService {
             return new RecommendationResponse(userId, List.of());
         }
 
+        // 2. 가중합 벡터(방향 + 크기) 연산
         float[] combinedVector = combineVectorByWeight(
             getOrEmpty(userVector.getPreferenceVector()),
             getOrEmpty(userVector.getCartVector()),
             getOrEmpty(userVector.getRecentVector())
         );
+
+        // 3. 정규화 벡터(정규화 -> 크기 제거)
          float[] normalizedVector = normalize(combinedVector);
 
+         // 4. 정규화 벡터 -> kNN 검색 -> 이벤트 후보군 30 개 추출
         List<Map<String, Object>> candidates = searchKnn(normalizedVector);
 
+        // 5. 모든 이벤트 후보군 -> 유저 벡터(4 가지)와 cosine 연산 -> 랭킹 정렬
         List<ScoredEvent> listedScore = reRank(candidates, userVector);
 
+        // 6. -> 5 개 추출
         List<String> topEventIds = listedScore.stream()
             .sorted(Comparator.comparingDouble(ScoredEvent::score).reversed())
             .limit(5)
@@ -66,7 +76,7 @@ public class RecommendationService {
 
 
 
-    // =============== 하위 함수 모음 =============== //
+    // =============== 하위 함수 모음(가중합 * 유저 벡터 -> 가중합 벡터) =============== //
     // 1. 가중치 기반 벡터합
     private float[] combineVectorByWeight(float[] preferenceVector, float[] cartVector, float[] recentVector){
         float[] combinedVector = new float[preferenceVector.length];
@@ -78,7 +88,7 @@ public class RecommendationService {
         return combinedVector;
     }
 
-    // 2. vector -> normalize
+    // 2. vector -> 정규화
     private float[] normalize(float[] combinedVector){
 
         float sum = 0f;
@@ -141,11 +151,11 @@ public class RecommendationService {
         }
         catch(Exception e){
             log.error("[Recommendation] kNN 검색 실패", e);
-            return List.of();
+            throw new BusinessException(AiErrorCode.EVENT_INDEX_SEARCH_FAILED);
         }
     }
     // ================================================================ //
-    // ============== kNN 30 개 재정렬 및 cosine 유사도 연산 ============== //
+    // 4-1. ============== kNN 30 개 재정렬 및 cosine 유사도 연산 ============== //
     private List<ScoredEvent> reRank(
         List<Map<String, Object>> candidates,
         UserVector userVector
@@ -179,7 +189,7 @@ public class RecommendationService {
         return vector != null ? vector : new float[1536];
     }
 
-    // consine 유사도 연산 메서드
+    // 4-2. consine 유사도 연산 메서드
     private double sim(float[] tendencyVector, float[] eventVector){
 
         // 내적
@@ -206,6 +216,7 @@ public class RecommendationService {
 
     }
 
+    // 4-3. 스코어 계산 후 -> record 화
     record ScoredEvent(String eventId, double score) {
 
     }

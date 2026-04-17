@@ -17,31 +17,42 @@ public class VectorService {
     private final UserVectorRepository userVectorRepository;
     private final EventEmbeddingRepository eventEmbeddingRepository;
 
-    // PURCHASE → preference_vector 갱신
+    // ====== logData -> UserVector 내 경향성 벡터들(Preference, Cart, Negative) 갱신 ====== //
+
+    // 1. PURCHASE → preference_vector 갱신
     public void updatePreferenceVector(String userId, String eventId){
         updateVector(userId, eventId, 5.0f, "preference");
     }
 
-    // REFUND → preference_vector 역보정 + negative_vector 갱신
+    // 2. REFUND → preference_vector 역보정 + negative_vector 갱신
     public void updateRefund(String userId, String eventId){
         updateVector(userId, eventId, -5.0f, "preference");
         updateVector(userId, eventId, 3.0f, "negative");
     }
 
-    // CART_ADD → cart_vector 갱신
+    // 3. CART_ADD → cart_vector 갱신
     public void updateCartVector(String userId, String eventId){
         updateVector(userId, eventId, 3.0f, "cart");
     }
 
-    // CART_REMOVE → negative_vector 갱신
+    // 4. CART_REMOVE → negative_vector 갱신
     public void updateNegativeVector(String userId, String eventId){
         updateVector(userId, eventId, 3.0f, "negative");
     }
 
-    // User_Vector 업데이트
+    // ================================================================================ //
+
+
+
+
+
+
+
+    // ====================== 부가 메서드 모음 ====================== //
+    // 1. User_Vector 업데이트
     private void updateVector(String userId, String eventId, float weight, String vectorType){
 
-        // 1. event Embedding 조회
+        // 1) event Embedding 조회
         float[] eventEmbedding = eventEmbeddingRepository.findEmbeddingById(eventId)
             .orElse(null);
 
@@ -50,7 +61,7 @@ public class VectorService {
             return;
         }
 
-        // 2. 기존 User_Vector 조회, 없으면 -> 신규 생성
+        // 2) 기존 User_Vector 조회, 없으면 -> 신규 생성
         UserVector userVector = userVectorRepository.findById(userId)
             .orElse(UserVector.builder()
                 .userId(userId)
@@ -65,7 +76,7 @@ public class VectorService {
                 .updatedAt(Instant.now().toString())
                 .build());
 
-        // 3. 벡터 갱신 공식 적용
+        // 3) 벡터 갱신 공식 적용
         float[] updatedVector = computeVector(
             getVector(userVector, vectorType),
             getWeightSum(userVector, vectorType),
@@ -83,7 +94,7 @@ public class VectorService {
     }
 
 
-    // 벡터 갱신 공식 메서드
+    // 2. 벡터 갱신 공식 메서드 : (현 벡터 * 누적 가중합 + 이벤트 벡터 * 추가된 가중합) / 누적 + 추가된 가중합 
     private float[] computeVector(float[] current, float currentWeightSum, float[] eventEmbedding, float weight){
         float[] result = new float[current.length];
         float totalWeight = currentWeightSum + weight;
@@ -99,6 +110,7 @@ public class VectorService {
         return result;
     }
 
+    // 3. 경향성 벡터 타입에 따라 벡터값 꺼내 오기
     private float[] getVector(UserVector userVector, String vectorType){
         return switch (vectorType){
             case "preference" -> userVector.getPreferenceVector() != null
@@ -111,8 +123,8 @@ public class VectorService {
         };
     }
 
-
-
+    
+    // 4. 누적 가중치 가져오기
     private float getWeightSum(UserVector userVector, String vectorType){
         return switch (vectorType){
             case "preference" -> userVector.getPreferenceWeightSum();
@@ -122,6 +134,7 @@ public class VectorService {
         };
     }
 
+    // 5. 갱신된 유저 벡터 업데이트 메서드
     private UserVector buildUpdatedUserVector(UserVector origin, String vectorType, float[] updatedVector, float newWeightSum){
         return UserVector.builder()
             .userId(origin.getUserId())
