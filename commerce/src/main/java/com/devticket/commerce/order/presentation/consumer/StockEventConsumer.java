@@ -1,4 +1,4 @@
-package com.devticket.commerce.order.infrastructure.kafka;
+package com.devticket.commerce.order.presentation.consumer;
 
 import com.devticket.commerce.common.messaging.KafkaTopics;
 import com.devticket.commerce.order.application.service.OrderService;
@@ -33,11 +33,15 @@ public class StockEventConsumer {
         UUID messageId = extractMessageId(record.headers());
         try {
             orderService.processStockDeducted(messageId, record.topic(), record.value());
+            ack.acknowledge();
         } catch (DataIntegrityViolationException e) {
-            // processed_message UNIQUE 충돌: 다른 요청이 이미 처리 완료 → 스킵
-            log.warn("[stock.deducted] messageId={} UNIQUE 충돌 — 이미 처리 완료, 스킵", messageId);
+            if (isProcessedMessageUniqueConflict(e)) {
+                log.warn("[stock.deducted] messageId={} processed_message UNIQUE 충돌 — 이미 처리 완료, 스킵", messageId);
+                ack.acknowledge();
+                return;
+            }
+            throw e;
         }
-        ack.acknowledge();
     }
 
     /**
@@ -52,11 +56,15 @@ public class StockEventConsumer {
         UUID messageId = extractMessageId(record.headers());
         try {
             orderService.processStockFailed(messageId, record.topic(), record.value());
+            ack.acknowledge();
         } catch (DataIntegrityViolationException e) {
-            // processed_message UNIQUE 충돌: 다른 요청이 이미 처리 완료 → 스킵
-            log.warn("[stock.failed] messageId={} UNIQUE 충돌 — 이미 처리 완료, 스킵", messageId);
+            if (isProcessedMessageUniqueConflict(e)) {
+                log.warn("[stock.failed] messageId={} processed_message UNIQUE 충돌 — 이미 처리 완료, 스킵", messageId);
+                ack.acknowledge();
+                return;
+            }
+            throw e;
         }
-        ack.acknowledge();
     }
 
     private UUID extractMessageId(Headers headers) {
@@ -66,5 +74,19 @@ public class StockEventConsumer {
                 "X-Message-Id 헤더 누락 — Outbox Producer 설정 확인 필요 (kafka-idempotency-guide.md §3-5)");
         }
         return UUID.fromString(new String(header.value(), StandardCharsets.UTF_8));
+    }
+
+    private boolean isProcessedMessageUniqueConflict(DataIntegrityViolationException e) {
+        Throwable cause = e.getCause();
+
+        while (cause != null) {
+            if (cause instanceof org.hibernate.exception.ConstraintViolationException constraintViolation) {
+                String constraintName = constraintViolation.getConstraintName();
+                return "uk_processed_message_message_id_topic".equals(constraintName);
+            }
+            cause = cause.getCause();
+        }
+
+        return false;
     }
 }

@@ -68,7 +68,7 @@ public class Order extends BaseEntity {
 
     // 장바구니 내용 해시 — (itemId, quantity) itemId 정렬 후 SHA-256, 중복 주문 판단 기준
     // UNIQUE 제약 없음 — 이력 주문(CANCELLED/FAILED)은 동일 해시 존재 가능
-    @Column(name = "cart_hash", length = 64, nullable = false )
+    @Column(name = "cart_hash", length = 64)
     String cartHash;
 
     // 낙관적 락 — Consumer/스케줄러 동시 상태 전이 충돌 방어

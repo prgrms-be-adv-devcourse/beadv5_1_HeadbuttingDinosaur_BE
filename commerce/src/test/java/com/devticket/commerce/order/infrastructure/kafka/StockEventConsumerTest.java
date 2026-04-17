@@ -8,6 +8,7 @@ import static org.mockito.Mockito.never;
 
 import com.devticket.commerce.common.messaging.KafkaTopics;
 import com.devticket.commerce.order.application.service.OrderService;
+import com.devticket.commerce.order.presentation.consumer.StockEventConsumer;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
