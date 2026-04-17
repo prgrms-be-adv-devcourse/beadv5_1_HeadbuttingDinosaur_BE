@@ -24,6 +24,22 @@ Kafka는 서비스 간 통신이므로 아래 항목은 반드시 팀 합의 후
 
 **이 문서가 합의 기록이다. 구현 전 반드시 확인할 것.**
 
+### 코드 컨벤션 / 리뷰 기준 참조
+
+Kafka 관련 코드의 **계층 배치·네이밍·Lombok·테스트·보안·PR 리뷰 접두사**는 레포 루트 `AGENTS.md` 기준.
+
+| 영역 | AGENTS.md 섹션 |
+|---|---|
+| 계층 배치 (`presentation.consumer` / `infrastructure.messaging`) | §2.1~2.2 |
+| Consumer/Producer 네이밍 (`*Consumer`, `*Producer`, `*EventPublisher`) | §3.1 |
+| Lombok 규칙, `@Enumerated(STRING)`, Entity 정적 팩토리 | §3.3, §4.3 |
+| 민감정보 로그 금지, SQL 인젝션 방지 | §7, §10.4 |
+| 테스트 네이밍/구조 (Given-When-Then) | §8 |
+| PR 리뷰 심각도 접두사 (🚨 / ⚠️ / 💡 / ❓) | §12 |
+| Enum 값 정의 일관성 | §11 |
+
+> **충돌 시 우선순위:** 이벤트 계약·토픽·Saga·멱등성 = 본 문서 / 코드 컨벤션 = `AGENTS.md`
+
 ---
 
 ## 목차
@@ -894,12 +910,13 @@ topic: event.force-cancelled  → DLT: event.force-cancelled.DLT
 - [x] ✅ Payment 엔티티 낙관적 락 (`@Version`) 적용 완료
 - [x] ✅ `WalletServiceImpl.processWalletPayment()`: `payment.completed` Outbox 이벤트 발행으로 전환 완료
 
+- [x] ✅ `OutboxEventProducer`: Kafka 발행 시 `X-Message-Id` 헤더 세팅 완료
+- [x] ✅ `KafkaConsumerConfig`: FixedBackOff → ExponentialBackOff(2→4→8초, 3회) 변경 완료
+- [x] ✅ `WalletEventConsumer`: groupId `payment-wallet-group` → `payment-refund.completed` 수정 완료
+- [x] ✅ `WalletEventConsumer`: `markProcessed()`를 `RefundCompletedHandler`의 단일 `@Transactional`로 이동 완료
+- [x] ✅ Payment 엔티티 `approve()` / `fail()` / `cancel()` / `refund()` 내부에 `validateTransition()` 가드 호출 추가 완료
+
 **미구현**
-- [ ] `OutboxEventProducer`: Kafka 발행 시 `X-Message-Id` 헤더 세팅 — Consumer dedup 필수 (§4, kafka-idempotency-guide.md §3-5)
-- [ ] `KafkaConsumerConfig`: FixedBackOff → ExponentialBackOffWithMaxRetries(3, 2→4→8초)
-- [ ] `WalletEventConsumer`: groupId 변경 (`payment-refund.completed`) — 현재 `payment-wallet-group`
-- [ ] `WalletEventConsumer`: `markProcessed()` 위치를 `walletService` 트랜잭션 내부로 이동
-- [ ] Payment 엔티티 `approve()` / `fail()` / `cancel()` / `refund()` 내부에 `canTransitionTo()` 가드 호출 추가
 - [ ] Consumer 순서 역전 3분류 처리 구현 (§5)
 - [ ] `RefundSagaOrchestrator` 클래스 신규 생성, `saga_state` 테이블 및 `SagaStateRepository` 구현
 - [ ] Orchestrator `start()` / `onOrderDone()` / `onTicketDone()` / `onStockDone()` / `onOrderFailed()` / `onTicketFailed()` / `onStockFailed()` 구현

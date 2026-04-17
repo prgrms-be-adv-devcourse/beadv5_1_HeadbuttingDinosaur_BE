@@ -170,7 +170,7 @@
 
 4. 활성 주문이 없을 때만 새 주문 생성
    → cart_version 일치 확인
-   → Order 생성 (CREATED, expires_at = now + 10분, cart_hash 저장)
+   → Order 생성 (CREATED, expires_at = now + 30분, cart_hash 저장)
    → 재고 선점 Outbox 저장 (같은 트랜잭션)
    → 트랜잭션 커밋 → 락 해제
 

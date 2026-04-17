@@ -270,12 +270,12 @@ sequenceDiagram
 - [x] ✅ `OutboxRepository`: 스케줄러 쿼리에 `next_retry_at IS NULL OR next_retry_at <= :now` 조건 추가 완료
 - [x] ✅ `OutboxScheduler`: ShedLock 적용 완료 (`@SchedulerLock(name = "outbox-scheduler", lockAtMostFor = "30s", lockAtLeastFor = "5s")`)
 - [x] ✅ Outbox 발행 시 Partition Key 설정 완료 — `outbox.getPartitionKey()` (fallback: aggregateId)
-- [ ] `OutboxEventProducer`: Kafka 발행 시 `X-Message-Id` 헤더 세팅 추가 필요 — 현재 헤더 미세팅, Consumer dedup이 깨짐 (kafka-design.md §4, kafka-idempotency-guide.md §3-5 참조)
+- [x] ✅ `OutboxEventProducer`: Kafka 발행 시 `X-Message-Id` 헤더 세팅 완료 — ProducerRecord 헤더에 Outbox messageId 포함
 
 **Consumer 멱등성**
-- [ ] `KafkaConsumerConfig`: FixedBackOff → ExponentialBackOff(3회, 2→4→8초) 변경 — 현재 `FixedBackOff(2000L, 3L)` 사용 중
-- [ ] `WalletEventConsumer`: groupId를 `payment-refund.completed` 로 수정 — 현재 `payment-wallet-group` 사용 중
-- [ ] `WalletEventConsumer`: `markProcessed()` 위치를 `walletService` 트랜잭션 내부로 이동
+- [x] ✅ `KafkaConsumerConfig`: FixedBackOff → ExponentialBackOff(2→4→8초, 3회) 변경 완료
+- [x] ✅ `WalletEventConsumer`: groupId `payment-wallet-group` → `payment-refund.completed` 수정 완료
+- [x] ✅ `WalletEventConsumer`: `markProcessed()`를 `RefundCompletedHandler`의 단일 `@Transactional`로 이동 완료 — WalletServiceImpl에서 dedup 의존 제거
 - [x] ✅ `ProcessedMessage`: `topic VARCHAR(128)` 컬럼 추가 완료
 
 **이벤트 DTO** *(타입 수정 완료)*
@@ -344,7 +344,7 @@ sequenceDiagram
 
 **도메인 안전장치**
 - [x] ✅ `PaymentStatus.canTransitionTo()` 상태 전이 검증 구현 완료 — READY→(SUCCESS,FAILED,CANCELLED), SUCCESS→(REFUNDED,CANCELLED), 나머지 종단
-- [ ] Payment 엔티티 `approve()` / `fail()` / `cancel()` / `refund()` 메서드 내부에 `canTransitionTo()` 가드 호출 추가 — 메서드는 존재하나 상태 변경 시 호출하지 않음
+- [x] ✅ Payment 엔티티 `approve()` / `fail()` / `cancel()` / `refund()` 메서드 내부에 `validateTransition()` 가드 호출 추가 완료
 - [x] ✅ Payment 엔티티 낙관적 락 (`@Version`) 적용 완료
 - [ ] Consumer 순서 역전 3분류 처리 구현 — ①이미 목표 상태(멱등 스킵+ACK) ②설명 가능한 역전(정책적 스킵+ACK) ③설명 불가능한 상태(throw→재시도→DLT) — 상세: kafka-design.md §5
 - [ ] Outbox 스케줄러와 Consumer 동시 처리 충돌 방지 — `@Version` 낙관적 락 + 상태 전이 검증 양쪽 적용 (상세: kafka-design.md §11 Case 9)
@@ -355,46 +355,55 @@ sequenceDiagram
 
 **DB 스키마**
 - [ ] `Order` 엔티티 필드 추가 (ddl-auto 자동 반영)
-  - `cart_hash VARCHAR(64)` — 장바구니 내용 해시 (itemId 정렬 후 SHA-256), 중복 주문 판단 기준
-  - `expires_at DATETIME` — 주문 만료 시각 (생성 시 created_at + 10분, 시간 리밋 팀 합의 필요)
-  - `version BIGINT` — 낙관적 락 (`@Version`)
-- [ ] `Order` 엔티티 인덱스 추가: `(user_id, cart_hash)` — 활성 주문 중복 판단 조회용
-- [ ] `Order.create()` 수정: 초기 status `PAYMENT_PENDING` → `CREATED` 변경, `expires_at = now() + 10분` 설정 추가
-- [ ] `outbox` 테이블 신규 생성 — JPA `@Entity` 추가 시 ddl-auto 자동 생성
-- [ ] `processed_message` 테이블 신규 생성 — JPA `@Entity` 추가 시 ddl-auto 자동 생성
-- [ ] `shedlock` 테이블 생성 — 수동 SQL 실행 필요
+  - `cart_hash VARCHAR(64)` — 장바구니 내용 해시 (itemId 정렬 후 SHA-256), 중복 주문 판단 기준 *(주문생성 Phase 스코프)*
+  - `expires_at DATETIME` — 주문 만료 시각 *(주문생성 Phase 스코프 — 현재는 런타임에 `created_at + 30분`으로 계산)*
+  - [x] ✅ `version BIGINT` — 낙관적 락 (`@Version`)
+- [ ] `Order` 엔티티 인덱스 추가: `(user_id, cart_hash)` — 활성 주문 중복 판단 조회용 *(주문생성 Phase 스코프)*
+- [ ] `Order.create()` 수정: 초기 status `PAYMENT_PENDING` → `CREATED` 변경, `expires_at = now() + 30분` 설정 추가 *(주문생성 Phase 스코프)*
+- [x] ✅ `outbox` 테이블 신규 생성 — JPA `@Entity` 추가 시 ddl-auto 자동 생성
+- [x] ✅ `processed_message` 테이블 신규 생성 — JPA `@Entity` 추가 시 ddl-auto 자동 생성
+- [x] ✅ `shedlock` 테이블 생성 — `commerce/src/main/resources/schema.sql` 수동 CREATE
 
 **기반 인프라**
-- [ ] `JacksonConfig` 추가 (JavaTimeModule + WRITE_DATES_AS_TIMESTAMPS=false)
-- [ ] `KafkaTopics` 상수 클래스에 Commerce 발행 토픽 추가 — `order.created`, `ticket.issue-failed` (현재 Payment 서비스 KafkaTopics에 미포함)
+- [x] ✅ `JacksonConfig` 추가 (JavaTimeModule + WRITE_DATES_AS_TIMESTAMPS=false)
+- [x] ✅ `KafkaTopics` 상수 클래스 생성 — Saga 6개 (`order.created`, `stock.deducted`, `stock.failed`, `payment.completed`, `payment.failed`, `ticket.issue-failed`) + 환불 1개 (`refund.completed`) + 이벤트 관리 2개 (`event.force-cancelled`, `event.sale-stopped`) + Orchestration 12개
 
-**이벤트 DTO** *(신규 생성 — 현재 코드에 없음)*
-- [ ] `OrderCreatedEvent` record 신규 생성 — `orderId(UUID)`, `userId(UUID)`, `eventId(UUID)`, `quantity(int)`, `totalAmount(int)`, `timestamp(Instant)`
-- [ ] `TicketIssueFailedEvent` record 신규 생성 — `orderId(UUID)`, `userId(UUID)`, `eventId(UUID)`, `paymentId(UUID)`, `quantity(int)`, `totalAmount(int)`, `reason(String)`, `timestamp(Instant)`
+**이벤트 DTO**
+- [x] ✅ `OrderCreatedEvent` record 신규 생성 — `orderId(UUID)`, `userId(UUID)`, `orderItems(List<OrderItem{eventId, quantity}>)`, `totalAmount(int)`, `timestamp(Instant)` *(2026-04-14 합의: 리스트 구조)*
+- [x] ✅ `TicketIssueFailedEvent` record 신규 생성 — `orderId(UUID)`, `userId(UUID)`, `paymentId(UUID)`, `items(List<FailedItem{eventId, quantity}>)`, `totalAmount(int)`, `reason(String)`, `timestamp(Instant)`
+- [x] ✅ 공용 이벤트 DTO 복사본 생성 (Commerce 모듈) — `PaymentCompletedEvent`, `PaymentFailedEvent`, `StockDeductedEvent`, `StockFailedEvent`, `CancelledBy`
 
 **Outbox 패턴**
-- [ ] Outbox 패턴 구현 — 비즈니스 로직 + `outboxService.save()` 반드시 단일 `@Transactional` 경계 안에 위치
-- [ ] `OutboxScheduler` ShedLock 적용 (6회, 즉시→1→2→4→8→16초, 총 최대 31초 — 상세: kafka-design.md §4)
-- [ ] Outbox 발행 시 Partition Key 설정 — `order.created` / `ticket.issue-failed` / `refund.requested` / `refund.order.done` / `refund.order.failed` / `refund.ticket.done` / `refund.ticket.failed` → `orderId` (상세: kafka-design.md §6)
-- [ ] `OrderService.createOrderByCart()` 내 동기 HTTP 재고 차감 코드(`orderToEventClient.adjustStocks()`) 제거 — Kafka 전환 후 Event Consumer가 담당하므로 중복 차감 방지 필수
-- [ ] `KafkaTopics` 상수 클래스에 Commerce 관련 Orchestration 토픽 추가 — `refund.requested`, `refund.order.cancel`, `refund.order.done`, `refund.order.failed`, `refund.ticket.cancel`, `refund.ticket.done`, `refund.ticket.failed`, `refund.order.compensate`, `refund.ticket.compensate`
+- [x] ✅ Outbox 패턴 구현 — `Outbox`, `OutboxService`, `OutboxEventProducer`, `OutboxRepository`, `OutboxStatus`, `OutboxEventMessage`, `OutboxPublishException` — 비즈니스 로직 + `outboxService.save()` 단일 `@Transactional` 경계 준수
+- [x] ✅ `OutboxScheduler` ShedLock 적용 (`lockAtMostFor=30s`, `lockAtLeastFor=5s`)
+- [x] ✅ Outbox 발행 시 Partition Key 설정 — `ticket.issue-failed` → `orderId` 적용 완료 *(`order.created` / `refund.*` 는 해당 Producer 스코프에서 적용)*
+- [x] ✅ `OutboxEventProducer`: Kafka 발행 시 `X-Message-Id` 헤더 세팅 (Outbox messageId 그대로 전달)
+- [ ] `OrderService.createOrderByCart()` 내 동기 HTTP 재고 차감 코드(`orderToEventClient.adjustStocks()`) 제거 *(주문생성 Phase 스코프)*
 
 **Consumer 멱등성**
-- [ ] `MessageDeduplicationService` 구현 + `processed_message` 테이블 생성
-- [ ] 모든 Consumer에 dedup 패턴 적용 (Saga 이벤트 + 보상 이벤트 + Orchestration 이벤트 포함)
-  - `stock.deducted` Consumer
-  - `stock.failed` Consumer
-  - `payment.completed` Consumer
-  - `payment.failed` Consumer
-  - `ticket.issue-failed` Consumer
-  - `refund.completed` Consumer
-  - `event.force-cancelled` Consumer (RefundFanoutService 진입점)
-  - `refund.order.cancel` Consumer (Orchestrator 명령 수신)
-  - `refund.ticket.cancel` Consumer (Orchestrator 명령 수신)
-  - `refund.order.compensate` Consumer (보상 명령 수신)
-  - `refund.ticket.compensate` Consumer (보상 명령 수신)
+- [x] ✅ `MessageDeduplicationService` 구현 + `processed_message` 테이블 생성 (`ProcessedMessage`, `ProcessedMessageRepository`)
+- [x] ✅ `KafkaConsumerConfig`: AckMode MANUAL, ExponentialBackOff (2→4→8초, 3회 재시도) + DLT Recoverer (`{topic}.DLT`)
+- [x] ✅ `payment.completed` Consumer dedup 적용 (`commerce-payment.completed`)
+- [x] ✅ `payment.failed` Consumer dedup 적용 (`commerce-payment.failed`)
+- [ ] 나머지 Consumer dedup 적용 *(스코프 외 — 각 Phase에서 처리)*
+  - `stock.deducted` / `stock.failed` — 주문생성 Phase
+  - `ticket.issue-failed` 자체 소비 / `refund.*` / `event.force-cancelled` — 환불 Saga 스코프
 
-**Refund Saga — Commerce 연동 (신규 구현)**
+**payment.completed / payment.failed Consumer 비즈니스 로직 (내 스코프 §8)**
+- [x] ✅ `PaymentCompletedConsumer` (`presentation.consumer`) — `X-Message-Id` 헤더 우선, 본문 `messageId` fallback, Outbox wrapper payload 추출
+- [x] ✅ `PaymentFailedConsumer` (`presentation.consumer`) — 동일 구조
+- [x] ✅ `OrderService.processPaymentCompleted()` — Dedup → `canTransitionTo(PAID)` → `completePayment()` → 티켓 발급 → 장바구니 삭제 → markProcessed (단일 `@Transactional`)
+- [x] ✅ `OrderService.processPaymentFailed()` — Dedup → `canTransitionTo(FAILED)` → `failPayment()` → markProcessed (단일 `@Transactional`)
+- [x] ✅ 티켓 발급 성공 경로 — `OrderItem × quantity` 만큼 `Ticket.create()` → `ticketRepository.saveAll()`
+- [x] ✅ 티켓 발급 실패 경로 — Order `cancel()` + `ticket.issue-failed` Outbox 발행 (경로 ① OrderItem 없음 / 경로 ② `saveAll()` 예외) *(추후 재검토: §4-3 참조)*
+- [x] ✅ 장바구니 삭제 — `payment.completed` 수신 시 userId 기준 CartItem 전체 삭제 *(단건/전체 분기 TODO: §4-4 참조)*
+
+**주문 만료 스케줄러 (내 스코프)**
+- [x] ✅ `OrderExpirationScheduler` 신규 — `@Scheduled(fixedDelay=60_000)` + `@SchedulerLock(name="order-expiration-scheduler", lockAtMostFor="50s", lockAtLeastFor="10s")`
+- [x] ✅ 만료 조건: `PAYMENT_PENDING` 상태 + `created_at + 30분 경과`
+- [x] ✅ 동시성 방어: `canTransitionTo(CANCELLED)` 선가드 + `ObjectOptimisticLockingFailureException` 재조회 후 종단 상태(PAID/FAILED/CANCELLED)면 스킵
+
+**Refund Saga — Commerce 연동 (신규 구현)** *(환불 Saga 스코프 — 본 스코프 외)*
 - [ ] `OrderRefundConsumer`: `refund.order.cancel` 수신 → Order가 `PAID`면 `REFUND_PENDING` 전이 / 이미 `CANCELLED`면 멱등 스킵 → `refund.order.done` Outbox 발행 (`REFUND_PENDING` 전이 사용 여부는 §4-1 미결사항 해결 후 확정)
 - [ ] `TicketRefundConsumer`: `refund.ticket.cancel` 수신 → Ticket 취소 처리 → `refund.ticket.done` / `refund.ticket.failed` Outbox 발행
 - [ ] `OrderCompensateConsumer`: `refund.order.compensate` 수신 → Order `REFUND_PENDING` → `PAID` 롤백
@@ -402,10 +411,10 @@ sequenceDiagram
 - [ ] `RefundFanoutService`: `event.force-cancelled` 수신 → 대상 Order 목록 조회 → orderId별 `refund.requested` Outbox 발행 (fan-out)
 
 **도메인 안전장치**
-- [ ] Order 엔티티 `canTransitionTo()` 상태 전이 검증 구현
-- [ ] Order 엔티티 낙관적 락 (`@Version`) 적용
-- [ ] Consumer 순서 역전 3분류 처리 구현 — ①이미 목표 상태(멱등 스킵+ACK) ②설명 가능한 역전(정책적 스킵+ACK) ③설명 불가능한 상태(throw→재시도→DLT) — 상세: kafka-design.md §5
-- [ ] Outbox 스케줄러와 Consumer 동시 처리 충돌 방지 — `@Version` 낙관적 락 + 상태 전이 검증 양쪽 적용
+- [x] ✅ Order 엔티티 `canTransitionTo()` 상태 전이 검증 구현 — `CREATED→PAYMENT_PENDING`, `PAYMENT_PENDING→PAID/FAILED/CANCELLED`, `PAID→CANCELLED`
+- [x] ✅ Order 엔티티 낙관적 락 (`@Version`) 적용
+- [x] ✅ Consumer 순서 역전 3분류 처리 구현 (payment.completed / payment.failed) — ①이미 목표 상태(멱등 스킵+ACK) ②정책적 스킵(PAID 후 CANCELLED/FAILED 도착 등) ③이상 상태(throw→재시도→DLT)
+- [x] ✅ Outbox 스케줄러와 Consumer 동시 처리 충돌 방지 — payment.* Consumer 경로 `@Version` + `canTransitionTo()` 양쪽 가드 적용 (`OrderExpirationScheduler`도 동일)
 
 > 설계 기준: kafka-design.md §12 참조 (이 문서가 상세 구현 체크리스트)
 
@@ -484,6 +493,39 @@ sequenceDiagram
 - [ ] **DLT 재처리 Admin API 구현** `[Commerce]` `[Event]` `[Payment]`
   DLT에 쌓인 메시지를 원본 토픽으로 재발행하는 Admin API
   반드시 원본 `X-Message-Id` 헤더 보존 필수 (새 UUID 생성 시 Consumer dedup 우회 → 중복 처리 발생)
+
+---
+
+### 4-3. ⚠️ [Commerce] 티켓 발급 실패 처리 — 환불 Saga 스코프 재검토
+
+> `OrderService.processPaymentCompleted()` 내부 티켓 발급 실패 경로 2종이 현재 스코프에서 "CANCELLED + `ticket.issue-failed` Outbox 발행"으로 구현되어 있으나, 환불 Saga Orchestrator 구현 시 아래 3항목의 설계 정합성 재점검 필요.  
+> **관련 서비스:** `[Commerce]`, `[Payment]`
+
+- [ ] **경로 ①(OrderItem 없음) 처리 방식 결정**  
+  현 구현: Order `cancel()` + `TicketIssueFailedEvent(items=List.of())` Outbox 발행 + dedup 기록.  
+  재검토 포인트: 정상 시나리오에서는 발생하지 않는 데이터 정합성 이상 케이스 — 조용히 CANCELLED 전이 vs `IllegalStateException` 던져 DLT로 보내고 운영팀 인지 요청 중 선택 필요.
+
+- [ ] **경로 ②(`ticketRepository.saveAll()` 예외) 영구 실패 판정 기준 정의**  
+  현 구현: `catch (Exception e)` → 모든 예외를 영구 실패로 간주 → Order CANCELLED + Outbox 발행.  
+  재검토 포인트: 일시 장애(네트워크 glitch, DB 타임아웃 등)에서도 즉시 환불 Saga 진입 → 재시도 기회 없음. 영구 실패로 분류할 예외 집합(제약 위반 등) vs 재시도 가능 예외 집합(connection timeout 등) 구분 설계 필요. `@Transactional` 내부 `saveAll()` 예외 시 트랜잭션 rollback-only 오염 여부 검증 포함.
+
+- [ ] **경로 ①의 `failedItems` 빈 리스트 → Refund Saga Stock 복구 대상 없음 정합성**  
+  OrderItem이 없는 상태에서 `TicketIssueFailedEvent(items=List.of())`를 발행하면, Payment Orchestrator가 이 이벤트로 Saga 진입 시 Stock 복구 단계에서 복구할 대상이 없음.  
+  재검토 포인트: Orchestrator가 빈 `items`를 정상 스킵 처리하도록 설계할지, 아니면 경로 ①에서는 Outbox 발행 자체를 하지 않을지 결정 필요.
+
+---
+
+### 4-4. 📋 [Commerce] 장바구니 삭제 단건/전체 분기 — 주문생성 Phase 연계
+
+> `OrderService.processPaymentCompleted()` 내부 장바구니 삭제 로직 현재는 **userId 기준 전체 삭제**로 구현됨. 사용자가 카트에 담은 상품 중 일부만 결제한 경우 미결제 상품까지 함께 삭제되는 UX 문제 존재.  
+> **관련 서비스:** `[Commerce]`
+
+- [ ] **`cart_hash` 도입 후 분기 로직 추가**  
+  분기 조건:
+  - `cart_hash` == 현재 카트 전체 내역 해시 → 카트 전체가 결제됨 → **전체 삭제** (현 동작 유지)
+  - `cart_hash` != 현재 카트 내역 해시 → 카트에 추가 아이템 있음 → **결제된 `cart_hash` 내역만 삭제**
+
+- [ ] **의존 관계**: 주문생성 Phase에서 `Order` 엔티티에 `cart_hash VARCHAR(64)` 컬럼 추가 (§3-2 DB 스키마 항목) 완료 후 활성화
 
 ---
 

@@ -31,9 +31,11 @@
 | order 엔티티 | `cart_hash` | VARCHAR(64) 컬럼 추가, 인덱스 (user_id, cart_hash), 해시 대상: (itemId, quantity) — unitPrice 미포함 (팀 합의) | 엔티티 필드 추가 → 자동 |
 
 > **코드 수정 연계 (DB 외)**
-> - `Order.create()` 초기 status `PAYMENT_PENDING` → `CREATED` 변경
-> - 만료 시각은 DB 컬럼 없음 — 런타임에 `created_at + 10분`으로 계산 (추후 수정 가능)
-> - 만료 스케줄러는 `created_at <= now() - 10분` 조건으로 `CREATED` 상태 주문 조회 후 `CANCELLED` 처리
+> - `Order.create()` 초기 status `PAYMENT_PENDING` → `CREATED` 변경 *(주문생성 Phase 스코프)*
+> - 만료 시각은 DB 컬럼 없음 — 런타임에 `created_at + 30분`으로 계산 (팀 합의 완료: 30분 픽스)
+> - 만료 스케줄러 스코프 구분:
+>   - **본 스코프 (구현 완료)**: `PAYMENT_PENDING` 상태 + `created_at <= now() - 30분` → `CANCELLED` (`OrderExpirationScheduler`)
+>   - **추후 (주문생성 Phase)**: `CREATED` 상태 + `created_at <= now() - 30분` → `CANCELLED` + 재고 복구 Outbox — `stock.deducted` 수신 후 `PAYMENT_PENDING` 전이하는 플로우가 도입된 이후 활성화
 
 ### Event
 
