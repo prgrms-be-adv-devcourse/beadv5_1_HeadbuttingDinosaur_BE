@@ -71,7 +71,10 @@ class StockEventConsumerTest {
             UUID messageId = UUID.randomUUID();
             ConsumerRecord<String, String> record =
                     recordWith(KafkaTopics.STOCK_DEDUCTED, messageId, "{}");
-            willThrow(new DataIntegrityViolationException("duplicate key"))
+            org.hibernate.exception.ConstraintViolationException hibernateCause =
+                    new org.hibernate.exception.ConstraintViolationException(
+                            "duplicate key", null, "uk_processed_message_message_id_topic");
+            willThrow(new DataIntegrityViolationException("duplicate key", hibernateCause))
                     .given(orderService).processStockDeducted(any(), any(), any());
 
             // when
@@ -124,7 +127,10 @@ class StockEventConsumerTest {
             UUID messageId = UUID.randomUUID();
             ConsumerRecord<String, String> record =
                     recordWith(KafkaTopics.STOCK_FAILED, messageId, "{}");
-            willThrow(new DataIntegrityViolationException("duplicate key"))
+            org.hibernate.exception.ConstraintViolationException hibernateCause =
+                    new org.hibernate.exception.ConstraintViolationException(
+                            "duplicate key", null, "uk_processed_message_message_id_topic");
+            willThrow(new DataIntegrityViolationException("duplicate key", hibernateCause))
                     .given(orderService).processStockFailed(any(), any(), any());
 
             // when
