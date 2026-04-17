@@ -47,7 +47,8 @@ com.devticket.{서비스}
 │   ├── repository      // Spring Data JPA Repository 인터페이스
 │   └── exception       // 도메인 비즈니스 예외
 └── infrastructure      // 기술 구현체
-    ├── messaging       // Kafka Producer
+    ├── messaging       // Kafka Producer / Consumer DTO 및 토픽 상수
+    │   └── event       // 토픽별 이벤트 record DTO (Producer/Consumer 공용 계약)
     ├── client          // OpenFeign Client (타 서비스 호출)
     ├── external        // 외부 연동 (S3, PG사 등)
     └── config          // Spring 설정 (Security, Kafka, DB 등)

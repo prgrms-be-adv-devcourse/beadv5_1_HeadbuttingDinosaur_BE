@@ -454,14 +454,16 @@ CREATE TABLE processed_message (
 > ✅ `PaymentStatus.canTransitionTo()` 구현 완료. 
 > ⚠️ **부분 미구현:** `approve()` / `fail()` / `cancel()` / `refund()` 메서드 내부에서 `canTransitionTo()` 가드를 호출하지 않음. 메서드 진입 시 검증 로직 추가 필요.
 
-**Stock** (enum 미구현 — 설계 기준)
+**Stock** ⏸ **Refund Saga 단계 결정** — 현 스코프는 enum 도입 보류
 
 | 현재 상태 | 허용 전이 | 비고 |
 |---|---|---|
 | `DEDUCTED` | → `RESTORED` | Event Consumer가 `order.created` 수신 후 재고 차감 성공 시 (Kafka 구현 전: 동기 HTTP 차감 성공 시) |
 | `RESTORED` | 없음 (종단) | `payment.failed` 수신 → 재고 복구 시 |
 
-> Stock 상태 enum은 현재 코드에 없음 — 구현 시 위 설계 기준으로 추가 필요
+> 본 프로젝트는 별도 Stock 엔티티 없이 `Event.remainingQuantity` 단일 컬럼으로 재고 관리.
+> 현 스코프(`payment.failed` → 재고 복구)는 **dedup + EventStatus 정책적 스킵(CANCELLED/FORCE_CANCELLED) + Event `@Version`** 3중 방어선으로 멱등성 충족.
+> Stock enum / `canTransitionTo()` / 별도 `@Version` 도입은 Refund Saga(`refund.stock.restore`) 진입 시 도메인 모델 변경 동반 여부와 함께 재논의.
 >
 > `RESERVED` 상태 미채택 근거: Event Consumer 내에서 재고 차감이 원자적으로 즉시 발생하므로 "차감 중" 중간 상태가 생길 틈이 없음. RESERVED는 차감과 확정 사이에 시간 간격이 있는 2단계 구조일 때만 필요 — 이 프로젝트는 1단계 즉시 차감 방식 채택. 비관적 락(`PESSIMISTIC_WRITE`)으로 동시성 제어.
 
@@ -878,8 +880,8 @@ topic: event.force-cancelled  → DLT: event.force-cancelled.DLT
 
 | # | 케이스 | 결정 | 구현 수단 | 현재 상태 |
 |---|---|---|---|---|
-| 1 | Consumer 재시작 시 동일 메시지 재처리 | `markProcessed()`를 Service 트랜잭션 내부로 이동 | `@Transactional` 경계 통합 | 수정 필요 |
-| 2 | dedupe 키 스코프 (message_id+topic 복합키는 fan-out 구조에서 Consumer 간 dedup 공유 문제 발생 → 모듈별 별도 테이블로 구독자 스코프 격리) | 격리 단위 = 서비스 DB, Outbox UUID를 Kafka 헤더로 전달 | `X-Message-Id` 헤더 + 모듈별 `processed_message` + `UNIQUE(message_id)` | 구현됨, 문서화 누락 |
+| 1 | Consumer 재시작 시 동일 메시지 재처리 | `markProcessed()`를 Service 트랜잭션 내부로 이동 | `@Transactional` 경계 통합 | 완료 |
+| 2 | dedupe 키 스코프 (message_id+topic 복합키는 fan-out 구조에서 Consumer 간 dedup 공유 문제 발생 → 모듈별 별도 테이블로 구독자 스코프 격리) | 격리 단위 = 서비스 DB, Outbox UUID를 Kafka 헤더로 전달 | `X-Message-Id` 헤더 + 모듈별 `processed_message` + `UNIQUE(message_id)` | Payment·Event 적용 완료 / Commerce 미적용 |
 | 3 | 메시지 순서 역전 | 3분류 처리 — ① 이미 목표 상태: 멱등 스킵 + ACK ② 설명 가능한 순서 역전(만료·보상 등): 정책적 스킵 + ACK ③ 설명 불가능한 상태: throw → 재시도 → DLT (단순 스킵 금지 — 정합성 문제 소거 위험) | `canTransitionTo()` + 예외 타입 3분류 | 미구현 |
 | 4 | Producer 재발행 시 dedupe | `Outbox.messageId` 생성 시 고정, 재발행 시 동일 ID | 현재 구현 유지 | 구현됨, 문서화 누락 |
 | 5 | Outbox 락·재시도 | ShedLock 채택, `next_retry_at` 컬럼 추가 | ShedLock + 지수 백오프 | 락 미구현 → ShedLock 적용 예정 |
@@ -909,6 +911,11 @@ topic: event.force-cancelled  → DLT: event.force-cancelled.DLT
 - [x] ✅ `PaymentStatus.canTransitionTo()` 상태 전이 검증 구현 완료
 - [x] ✅ Payment 엔티티 낙관적 락 (`@Version`) 적용 완료
 - [x] ✅ `WalletServiceImpl.processWalletPayment()`: `payment.completed` Outbox 이벤트 발행으로 전환 완료
+- [x] ✅ `OutboxEventProducer`: Kafka 발행 시 `X-Message-Id` 헤더 세팅 완료
+- [x] ✅ `KafkaConsumerConfig`: FixedBackOff → ExponentialBackOff(2→4→8초, 3회) 변경 완료
+- [x] ✅ `WalletEventConsumer`: groupId `payment-wallet-group` → `payment-refund.completed` 수정 완료
+- [x] ✅ `WalletEventConsumer`: `markProcessed()`를 `RefundCompletedHandler`의 단일 `@Transactional`로 이동 완료
+- [x] ✅ Payment 엔티티 `approve()` / `fail()` / `cancel()` / `refund()` 내부에 `validateTransition()` 가드 호출 추가 완료
 
 - [x] ✅ `OutboxEventProducer`: Kafka 발행 시 `X-Message-Id` 헤더 세팅 완료
 - [x] ✅ `KafkaConsumerConfig`: FixedBackOff → ExponentialBackOff(2→4→8초, 3회) 변경 완료
@@ -941,16 +948,24 @@ topic: event.force-cancelled  → DLT: event.force-cancelled.DLT
 
 ### Event (신규 적용)
 
+**구현 완료**
+- [x] ✅ `KafkaTopics` 상수 클래스 신규 생성 (`infrastructure/messaging/KafkaTopics.java`) — Consumer/Producer 토픽 모두 선반영
+- [x] ✅ `MessageDeduplicationService` 구현 + `processed_message` 테이블 (`topic` 컬럼 포함, schema=`event`)
+- [x] ✅ `payment.failed` Consumer 구현 (`PaymentFailedConsumer` + `StockRestoreService`) — dedup, EventStatus 정책적 스킵, 비관적 락 정렬 조회, `markProcessed()` 트랜잭션 내부, `@Version` / UNIQUE 충돌 핸들링
+- [x] ✅ `Event` 엔티티 낙관적 락 (`@Version`) 적용
+- [x] ✅ `KafkaConsumerConfig` — `ExponentialBackOff(2→4→8초, 3회)` + `AckMode.MANUAL`
+- [x] ✅ `PaymentFailedEvent` record (`infrastructure/messaging/event/`, `List<OrderItem>` 구조)
+
+**미구현**
 - [ ] `JacksonConfig` 추가
-- [ ] `KafkaTopics` 상수 클래스에 Event 발행 토픽 추가
 - [ ] Outbox 패턴 구현 (비즈니스 + save 단일 트랜잭션)
-- [ ] `MessageDeduplicationService` 구현 + `processed_message` 테이블
 - [ ] ShedLock 적용
-- [ ] 모든 Consumer에 dedup 패턴 적용 (`refund.stock.restore` 포함)
-- [ ] 상태 전이 검증 구현 (`canTransitionTo()`)
-- [ ] 도메인 엔티티 낙관적 락 (`@Version`)
-- [ ] `StockStatus` enum 신규 추가 (`DEDUCTED` → `RESTORED`)
-- [ ] `StockRestoreConsumer`: `refund.stock.restore` 수신 → Stock 복구 → `refund.stock.done/failed` 발행
+- [ ] 잔여 Consumer dedup 패턴 적용 (`order.created`, `refund.completed`, `refund.stock.restore`)
+- [ ] Consumer 순서 역전 3분류 처리 구현
+- [ ] `StockRestoreConsumer`: `refund.stock.restore` 수신 → 재고 복구 → `refund.stock.done/failed` 발행
+
+**⏸ Refund Saga 단계 결정**
+- [ ] `StockStatus` enum / Stock `canTransitionTo()` / Stock `@Version` (별도 엔티티 도입 여부 포함)
 
 > 전체 구현 체크리스트: kafka-impl-plan.md §3-3 참조
 
