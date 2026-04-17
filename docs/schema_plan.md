@@ -39,12 +39,12 @@
 
 ### Event
 
-| 분류 | 대상 | 변경 내용 | 방법 |
-|------|------|-----------|------|
-| outbox 생성 | 신규 테이블 | Commerce와 동일 구조 | @Entity 추가 → 자동 |
-| processed_message 생성 | 신규 테이블 | Commerce와 동일 구조 | @Entity 추가 → 자동 |
-| shedlock 생성 | 신규 테이블 | Outbox 스케줄러 분산 락 | 수동 CREATE TABLE |
-| event 엔티티 | `version` | BIGINT 컬럼 추가 (@Version) | 엔티티 필드 추가 → 자동 |
+| 분류 | 대상 | 변경 내용 | 방법 | 상태 |
+|------|------|-----------|------|------|
+| outbox 생성 | 신규 테이블 | Commerce와 동일 구조 | @Entity 추가 → 자동 | ⬜ 미구현 |
+| processed_message 생성 | 신규 테이블 | Commerce와 동일 구조 (schema=`event`, `topic VARCHAR` 컬럼 포함) | @Entity 추가 → 자동 | ✅ 완료 |
+| shedlock 생성 | 신규 테이블 | Outbox 스케줄러 분산 락 | 수동 CREATE TABLE | ⬜ 미구현 |
+| event 엔티티 | `version` | BIGINT 컬럼 추가 (@Version) | 엔티티 필드 추가 → 자동 | ✅ 완료 |
 
 > **합의 완료 (2026-04-14):** OrderCreatedEvent / PaymentFailedEvent 모두 `List<OrderItem>(eventId, quantity)` 리스트 구조 채택 → Stock 신규 엔티티 추가 없음, 기존 event 테이블 quantity 컬럼 사용
 
