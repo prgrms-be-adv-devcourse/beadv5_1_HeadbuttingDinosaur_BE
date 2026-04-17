@@ -50,7 +50,7 @@ public class VectorService {
 
     // ====================== 부가 메서드 모음 ====================== //
     // 1. User_Vector 업데이트
-    public void updateVector(String userId, String eventId, float weight, String vectorType){
+    void updateVector(String userId, String eventId, float weight, String vectorType){
 
         // 1) event Embedding 조회
         float[] eventEmbedding = eventEmbeddingRepository.findEmbeddingById(eventId)
@@ -95,7 +95,7 @@ public class VectorService {
 
 
     // 2. 벡터 갱신 공식 메서드 : (현 벡터 * 누적 가중합 + 이벤트 벡터 * 추가된 가중합) / 누적 + 추가된 가중합 
-    public float[] computeVector(float[] current, float currentWeightSum, float[] eventEmbedding, float weight){
+    float[] computeVector(float[] current, float currentWeightSum, float[] eventEmbedding, float weight){
         float[] result = new float[current.length];
         float totalWeight = currentWeightSum + weight;
 
@@ -111,7 +111,7 @@ public class VectorService {
     }
 
     // 3. 경향성 벡터 타입에 따라 벡터값 꺼내 오기
-    public float[] getVector(UserVector userVector, String vectorType){
+    float[] getVector(UserVector userVector, String vectorType){
         return switch (vectorType){
             case "preference" -> userVector.getPreferenceVector() != null
                 ? userVector.getPreferenceVector() : new float[1536];
@@ -125,7 +125,7 @@ public class VectorService {
 
     
     // 4. 누적 가중치 가져오기
-    public float getWeightSum(UserVector userVector, String vectorType){
+    float getWeightSum(UserVector userVector, String vectorType){
         return switch (vectorType){
             case "preference" -> userVector.getPreferenceWeightSum();
             case "cart"       -> userVector.getCartWeightSum();
@@ -135,7 +135,7 @@ public class VectorService {
     }
 
     // 5. 갱신된 유저 벡터 업데이트 메서드
-    public UserVector buildUpdatedUserVector(UserVector origin, String vectorType, float[] updatedVector, float newWeightSum){
+    UserVector buildUpdatedUserVector(UserVector origin, String vectorType, float[] updatedVector, float newWeightSum){
         return UserVector.builder()
             .userId(origin.getUserId())
             .preferenceVector(vectorType.equals("preference") ? updatedVector : origin.getPreferenceVector())

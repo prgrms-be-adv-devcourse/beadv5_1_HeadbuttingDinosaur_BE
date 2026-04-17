@@ -1,10 +1,9 @@
-package org.example.ai.application;
+package org.example.ai.application.service;
 
 
 
 import java.util.List;
 import java.util.Optional;
-import org.example.ai.application.service.RecentVectorService;
 import org.example.ai.domain.model.UserVector;
 import org.example.ai.domain.repository.EventEmbeddingRepository;
 import org.example.ai.domain.repository.UserVectorRepository;

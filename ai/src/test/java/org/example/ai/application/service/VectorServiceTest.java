@@ -1,4 +1,4 @@
-package org.example.ai.application;
+package org.example.ai.application.service;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
@@ -8,7 +8,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import java.util.Optional;
-import org.example.ai.application.service.VectorService;
 import org.example.ai.domain.model.UserVector;
 import org.example.ai.domain.repository.EventEmbeddingRepository;
 import org.example.ai.domain.repository.UserVectorRepository;

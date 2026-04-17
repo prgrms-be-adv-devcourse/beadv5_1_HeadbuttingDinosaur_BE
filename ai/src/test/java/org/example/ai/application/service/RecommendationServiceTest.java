@@ -1,4 +1,4 @@
-package org.example.ai.application;
+package org.example.ai.application.service;
 
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
@@ -10,7 +10,7 @@ import static org.mockito.Mockito.doReturn;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import org.example.ai.application.service.RecommendationService;
+import org.example.ai.common.exception.BusinessException;
 import org.example.ai.domain.model.UserVector;
 import org.example.ai.domain.repository.UserVectorRepository;
 import org.example.ai.presentation.dto.req.RecommendationRequest;
@@ -78,7 +78,7 @@ public class RecommendationServiceTest {
         // when & then
         assertThatThrownBy(() -> recommendationService
             .recommendByUserVector(new RecommendationRequest("user-1")))
-            .isInstanceOf(Exception.class);
+            .isInstanceOf(BusinessException.class);
     }
 
     // ======================== 3. 정상 흐름 ======================== //
