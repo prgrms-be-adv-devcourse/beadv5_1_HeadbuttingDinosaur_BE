@@ -45,4 +45,5 @@ public record EventListContentResponse(
             event.getRemainingQuantity()
         );
     }
+
 }
