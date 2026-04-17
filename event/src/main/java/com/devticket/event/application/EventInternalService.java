@@ -278,8 +278,12 @@ public class EventInternalService {
         if (status == EventStatus.SOLD_OUT) {
             return PurchaseUnavailableReason.SOLD_OUT;
         }
-        LocalDateTime now = LocalDateTime.now();
-        if (now.isBefore(event.getSaleStartAt()) || now.isAfter(event.getSaleEndAt())) {
+        // InstantType으로 수정 필요 그래야 올바른 시간 비교 가능해짐
+        // LocalDateTime now = LocalDateTime.now();
+        // if (now.isBefore(event.getSaleStartAt()) || now.isAfter(event.getSaleEndAt())) {
+        //     return PurchaseUnavailableReason.SALE_ENDED;
+        // }
+        if (status == EventStatus.SALE_ENDED) {
             return PurchaseUnavailableReason.SALE_ENDED;
         }
         if (requestedQuantity > event.getMaxQuantity()) {
