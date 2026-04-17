@@ -13,6 +13,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.UUID;
@@ -33,6 +34,9 @@ public class Order extends BaseEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     Long id;
+
+    @Version
+    Long version;
 
     @Column(name = "order_id", unique = true)
     UUID orderId;
@@ -155,6 +159,19 @@ public class Order extends BaseEntity {
             throw new BusinessException(OrderErrorCode.ALREADY_PAID_ORDER);
         }
         this.status = OrderStatus.FAILED;
+    }
+
+    //---- 상태 전이 검증 ------------------------------
+
+    public boolean canTransitionTo(OrderStatus target) {
+        return switch (this.status) {
+            case CREATED         -> target == OrderStatus.PAYMENT_PENDING;
+            case PAYMENT_PENDING -> target == OrderStatus.PAID
+                                 || target == OrderStatus.FAILED
+                                 || target == OrderStatus.CANCELLED;
+            case PAID            -> target == OrderStatus.CANCELLED;
+            default              -> false;
+        };
     }
 
     //-------------------

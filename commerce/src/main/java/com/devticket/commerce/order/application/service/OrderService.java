@@ -1,10 +1,18 @@
 package com.devticket.commerce.order.application.service;
 
 import com.devticket.commerce.cart.domain.exception.EventErrorCode;
+import com.devticket.commerce.cart.domain.model.Cart;
 import com.devticket.commerce.cart.domain.model.CartItem;
 import com.devticket.commerce.cart.domain.repository.CartItemRepository;
+import com.devticket.commerce.cart.domain.repository.CartRepository;
 import com.devticket.commerce.common.enums.OrderStatus;
 import com.devticket.commerce.common.exception.BusinessException;
+import com.devticket.commerce.common.messaging.KafkaTopics;
+import com.devticket.commerce.common.messaging.MessageDeduplicationService;
+import com.devticket.commerce.common.messaging.event.PaymentCompletedEvent;
+import com.devticket.commerce.common.messaging.event.PaymentFailedEvent;
+import com.devticket.commerce.common.messaging.event.TicketIssueFailedEvent;
+import com.devticket.commerce.common.outbox.OutboxService;
 import com.devticket.commerce.order.application.usecase.OrderUsecase;
 import com.devticket.commerce.order.domain.exception.OrderErrorCode;
 import com.devticket.commerce.order.domain.model.Order;
@@ -31,8 +39,13 @@ import com.devticket.commerce.ticket.domain.model.Ticket;
 import com.devticket.commerce.ticket.domain.repository.TicketRepository;
 import com.devticket.commerce.ticket.infrastructure.external.client.dto.InternalEventInfoResponse;
 import com.devticket.commerce.ticket.presentation.dto.req.TicketRequest;
+import java.util.stream.IntStream;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -50,10 +63,14 @@ public class OrderService implements OrderUsecase {
 
     private final OrderToEventClient orderToEventClient;
     private final CartItemRepository cartItemRepository;
+    private final CartRepository cartRepository;
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final TicketUsecase ticketUsecase;
     private final TicketRepository ticketRepository;
+    private final MessageDeduplicationService deduplicationService;
+    private final OutboxService outboxService;
+    private final ObjectMapper objectMapper;
 
     // ==== Public Methods (Main Flow) ====================================
 
@@ -75,10 +92,6 @@ public class OrderService implements OrderUsecase {
             orderRepository.save(order);
             //OrderItem생성
             List<OrderItem> savedOrderItems = createOrderItem(order.getId(), userId, cartItems, eventResults);
-            //주문완료건 장바구니에서 삭제처리
-            if (!cartItems.isEmpty()) {
-                cartItemRepository.deleteAllInBatch(cartItems);
-            }
             //응답데이터 변환
             Map<UUID, String> eventTitles = eventResults.stream()
                 .collect(Collectors.toMap(
@@ -306,6 +319,172 @@ public class OrderService implements OrderUsecase {
 //        List<OrderItem> orderItems = orderItemRepository.findAllByEventId(eventId);
 //        return InternalEventOrdersResponse.from(eventId, orderItems);
 //    }
+
+    // ==== Kafka Consumer 처리 ==========================================
+
+    @Override
+    @Transactional
+    public void processPaymentCompleted(UUID messageId, String topic, String payload) {
+        // Step 1. Dedup 체크
+        if (deduplicationService.isDuplicate(messageId)) {
+            return;
+        }
+
+        PaymentCompletedEvent event = deserialize(payload, PaymentCompletedEvent.class);
+
+        // Step 2. 상태 전이 유효성 검증 (3분류)
+        Order order = orderRepository.findByOrderId(event.orderId())
+                .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
+
+        if (!order.canTransitionTo(OrderStatus.PAID)) {
+            if (order.getStatus() == OrderStatus.PAID) {
+                // ① 멱등 스킵: 이미 목표 상태
+                deduplicationService.markProcessed(messageId, topic);
+                return;
+            }
+            if (order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.FAILED) {
+                // ② 정책적 스킵: 보상/만료가 먼저 처리됨
+                log.warn("[processPaymentCompleted] 정책적 스킵 — orderId={}, 현재상태={}",
+                        event.orderId(), order.getStatus());
+                deduplicationService.markProcessed(messageId, topic);
+                return;
+            }
+            // ③ 이상 상태 → throw → 재시도 → DLT
+            throw new IllegalStateException(
+                    "Invalid transition: " + order.getStatus() + " -> PAID, orderId=" + event.orderId());
+        }
+
+        // Step 3. 비즈니스 로직
+        order.completePayment();
+
+        // 티켓 발급 (직접 호출 — @Transactional 프록시 경유 시 rollback-only 오염 방지)
+        List<OrderItem> orderItems = orderItemRepository.findAllByOrderId(order.getId());
+        if (orderItems.isEmpty()) {
+            // 영구 실패: OrderItem 없음 → Order CANCELLED + ticket.issue-failed Outbox 발행
+            log.error("[processPaymentCompleted] 티켓 발급 실패 — OrderItem 없음. orderId={}", event.orderId());
+            order.cancel();
+
+            List<TicketIssueFailedEvent.FailedItem> failedItems = List.of();
+
+            TicketIssueFailedEvent failedEvent = new TicketIssueFailedEvent(
+                    event.orderId(),
+                    event.userId(),
+                    event.paymentId(),
+                    failedItems,
+                    event.totalAmount(),
+                    "OrderItem not found",
+                    Instant.now()
+            );
+
+            outboxService.save(
+                    event.orderId().toString(),
+                    event.orderId().toString(),
+                    "TICKET_ISSUE_FAILED",
+                    KafkaTopics.TICKET_ISSUE_FAILED,
+                    failedEvent
+            );
+
+            deduplicationService.markProcessed(messageId, topic);
+            return;
+        }
+
+        try {
+            List<Ticket> tickets = orderItems.stream()
+                    .flatMap(item -> IntStream.range(0, item.getQuantity())
+                            .mapToObj(i -> Ticket.create(item.getOrderItemId(), item.getUserId(), item.getEventId())))
+                    .collect(Collectors.toList());
+            ticketRepository.saveAll(tickets);
+        } catch (Exception e) {
+            // 영구 실패: 티켓 발급 실패 → Order CANCELLED + ticket.issue-failed Outbox 발행
+            log.error("[processPaymentCompleted] 티켓 발급 실패 — orderId={}, error={}",
+                    event.orderId(), e.getMessage());
+            order.cancel();
+
+            List<TicketIssueFailedEvent.FailedItem> failedItems = orderItems.stream()
+                    .map(item -> new TicketIssueFailedEvent.FailedItem(item.getEventId(), item.getQuantity()))
+                    .toList();
+
+            TicketIssueFailedEvent failedEvent = new TicketIssueFailedEvent(
+                    event.orderId(),
+                    event.userId(),
+                    event.paymentId(),
+                    failedItems,
+                    event.totalAmount(),
+                    e.getMessage(),
+                    Instant.now()
+            );
+
+            outboxService.save(
+                    event.orderId().toString(),
+                    event.orderId().toString(),
+                    "TICKET_ISSUE_FAILED",
+                    KafkaTopics.TICKET_ISSUE_FAILED,
+                    failedEvent
+            );
+
+            deduplicationService.markProcessed(messageId, topic);
+            return;
+        }
+
+        // 장바구니 비우기 (카트가 없으면 무시)
+        Optional<Cart> cart = cartRepository.findByUserId(event.userId());
+        cart.ifPresent(c -> {
+            List<CartItem> cartItems = cartItemRepository.findAllByCartId(c.getId());
+            if (!cartItems.isEmpty()) {
+                cartItemRepository.deleteAllInBatch(cartItems);
+            }
+        });
+
+        // Step 4. Dedup 기록 (같은 트랜잭션)
+        deduplicationService.markProcessed(messageId, topic);
+    }
+
+    @Override
+    @Transactional
+    public void processPaymentFailed(UUID messageId, String topic, String payload) {
+        // Step 1. Dedup 체크
+        if (deduplicationService.isDuplicate(messageId)) {
+            return;
+        }
+
+        PaymentFailedEvent event = deserialize(payload, PaymentFailedEvent.class);
+
+        // Step 2. 상태 전이 유효성 검증 (3분류)
+        Order order = orderRepository.findByOrderId(event.orderId())
+                .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
+
+        if (!order.canTransitionTo(OrderStatus.FAILED)) {
+            if (order.getStatus() == OrderStatus.FAILED) {
+                // ① 멱등 스킵: 이미 목표 상태
+                deduplicationService.markProcessed(messageId, topic);
+                return;
+            }
+            if (order.getStatus() == OrderStatus.CANCELLED) {
+                // ② 정책적 스킵
+                log.warn("[processPaymentFailed] 정책적 스킵 — orderId={}, 현재상태={}",
+                        event.orderId(), order.getStatus());
+                deduplicationService.markProcessed(messageId, topic);
+                return;
+            }
+            // ③ 이상 상태 → throw → 재시도 → DLT
+            throw new IllegalStateException(
+                    "Invalid transition: " + order.getStatus() + " -> FAILED, orderId=" + event.orderId());
+        }
+
+        // Step 3. 비즈니스 로직
+        order.failPayment();
+
+        // Step 4. Dedup 기록 (같은 트랜잭션)
+        deduplicationService.markProcessed(messageId, topic);
+    }
+
+    private <T> T deserialize(String payload, Class<T> clazz) {
+        try {
+            return objectMapper.readValue(payload, clazz);
+        } catch (JsonProcessingException e) {
+            throw new IllegalArgumentException("Kafka 메시지 역직렬화 실패: " + clazz.getSimpleName(), e);
+        }
+    }
 
     // ==== Private Helpers (Logic & Validation) ==========================
 

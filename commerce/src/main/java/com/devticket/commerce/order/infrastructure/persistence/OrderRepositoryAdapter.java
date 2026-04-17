@@ -50,4 +50,9 @@ public class OrderRepositoryAdapter implements OrderRepository {
         return orderJpaRepository.findAllByUserIdAndStatus(userId, status, pageable);
     }
 
+    @Override
+    public List<Order> findExpiredOrders(OrderStatus status, int expirationMinutes) {
+        return orderJpaRepository.findExpiredOrders(status.name(), expirationMinutes);
+    }
+
 }

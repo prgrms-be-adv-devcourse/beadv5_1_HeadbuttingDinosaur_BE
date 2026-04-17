@@ -22,4 +22,6 @@ public interface OrderRepository {
 
     Page<Order> findAllByUserId(UUID userId, OrderStatus status, Pageable pageable);
 
+    List<Order> findExpiredOrders(OrderStatus status, int expirationMinutes);
+
 }
