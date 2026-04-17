@@ -16,10 +16,14 @@ spring:
     consumer:
       group-id: devticket-event
       auto-offset-reset: latest
+  elasticsearch:
+    uris: ${ELASTICSEARCH_URI}
+    connection-timeout: 5s
+    socket-timeout: 30s
 
 service:
   member:
-    url: http://localhost:8081
+    url: http://member:8081
 
 logging:
   level:

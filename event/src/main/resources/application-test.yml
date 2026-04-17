@@ -23,4 +23,6 @@ spring:
       - org.springframework.boot.data.elasticsearch.autoconfigure.ElasticsearchDataAutoConfiguration
       - org.springframework.boot.data.elasticsearch.autoconfigure.ElasticsearchRepositoriesAutoConfiguration
   elasticsearch:
-    uris: http://localhost:19200
+    uris: http://localhost:9200
+    connection-timeout: 1s
+    socket-timeout: 1s

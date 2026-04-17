@@ -47,6 +47,8 @@ dependencies {
 
     // ES
     implementation 'org.springframework.boot:spring-boot-starter-data-elasticsearch'
+    testImplementation 'org.testcontainers:testcontainers:1.19.0'
+    testImplementation 'org.testcontainers:elasticsearch:1.19.0'
 
 }
 
