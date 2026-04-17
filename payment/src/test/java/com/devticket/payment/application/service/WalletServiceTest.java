@@ -211,8 +211,6 @@ class WalletServiceTest {
                 .willReturn(Optional.empty())           // 1차 멱등 체크: 없음
                 .willReturn(Optional.of(existingCharge)); // DataIntegrityViolation 후 재조회: 있음
             given(walletRepository.findByUserIdForUpdate(USER_ID)).willReturn(Optional.of(wallet));
-            given(walletChargeRepository.sumTodayChargeAmount(eq(USER_ID), any(LocalDateTime.class)))
-                .willReturn(0);
 
             // when
             WalletChargeResponse response = walletService.charge(
