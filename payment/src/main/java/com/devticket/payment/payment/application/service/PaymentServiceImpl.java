@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import lombok.RequiredArgsConstructor;
@@ -59,6 +60,13 @@ public class PaymentServiceImpl implements PaymentService {
         InternalOrderInfoResponse order = commerceInternalClient.getOrderInfo(request.orderId());
         validateOrderOwner(userId, order.userId());
         validateOrderPayable(order);
+
+        // 중복 요청: 동일 orderId + 동일 결제수단의 Payment가 이미 존재하면 기존 레코드 재사용
+        Optional<Payment> existing = paymentRepository.findByOrderId(order.id());
+        if (existing.isPresent() && existing.get().getPaymentMethod() == request.paymentMethod()) {
+            return PaymentReadyResponse.from(
+                existing.get(), request.orderId(), order.orderNumber(), order.status());
+        }
 
         //Payment 생성
         Payment payment = Payment.create(
