@@ -5,8 +5,8 @@ import java.util.UUID;
 public record InternalTicketSettlementItemResponse(
     UUID eventId,
     UUID orderItemId,
-    int salesAmount,
-    int refundAmount
+    Long salesAmount,
+    Long refundAmount
 ) {
 
 }
