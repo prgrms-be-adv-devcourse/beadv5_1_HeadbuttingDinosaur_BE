@@ -14,7 +14,10 @@ public enum CartErrorCode implements ErrorCode {
     EXCEED_MAX_PURCHASE(400, "CART_004", "인당 최대 구매 수량을 초과했습니다."),
     ITEM_NOT_FOUND(404, "CART_005", "장바구니에 해당 항목이 없습니다."),
     CART_EMPTY(400, "CART_006", "장바구니가 비어 있습니다."),
-    EVENT_PURCHASE_VALID_UNAVAILABLE(500, "CART_007", "현재 이벤트 정보를 불러올 수 없어 장바구니 담기가 일시적으로 제한됩니다. 잠시 후 다시 시도해주세요.");
+    EVENT_PURCHASE_VALID_UNAVAILABLE(500, "CART_007", "현재 이벤트 정보를 불러올 수 없어 장바구니 담기가 일시적으로 제한됩니다. 잠시 후 다시 시도해주세요."),
+    CART_NOT_FOUND(404, "CART_008", "장바구니를 찾을 수 없습니다."),
+    CART_ITEM_NOT_FOUND(404, "CART_009", "선택한 티켓이 장바구니에 없습니다."),
+    DUPLICATE_CART_ITEM_ID(400, "CART_010", "중복된 상품이 포함되어 있습니다.");
     
     private final int status;
     private final String code;

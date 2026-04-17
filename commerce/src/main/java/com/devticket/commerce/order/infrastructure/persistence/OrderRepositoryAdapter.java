@@ -55,4 +55,9 @@ public class OrderRepositoryAdapter implements OrderRepository {
         return orderJpaRepository.findExpiredOrders(status.name(), expirationMinutes);
     }
 
+    @Override
+    public Optional<Order> findActiveOrder(UUID userId, String cartHash, List<OrderStatus> activeStatuses) {
+        return orderJpaRepository.findActiveOrder(userId, cartHash, activeStatuses);
+    }
+
 }

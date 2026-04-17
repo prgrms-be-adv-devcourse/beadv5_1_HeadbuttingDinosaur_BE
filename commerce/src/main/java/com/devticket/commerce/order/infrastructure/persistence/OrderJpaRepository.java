@@ -9,6 +9,8 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface OrderJpaRepository extends JpaRepository<Order, Long> {
 
@@ -24,11 +26,23 @@ public interface OrderJpaRepository extends JpaRepository<Order, Long> {
 
     Page<Order> findAllByUserIdAndStatus(UUID userId, OrderStatus status, Pageable pageable);
 
-    @org.springframework.data.jpa.repository.Query(
+    @Query(
             value = "SELECT * FROM commerce.\"order\" WHERE status = :status AND created_at < NOW() - CAST(:minutes || ' minutes' AS INTERVAL)",
             nativeQuery = true)
     List<Order> findExpiredOrders(
-            @org.springframework.data.repository.query.Param("status") String status,
-            @org.springframework.data.repository.query.Param("minutes") int minutes);
+            @Param("status") String status,
+            @Param("minutes") int minutes);
+
+    @Query("""
+            SELECT o FROM Order o
+            WHERE o.userId = :userId
+              AND o.cartHash = :cartHash
+              AND o.status IN :activeStatuses
+            """)
+    Optional<Order> findActiveOrder(
+            @Param("userId") UUID userId,
+            @Param("cartHash") String cartHash,
+            @Param("activeStatuses") List<OrderStatus> activeStatuses
+    );
 
 }
