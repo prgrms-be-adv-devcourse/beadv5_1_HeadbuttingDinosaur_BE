@@ -3,6 +3,10 @@ spring:
     name: devticket-event
   profiles:
     active: local
+  jackson:
+    datatype:
+      datetime:
+        write-dates-as-timestamps: false
 
 server:
   port: 8082
