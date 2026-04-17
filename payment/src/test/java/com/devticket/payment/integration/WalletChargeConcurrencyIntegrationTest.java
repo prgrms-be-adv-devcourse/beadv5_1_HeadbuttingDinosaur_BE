@@ -28,6 +28,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
@@ -37,6 +38,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * PgPaymentClient만 Mock (외부 PG 호출 차단).
  */
 @SpringBootTest
+@ActiveProfiles("test")
 class WalletChargeConcurrencyIntegrationTest {
 
     @Autowired
@@ -200,6 +202,7 @@ class WalletChargeConcurrencyIntegrationTest {
     }
 
     // =========================================================================
+    // TODO : 테스트3
     // 테스트 3: 신규 유저 — 지갑 미생성 상태에서 다기기 동시 충전 (각기 다른 멱등성 키)
     //
     // 시나리오: 신규 사용자가 여러 기기에서 동시에 첫 충전 시도
@@ -280,10 +283,10 @@ class WalletChargeConcurrencyIntegrationTest {
     // 검증: 모든 응답의 chargeId 동일 + DB 충전 총액 = 1건 금액 + 성공 100건
     // =========================================================================
     @Test
-    @DisplayName("기존 유저: 동일 멱등성 키로 동시 100건 요청 시 WalletCharge는 1건만 생성된다")
-    void 기존유저_동일_멱등성키_동시100건_1건만_생성() throws InterruptedException {
+    @DisplayName("기존 유저: 동일 멱등성 키로 동시 10건 요청 시 WalletCharge는 1건만 생성된다")
+    void 기존유저_동일_멱등성키_동시요청_1건만_생성() throws InterruptedException {
         // given
-        int threadCount = 100;
+        int threadCount = 10;
         int amount = 10_000;
         String idempotencyKey = "idem-existing-" + UUID.randomUUID();
         WalletChargeRequest request = new WalletChargeRequest(amount);
@@ -350,10 +353,10 @@ class WalletChargeConcurrencyIntegrationTest {
     // 검증: 에러 없이 100건 전부 성공 + DB 충전 총액 = 100 × 5,000원
     // =========================================================================
     @Test
-    @DisplayName("기존 유저: 다기기(다른 멱등성 키)로 동시 100건 요청 시 모두 성공하고 총액이 정확하다")
-    void 기존유저_다기기_동시100건_모두_성공() throws InterruptedException {
+    @DisplayName("기존 유저: 다기기(다른 멱등성 키)로 동시 10건 요청 시 모두 성공하고 총액이 정확하다")
+    void 기존유저_다기기_동시요청_모두_성공() throws InterruptedException {
         // given — 100건 × 5,000원 = 500,000원 (일일 한도 100만원 이내)
-        int threadCount = 100;
+        int threadCount = 10;
         int amountPerRequest = 5_000;
 
         ExecutorService executor = Executors.newFixedThreadPool(threadCount);

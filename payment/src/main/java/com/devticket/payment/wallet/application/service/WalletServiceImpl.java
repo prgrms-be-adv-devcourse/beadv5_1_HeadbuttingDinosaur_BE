@@ -12,7 +12,6 @@ import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -71,6 +70,7 @@ public class WalletServiceImpl implements WalletService {
     private final PlatformTransactionManager txManager;
 
     //this.claimChargeForProcessing() 같은 Self-call이 프록시를 우회하는 문제를 해결하려면 자기 참조 주입(self-injection) 이 필요
+    // Self-invocation 문제 해결을 위한 자기 참조 주입
     @Lazy
     @Autowired
     private WalletServiceImpl self;
@@ -79,56 +79,57 @@ public class WalletServiceImpl implements WalletService {
     // 충전 시작(결제인증에 필요한 WalletCharge생성-chargeId)
     // =====================================================================
 
-    //예치금 충전시 PG사 결제창을 띄우기위한 chargeId와 결제정보 생성.
     @Override
-    @Transactional
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public WalletChargeResponse charge(UUID userId, WalletChargeRequest request,
         String idempotencyKey) {
 
-        //1차 멱등성 체크 : 이미 Wallet이 존재하는 경우(기존 사용자)
+        // 1차 멱등성 체크 (트랜잭션 없음 — 빠른 반환)
         Optional<WalletCharge> existing =
             walletChargeRepository.findByUserIdAndIdempotencyKey(userId, idempotencyKey);
         if (existing.isPresent()) {
             return WalletChargeResponse.from(existing.get());
         }
 
-        //예치금 지갑 조회 — 비관적 락으로 한도 체크 구간 직렬화
-        Optional<Wallet> existingWallet = walletRepository.findByUserIdForUpdate(userId);
-        Wallet wallet;
-        //Wallet이 존재
-        if (existingWallet.isPresent()) {
-            wallet = existingWallet.get();
-        } else {
-            //wallet이 존재하지 않는 경우 내부에서 새로운 세션으로 wallet생성 진행
-            //지갑중복생성 예외가 발행해도 메인 트랜잭션은 롤백되지 않고 로직을 이어갈수 있음.
-            TransactionTemplate requiresNew = new TransactionTemplate(txManager);
-            requiresNew.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
-            try {
-                requiresNew.executeWithoutResult(s -> walletRepository.save(Wallet.create(userId)));
-            } catch (DataIntegrityViolationException ignored) {
-            }
-            //wallet생성시 중복오류가 발생한경우_외부 세션은 살아있으므로 wallet 조회 진행
-            wallet = walletRepository.findByUserIdForUpdate(userId)
-                .orElseThrow(() -> new WalletException(WalletErrorCode.WALLET_NOT_FOUND));
-        }
+        // TX1: 비관적 락으로 지갑 조회/생성 → 커밋 후 락 해제
+        Wallet wallet = self.getWallet(userId);
 
-        //2차 멱등성 체크 : 기존에 Wallet이 존재하지 않았고 이번에 새롭게 생성한 경우(신규사용자)
-        Optional<WalletCharge> reCheckExisting =
+        // TX2: 2차 멱등성 체크 + 한도 체크 + WalletCharge 생성
+        return self.createChargeWithLimitCheck(userId, request, idempotencyKey);
+    }
+
+    // TX1: Wallet 조회/생성
+    // TODO : Wallet이 존재하지 않은 신규사용자의 여러기기 접속+예치금 충전 동시요청의 케이스 추가고려 필요.
+    //  테스트메서드 "신규유저_지갑미생성_다기기_동시충전_각기다른멱등성키()" 실패
+    @Transactional
+    public Wallet getWallet(UUID userId) {
+        return walletRepository.findByUserId(userId)
+            .orElseGet(() -> walletRepository.save(Wallet.create(userId)));
+    }
+
+    // TX2: 비관적 락 재획득 → 멱등성 재확인 → 한도 체크 → WalletCharge 생성
+    @Transactional
+    public WalletChargeResponse createChargeWithLimitCheck(UUID userId,
+        WalletChargeRequest request, String idempotencyKey) {
+
+        // 한도 체크 직렬화를 위해 비관적 락 재획득 (TX1 커밋 후 락이 해제됐으므로 재진입)
+        Wallet wallet = walletRepository.findByUserIdForUpdate(userId)
+            .orElseThrow(() -> new WalletException(WalletErrorCode.WALLET_NOT_FOUND));
+
+        // 2차 멱등성 체크 (TX1과 사이에 끼어든 동시 요청 방어)
+        Optional<WalletCharge> existing =
             walletChargeRepository.findByUserIdAndIdempotencyKey(userId, idempotencyKey);
-        if (reCheckExisting.isPresent()) {
-            return WalletChargeResponse.from(reCheckExisting.get());
+        if (existing.isPresent()) {
+            return WalletChargeResponse.from(existing.get());
         }
 
-        //일일 충전 한도 체크
         LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
         int todayTotal = walletChargeRepository.sumTodayChargeAmount(userId, startOfDay);
         if (todayTotal + request.amount() > WalletPolicyConstants.DAILY_CHARGE_LIMIT) {
             throw new WalletException(WalletErrorCode.DAILY_CHARGE_LIMIT_EXCEEDED);
         }
 
-        // WalletCharge 생성
-        WalletCharge walletCharge = WalletCharge.create(
-            wallet.getId(), userId, request.amount(), idempotencyKey);
+        WalletCharge walletCharge = WalletCharge.create(wallet.getId(), userId, request.amount(), idempotencyKey);
         walletChargeRepository.save(walletCharge);
         return WalletChargeResponse.from(walletCharge);
     }
