@@ -13,6 +13,9 @@ public interface CartItemRepository {
 
     List<CartItem> findAllByCartItemId(List<UUID> cartItemIds);
 
+    // 주문 생성 시 CartItem 동시 변경 차단용 — @Transactional 안에서만 호출, ORDER BY cartItemId로 락 순서 고정
+    List<CartItem> findAllByCartItemIdWithLock(List<UUID> cartItemIds);
+
     Optional<CartItem> findByCartIdAndEventId(Long cartId, UUID eventId);
 
     //장바구니 아이템 삭제

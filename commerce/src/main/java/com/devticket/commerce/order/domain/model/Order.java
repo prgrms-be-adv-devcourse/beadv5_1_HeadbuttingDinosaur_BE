@@ -12,7 +12,9 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.UUID;
@@ -25,7 +27,11 @@ import lombok.experimental.SuperBuilder;
 @Entity
 @SuperBuilder
 @Getter
-@Table(name = "order", schema = "commerce")
+@Table(
+        name = "order",
+        schema = "commerce",
+        indexes = @Index(name = "idx_order_user_cart_hash", columnList = "user_id, cart_hash")
+)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 public class Order extends BaseEntity {
@@ -60,13 +66,22 @@ public class Order extends BaseEntity {
     @Column(name = "deleted_at")
     LocalDateTime deletedAt;
 
+    // 장바구니 내용 해시 — (itemId, quantity) itemId 정렬 후 SHA-256, 중복 주문 판단 기준
+    // UNIQUE 제약 없음 — 이력 주문(CANCELLED/FAILED)은 동일 해시 존재 가능
+    @Column(name = "cart_hash", length = 64, nullable = false )
+    String cartHash;
+
+    // 낙관적 락 — Consumer/스케줄러 동시 상태 전이 충돌 방어
+    @Version
+    @Column(name = "version", nullable = false)
+    Long version;
+
     //---- 정적 팩토리 메서드 ------------------------------
 
     public static Order create(
         UUID userId,
-        int totalAmount
-        //List<OrderItem> items
-
+        int totalAmount,
+        String cartHash
     ) {
         LocalDateTime now = LocalDateTime.now();
 
@@ -93,8 +108,9 @@ public class Order extends BaseEntity {
             .orderNumber(generatedOrderNumber)
             .paymentMethod(null)
             .totalAmount(totalAmount)
-            .status(OrderStatus.PAYMENT_PENDING)
+            .status(OrderStatus.CREATED)
             .orderedAt(now)
+            .cartHash(cartHash)
             .deletedAt(null)
             .build();
 
@@ -114,29 +130,56 @@ public class Order extends BaseEntity {
         this.totalAmount = newTotalAmount;
     }
 
-    //주문 상태 변경 : 결제 대기중 PAYMENT_PENDING
-    public void pendingPayment(PaymentMethod method) {
-        if (this.status != OrderStatus.CREATED) {
-            throw new BusinessException(OrderErrorCode.CANNOT_CHANGE_TO_PENDING);
+    // stock.deducted 수신: CREATED → PAYMENT_PENDING
+    public void pendingPayment() {
+        if (!canTransitionTo(OrderStatus.PAYMENT_PENDING)) {
+            throw new BusinessException(OrderErrorCode.INVALID_ORDER_STATUS_TRANSITION);
         }
         this.status = OrderStatus.PAYMENT_PENDING;
     }
 
-    //주문 상태 변경 : 결제완료 PAID
+    // payment.completed 수신: PAYMENT_PENDING → PAID
     public void completePayment() {
         if (this.status == OrderStatus.PAID) {
             throw new BusinessException(OrderErrorCode.ALREADY_PAID_ORDER);
         }
-        if (this.status != OrderStatus.PAYMENT_PENDING) {
+        if (!canTransitionTo(OrderStatus.PAID)) {
             throw new BusinessException(OrderErrorCode.CANNOT_COMPLETE_PAYMENT);
         }
         this.status = OrderStatus.PAID;
     }
 
-    //주문 상태 변경 : 주문취소 CANCELLED
+    // stock.failed 수신: CREATED → FAILED
+    public void failByStock() {
+        if (!canTransitionTo(OrderStatus.FAILED)) {
+            throw new BusinessException(OrderErrorCode.INVALID_ORDER_STATUS_TRANSITION);
+        }
+        this.status = OrderStatus.FAILED;
+    }
+
+    // 스케줄러 만료: CREATED 상태로 10분 초과 시 → FAILED
+    public void expire() {
+        if (!canTransitionTo(OrderStatus.FAILED)) {
+            throw new BusinessException(OrderErrorCode.INVALID_ORDER_STATUS_TRANSITION);
+        }
+        this.status = OrderStatus.FAILED;
+    }
+
+    // payment.failed 수신: PAYMENT_PENDING → FAILED
+    public void failPayment() {
+        if (!canTransitionTo(OrderStatus.FAILED)) {
+            throw new BusinessException(OrderErrorCode.INVALID_ORDER_STATUS_TRANSITION);
+        }
+        this.status = OrderStatus.FAILED;
+    }
+
+    // 주문 취소: PAYMENT_PENDING → CANCELLED / PAID → CANCELLED
     public void cancel() {
         if (this.status == OrderStatus.CANCELLED) {
             throw new BusinessException(OrderErrorCode.ALREADY_CANCELLED_ORDER);
+        }
+        if (!canTransitionTo(OrderStatus.CANCELLED)) {
+            throw new BusinessException(OrderErrorCode.INVALID_ORDER_STATUS_TRANSITION);
         }
         this.status = OrderStatus.CANCELLED;
     }
@@ -149,12 +192,21 @@ public class Order extends BaseEntity {
         this.totalAmount -= refundAmount;
     }
 
-    //주문 상태 변경 : 결제실패 FAILED
-    public void failPayment() {
-        if (this.status == OrderStatus.PAID) {
-            throw new BusinessException(OrderErrorCode.ALREADY_PAID_ORDER);
-        }
-        this.status = OrderStatus.FAILED;
+    // Consumer 멱등 처리 및 상태 전이 방어용 — canTransitionTo() 기반으로 모든 도메인 메서드 가드 구현
+    public boolean canTransitionTo(OrderStatus target) {
+        return switch (this.status) {
+            // CREATED: 재고 확인 대기 중 — stock.deducted(→PAYMENT_PENDING) 또는 stock.failed(→FAILED)만 허용
+            case CREATED         -> target == OrderStatus.PAYMENT_PENDING
+                                 || target == OrderStatus.FAILED;
+            // PAYMENT_PENDING: 결제 대기 중 — 결제 완료/실패/취소 허용
+            case PAYMENT_PENDING -> target == OrderStatus.PAID
+                                 || target == OrderStatus.FAILED
+                                 || target == OrderStatus.CANCELLED;
+            // PAID: 결제 완료 — 취소(환불 흐름)만 허용
+            case PAID            -> target == OrderStatus.CANCELLED;
+            // FAILED, CANCELLED, REFUND_PENDING, REFUNDED: 종단 상태 — 전이 불가
+            default              -> false;
+        };
     }
 
     //-------------------

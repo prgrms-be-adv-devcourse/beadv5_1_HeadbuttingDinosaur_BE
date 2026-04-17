@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -35,7 +36,7 @@ public class OrderController {
     @Operation(description = "주문하기 : 장바구니에 저장된 상품 단건,다건 주문하기")
     public ResponseEntity<OrderResponse> createOrderByCart(
         @RequestHeader("X-User-Id") UUID userId,
-        @RequestBody CartOrderRequest request
+        @Valid @RequestBody CartOrderRequest request
     ) {
         OrderResponse response = orderUsecase.createOrderByCart(userId, request);
         return ResponseEntity
