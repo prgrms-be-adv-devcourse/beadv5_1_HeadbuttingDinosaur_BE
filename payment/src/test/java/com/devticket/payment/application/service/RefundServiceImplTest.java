@@ -9,17 +9,19 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import com.devticket.payment.common.outbox.OutboxService;
 import com.devticket.payment.payment.domain.enums.PaymentMethod;
 import com.devticket.payment.payment.domain.model.Payment;
 import com.devticket.payment.payment.domain.repository.PaymentRepository;
 import com.devticket.payment.payment.infrastructure.client.CommerceInternalClient;
-import com.devticket.payment.payment.infrastructure.external.PgPaymentClient;
 import com.devticket.payment.refund.application.service.RefundServiceImpl;
 import com.devticket.payment.refund.domain.enums.RefundStatus;
 import com.devticket.payment.refund.domain.exception.RefundErrorCode;
 import com.devticket.payment.refund.domain.exception.RefundException;
 import com.devticket.payment.refund.domain.model.Refund;
+import com.devticket.payment.refund.domain.repository.OrderRefundRepository;
 import com.devticket.payment.refund.domain.repository.RefundRepository;
+import com.devticket.payment.refund.infrastructure.persistence.RefundTicketJpaRepository;
 import com.devticket.payment.refund.infrastructure.client.EventInternalClient;
 import com.devticket.payment.refund.infrastructure.client.dto.InternalEventInfoResponse;
 import com.devticket.payment.refund.presentation.dto.SellerRefundListItemResponse;
@@ -49,8 +51,10 @@ class RefundServiceImplTest {
     @Mock private CommerceInternalClient commerceInternalClient;
     @Mock private EventInternalClient eventInternalClient;
     @Mock private PaymentRepository paymentRepository;
-    @Mock private PgPaymentClient pgPaymentClient;
     @Mock private RefundRepository refundRepository;
+    @Mock private OrderRefundRepository orderRefundRepository;
+    @Mock private RefundTicketJpaRepository refundTicketRepository;
+    @Mock private OutboxService outboxService;
 
     @InjectMocks
     private RefundServiceImpl refundService;

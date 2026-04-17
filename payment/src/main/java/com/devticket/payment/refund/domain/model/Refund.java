@@ -10,6 +10,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.time.LocalDateTime;
 import java.util.UUID;
 import lombok.AccessLevel;
@@ -26,8 +27,15 @@ public class Refund extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Version
+    @Column(name = "version")
+    private Long version;
+
     @Column(name = "refund_id", nullable = false, unique = true)
     private UUID refundId;
+
+    @Column(name = "order_refund_id")
+    private UUID orderRefundId;
 
     @Column(name = "user_id", nullable = false)
     private UUID userId;
@@ -43,6 +51,9 @@ public class Refund extends BaseEntity {
 
     @Column(name = "refund_rate", nullable = false)
     private Integer refundRate;
+
+    @Column(name = "ticket_count", nullable = false)
+    private Integer ticketCount;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -75,6 +86,27 @@ public class Refund extends BaseEntity {
         refund.userId = userId;
         refund.refundAmount = amount;
         refund.refundRate = refundRate;
+        refund.ticketCount = 1;
+        refund.status = RefundStatus.REQUESTED;
+        refund.requestedAt = LocalDateTime.now();
+        return refund;
+    }
+
+    public static Refund create(
+        OrderRefund orderRefund,
+        int ticketCount,
+        int refundAmount,
+        int refundRate
+    ) {
+        Refund refund = new Refund();
+        refund.refundId = UUID.randomUUID();
+        refund.orderRefundId = orderRefund.getOrderRefundId();
+        refund.orderId = orderRefund.getOrderId();
+        refund.userId = orderRefund.getUserId();
+        refund.paymentId = orderRefund.getPaymentId();
+        refund.refundAmount = refundAmount;
+        refund.refundRate = refundRate;
+        refund.ticketCount = ticketCount;
         refund.status = RefundStatus.REQUESTED;
         refund.requestedAt = LocalDateTime.now();
         return refund;

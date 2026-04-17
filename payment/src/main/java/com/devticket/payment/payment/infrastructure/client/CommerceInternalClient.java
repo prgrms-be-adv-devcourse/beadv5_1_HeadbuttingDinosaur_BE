@@ -3,6 +3,7 @@ package com.devticket.payment.payment.infrastructure.client;
 import com.devticket.payment.common.exception.BusinessException;
 import com.devticket.payment.common.exception.CommonErrorCode;
 import com.devticket.payment.payment.infrastructure.client.dto.InternalOrderInfoResponse;
+import com.devticket.payment.payment.infrastructure.client.dto.InternalOrderTicketsResponse;
 import com.devticket.payment.wallet.infrastructure.client.dto.InternalEventOrdersResponse;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
@@ -95,6 +96,24 @@ public class CommerceInternalClient {
             throw e;
         } catch (RestClientResponseException e) {
             throw e;
+        }
+    }
+
+    /**
+     * 오더 전체 환불 시 사용할 orderId 내 ISSUED 상태 티켓 목록 조회.
+     * Commerce 가 소유한 ticketId 의 "source of truth" 로 사용한다.
+     */
+    public InternalOrderTicketsResponse getIssuedTicketsByOrder(UUID orderId) {
+        log.info("[CommerceClient] 발급 티켓 목록 조회 — orderId={}", orderId);
+        try {
+            return restClient.get()
+                .uri("/internal/orders/{orderId}/tickets?status=ISSUED", orderId)
+                .retrieve()
+                .body(InternalOrderTicketsResponse.class);
+        } catch (RestClientException e) {
+            log.error("[CommerceClient] 발급 티켓 조회 실패 — orderId={}, error={}",
+                orderId, e.getMessage());
+            throw new IllegalStateException("Commerce 서비스 호출 실패 — orderId=" + orderId, e);
         }
     }
 }

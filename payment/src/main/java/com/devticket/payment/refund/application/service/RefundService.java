@@ -1,5 +1,7 @@
 package com.devticket.payment.refund.application.service;
 
+import com.devticket.payment.refund.application.event.TicketIssueFailedEvent;
+import com.devticket.payment.refund.presentation.dto.OrderRefundResponse;
 import com.devticket.payment.refund.presentation.dto.RefundDetailResponse;
 import com.devticket.payment.refund.presentation.dto.RefundInfoResponse;
 import com.devticket.payment.refund.presentation.dto.RefundListItemResponse;
@@ -13,6 +15,8 @@ import org.springframework.data.domain.Pageable;
 public interface RefundService {
     RefundInfoResponse getRefundInfo(UUID userId, String ticketId);
     PgRefundResponse refundPgTicket(UUID userId, String ticketId, PgRefundRequest request);
+    OrderRefundResponse refundOrder(UUID userId, UUID orderId, String reason);
+    void initiateAutoRefund(TicketIssueFailedEvent event);
     Page<RefundListItemResponse> getRefundList(UUID userId, Pageable pageable);
     RefundDetailResponse getRefundDetail(UUID userId, UUID refundId);
     Page<SellerRefundListItemResponse> getSellerRefundListByEventId(UUID sellerId, String eventId, Pageable pageable);

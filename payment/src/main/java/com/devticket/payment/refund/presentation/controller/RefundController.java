@@ -1,6 +1,8 @@
 package com.devticket.payment.refund.presentation.controller;
 
 import com.devticket.payment.refund.application.service.RefundService;
+import com.devticket.payment.refund.presentation.dto.OrderRefundRequest;
+import com.devticket.payment.refund.presentation.dto.OrderRefundResponse;
 import com.devticket.payment.refund.presentation.dto.RefundDetailResponse;
 import com.devticket.payment.refund.presentation.dto.RefundInfoResponse;
 import com.devticket.payment.refund.presentation.dto.RefundListItemResponse;
@@ -80,6 +82,18 @@ public class RefundController {
         @Valid @RequestBody PgRefundRequest request
     ) {
         PgRefundResponse response = refundService.refundPgTicket(userId, ticketId, request);
+        return ResponseEntity.ok(response);
+    }
+
+    @Operation(summary = "오더 전체 환불 요청",
+        description = "오더 내 ISSUED 상태 티켓 전부를 한 번에 비동기 환불 처리합니다. Saga 시작 직후 REQUESTED 상태로 즉시 응답합니다.")
+    @PostMapping("/orders/{orderId}")
+    public ResponseEntity<OrderRefundResponse> refundOrder(
+        @RequestHeader("X-User-Id") UUID userId,
+        @PathVariable UUID orderId,
+        @Valid @RequestBody OrderRefundRequest request
+    ) {
+        OrderRefundResponse response = refundService.refundOrder(userId, orderId, request.reason());
         return ResponseEntity.ok(response);
     }
 }
