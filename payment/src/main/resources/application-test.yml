@@ -1,30 +1,20 @@
 spring:
   datasource:
-    url: jdbc:h2:mem:testdb;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;INIT=CREATE SCHEMA IF NOT EXISTS payment\;CREATE SCHEMA IF NOT EXISTS refund\;CREATE TABLE IF NOT EXISTS payment.shedlock(name VARCHAR(64) NOT NULL PRIMARY KEY, lock_until TIMESTAMP NOT NULL, locked_at TIMESTAMP NOT NULL, locked_by VARCHAR(255) NOT NULL)
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
+    url: jdbc:postgresql://localhost:5433/devticket?currentSchema=payment
+    driver-class-name: org.postgresql.Driver
+    username: devticket
+    password: devticket
+    hikari:
+      maximum-pool-size: 30
   jpa:
-    database-platform: org.hibernate.dialect.H2Dialect
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
       ddl-auto: create-drop
-    show-sql: false
-    properties:
-      hibernate:
-        default_schema: payment
+    show-sql: true
   kafka:
     bootstrap-servers: localhost:9093
-    consumer:
-      group-id: devticket-payment
-      auto-offset-reset: earliest
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-    producer:
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.apache.kafka.common.serialization.StringSerializer
-
-server:
-  port: 8085
+    listener:
+      auto-startup: false
 
 jwt:
   secret-key: test-jwt-secret-key
@@ -33,9 +23,9 @@ jwt:
 
 internal:
   commerce:
-    base-url: http://localhost:8085
+    base-url: http://localhost:8083
   event:
-    base-url: http://localhost:8085
+    base-url: http://localhost:8082
 
 pg:
   toss:
