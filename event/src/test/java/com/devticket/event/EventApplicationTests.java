@@ -7,7 +7,7 @@ import org.springframework.test.context.ActiveProfiles;
 
 @SpringBootTest
 @ActiveProfiles("test")
-@Disabled("ES testcontainers 설정 필요 - develop/event 팀 후속 처리")
+//@Disabled("ES testcontainers 설정 필요 - develop/event 팀 후속 처리")
 class EventApplicationTests {
 
 	@Test

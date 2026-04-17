@@ -5,8 +5,14 @@ import co.elastic.clients.elasticsearch._types.FieldValue;
 import co.elastic.clients.elasticsearch._types.query_dsl.BoolQuery;
 import co.elastic.clients.elasticsearch._types.query_dsl.Query;
 import com.devticket.event.common.exception.BusinessException;
+import com.devticket.event.common.messaging.KafkaTopics;
+import com.devticket.event.common.messaging.event.OrderCreatedEvent;
+import com.devticket.event.common.messaging.event.StockDeductedEvent;
+import com.devticket.event.common.messaging.event.StockFailedEvent;
+import com.devticket.event.common.outbox.OutboxService;
 import com.devticket.event.domain.enums.EventStatus;
 import com.devticket.event.domain.exception.EventErrorCode;
+import com.devticket.event.domain.exception.StockDeductionException;
 import com.devticket.event.domain.model.Event;
 import com.devticket.event.domain.model.EventImage;
 import com.devticket.event.domain.model.EventTechStack;
@@ -25,8 +31,10 @@ import com.devticket.event.presentation.dto.SellerEventDetailResponse;
 import com.devticket.event.presentation.dto.SellerEventSummaryResponse;
 import com.devticket.event.presentation.dto.SellerEventUpdateRequest;
 import com.devticket.event.presentation.dto.SellerEventUpdateResponse;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.StringReader;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -55,6 +63,9 @@ public class EventService {
     private final ElasticsearchOperations elasticsearchOperations;
     private final ElasticsearchClient esClient;
     private final OpenAiEmbeddingClient openAiEmbeddingClient;
+    private final OutboxService outboxService;
+    private final MessageDeduplicationService deduplicationService;
+    private final ObjectMapper objectMapper;
 
     @Transactional
     public SellerEventCreateResponse createEvent(UUID sellerId, SellerEventCreateRequest request) {
@@ -306,6 +317,76 @@ public class EventService {
         syncToElasticsearch(event);
 
         return SellerEventUpdateResponse.from(event);
+    }
+
+    /**
+     * order.created Consumer 처리 — 재고 차감 + stock.deducted Outbox 저장
+     *
+     * <p>처리 순서: isDuplicate → 재고 차감(전체) → stock.deducted Outbox 저장 → markProcessed
+     * <p>재고 부족(BusinessException) 발생 시 StockDeductionException throw → @Transactional 전체 롤백
+     * Consumer가 이를 캐치하여 saveStockFailed()를 별도 트랜잭션으로 호출한다.
+     */
+    @Transactional
+    public void processOrderCreated(UUID messageId, String topic, String payload) {
+        if (deduplicationService.isDuplicate(messageId)) {
+            return;
+        }
+
+        OrderCreatedEvent event = deserialize(payload, OrderCreatedEvent.class);
+
+        // Phase 1: 모든 항목 재고 차감 — 실패 시 StockDeductionException throw (전체 롤백)
+        List<StockDeductedEvent> deductedEvents = new ArrayList<>();
+        for (OrderCreatedEvent.OrderItem item : event.orderItems()) {
+            Event e = eventRepository.findByEventIdWithLock(item.eventId())
+                .orElseThrow(() -> new BusinessException(EventErrorCode.EVENT_NOT_FOUND));
+            try {
+                e.deductStock(item.quantity());
+            } catch (BusinessException ex) {
+                throw new StockDeductionException(event.orderId(), item.eventId(), ex.getMessage());
+            }
+            deductedEvents.add(new StockDeductedEvent(event.orderId(), item.eventId(), item.quantity(), Instant.now()));
+        }
+
+        // Phase 2: 모두 성공 → Outbox 저장
+        for (StockDeductedEvent deducted : deductedEvents) {
+            outboxService.save(
+                event.orderId().toString(),
+                event.orderId().toString(),
+                "STOCK_DEDUCTED",
+                KafkaTopics.STOCK_DEDUCTED,
+                deducted
+            );
+        }
+
+        deduplicationService.markProcessed(messageId, topic);
+    }
+
+    /**
+     * 재고 차감 실패 시 stock.failed Outbox 저장 — Consumer가 별도 트랜잭션으로 호출
+     */
+    @Transactional
+    public void saveStockFailed(UUID messageId, String topic, UUID orderId, UUID eventId, String reason) {
+        if (deduplicationService.isDuplicate(messageId)) {
+            return;
+        }
+
+        outboxService.save(
+            orderId.toString(),
+            orderId.toString(),
+            "STOCK_FAILED",
+            KafkaTopics.STOCK_FAILED,
+            new StockFailedEvent(orderId, eventId, reason, Instant.now())
+        );
+
+        deduplicationService.markProcessed(messageId, topic);
+    }
+
+    private <T> T deserialize(String payload, Class<T> type) {
+        try {
+            return objectMapper.readValue(payload, type);
+        } catch (JsonProcessingException e) {
+            throw new IllegalArgumentException("Kafka 페이로드 역직렬화 실패: " + type.getSimpleName(), e);
+        }
     }
 
     /**
