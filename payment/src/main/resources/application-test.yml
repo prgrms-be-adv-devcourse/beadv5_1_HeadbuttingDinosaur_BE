@@ -1,11 +1,15 @@
 spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
+
   datasource:
     url: jdbc:postgresql://localhost:5433/devticket?currentSchema=payment
     driver-class-name: org.postgresql.Driver
     username: devticket
     password: devticket
     hikari:
-      maximum-pool-size: 30
+      maximum-pool-size: 50
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
