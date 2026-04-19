@@ -31,11 +31,16 @@
 | order 엔티티 | `cart_hash` | VARCHAR(64) 컬럼 추가, 인덱스 (user_id, cart_hash), 해시 대상: (itemId, quantity) — unitPrice 미포함 (팀 합의) | 엔티티 필드 추가 → 자동 |
 
 > **코드 수정 연계 (DB 외)**
-> - `Order.create()` 초기 status `PAYMENT_PENDING` → `CREATED` 변경 *(주문생성 Phase 스코프)*
-> - 만료 시각은 DB 컬럼 없음 — 런타임에 `created_at + 30분`으로 계산 (팀 합의 완료: 30분 픽스)
-> - 만료 스케줄러 스코프 구분:
->   - **본 스코프 (구현 완료)**: `PAYMENT_PENDING` 상태 + `created_at <= now() - 30분` → `CANCELLED` (`OrderExpirationScheduler`)
->   - **추후 (주문생성 Phase)**: `CREATED` 상태 + `created_at <= now() - 30분` → `CANCELLED` + 재고 복구 Outbox — `stock.deducted` 수신 후 `PAYMENT_PENDING` 전이하는 플로우가 도입된 이후 활성화
+> - `Order.create()` 초기 status `CREATED` (주문생성 Phase 코드 취합 완료 — `stock.deducted` 수신 후 `PAYMENT_PENDING` 전이)
+> - 만료 시각은 DB 컬럼 없음 — `BaseEntity.updated_at` (`@LastModifiedDate`) 재활용, `PAYMENT_PENDING` 진입 시각 기준 (팀 합의 완료: 30분 픽스)
+>   - `created_at` 기준은 `CREATED` 진입 시각이라 `stock.deducted` 지연 시 결제 시간 단축 문제 발생 → 폐기
+>   - ⚠️ 가정: PAYMENT_PENDING 상태에서 Order 엔티티 수정 경로 없음. 향후 mutation 추가 시 `payment_pending_at` 전용 컬럼 신설로 이관 검토
+> - 만료 스케줄러 스코프:
+>   - **본 스코프**: `PAYMENT_PENDING` 상태 + `updated_at <= now() - 30분` → `CANCELLED` + **재고 복구 Outbox 발행** (`payment.failed`, `reason="ORDER_TIMEOUT"`) — `OrderExpirationScheduler`
+>     - `PAYMENT_PENDING` 상태는 이미 `stock.deducted` 이후이므로 재고가 선점된 상태 → 복구 필수
+>     - Event 모듈 `PaymentFailedConsumer`가 수신하여 재고 `DEDUCTED → RESTORED` 전이 (`kafka-idempotency-guide.md §10` 원칙 준수)
+>     - reason 값 정의: `docs/kafka-design.md §3 PaymentFailedEvent`
+>   - **추후 (주문생성 Phase 보강)**: `CREATED` 상태 만료 처리 — 재고 차감 전이라 재고 복구 불필요, Order 상태만 `CANCELLED` 또는 `FAILED`로 종단 처리
 
 ### Event
 

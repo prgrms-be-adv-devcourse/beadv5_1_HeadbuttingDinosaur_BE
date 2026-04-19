@@ -185,7 +185,7 @@ public record PaymentFailedEvent(
     UUID orderId,
     UUID userId,
     List<OrderItem> orderItems,   // 재고 복구 대상 목록
-    String reason,
+    String reason,                // reason 허용값은 아래 표 참조
     Instant timestamp
 ) {
     public record OrderItem(
@@ -194,6 +194,18 @@ public record PaymentFailedEvent(
     ) {}
 }
 ```
+
+#### `reason` 허용값 (팀 컨벤션)
+
+| 값 | 발행 상황 | 발행자 |
+|----|----------|--------|
+| `ORDER_TIMEOUT` | 주문 30분 만료 스케줄러 → `PAYMENT_PENDING` 주문을 `CANCELLED` 전이하면서 발행 | Commerce |
+| `PAYMENT_DECLINED` | PG 승인 실패 | Payment |
+| `VALIDATION_FAILED` | 내부 검증 실패 (금액/상태 등) | Payment |
+| `PAYMENT_TIMEOUT` | 결제 PG 응답 타임아웃 | Payment |
+
+> Consumer(Event `PaymentFailedConsumer`)는 `reason` 값으로 **로직 분기하지 않음** — 재고 복구 동작은 동일.
+> `reason`은 로깅·집계·모니터링 전용.
 
 ### RefundCompletedEvent
 

@@ -400,7 +400,13 @@ sequenceDiagram
 
 **주문 만료 스케줄러 (내 스코프)**
 - [x] ✅ `OrderExpirationScheduler` 신규 — `@Scheduled(fixedDelay=60_000)` + `@SchedulerLock(name="order-expiration-scheduler", lockAtMostFor="50s", lockAtLeastFor="10s")`
-- [x] ✅ 만료 조건: `PAYMENT_PENDING` 상태 + `created_at + 30분 경과`
+- [ ] 🚧 만료 조건: `PAYMENT_PENDING` 상태 + **`updated_at + 30분 경과`** (PAYMENT_PENDING 진입 시각 기준)
+  - 기존 `created_at` 기준은 `CREATED` 진입 시각이라 `stock.deducted` 지연 시 결제 시간 단축 문제 발생 (PR #426 Codex P2 지적)
+  - `BaseEntity.updated_at` (`@LastModifiedDate`) 재활용 — `pendingPayment()` 호출 시 자동 갱신
+  - ⚠️ 가정: PAYMENT_PENDING 상태에서 Order 엔티티 수정 경로 없음 (`Order.updateTotalAmount()` dead code 확인). 향후 mutation 추가 시 `payment_pending_at` 전용 컬럼 신설로 이관 검토
+- [ ] 🚧 만료 취소 시 재고 복구 — `payment.failed` Outbox 발행 (`reason="ORDER_TIMEOUT"`) → Event 모듈 `PaymentFailedConsumer`가 재고 `DEDUCTED → RESTORED` 전이
+  - `OrderExpirationCancelService`에서 Order `CANCELLED` 전이 + OrderItem 조회 + `PaymentFailedEvent` Outbox INSERT를 단일 `@Transactional` 보장
+  - `reason` 허용값 정의: `docs/kafka-design.md §3 PaymentFailedEvent` 참조
 - [x] ✅ 동시성 방어: `canTransitionTo(CANCELLED)` 선가드 + `ObjectOptimisticLockingFailureException` 재조회 후 종단 상태(PAID/FAILED/CANCELLED)면 스킵
 
 **Refund Saga — Commerce 연동 (신규 구현)** *(환불 Saga 스코프 — 본 스코프 외)*
