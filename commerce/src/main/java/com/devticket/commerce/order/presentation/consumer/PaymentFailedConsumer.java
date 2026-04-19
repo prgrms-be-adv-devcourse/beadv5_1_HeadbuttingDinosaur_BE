@@ -15,6 +15,18 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Component;
 
+/**
+ * payment.failed Consumer — Order PAYMENT_PENDING → FAILED 전이.
+ *
+ * <p>예외 정책 (at-least-once + DLT, 무한 재시도 아님):
+ * <ul>
+ *   <li>processed_message UNIQUE 충돌(constraint=uk_processed_message_message_id_topic) → 이미 처리
+ *       완료 간주 → ACK + 스킵
+ *   <li>그 외 DataIntegrityViolationException → rethrow → KafkaConsumerConfig의 ExponentialBackOff
+ *       (2→4→8초, 3회) 재시도 → 소진 시 {topic}.DLT 이동
+ *   <li>DLT 이동 후 수동 조치 (Admin API 또는 재처리 워커)
+ * </ul>
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -28,21 +40,33 @@ public class PaymentFailedConsumer {
             groupId = "commerce-payment.failed"
     )
     public void consume(ConsumerRecord<String, String> record, Acknowledgment ack) {
-        try {
-            UUID messageId = extractMessageId(record);
-            String payload = extractPayload(record.value());
+        UUID messageId = extractMessageId(record);
+        String payload = extractPayload(record.value());
 
-            try {
-                orderUsecase.processPaymentFailed(messageId, record.topic(), payload);
-            } catch (DataIntegrityViolationException e) {
-                log.warn("[PaymentFailedConsumer] UNIQUE 충돌 — 이미 처리된 메시지. messageId={}", messageId);
-            }
+        try {
+            orderUsecase.processPaymentFailed(messageId, record.topic(), payload);
             ack.acknowledge();
-        } catch (Exception e) {
-            log.error("[PaymentFailedConsumer] 메시지 처리 실패 — topic={}, error={}",
-                    record.topic(), e.getMessage(), e);
+        } catch (DataIntegrityViolationException e) {
+            if (isProcessedMessageUniqueConflict(e)) {
+                log.warn("[PaymentFailedConsumer] processed_message UNIQUE 충돌 — 이미 처리 완료, 스킵. messageId={}",
+                        messageId);
+                ack.acknowledge();
+                return;
+            }
             throw e;
         }
+    }
+
+    private boolean isProcessedMessageUniqueConflict(DataIntegrityViolationException e) {
+        Throwable cause = e.getCause();
+        while (cause != null) {
+            if (cause instanceof org.hibernate.exception.ConstraintViolationException constraintViolation) {
+                String constraintName = constraintViolation.getConstraintName();
+                return "uk_processed_message_message_id_topic".equals(constraintName);
+            }
+            cause = cause.getCause();
+        }
+        return false;
     }
 
     private UUID extractMessageId(ConsumerRecord<String, String> record) {

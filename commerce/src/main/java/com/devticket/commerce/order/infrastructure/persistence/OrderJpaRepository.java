@@ -26,12 +26,15 @@ public interface OrderJpaRepository extends JpaRepository<Order, Long> {
 
     Page<Order> findAllByUserIdAndStatus(UUID userId, OrderStatus status, Pageable pageable);
 
-    @Query(
-            value = "SELECT * FROM commerce.\"order\" WHERE status = :status AND created_at < NOW() - CAST(:minutes || ' minutes' AS INTERVAL)",
-            nativeQuery = true)
+    // 만료 조건: status + updatedAt < threshold
+    // PAYMENT_PENDING 진입 시각 기준 — BaseEntity.updated_at (@LastModifiedDate) 재활용
+    // 이유: created_at 기준은 CREATED 진입 시각이라 stock.deducted 지연 시 결제 시간 단축 문제 발생 (PR #426 Codex P2)
+    // 가정: PAYMENT_PENDING 상태에서 Order 엔티티 mutation 경로 없음 (Order.updateTotalAmount() @Deprecated)
+    // 근거: docs/kafka-impl-plan.md §주문 만료 스케줄러
+    @Query("SELECT o FROM Order o WHERE o.status = :status AND o.updatedAt < :threshold")
     List<Order> findExpiredOrders(
-            @Param("status") String status,
-            @Param("minutes") int minutes);
+            @Param("status") OrderStatus status,
+            @Param("threshold") LocalDateTime threshold);
 
     @Query("""
             SELECT o FROM Order o

@@ -118,8 +118,10 @@ public class Order extends BaseEntity {
 
     //---- 도메인 비즈니스 메서드 ------------------------------
 
-    //총 주문 금액 업데이트
-    //OrderItem의 구매수량이 변경되면 Order의 총 주문금액도 변경됩니다.
+    // ⚠️ 사용 금지 — OrderExpirationScheduler 만료 타이머가 BaseEntity.updated_at 에 의존함.
+    // PAYMENT_PENDING 상태에서 이 메서드를 호출하면 updated_at 이 갱신되어 만료 타이머가 리셋됨.
+    // 금액 변경이 필요하면 주문 재생성 경로 사용. 관련: docs/kafka-impl-plan.md §주문 만료 스케줄러
+    @Deprecated(forRemoval = true)
     public void updateTotalAmount(int newTotalAmount) {
         if (newTotalAmount < 0) {
             throw new BusinessException(OrderErrorCode.INVALID_ORDER_AMOUNT);
