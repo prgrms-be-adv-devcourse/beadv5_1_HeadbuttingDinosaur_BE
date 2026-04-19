@@ -3,6 +3,7 @@ package com.devticket.commerce.order.infrastructure.persistence;
 import com.devticket.commerce.common.enums.OrderStatus;
 import com.devticket.commerce.order.domain.model.Order;
 import com.devticket.commerce.order.domain.repository.OrderRepository;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -52,7 +53,8 @@ public class OrderRepositoryAdapter implements OrderRepository {
 
     @Override
     public List<Order> findExpiredOrders(OrderStatus status, int expirationMinutes) {
-        return orderJpaRepository.findExpiredOrders(status.name(), expirationMinutes);
+        LocalDateTime threshold = LocalDateTime.now().minusMinutes(expirationMinutes);
+        return orderJpaRepository.findExpiredOrders(status, threshold);
     }
 
     @Override
