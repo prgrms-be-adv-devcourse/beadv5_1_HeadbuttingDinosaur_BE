@@ -36,6 +36,7 @@ import com.devticket.commerce.order.presentation.dto.res.OrderCancelResponse;
 import com.devticket.commerce.order.presentation.dto.res.OrderDetailResponse;
 import com.devticket.commerce.order.presentation.dto.res.OrderListResponse;
 import com.devticket.commerce.order.presentation.dto.res.OrderResponse;
+import com.devticket.commerce.order.presentation.dto.res.OrderStatusResponse;
 import com.devticket.commerce.ticket.application.usecase.TicketUsecase;
 import com.devticket.commerce.ticket.domain.enums.TicketStatus;
 import com.devticket.commerce.ticket.domain.exception.TicketErrorCode;
@@ -163,6 +164,19 @@ public class OrderService implements OrderUsecase {
             .collect(Collectors.toMap(InternalEventInfoResponse::eventId, InternalEventInfoResponse::title));
 
         return OrderResponse.of(order, savedOrderItems, eventTitles);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public OrderStatusResponse getOrderStatus(UUID userId, UUID orderId) {
+        Order order = orderRepository.findByOrderId(orderId)
+            .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
+
+        if (!order.getUserId().equals(userId)) {
+            throw new BusinessException(OrderErrorCode.ORDER_FORBIDDEN);
+        }
+
+        return OrderStatusResponse.of(order);
     }
 
     @Override
