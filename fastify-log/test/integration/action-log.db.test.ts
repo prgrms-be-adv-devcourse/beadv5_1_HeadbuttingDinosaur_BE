@@ -133,6 +133,74 @@ describeIfDb('ActionLog Repository (실 Postgres)', () => {
     });
   });
 
+  describe('insertActionLogs — 다행 bulk INSERT', () => {
+    function buildLog(eventId: string, quantity: number): Parameters<
+      typeof actionLogRepository.insertActionLog
+    >[0] {
+      return {
+        userId: USER_UUID,
+        eventId,
+        actionType: 'PURCHASE' as never,
+        searchKeyword: null,
+        stackFilter: null,
+        dwellTimeSeconds: null,
+        quantity,
+        totalAmount: null,
+        timestamp: TIMESTAMP,
+      };
+    }
+
+    it('빈 배열 → no-op (쿼리 실행 없이 0행 유지)', async () => {
+      await actionLogRepository.insertActionLogs([]);
+      const rows = await fetchAll();
+      expect(rows).toHaveLength(0);
+    });
+
+    it('1건 배열 → 단일 INSERT 경로로 1행 저장', async () => {
+      await actionLogRepository.insertActionLogs([buildLog(EVENT_UUID_1, 1)]);
+      const rows = await fetchAll();
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ event_id: EVENT_UUID_1, quantity: 1 });
+    });
+
+    it('3건 배열 → placeholder offset(두 자릿수) 정상 동작, 순서 보존', async () => {
+      const thirdEventId = '33333333-3333-4333-8333-aaaaaaaaaaaa';
+      await actionLogRepository.insertActionLogs([
+        buildLog(EVENT_UUID_1, 1),
+        buildLog(EVENT_UUID_2, 2),
+        buildLog(thirdEventId, 3),
+      ]);
+      const rows = await fetchAll();
+      expect(rows).toHaveLength(3);
+      expect(rows.map((r) => r.event_id)).toEqual([
+        EVENT_UUID_1,
+        EVENT_UUID_2,
+        thirdEventId,
+      ]);
+      expect(rows.map((r) => r.quantity)).toEqual([1, 2, 3]);
+    });
+
+    /**
+     * P1 회귀 방지: multi-row INSERT는 단일 statement이므로 중간 row가 DB 제약을 위반하면
+     * 전체 statement가 ROLLBACK되어야 한다. 부분 저장이 발생하면 payment.completed 1건의
+     * PURCHASE 로그가 영구히 일부만 저장되어 집계 정확도가 깨진다.
+     */
+    it('다건 중 하나라도 제약 위반이면 전체 ROLLBACK — 부분 저장 없음', async () => {
+      const invalidLog = buildLog(EVENT_UUID_2, 2);
+      (invalidLog as { eventId: string }).eventId = 'not-a-uuid';
+
+      await expect(
+        actionLogRepository.insertActionLogs([
+          buildLog(EVENT_UUID_1, 1),
+          invalidLog,
+        ]),
+      ).rejects.toThrow();
+
+      const rows = await fetchAll();
+      expect(rows).toHaveLength(0);
+    });
+  });
+
   describe('paymentCompletedService → DB fan-out', () => {
     it('단건 주문 → PURCHASE 1행, totalAmount 보존', async () => {
       await paymentCompletedService.save({
