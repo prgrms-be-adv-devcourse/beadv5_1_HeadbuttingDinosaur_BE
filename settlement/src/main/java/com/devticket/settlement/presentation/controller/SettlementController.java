@@ -1,13 +1,14 @@
 package com.devticket.settlement.presentation.controller;
 
 import com.devticket.settlement.application.service.SettlementServiceImpl;
-import com.devticket.settlement.infrastructure.client.dto.res.InternalSettlementDataResponse;
 import com.devticket.settlement.presentation.dto.SellerSettlementDetailResponse;
 import com.devticket.settlement.presentation.dto.SettlementResponse;
-import com.devticket.settlement.presentation.scheduler.SettlementScheduler;
+import com.devticket.settlement.presentation.dto.SettlementTargetPreviewResponse;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -27,28 +28,19 @@ public class SettlementController {
 
     private final SettlementServiceImpl settlementServiceImpl;
 
-    // 자동 정산 스케쥴러 목 데이터
-    private final SettlementScheduler settlementScheduler;
-
-    // 목 데이터
-    @GetMapping("/seller/settlements/fetch")
-    public ResponseEntity<InternalSettlementDataResponse> fetchSettlementData(
-        @RequestHeader("X-User-Id") UUID sellerId,
-        @RequestParam String periodStart,
-        @RequestParam String periodEnd
+    @Operation(
+        summary = "[테스트] 정산대상 데이터 수집 미리보기",
+        description = "DB 저장 없이 Event 서비스 → Commerce 서비스 순서대로 실제 API를 호출하여 " +
+            "수집될 정산대상 데이터를 미리 확인합니다. date 미입력 시 어제 날짜로 조회합니다."
+    )
+    @ApiResponse(responseCode = "200", description = "미리보기 조회 성공")
+    @GetMapping("/test/settlement-target/preview")
+    public ResponseEntity<SettlementTargetPreviewResponse> previewSettlementTarget(
+        @Parameter(description = "종료된 이벤트 조회 기준 날짜 (yyyy-MM-dd), 미입력 시 어제")
+        @RequestParam(required = false) LocalDate date
     ) {
-        return ResponseEntity.ok(settlementServiceImpl.fetchSettlementData(sellerId, periodStart, periodEnd));
-    }
-
-    // 자동 정산 목 데이터
-    @GetMapping("/test/batch")
-    public ResponseEntity<String> runBatch() {
-        try {
-            settlementScheduler.runSettlementJob();
-            return ResponseEntity.ok("배치 실행 완료");
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError().body("배치 실행 실패: " + e.getMessage());
-        }
+        LocalDate targetDate = (date != null) ? date : LocalDate.now().minusDays(1);
+        return ResponseEntity.ok(settlementServiceImpl.previewSettlementTarget(targetDate));
     }
 
     @Operation(
@@ -73,5 +65,4 @@ public class SettlementController {
         @PathVariable UUID settlementId) {
         return ResponseEntity.ok(settlementServiceImpl.getSellerSettlementDetail(sellerId, settlementId));
     }
-
 }

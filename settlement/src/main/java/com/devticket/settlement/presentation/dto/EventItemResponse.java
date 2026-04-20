@@ -15,19 +15,19 @@ public record EventItemResponse(
 
     @NotNull
     @Schema(description = "판매 금액", example = "810000", minimum = "0")
-    Integer salesAmount,
+    Long salesAmount,
 
     @NotNull
     @Schema(description = "환불 금액", example = "30000", minimum = "0")
-    Integer refundAmount,
+    Long refundAmount,
 
     @NotNull
     @Schema(description = "수수료 금액", example = "78000", minimum = "0")
-    Integer feeAmount,
+    Long feeAmount,
 
     @NotNull
     @Schema(description = "최종 정산 금액", example = "702000", minimum = "0")
-    Integer settlementAmount
+    Long settlementAmount
 ) {
 
 }
