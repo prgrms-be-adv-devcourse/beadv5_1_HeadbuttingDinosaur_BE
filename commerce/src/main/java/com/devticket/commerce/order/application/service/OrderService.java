@@ -484,7 +484,8 @@ public class OrderService implements OrderUsecase {
         }
 
         // 장바구니 분기 삭제 (A안, #427) — 결제된 OrderItem eventId별 총 qty를 카트에서 차감
-        //   - (cart_id, event_id) UNIQUE 전제: eventId당 CartItem은 0 또는 1개
+        //   - 차감 후 orderedByEvent 잔여 수량을 갱신/제거 → 동일 eventId 행이 복수일 때 과차감 방지
+        //     (UNIQUE 제약은 신규 데이터에 대해서만 보장 — 레거시 중복 행 가능성 방어)
         //   - remaining == 0 이면 row 삭제, 그 외 quantity 갱신
         //   - 결제 대상이 아닌 CartItem 은 카트에 보존 (부분 결제 UX 대응)
         Map<UUID, Integer> orderedByEvent = orderItems.stream()
@@ -498,7 +499,7 @@ public class OrderService implements OrderUsecase {
             List<CartItem> toDelete = new ArrayList<>();
             for (CartItem cartItem : cartItems) {
                 Integer orderedQty = orderedByEvent.get(cartItem.getEventId());
-                if (orderedQty == null) {
+                if (orderedQty == null || orderedQty == 0) {
                     continue;
                 }
                 int deduct = Math.min(orderedQty, cartItem.getQuantity());
@@ -507,6 +508,12 @@ public class OrderService implements OrderUsecase {
                     toDelete.add(cartItem);
                 } else {
                     cartItem.updateQuantity(remaining);
+                }
+                int remainingOrder = orderedQty - deduct;
+                if (remainingOrder == 0) {
+                    orderedByEvent.remove(cartItem.getEventId());
+                } else {
+                    orderedByEvent.put(cartItem.getEventId(), remainingOrder);
                 }
             }
             if (!toDelete.isEmpty()) {

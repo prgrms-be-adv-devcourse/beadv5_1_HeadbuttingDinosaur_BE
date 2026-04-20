@@ -38,6 +38,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.kafka.test.context.EmbeddedKafka;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
@@ -52,6 +53,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  *   <li>B. 부분 결제 → 결제된 eventId 만 삭제, 미주문 아이템 보존
  *   <li>C. 수량 일부만 결제 → row 보존 + quantity 차감
  *   <li>D. 광클 race → (cart_id, event_id) UNIQUE 차단 + catch 복구 → 최종 row 1개 유지
+ *   <li>E. 동일 eventId 중복 행(레거시) → 차감량 소진으로 과차감 방지
  * </ul>
  */
 @SpringBootTest
@@ -74,6 +76,7 @@ class PaymentCompletedCartIntegrationTest {
     @Autowired private CartRepository cartRepository;
     @Autowired private CartItemRepository cartItemRepository;
     @Autowired private ObjectMapper objectMapper;
+    @Autowired private JdbcTemplate jdbcTemplate;
 
     @BeforeEach
     void setUp() {
@@ -193,6 +196,44 @@ class PaymentCompletedCartIntegrationTest {
         assertThat(rows).hasSize(1);
         assertThat(rows.get(0).getEventId()).isEqualTo(eventId);
         assertThat(rows.get(0).getQuantity()).isBetween(1, threadCount);
+    }
+
+    @Test
+    @DisplayName("IT-#427-E: 동일 eventId 중복 행(레거시) → 차감량 소진으로 과차감 방지")
+    void duplicateRows_preventOverDeduction() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID eventA = UUID.randomUUID();
+
+        Cart cart = cartRepository.save(Cart.create(userId));
+        cartItemRepository.save(CartItem.create(cart.getId(), eventA, 1));
+
+        // UNIQUE 제약 일시 DROP — 레거시 중복 행 시뮬레이션
+        jdbcTemplate.execute(
+                "ALTER TABLE commerce.cart_item DROP CONSTRAINT IF EXISTS uk_cart_item_cart_event");
+        try {
+            // 동일 (cart_id, event_id) 두 번째 행 — 제약 없음 상태로 INSERT 가능
+            cartItemRepository.save(CartItem.create(cart.getId(), eventA, 1));
+
+            // 주문: eventA 1개만 결제
+            Order order = savePendingOrder(userId, 10_000, "hash-E");
+            orderItemRepository.save(OrderItem.create(order.getId(), userId, eventA, 10_000, 1, 10));
+
+            String payload = paymentCompletedPayload(order.getOrderId(), userId, 10_000);
+
+            orderService.processPaymentCompleted(
+                    UUID.randomUUID(), KafkaTopics.PAYMENT_COMPLETED, payload);
+
+            // 차감량 소진 적용 시: 1개 행만 삭제, 1개 행 보존 (과차감 방지)
+            List<CartItem> remaining = cartItemRepository.findAllByCartId(cart.getId());
+            assertThat(remaining).hasSize(1);
+            assertThat(remaining.get(0).getEventId()).isEqualTo(eventA);
+            assertThat(remaining.get(0).getQuantity()).isEqualTo(1);
+        } finally {
+            // UNIQUE 제약 복구 — 다른 테스트 격리
+            jdbcTemplate.execute(
+                    "ALTER TABLE commerce.cart_item ADD CONSTRAINT uk_cart_item_cart_event "
+                            + "UNIQUE (cart_id, event_id)");
+        }
     }
 
     private Order savePendingOrder(UUID userId, int totalAmount, String hashPrefix) {
