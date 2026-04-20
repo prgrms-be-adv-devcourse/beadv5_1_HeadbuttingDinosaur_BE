@@ -1,10 +1,8 @@
 package com.devticket.settlement.presentation.controller;
 
 import com.devticket.settlement.application.service.SettlementServiceImpl;
-import com.devticket.settlement.infrastructure.client.dto.res.InternalSettlementDataResponse;
 import com.devticket.settlement.presentation.dto.SellerSettlementDetailResponse;
 import com.devticket.settlement.presentation.dto.SettlementResponse;
-import com.devticket.settlement.presentation.scheduler.SettlementScheduler;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -16,7 +14,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @Tag(name = "Settlement", description = "정산 외부 API")
@@ -26,30 +23,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class SettlementController {
 
     private final SettlementServiceImpl settlementServiceImpl;
-
-    // 자동 정산 스케쥴러 목 데이터
-    private final SettlementScheduler settlementScheduler;
-
-    // 목 데이터
-    @GetMapping("/seller/settlements/fetch")
-    public ResponseEntity<InternalSettlementDataResponse> fetchSettlementData(
-        @RequestHeader("X-User-Id") UUID sellerId,
-        @RequestParam String periodStart,
-        @RequestParam String periodEnd
-    ) {
-        return ResponseEntity.ok(settlementServiceImpl.fetchSettlementData(sellerId, periodStart, periodEnd));
-    }
-
-    // 자동 정산 목 데이터
-    @GetMapping("/test/batch")
-    public ResponseEntity<String> runBatch() {
-        try {
-            settlementScheduler.runSettlementJob();
-            return ResponseEntity.ok("배치 실행 완료");
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError().body("배치 실행 실패: " + e.getMessage());
-        }
-    }
 
     @Operation(
         summary = "판매자 정산 내용 조회",
