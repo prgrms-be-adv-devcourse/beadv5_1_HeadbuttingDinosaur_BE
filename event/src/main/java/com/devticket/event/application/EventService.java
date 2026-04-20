@@ -6,6 +6,8 @@ import co.elastic.clients.elasticsearch._types.query_dsl.BoolQuery;
 import co.elastic.clients.elasticsearch._types.query_dsl.Query;
 import com.devticket.event.common.exception.BusinessException;
 import com.devticket.event.common.messaging.KafkaTopics;
+import com.devticket.event.common.messaging.event.EventForceCancelledEvent;
+import com.devticket.event.common.messaging.event.EventSaleStoppedEvent;
 import com.devticket.event.common.messaging.event.OrderCreatedEvent;
 import com.devticket.event.common.messaging.event.StockDeductedEvent;
 import com.devticket.event.common.messaging.event.StockFailedEvent;
@@ -248,6 +250,13 @@ public class EventService {
                 throw new BusinessException(EventErrorCode.CANNOT_CHANGE_STATUS);
             }
             event.cancel();
+            outboxService.save(
+                event.getEventId().toString(),
+                event.getEventId().toString(),
+                "EVENT_SALE_STOPPED",
+                KafkaTopics.EVENT_SALE_STOPPED,
+                new EventSaleStoppedEvent(event.getEventId(), event.getSellerId(), Instant.now())
+            );
             syncToElasticsearch(event);
             return SellerEventUpdateResponse.from(event);
         }
@@ -318,6 +327,28 @@ public class EventService {
         syncToElasticsearch(event);
 
         return SellerEventUpdateResponse.from(event);
+    }
+
+    /**
+     * 어드민 강제 취소 — 이벤트 상태를 FORCE_CANCELLED 로 전이하고 event.force-cancelled Outbox 발행.
+     * Commerce 가 이를 수신해 해당 이벤트의 PAID 주문에 대해 환불 fan-out 을 수행한다.
+     */
+    @Transactional
+    public void forceCancel(UUID eventId, String reason) {
+        Event event = eventRepository.findByEventIdWithLock(eventId)
+            .orElseThrow(() -> new BusinessException(EventErrorCode.EVENT_NOT_FOUND));
+
+        event.forceCancel();
+
+        outboxService.save(
+            event.getEventId().toString(),
+            event.getEventId().toString(),
+            "EVENT_FORCE_CANCELLED",
+            KafkaTopics.EVENT_FORCE_CANCELLED,
+            new EventForceCancelledEvent(event.getEventId(), event.getSellerId(), reason, Instant.now())
+        );
+
+        syncToElasticsearch(event);
     }
 
     /**
