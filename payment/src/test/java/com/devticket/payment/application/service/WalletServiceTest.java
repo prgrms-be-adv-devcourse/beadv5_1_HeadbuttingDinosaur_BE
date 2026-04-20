@@ -49,6 +49,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -83,6 +84,11 @@ class WalletServiceTest {
     private WalletServiceImpl walletService;
 
     private static final UUID USER_ID = UUID.randomUUID();
+
+    @BeforeEach
+    void setUp() {
+        ReflectionTestUtils.setField(walletService, "self", walletService);
+    }
 
     // =====================================================================
     // 충전 요청 (charge)
@@ -121,8 +127,9 @@ class WalletServiceTest {
             Wallet newWallet = walletWithBalance(0);
             given(walletChargeRepository.findByUserIdAndIdempotencyKey(USER_ID, IDEMPOTENCY_KEY))
                 .willReturn(Optional.empty());
-            given(walletRepository.findByUserIdForUpdate(USER_ID)).willReturn(Optional.empty());
+            given(walletRepository.findByUserId(USER_ID)).willReturn(Optional.empty()); // getWallet: 없음 → 생성
             given(walletRepository.save(any(Wallet.class))).willReturn(newWallet);
+            given(walletRepository.findByUserIdForUpdate(USER_ID)).willReturn(Optional.of(newWallet)); // createChargeWithLimitCheck: 생성된 지갑 조회
             given(walletChargeRepository.sumTodayChargeAmount(eq(USER_ID), any(LocalDateTime.class)))
                 .willReturn(0);
 
@@ -204,16 +211,12 @@ class WalletServiceTest {
                 .willReturn(Optional.empty())           // 1차 멱등 체크: 없음
                 .willReturn(Optional.of(existingCharge)); // DataIntegrityViolation 후 재조회: 있음
             given(walletRepository.findByUserIdForUpdate(USER_ID)).willReturn(Optional.of(wallet));
-            given(walletChargeRepository.sumTodayChargeAmount(eq(USER_ID), any(LocalDateTime.class)))
-                .willReturn(0);
-            given(walletChargeRepository.save(any()))
-                .willThrow(new DataIntegrityViolationException("duplicate idempotency_key"));
 
             // when
             WalletChargeResponse response = walletService.charge(
                 USER_ID, new WalletChargeRequest(10_000), IDEMPOTENCY_KEY);
 
-            // then: 재조회된 기존 충전건 반환
+            // then: createChargeWithLimitCheck 내 2차 멱등 체크에서 기존 충전건 반환
             assertThat(response.chargeId()).isEqualTo(chargeId.toString());
         }
     }
@@ -237,6 +240,8 @@ class WalletServiceTest {
 
             given(walletChargeRepository.findByChargeIdForUpdate(chargeId))
                 .willReturn(Optional.of(walletCharge));
+            given(walletChargeRepository.findByChargeId(chargeId))
+                .willReturn(Optional.of(walletCharge)); // completeChargeAfterPg 내 재조회
             given(pgPaymentClient.confirm(any()))
                 .willReturn(new PgPaymentConfirmResult(
                     paymentKey, chargeId.toString(), "카드", "DONE", 10_000, "2024-01-01T12:00:00"));
@@ -328,6 +333,8 @@ class WalletServiceTest {
             WalletCharge walletCharge = pendingCharge(chargeId, USER_ID, 10_000);
             given(walletChargeRepository.findByChargeIdForUpdate(chargeId))
                 .willReturn(Optional.of(walletCharge));
+            given(walletChargeRepository.findByChargeId(chargeId))
+                .willReturn(Optional.of(walletCharge)); // failProcessingCharge 내 재조회
             given(pgPaymentClient.confirm(any())).willThrow(new RuntimeException("PG timeout"));
 
             // when
@@ -352,6 +359,8 @@ class WalletServiceTest {
 
             given(walletChargeRepository.findByChargeIdForUpdate(chargeId))
                 .willReturn(Optional.of(walletCharge));
+            given(walletChargeRepository.findByChargeId(chargeId))
+                .willReturn(Optional.of(walletCharge)); // completeChargeAfterPg 내 재조회
             given(pgPaymentClient.confirm(any()))
                 .willReturn(new PgPaymentConfirmResult(
                     paymentKey, chargeId.toString(), "카드", "DONE", 10_000, "2024-01-01T12:00:00"));
