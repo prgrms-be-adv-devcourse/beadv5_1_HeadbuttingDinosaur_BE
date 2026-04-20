@@ -50,6 +50,9 @@ dependencies {
     testImplementation 'org.testcontainers:testcontainers:1.19.0'
     testImplementation 'org.testcontainers:elasticsearch:1.19.0'
 
+    // ShedLock — Outbox 스케줄러 분산 환경 중복 실행 방지
+    implementation 'net.javacrumbs.shedlock:shedlock-spring:5.16.0'
+    implementation 'net.javacrumbs.shedlock:shedlock-provider-jdbc-template:5.16.0'
 }
 
 tasks.named('test') {

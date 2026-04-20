@@ -4,7 +4,7 @@ import com.devticket.event.common.messaging.event.PaymentFailedEvent;
 import com.devticket.event.domain.enums.EventStatus;
 import com.devticket.event.domain.model.Event;
 import com.devticket.event.infrastructure.persistence.EventRepository;
-import tools.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -22,7 +22,7 @@ public class StockRestoreService {
 
     private final EventRepository eventRepository;
     private final MessageDeduplicationService deduplicationService;
-    private final JsonMapper jsonMapper;
+    private final ObjectMapper objectMapper;
 
     @Transactional
     public void restoreStockForPaymentFailed(UUID messageId, String topic, String payload) {
@@ -77,7 +77,7 @@ public class StockRestoreService {
 
     private PaymentFailedEvent deserialize(String payload) {
         try {
-            return jsonMapper.readValue(payload, PaymentFailedEvent.class);
+            return objectMapper.readValue(payload, PaymentFailedEvent.class);
         } catch (Exception e) {
             throw new IllegalArgumentException("PaymentFailedEvent 역직렬화 실패", e);
         }
