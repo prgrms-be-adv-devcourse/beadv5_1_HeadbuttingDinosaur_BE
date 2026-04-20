@@ -205,22 +205,22 @@ class EventServiceKafkaTest {
     void 다건_주문_중_하나_재고_부족_시_실패한_항목의_eventId로_StockDeductionException을_던진다() {
         // given
         UUID orderId = UUID.randomUUID();
-        // 락 획득 순서(eventId 오름차순)를 명시적으로 고정
-        UUID smallId = UUID.fromString("00000000-0000-0000-0000-000000000001"); // 성공
-        UUID largeId = UUID.fromString("ffffffff-ffff-ffff-ffff-ffffffffffff"); // 재고 부족
+        // MSB가 동일한 양수 UUID 사용 — Java UUID 비교는 signed long 기준이므로 혼동 없는 순서 고정
+        UUID firstId  = UUID.fromString("00000000-0000-0000-0000-000000000001"); // 먼저 처리됨 (성공)
+        UUID secondId = UUID.fromString("00000000-0000-0000-0000-000000000002"); // 나중에 처리됨 (재고 부족)
 
         given(deduplicationService.isDuplicate(MESSAGE_ID)).willReturn(false);
-        given(eventRepository.findByEventIdWithLock(smallId)).willReturn(Optional.of(onSaleEvent(smallId, 10, 5)));
-        given(eventRepository.findByEventIdWithLock(largeId)).willReturn(Optional.of(onSaleEvent(largeId, 1, 10)));
+        given(eventRepository.findByEventIdWithLock(firstId)).willReturn(Optional.of(onSaleEvent(firstId, 10, 5)));
+        given(eventRepository.findByEventIdWithLock(secondId)).willReturn(Optional.of(onSaleEvent(secondId, 1, 10)));
 
-        String payload = toJson(multiItemEvent(orderId, smallId, largeId, 3, 5)); // largeId: 잔여 1 < 요청 5
+        String payload = toJson(multiItemEvent(orderId, firstId, secondId, 3, 5)); // secondId: 잔여 1 < 요청 5
 
         // when & then
         assertThatThrownBy(() -> eventService.processOrderCreated(MESSAGE_ID, TOPIC, payload))
                 .isInstanceOf(StockDeductionException.class)
                 .satisfies(ex -> {
                     StockDeductionException sde = (StockDeductionException) ex;
-                    assertThat(sde.getEventId()).isEqualTo(largeId);
+                    assertThat(sde.getEventId()).isEqualTo(secondId);
                 });
 
         then(outboxService).shouldHaveNoInteractions(); // 부분 커밋 없음
