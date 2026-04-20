@@ -53,6 +53,12 @@ public class Payment extends BaseEntity {
     @Column(nullable = false)
     private Integer amount;
 
+    @Column(name = "wallet_amount")
+    private Integer walletAmount;
+
+    @Column(name = "pg_amount")
+    private Integer pgAmount;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private PaymentStatus status;
@@ -82,6 +88,28 @@ public class Payment extends BaseEntity {
         payment.userId = userId;
         payment.paymentMethod = method;
         payment.amount = amount;
+        payment.walletAmount = 0;
+        payment.pgAmount = 0;
+        payment.status = PaymentStatus.READY;
+        return payment;
+    }
+
+    public static Payment create(
+        UUID orderId,
+        UUID userId,
+        PaymentMethod method,
+        Integer amount,
+        Integer walletAmount,
+        Integer pgAmount
+    ) {
+        Payment payment = new Payment();
+        payment.paymentId = UUID.randomUUID();
+        payment.orderId = orderId;
+        payment.userId = userId;
+        payment.paymentMethod = method;
+        payment.amount = amount;
+        payment.walletAmount = walletAmount;
+        payment.pgAmount = pgAmount;
         payment.status = PaymentStatus.READY;
         return payment;
     }

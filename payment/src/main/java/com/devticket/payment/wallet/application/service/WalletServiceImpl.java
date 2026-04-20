@@ -420,6 +420,67 @@ public class WalletServiceImpl implements WalletService {
 
 
     // =====================================================================
+    // WALLET_PG 복합결제 — 예치금 차감 / 복구
+    // =====================================================================
+
+    @Override
+    @Transactional
+    public void deductForWalletPg(UUID userId, UUID orderId, int walletAmount) {
+        String transactionKey = "USE_" + orderId;
+
+        if (walletTransactionRepository.existsByTransactionKey(transactionKey)) {
+            log.info("[WalletPG] 이미 처리된 차감 — orderId={}", orderId);
+            return;
+        }
+
+        int updated = walletRepository.useBalanceAtomic(userId, walletAmount);
+        if (updated == 0) {
+            walletRepository.findByUserId(userId)
+                .orElseThrow(() -> new WalletException(WalletErrorCode.WALLET_NOT_FOUND));
+            throw new WalletException(WalletErrorCode.INSUFFICIENT_BALANCE);
+        }
+
+        Wallet wallet = walletRepository.findByUserId(userId)
+            .orElseThrow(() -> new WalletException(WalletErrorCode.WALLET_NOT_FOUND));
+
+        WalletTransaction tx = WalletTransaction.createUse(
+            wallet.getId(), userId, transactionKey, walletAmount, wallet.getBalance(), orderId
+        );
+        walletTransactionRepository.save(tx);
+
+        log.info("[WalletPG] 예치금 차감 완료 — orderId={}, walletAmount={}, balanceAfter={}",
+            orderId, walletAmount, wallet.getBalance());
+    }
+
+    @Override
+    @Transactional
+    public void restoreForWalletPgFail(UUID userId, int walletAmount, UUID orderId) {
+        String transactionKey = "PG_WALLET_RESTORE_" + orderId;
+
+        if (walletTransactionRepository.existsByTransactionKey(transactionKey)) {
+            log.info("[WalletPG] 이미 처리된 복구 — orderId={}", orderId);
+            return;
+        }
+
+        walletRepository.findByUserId(userId)
+            .orElseThrow(() -> new WalletException(WalletErrorCode.WALLET_NOT_FOUND));
+
+        walletRepository.refundBalanceAtomic(userId, walletAmount);
+
+        Wallet wallet = walletRepository.findByUserId(userId)
+            .orElseThrow(() -> new WalletException(WalletErrorCode.WALLET_NOT_FOUND));
+
+        WalletTransaction tx = WalletTransaction.createRefund(
+            wallet.getId(), userId, transactionKey, walletAmount, wallet.getBalance(),
+            orderId, null
+        );
+        walletTransactionRepository.save(tx);
+
+        log.info("[WalletPG] 예치금 복구 완료 — orderId={}, walletAmount={}, balanceAfter={}",
+            orderId, walletAmount, wallet.getBalance());
+    }
+
+    // =====================================================================
     // event.force-cancelled / event.sale-stopped — 일괄 환불
     // =====================================================================
 
