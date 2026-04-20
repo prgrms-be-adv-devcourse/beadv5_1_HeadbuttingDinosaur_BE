@@ -28,7 +28,8 @@ export const env = {
   // Kafka
   KAFKA_BROKERS: requireEnv('KAFKA_BROKERS').split(','),
   KAFKA_GROUP_ID: optionalEnv('KAFKA_GROUP_ID', 'log-group'),
-  KAFKA_TOPIC: optionalEnv('KAFKA_TOPIC', 'action.log'),
+  KAFKA_TOPIC_ACTION_LOG: optionalEnv('KAFKA_TOPIC_ACTION_LOG', 'action.log'),
+  KAFKA_TOPIC_PAYMENT_COMPLETED: optionalEnv('KAFKA_TOPIC_PAYMENT_COMPLETED', 'payment.completed'),
 
   // Server
   PORT: parseInt(optionalEnv('PORT', '8086'), 10),
