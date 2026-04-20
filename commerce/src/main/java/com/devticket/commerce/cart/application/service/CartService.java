@@ -165,28 +165,11 @@ public class CartService implements CartUseCase, CartItemUseCase {
     }
 
     private CartItem addOrUpdateCartItem(Long cartId, CartItemRequest request) {
-        try {
-            return cartItemRepository.findByCartIdAndEventId(cartId, request.eventId())
-                .map(existingItem -> {
-                    log.info("[CartService] 기존 아이템 수량 추가: cartId={}, eventId={}", cartId, request.eventId());
-                    existingItem.addQuantity(request.quantity());
-                    return cartItemRepository.save(existingItem);
-                })
-                .orElseGet(() -> {
-                    log.info("[CartService] 신규 아이템 생성: cartId={}, eventId={}", cartId, request.eventId());
-                    CartItem newItem = CartItem.create(cartId, request.eventId(), request.quantity());
-                    return cartItemRepository.save(newItem);
-                });
-        } catch (DataIntegrityViolationException e) {
-            // 광클 race: 동시 INSERT 중 다른 트랜잭션이 먼저 커밋 → (cart_id, event_id) UNIQUE 위반
-            // findOrCreateCart 와 동일한 복구 패턴 — 재조회 후 수량 합산
-            log.warn("[CartService] addOrUpdateCartItem UNIQUE 충돌 감지 — race 복구 재조회. cartId={}, eventId={}",
-                cartId, request.eventId());
-            CartItem existing = cartItemRepository.findByCartIdAndEventId(cartId, request.eventId())
-                .orElseThrow(() -> new RuntimeException("장바구니 아이템 확보 실패", e));
-            existing.addQuantity(request.quantity());
-            return cartItemRepository.save(existing);
-        }
+        // 단일 atomic upsert: INSERT ... ON CONFLICT DO UPDATE
+        // SELECT→INSERT 패턴의 race condition과 DataIntegrityViolationException으로 인한 트랜잭션 세션 깨짐 방지
+        cartItemRepository.upsertCartItem(cartId, request.eventId(), request.quantity());
+        return cartItemRepository.findByCartIdAndEventId(cartId, request.eventId())
+            .orElseThrow(() -> new RuntimeException("장바구니 아이템 확보 실패"));
     }
 
     // Event에서 반환된 reason값 기준 에러 처리

@@ -26,4 +26,7 @@ public interface CartItemRepository {
 
     // 장바구니 아이템 조회
     Optional<CartItem> findById(Long cartItemId);
+
+    // (cart_id, event_id) UNIQUE 제약을 위반하지 않는 단일 atomic upsert
+    void upsertCartItem(Long cartId, UUID eventId, int quantity);
 }
