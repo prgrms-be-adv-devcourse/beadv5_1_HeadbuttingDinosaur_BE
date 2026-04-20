@@ -75,6 +75,7 @@ public class SettlementServiceImpl implements SettlementService {
      * 정산대상데이터 요청기능의 수동테스트 진행건.
      */
     @Override
+    @Transactional
     public SettlementTargetPreviewResponse previewSettlementTarget(LocalDate targetDate) {
         return collectSettlementTargets(targetDate);
     }
