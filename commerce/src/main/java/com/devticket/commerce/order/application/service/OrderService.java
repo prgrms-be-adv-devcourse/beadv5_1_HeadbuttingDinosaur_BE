@@ -46,6 +46,7 @@ import com.devticket.commerce.ticket.presentation.dto.req.TicketRequest;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.stream.IntStream;
 import java.util.List;
@@ -482,12 +483,34 @@ public class OrderService implements OrderUsecase {
             return;
         }
 
-        // 장바구니 비우기 (카트가 없으면 무시)
-        Optional<Cart> cart = cartRepository.findByUserId(event.userId());
-        cart.ifPresent(c -> {
-            List<CartItem> cartItems = cartItemRepository.findAllByCartId(c.getId());
-            if (!cartItems.isEmpty()) {
-                cartItemRepository.deleteAllInBatch(cartItems);
+        // 장바구니 분기 삭제 (A안, #427) — 결제된 OrderItem eventId별 총 qty를 카트에서 차감
+        //   - (cart_id, event_id) UNIQUE 전제: eventId당 CartItem은 0 또는 1개
+        //   - remaining == 0 이면 row 삭제, 그 외 quantity 갱신
+        //   - 결제 대상이 아닌 CartItem 은 카트에 보존 (부분 결제 UX 대응)
+        Map<UUID, Integer> orderedByEvent = orderItems.stream()
+                .collect(Collectors.toMap(
+                        OrderItem::getEventId,
+                        OrderItem::getQuantity,
+                        Integer::sum
+                ));
+        cartRepository.findByUserId(event.userId()).ifPresent(cart -> {
+            List<CartItem> cartItems = cartItemRepository.findAllByCartId(cart.getId());
+            List<CartItem> toDelete = new ArrayList<>();
+            for (CartItem cartItem : cartItems) {
+                Integer orderedQty = orderedByEvent.get(cartItem.getEventId());
+                if (orderedQty == null) {
+                    continue;
+                }
+                int deduct = Math.min(orderedQty, cartItem.getQuantity());
+                int remaining = cartItem.getQuantity() - deduct;
+                if (remaining == 0) {
+                    toDelete.add(cartItem);
+                } else {
+                    cartItem.updateQuantity(remaining);
+                }
+            }
+            if (!toDelete.isEmpty()) {
+                cartItemRepository.deleteAllInBatch(toDelete);
             }
         });
 
