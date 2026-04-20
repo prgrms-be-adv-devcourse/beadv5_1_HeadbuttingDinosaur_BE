@@ -42,27 +42,6 @@ public class CommerceInternalClient {
         }
     }
 
-    public void completePayment(UUID orderId) {
-        try {
-            restClient.post()
-                .uri("/internal/orders/{orderId}/payment-completed", orderId)
-                .retrieve()
-                .toBodilessEntity();
-        } catch (ResourceAccessException e) {
-            throw e;
-        } catch (RestClientResponseException e) {
-            throw e;
-        }
-    }
-
-    public void failOrder(UUID orderId) {
-        restClient.post()
-            .uri("/internal/orders/{orderId}/payment-failed", orderId)
-            .retrieve()
-            .toBodilessEntity();
-    }
-
-
     public InternalEventOrdersResponse getOrdersByEvent(UUID eventId) {
         log.info("[CommerceClient] 이벤트 주문 조회 — eventId={}", eventId);
         try {

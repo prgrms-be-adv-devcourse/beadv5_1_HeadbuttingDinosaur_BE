@@ -1,0 +1,187 @@
+{
+  "module": "event",
+  "endpointCount": 20,
+  "endpoints": [
+    {
+      "module": "event",
+      "controller": "EventController",
+      "method": "getEventList",
+      "httpMethod": "GET",
+      "path": "/api/events",
+      "summary": "get event list",
+      "source": "event/src/main/java/com/devticket/event/presentation/controller/EventController.java"
+    },
+    {
+      "module": "event",
+      "controller": "EventController",
+      "method": "getRecommendations",
+      "httpMethod": "GET",
+      "path": "/api/events/user/recommendations",
+      "summary": "get recommendations",
+      "source": "event/src/main/java/com/devticket/event/presentation/controller/EventController.java"
+    },
+    {
+      "module": "event",
+      "controller": "EventController",
+      "method": "getEvent",
+      "httpMethod": "GET",
+      "path": "/api/events/{eventId}",
+      "summary": "get event",
+      "source": "event/src/main/java/com/devticket/event/presentation/controller/EventController.java"
+    },
+    {
+      "module": "event",
+      "controller": "DwellController",
+      "method": "reportDwell",
+      "httpMethod": "POST",
+      "path": "/api/events/{eventId}/dwell",
+      "summary": "report dwell",
+      "source": "event/src/main/java/com/devticket/event/presentation/controller/DwellController.java"
+    },
+    {
+      "module": "event",
+      "controller": "SellerEventController",
+      "method": "getSellerEvents",
+      "httpMethod": "GET",
+      "path": "/api/seller/events",
+      "summary": "get seller events",
+      "source": "event/src/main/java/com/devticket/event/presentation/controller/SellerEventController.java"
+    },
+    {
+      "module": "event",
+      "controller": "SellerEventController",
+      "method": "createEvent",
+      "httpMethod": "POST",
+      "path": "/api/seller/events",
+      "summary": "create event",
+      "source": "event/src/main/java/com/devticket/event/presentation/controller/SellerEventController.java"
+    },
+    {
+      "module": "event",
+      "controller": "SellerEventController",
+      "method": "getSellerEventDetail",
+      "httpMethod": "GET",
+      "path": "/api/seller/events/{eventId}",
+      "summary": "get seller event detail",
+      "source": "event/src/main/java/com/devticket/event/presentation/controller/SellerEventController.java"
+    },
+    {
+      "module": "event",
+      "controller": "SellerEventController",
+      "method": "updateEvent",
+      "httpMethod": "PATCH",
+      "path": "/api/seller/events/{eventId}",
+      "summary": "update event",
+      "source": "event/src/main/java/com/devticket/event/presentation/controller/SellerEventController.java"
+    },
+    {
+      "module": "event",
+      "controller": "SellerEventController",
+      "method": "getEventSummary",
+      "httpMethod": "GET",
+      "path": "/api/seller/events/{eventId}/statistics",
+      "summary": "get event summary",
+      "source": "event/src/main/java/com/devticket/event/presentation/controller/SellerEventController.java"
+    },
+    {
+      "module": "event",
+      "controller": "SellerImageUploadController",
+      "method": "uploadImage",
+      "httpMethod": "POST",
+      "path": "/api/seller/images/upload",
+      "summary": "upload image",
+      "source": "event/src/main/java/com/devticket/event/presentation/controller/SellerImageUploadController.java"
+    },
+    {
+      "module": "event",
+      "controller": "EventInternalController",
+      "method": "getEvents",
+      "httpMethod": "GET",
+      "path": "/internal/events",
+      "summary": "get events",
+      "source": "event/src/main/java/com/devticket/event/presentation/controller/EventInternalController.java"
+    },
+    {
+      "module": "event",
+      "controller": "EventInternalController",
+      "method": "getBulkEventInfo",
+      "httpMethod": "POST",
+      "path": "/internal/events/bulk",
+      "summary": "get bulk event info",
+      "source": "event/src/main/java/com/devticket/event/presentation/controller/EventInternalController.java"
+    },
+    {
+      "module": "event",
+      "controller": "EventInternalController",
+      "method": "getEventsBySeller",
+      "httpMethod": "GET",
+      "path": "/internal/events/by-seller/{sellerId}",
+      "summary": "get events by seller",
+      "source": "event/src/main/java/com/devticket/event/presentation/controller/EventInternalController.java"
+    },
+    {
+      "module": "event",
+      "controller": "EventInternalController",
+      "method": "getEventsBySellerForSettlement",
+      "httpMethod": "GET",
+      "path": "/internal/events/by-seller/{sellerId}/settlement",
+      "summary": "get events by seller for settlement",
+      "source": "event/src/main/java/com/devticket/event/presentation/controller/EventInternalController.java"
+    },
+    {
+      "module": "event",
+      "controller": "EventInternalController",
+      "method": "getEndedEventsByDate",
+      "httpMethod": "GET",
+      "path": "/internal/events/ended",
+      "summary": "get ended events by date",
+      "source": "event/src/main/java/com/devticket/event/presentation/controller/EventInternalController.java"
+    },
+    {
+      "module": "event",
+      "controller": "EventInternalController",
+      "method": "getPopularEvents",
+      "httpMethod": "POST",
+      "path": "/internal/events/popular",
+      "summary": "get popular events",
+      "source": "event/src/main/java/com/devticket/event/presentation/controller/EventInternalController.java"
+    },
+    {
+      "module": "event",
+      "controller": "EventInternalController",
+      "method": "adjustStockBulk",
+      "httpMethod": "PATCH",
+      "path": "/internal/events/stock-adjustments",
+      "summary": "adjust stock bulk",
+      "source": "event/src/main/java/com/devticket/event/presentation/controller/EventInternalController.java"
+    },
+    {
+      "module": "event",
+      "controller": "EventInternalController",
+      "method": "getEventInfo",
+      "httpMethod": "GET",
+      "path": "/internal/events/{eventId}",
+      "summary": "get event info",
+      "source": "event/src/main/java/com/devticket/event/presentation/controller/EventInternalController.java"
+    },
+    {
+      "module": "event",
+      "controller": "EventInternalController",
+      "method": "forceCancel",
+      "httpMethod": "PATCH",
+      "path": "/internal/events/{eventId}/force-cancel",
+      "summary": "force cancel",
+      "source": "event/src/main/java/com/devticket/event/presentation/controller/EventInternalController.java"
+    },
+    {
+      "module": "event",
+      "controller": "EventInternalController",
+      "method": "validatePurchase",
+      "httpMethod": "GET",
+      "path": "/internal/events/{eventId}/validate-purchase",
+      "summary": "validate purchase",
+      "source": "event/src/main/java/com/devticket/event/presentation/controller/EventInternalController.java"
+    }
+  ],
+  "notes": []
+}

@@ -7,6 +7,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 @DisplayName("Outbox 엔티티")
 class OutboxTest {
@@ -17,16 +19,12 @@ class OutboxTest {
     void setUp() {
         outbox = Outbox.create(
             "payment-uuid-001",
-            "payment.completed",
-            "payment.completed",
             "order-uuid-001",
+            "payment.completed",
+            "payment.completed",
             "{\"orderId\":\"order-uuid-001\"}"
         );
     }
-
-    // =====================================================================
-    // 생성
-    // =====================================================================
 
     @Nested
     @DisplayName("생성")
@@ -58,11 +56,15 @@ class OutboxTest {
             assertThat(outbox.getTopic()).isEqualTo("payment.completed");
             assertThat(outbox.getPartitionKey()).isEqualTo("order-uuid-001");
         }
-    }
 
-    // =====================================================================
-    // 발행 성공 — markSent()
-    // =====================================================================
+        @Test
+        void messageId는_36자리_UUID_문자열() {
+            assertThat(outbox.getMessageId())
+                .isNotNull()
+                .hasSize(36)
+                .matches("^[0-9a-fA-F-]{36}$");
+        }
+    }
 
     @Nested
     @DisplayName("발행 성공 — markSent()")
@@ -70,22 +72,14 @@ class OutboxTest {
 
         @Test
         void markSent_호출_후_status가_SENT() {
-            // when
             outbox.markSent();
-
-            // then
             assertThat(outbox.getStatus()).isEqualTo(OutboxStatus.SENT);
         }
 
         @Test
         void markSent_호출_후_sentAt_채워짐() {
-            // given
             Instant before = Instant.now();
-
-            // when
             outbox.markSent();
-
-            // then
             assertThat(outbox.getSentAt())
                 .isNotNull()
                 .isAfterOrEqualTo(before);
@@ -93,40 +87,25 @@ class OutboxTest {
 
         @Test
         void markSent_후_isPending_false() {
-            // when
             outbox.markSent();
-
-            // then
             assertThat(outbox.isPending()).isFalse();
         }
     }
 
-    // =====================================================================
-    // 재시도 — increaseRetryCount()
-    // =====================================================================
-
     @Nested
-    @DisplayName("재시도 — increaseRetryCount()")
-    class IncreaseRetryCount {
+    @DisplayName("재시도 — markFailed() 지수 백오프")
+    class MarkFailed {
 
         @Test
         void 재시도_호출_시_retryCount_1_증가() {
-            // when
-            outbox.increaseRetryCount();
-
-            // then
+            outbox.markFailed();
             assertThat(outbox.getRetryCount()).isEqualTo(1);
         }
 
         @Test
         void 재시도_시_nextRetryAt이_현재_이후로_설정() {
-            // given
             Instant before = Instant.now();
-
-            // when
-            outbox.increaseRetryCount();
-
-            // then
+            outbox.markFailed();
             assertThat(outbox.getNextRetryAt())
                 .isNotNull()
                 .isAfterOrEqualTo(before);
@@ -134,64 +113,61 @@ class OutboxTest {
 
         @Test
         void MAX_RETRY_미만이면_status_PENDING_유지() {
-            // when: 4회 재시도 (MAX_RETRY = 5)
-            for (int i = 0; i < 4; i++) {
-                outbox.increaseRetryCount();
-            }
-
-            // then
-            assertThat(outbox.getStatus()).isEqualTo(OutboxStatus.PENDING);
-            assertThat(outbox.getRetryCount()).isEqualTo(4);
-        }
-
-        @Test
-        void MAX_RETRY_도달_시_status가_FAILED() {
-            // when: 5회 재시도
+            // 5회 재시도 (MAX_RETRY = 6)
             for (int i = 0; i < 5; i++) {
-                outbox.increaseRetryCount();
+                outbox.markFailed();
             }
-
-            // then
-            assertThat(outbox.getStatus()).isEqualTo(OutboxStatus.FAILED);
+            assertThat(outbox.getStatus()).isEqualTo(OutboxStatus.PENDING);
             assertThat(outbox.getRetryCount()).isEqualTo(5);
         }
 
         @Test
-        void 재시도_횟수에_따른_백오프_간격_증가() {
-            // 1차 재시도: 60초, 2차: 120초, 3차: 180초
-            Instant before1 = Instant.now();
-            outbox.increaseRetryCount(); // retryCount=1
-            Instant after1 = outbox.getNextRetryAt();
-
-            Instant before2 = Instant.now();
-            outbox.increaseRetryCount(); // retryCount=2
-            Instant after2 = outbox.getNextRetryAt();
-
-            // 2차 nextRetryAt이 1차보다 더 먼 미래
-            assertThat(after2).isAfter(after1);
+        void MAX_RETRY_도달_시_status가_FAILED() {
+            // 6회 재시도
+            for (int i = 0; i < 6; i++) {
+                outbox.markFailed();
+            }
+            assertThat(outbox.getStatus()).isEqualTo(OutboxStatus.FAILED);
+            assertThat(outbox.getRetryCount()).isEqualTo(6);
         }
 
-        @Test
-        void markSent_후_sentAt이_Instant_타입() {
-            // when
-            outbox.markSent();
+        /**
+         * 회차별 지수 백오프 정확값 — 2^(retryCount-1) 초.
+         * 1→1s / 2→2s / 3→4s / 4→8s / 5→16s (6회차는 FAILED 전환으로 nextRetryAt 미세팅)
+         */
+        @ParameterizedTest(name = "retryCount={0} → {1}초")
+        @CsvSource({
+            "1, 1",
+            "2, 2",
+            "3, 4",
+            "4, 8",
+            "5, 16"
+        })
+        void 회차별_지수_백오프_정확값(int attempts, long expectedSeconds) {
+            Instant before = Instant.now();
+            for (int i = 0; i < attempts; i++) {
+                outbox.markFailed();
+            }
 
-            // then
-            assertThat(outbox.getSentAt()).isInstanceOf(Instant.class);
+            assertThat(outbox.getRetryCount()).isEqualTo(attempts);
+            // 허용 오차 ±1초 (markFailed() 내부 Instant.now() 호출 타이밍)
+            long actualDelta = outbox.getNextRetryAt().getEpochSecond() - before.getEpochSecond();
+            assertThat(actualDelta)
+                .as("retryCount=%d 에서 expectedSeconds=%d 근사 (±1초 허용)", attempts, expectedSeconds)
+                .isBetween(expectedSeconds - 1, expectedSeconds + 1);
         }
 
         @Test
         void MAX_RETRY_도달_시_nextRetryAt_갱신_안됨() {
-            // given: 4회까지 nextRetryAt 설정
-            for (int i = 0; i < 4; i++) {
-                outbox.increaseRetryCount();
+            // 5회까지 nextRetryAt 설정
+            for (int i = 0; i < 5; i++) {
+                outbox.markFailed();
             }
             Instant nextRetryAtBefore = outbox.getNextRetryAt();
 
-            // when: 5회째 → FAILED 전환, nextRetryAt 갱신 없음
-            outbox.increaseRetryCount();
+            // 6회째 → FAILED 전환, nextRetryAt 갱신 없음
+            outbox.markFailed();
 
-            // then
             assertThat(outbox.getNextRetryAt()).isEqualTo(nextRetryAtBefore);
         }
     }

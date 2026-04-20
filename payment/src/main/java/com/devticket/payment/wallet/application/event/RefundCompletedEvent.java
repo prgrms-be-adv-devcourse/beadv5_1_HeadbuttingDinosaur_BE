@@ -13,9 +13,7 @@ public record RefundCompletedEvent(
     UUID paymentId,
     PaymentMethod paymentMethod,
     int refundAmount,
-    int refundRate,       // 0 | 50 | 100
+    int refundRate,
     Instant timestamp
-) {
-
-}
+) {}
 

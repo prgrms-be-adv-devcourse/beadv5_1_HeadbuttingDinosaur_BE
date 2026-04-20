@@ -96,6 +96,65 @@ class PaymentKafkaIntegrationTest {
     class OutboxToKafkaTest {
 
         @Test
+        @DisplayName("payment.completed Outbox orderItems → Kafka payload에 보존")
+        void payment_completed_orderItems_preserved_to_kafka() throws Exception {
+            // given: orderItems 포함 payload → Outbox INSERT
+            UUID orderId = UUID.randomUUID();
+            UUID userId = UUID.randomUUID();
+            UUID eventId1 = UUID.randomUUID();
+            UUID eventId2 = UUID.randomUUID();
+
+            Payment payment = Payment.create(orderId, userId, PaymentMethod.PG, 80_000);
+            payment.approve("test-key-orderItems");
+            paymentRepository.save(payment);
+
+            String payload = objectMapper.writeValueAsString(new java.util.LinkedHashMap<>() {{
+                put("orderId", orderId.toString());
+                put("userId", userId.toString());
+                put("paymentId", payment.getPaymentId().toString());
+                put("paymentMethod", "PG");
+                put("totalAmount", 80_000);
+                put("orderItems", List.of(
+                    new java.util.LinkedHashMap<>() {{
+                        put("eventId", eventId1.toString());
+                        put("quantity", 2);
+                    }},
+                    new java.util.LinkedHashMap<>() {{
+                        put("eventId", eventId2.toString());
+                        put("quantity", 3);
+                    }}
+                ));
+                put("timestamp", java.time.Instant.now().toString());
+            }});
+
+            Outbox outbox = Outbox.create(
+                payment.getPaymentId().toString(),
+                orderId.toString(),
+                "payment.completed",
+                "payment.completed",
+                payload
+            );
+            outboxRepository.save(outbox);
+
+            // then: Kafka payload에 orderItems 배열과 각 eventId/quantity 보존
+            await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+                assertThat(completedRecords).anyMatch(r -> {
+                    try {
+                        JsonNode node = objectMapper.readTree(r.value());
+                        JsonNode p = objectMapper.readTree(node.get("payload").asText());
+                        if (!orderId.toString().equals(p.get("orderId").asText())) return false;
+                        JsonNode items = p.get("orderItems");
+                        if (items == null || !items.isArray() || items.size() != 2) return false;
+                        return eventId1.toString().equals(items.get(0).get("eventId").asText())
+                            && items.get(0).get("quantity").asInt() == 2
+                            && eventId2.toString().equals(items.get(1).get("eventId").asText())
+                            && items.get(1).get("quantity").asInt() == 3;
+                    } catch (Exception e) { return false; }
+                });
+            });
+        }
+
+        @Test
         @DisplayName("payment.completed Outbox 레코드 → 스케줄러가 Kafka로 발행")
         void payment_completed_outbox_to_kafka() throws Exception {
             // given: Payment 생성 + 승인 + Outbox 직접 INSERT (Commerce/PG 우회)
@@ -117,9 +176,9 @@ class PaymentKafkaIntegrationTest {
 
             Outbox outbox = Outbox.create(
                 payment.getPaymentId().toString(),
-                "payment.completed",
-                "payment.completed",
                 orderId.toString(),
+                "payment.completed",
+                "payment.completed",
                 payload
             );
             outboxRepository.save(outbox);
@@ -159,9 +218,9 @@ class PaymentKafkaIntegrationTest {
 
             Outbox outbox = Outbox.create(
                 payment.getPaymentId().toString(),
-                "payment.failed",
-                "payment.failed",
                 orderId.toString(),
+                "payment.failed",
+                "payment.failed",
                 payload
             );
             outboxRepository.save(outbox);
@@ -203,7 +262,7 @@ class PaymentKafkaIntegrationTest {
             paymentRepository.save(payment);
 
             // when: WalletService.processWalletPayment 호출 (Commerce 우회, 직접 호출)
-            walletService.processWalletPayment(userId, orderId, 30_000);
+            walletService.processWalletPayment(userId, orderId, 30_000, List.of());
 
             // then: 잔액 차감 확인
             Wallet updated = walletRepository.findByUserId(userId).orElseThrow();
@@ -214,8 +273,10 @@ class PaymentKafkaIntegrationTest {
             assertThat(completedPayment.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
 
             // Outbox INSERT 확인
-            List<Outbox> outboxes = outboxRepository.findPendingForRetry(
-                OutboxStatus.PENDING, java.time.Instant.now().plusSeconds(60));
+            List<Outbox> outboxes = outboxRepository.findPendingToPublish(
+                OutboxStatus.PENDING,
+                java.time.Instant.now().plusSeconds(60),
+                java.time.LocalDateTime.now().plusSeconds(60));
             assertThat(outboxes).anyMatch(o ->
                 "payment.completed".equals(o.getEventType())
                 && o.getPartitionKey().equals(orderId.toString())

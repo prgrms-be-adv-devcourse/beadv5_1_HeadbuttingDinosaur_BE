@@ -2,12 +2,14 @@ package com.devticket.payment.common.outbox;
 
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.KafkaException;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
@@ -16,28 +18,37 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class OutboxEventProducer {
 
     private final KafkaTemplate<String, String> kafkaTemplate;
     private final ObjectMapper objectMapper;
 
+    @Value("${kafka-producer.send-timeout-ms:2000}")
+    private long sendTimeoutMs = 2000L;
+
+    public OutboxEventProducer(KafkaTemplate<String, String> kafkaTemplate,
+                               ObjectMapper objectMapper) {
+        this.kafkaTemplate = kafkaTemplate;
+        this.objectMapper = objectMapper;
+    }
+
     /**
      * Kafka 메시지를 동기적으로 발행한다.
      * 발행 실패 시 OutboxPublishException을 던진다.
      */
-    public void send(String topic, String key, OutboxEventMessage message) {
+    public void publish(OutboxEventMessage message) {
         try {
             String json = objectMapper.writeValueAsString(message);
 
-            ProducerRecord<String, String> record = new ProducerRecord<>(topic, key, json);
+            ProducerRecord<String, String> record =
+                new ProducerRecord<>(message.topic(), message.partitionKey(), json);
             record.headers().add("X-Message-Id",
-                message.messageId().toString().getBytes(StandardCharsets.UTF_8));
+                message.messageId().getBytes(StandardCharsets.UTF_8));
 
-            var result = kafkaTemplate.send(record).get();
+            var result = kafkaTemplate.send(record).get(sendTimeoutMs, TimeUnit.MILLISECONDS);
 
             log.info("[Outbox] Kafka 발행 성공 — topic={}, messageId={}, offset={}",
-                topic, message.messageId(),
+                message.topic(), message.messageId(),
                 result.getRecordMetadata().offset());
 
         } catch (JsonProcessingException e) {
@@ -45,7 +56,7 @@ public class OutboxEventProducer {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new OutboxPublishException("Kafka 발행 중 인터럽트 발생", e);
-        } catch (ExecutionException | KafkaException e) {
+        } catch (TimeoutException | ExecutionException | KafkaException e) {
             throw new OutboxPublishException("Kafka 발행 실패", e);
         }
     }

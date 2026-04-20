@@ -61,37 +61,104 @@ public class PaymentServiceImpl implements PaymentService {
         validateOrderOwner(userId, order.userId());
         validateOrderPayable(order);
 
-        // 중복 요청: 동일 orderId + 동일 결제수단의 Payment가 이미 존재하면 기존 레코드 재사용
+        // 기존 Payment 처리 — READY는 재시도/멱등 재사용 허용, 종단 상태는 변경 불가
         Optional<Payment> existing = paymentRepository.findByOrderId(order.id());
-        if (existing.isPresent() && existing.get().getPaymentMethod() == request.paymentMethod()) {
-            return PaymentReadyResponse.from(
-                existing.get(), request.orderId(), order.orderNumber(), order.status());
+        Payment retryTarget = null;
+
+        if (existing.isPresent()) {
+            Payment ep = existing.get();
+
+            if (ep.getStatus() != PaymentStatus.READY) {
+                throw new PaymentException(PaymentErrorCode.ALREADY_PROCESSED_PAYMENT);
+            }
+
+            if (isSameReadyRequest(ep, request)) {
+                log.info("[ReadyPayment] 기존 READY Payment 재사용 — orderId={}, method={}",
+                    order.id(), request.paymentMethod());
+                return PaymentReadyResponse.from(
+                    ep, request.orderId(), order.orderNumber(), order.status());
+            }
+
+            if (ep.getPaymentMethod() == PaymentMethod.WALLET_PG
+                && ep.getWalletAmount() != null && ep.getWalletAmount() > 0) {
+                walletService.restoreForWalletPgFail(ep.getUserId(), ep.getWalletAmount(), ep.getOrderId());
+                log.info("[ReadyPayment] 결제수단 변경 — 기존 WALLET_PG 예치금 환원. orderId={}, walletAmount={}",
+                    ep.getOrderId(), ep.getWalletAmount());
+            }
+            retryTarget = ep;
         }
 
-        //Payment 생성
-        Payment payment = Payment.create(
-            order.id(),
-            userId,
-            request.paymentMethod(),
-            order.totalAmount()
-        );
+        // WALLET_PG 복합결제
+        if (request.paymentMethod() == PaymentMethod.WALLET_PG) {
+            return readyWalletPgPayment(userId, request, order, retryTarget);
+        }
 
+        // PG 결제
+        if (request.paymentMethod() == PaymentMethod.PG) {
+            Payment payment = (retryTarget != null)
+                ? applyRetry(retryTarget, PaymentMethod.PG, order.totalAmount(), 0, 0)
+                : Payment.create(order.id(), userId, PaymentMethod.PG, order.totalAmount());
+            Payment savedPayment = paymentRepository.save(payment);
+            return PaymentReadyResponse.from(savedPayment, request.orderId(), order.orderNumber(), order.status());
+        }
+
+        // WALLET 결제
+        Payment payment = (retryTarget != null)
+            ? applyRetry(retryTarget, PaymentMethod.WALLET, order.totalAmount(), 0, 0)
+            : Payment.create(order.id(), userId, PaymentMethod.WALLET, order.totalAmount());
+        paymentRepository.save(payment);
+        List<PaymentCompletedEvent.OrderItem> walletOrderItems = order.orderItems() == null
+            ? List.of()
+            : order.orderItems().stream()
+                .map(item -> new PaymentCompletedEvent.OrderItem(item.eventId(), item.quantity()))
+                .toList();
+        walletService.processWalletPayment(userId, request.orderId(), order.totalAmount(), walletOrderItems);
+        Payment updated = paymentRepository.findByOrderId(order.id())
+            .orElseThrow(() -> new PaymentException(PaymentErrorCode.INVALID_PAYMENT_REQUEST));
+        return PaymentReadyResponse.from(updated, request.orderId(), order.orderNumber(), order.status());
+    }
+
+    private PaymentReadyResponse readyWalletPgPayment(
+        UUID userId, PaymentReadyRequest request, InternalOrderInfoResponse order, Payment retryTarget) {
+        int totalAmount = order.totalAmount();
+
+        // 입력값 검증
+        if (request.walletAmount() == null || request.walletAmount() <= 0 || request.walletAmount() >= totalAmount) {
+            throw new PaymentException(PaymentErrorCode.INVALID_PAYMENT_REQUEST);
+        }
+
+        int walletAmount = request.walletAmount();
+        int pgAmount = totalAmount - walletAmount;
+
+        // 예치금 차감 (WalletTransaction USE 기록 포함)
+        walletService.deductForWalletPg(userId, order.id(), walletAmount);
+
+        // Payment 생성 또는 재초기화 (READY, WALLET_PG)
+        Payment payment = (retryTarget != null)
+            ? applyRetry(retryTarget, PaymentMethod.WALLET_PG, totalAmount, walletAmount, pgAmount)
+            : Payment.create(order.id(), userId, PaymentMethod.WALLET_PG, totalAmount, walletAmount, pgAmount);
         Payment savedPayment = paymentRepository.save(payment);
 
-        //예치금 결제일 경우 - WalletService로 위임 (원자적 UPDATE + Outbox 발행)
-        if (request.paymentMethod() == PaymentMethod.WALLET) {
-            walletService.processWalletPayment(userId, request.orderId(), order.totalAmount());
-            Payment updated = paymentRepository.findByOrderId(order.id())
-                .orElseThrow(() -> new PaymentException(PaymentErrorCode.INVALID_PAYMENT_REQUEST));
-            return PaymentReadyResponse.from(updated, request.orderId(), order.orderNumber(), order.status());
-        }
+        log.info("[ReadyPayment] WALLET_PG 결제 준비 — orderId={}, walletAmount={}, pgAmount={}",
+            order.id(), walletAmount, pgAmount);
 
-        return PaymentReadyResponse.from(
-            savedPayment,
-            request.orderId(),
-            order.orderNumber(),
-            order.status()
-        );
+        return PaymentReadyResponse.from(savedPayment, request.orderId(), order.orderNumber(), order.status());
+    }
+
+    private boolean isSameReadyRequest(Payment existing, PaymentReadyRequest request) {
+        if (existing.getPaymentMethod() != request.paymentMethod()) {
+            return false;
+        }
+        if (request.paymentMethod() == PaymentMethod.WALLET_PG) {
+            Integer reqWallet = request.walletAmount();
+            return reqWallet != null && reqWallet.equals(existing.getWalletAmount());
+        }
+        return true;
+    }
+
+    private Payment applyRetry(Payment target, PaymentMethod method, Integer amount, Integer walletAmount, Integer pgAmount) {
+        target.resetForRetry(method, amount, walletAmount, pgAmount);
+        return target;
     }
 
     @Override
@@ -115,19 +182,26 @@ public class PaymentServiceImpl implements PaymentService {
         paymentRepository.save(payment);
 
         // payment.completed Outbox 발행 (트랜잭션 내)
+        List<PaymentCompletedEvent.OrderItem> orderItems = order.orderItems() == null
+            ? List.of()
+            : order.orderItems().stream()
+                .map(item -> new PaymentCompletedEvent.OrderItem(item.eventId(), item.quantity()))
+                .toList();
+
         PaymentCompletedEvent event = PaymentCompletedEvent.builder()
             .orderId(payment.getOrderId())
             .userId(payment.getUserId())
             .paymentId(payment.getPaymentId())
             .paymentMethod(payment.getPaymentMethod())
             .totalAmount(payment.getAmount())
+            .orderItems(orderItems)
             .timestamp(Instant.now())
             .build();
         outboxService.save(
             payment.getPaymentId().toString(),
-            KafkaTopics.PAYMENT_COMPLETED,
-            KafkaTopics.PAYMENT_COMPLETED,
             payment.getOrderId().toString(),
+            KafkaTopics.PAYMENT_COMPLETED,
+            KafkaTopics.PAYMENT_COMPLETED,
             event
         );
 
@@ -156,11 +230,15 @@ public class PaymentServiceImpl implements PaymentService {
         }
     }
 
-    // 금액 검증
+    // 금액 검증: WALLET_PG이면 pgAmount 기준, 그 외는 총액 기준
     private void validatePaymentAmount(Payment payment, PaymentConfirmRequest request) {
-        if (!payment.getAmount().equals(request.amount())) {
+        int expectedAmount = payment.getPaymentMethod() == PaymentMethod.WALLET_PG
+            ? payment.getPgAmount()
+            : payment.getAmount();
+
+        if (expectedAmount != request.amount()) {
             log.warn("결제 금액 불일치: expected={}, actual={}, orderId={}",
-                payment.getAmount(), request.amount(), request.paymentId());
+                expectedAmount, request.amount(), request.paymentId());
             throw new PaymentException(PaymentErrorCode.INVALID_PAYMENT_REQUEST);
         }
     }
@@ -179,6 +257,13 @@ public class PaymentServiceImpl implements PaymentService {
         String reason = buildFailureReason(request.code(), request.message());
         payment.fail(reason);
         paymentRepository.save(payment);
+
+        // WALLET_PG인 경우 예치금 복구
+        if (payment.getPaymentMethod() == PaymentMethod.WALLET_PG) {
+            walletService.restoreForWalletPgFail(payment.getUserId(), payment.getWalletAmount(), payment.getOrderId());
+            log.info("[FailPgPayment] WALLET_PG 예치금 복구 — orderId={}, walletAmount={}",
+                payment.getOrderId(), payment.getWalletAmount());
+        }
 
         log.info("PG 결제 실패 처리 완료: orderId={}, code={}, message={}",
             request.orderId(), request.code(), request.message());
@@ -199,9 +284,9 @@ public class PaymentServiceImpl implements PaymentService {
             .build();
         outboxService.save(
             payment.getPaymentId().toString(),
-            KafkaTopics.PAYMENT_FAILED,
-            KafkaTopics.PAYMENT_FAILED,
             payment.getOrderId().toString(),
+            KafkaTopics.PAYMENT_FAILED,
+            KafkaTopics.PAYMENT_FAILED,
             event
         );
 
@@ -247,8 +332,6 @@ public class PaymentServiceImpl implements PaymentService {
             )
         );
     }
-
-
 
     private LocalDateTime parseApprovedAt(String approvedAt) {
         try {

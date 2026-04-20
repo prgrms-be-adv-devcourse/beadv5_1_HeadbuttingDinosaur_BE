@@ -1,0 +1,46 @@
+spring:
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
+    consumer:
+      group-id: devticket-admin
+      auto-offset-reset: latest
+  elasticsearch:
+    uris: http://elasticsearch:9200
+    connection-timeout: 5s
+    socket-timeout: 30s
+
+jwt:
+  secret-key: ${JWT_SECRET_KEY}
+  access-token-ttl: 1800000
+  refresh-token-ttl: 604800000
+
+openai:
+  embedding:
+    enabled: true
+    api-key: ${OPENAI_API_KEY:}
+    model: text-embedding-3-small
+    url: https://api.openai.com/v1/embeddings
+
+internal:
+  member-service:
+    url: http://member:8081
+  event-service:
+    url: http://event:8082
+  settlement-service:
+    url: http://settlement:8085
+
+logging:
+  level:
+    com.devticket: INFO

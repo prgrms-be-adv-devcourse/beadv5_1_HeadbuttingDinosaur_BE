@@ -53,6 +53,12 @@ public class Payment extends BaseEntity {
     @Column(nullable = false)
     private Integer amount;
 
+    @Column(name = "wallet_amount")
+    private Integer walletAmount;
+
+    @Column(name = "pg_amount")
+    private Integer pgAmount;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private PaymentStatus status;
@@ -82,6 +88,28 @@ public class Payment extends BaseEntity {
         payment.userId = userId;
         payment.paymentMethod = method;
         payment.amount = amount;
+        payment.walletAmount = 0;
+        payment.pgAmount = 0;
+        payment.status = PaymentStatus.READY;
+        return payment;
+    }
+
+    public static Payment create(
+        UUID orderId,
+        UUID userId,
+        PaymentMethod method,
+        Integer amount,
+        Integer walletAmount,
+        Integer pgAmount
+    ) {
+        Payment payment = new Payment();
+        payment.paymentId = UUID.randomUUID();
+        payment.orderId = orderId;
+        payment.userId = userId;
+        payment.paymentMethod = method;
+        payment.amount = amount;
+        payment.walletAmount = walletAmount;
+        payment.pgAmount = pgAmount;
         payment.status = PaymentStatus.READY;
         return payment;
     }
@@ -89,6 +117,20 @@ public class Payment extends BaseEntity {
     /* =======================
         상태 변경 메서드
        ======================= */
+
+    /**
+     * READY 상태인 Payment를 다른 결제수단/금액으로 재초기화.
+     * status / paymentId / orderId / userId 는 보존, 결제 정보만 갱신.
+     */
+    public void resetForRetry(PaymentMethod method, Integer amount, Integer walletAmount, Integer pgAmount) {
+        if (this.status != PaymentStatus.READY) {
+            throw new PaymentException(PaymentErrorCode.INVALID_STATUS_TRANSITION);
+        }
+        this.paymentMethod = method;
+        this.amount = amount;
+        this.walletAmount = walletAmount != null ? walletAmount : 0;
+        this.pgAmount = pgAmount != null ? pgAmount : 0;
+    }
 
     public void approve(String paymentKey) {
         validateTransition(PaymentStatus.SUCCESS);

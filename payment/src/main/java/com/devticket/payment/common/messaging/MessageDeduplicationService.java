@@ -1,6 +1,5 @@
 package com.devticket.payment.common.messaging;
 
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -13,7 +12,7 @@ public class MessageDeduplicationService {
     /**
      * 이미 처리된 메시지인지 확인한다.
      */
-    public boolean isDuplicate(UUID messageId) {
+    public boolean isDuplicate(String messageId) {
         return processedMessageRepository.existsByMessageId(messageId);
     }
 
@@ -21,7 +20,7 @@ public class MessageDeduplicationService {
      * 메시지를 처리 완료로 기록한다.
      * 반드시 비즈니스 로직과 같은 트랜잭션 안에서 호출해야 한다.
      */
-    public void markProcessed(UUID messageId, String topic) {
+    public void markProcessed(String messageId, String topic) {
         processedMessageRepository.save(ProcessedMessage.of(messageId, topic));
     }
 }

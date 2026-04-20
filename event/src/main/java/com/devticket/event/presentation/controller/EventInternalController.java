@@ -1,0 +1,164 @@
+package com.devticket.event.presentation.controller;
+
+import com.devticket.event.application.EventInternalService;
+import com.devticket.event.common.response.SuccessResponse;
+import com.devticket.event.domain.enums.EventStatus;
+import com.devticket.event.application.EventService;
+import com.devticket.event.presentation.dto.internal.InternalBulkEventInfoRequest;
+import com.devticket.event.presentation.dto.internal.InternalPopularEventRequest;
+import com.devticket.event.presentation.dto.internal.InternalPopularEventResponse;
+import com.devticket.event.presentation.dto.internal.InternalBulkEventInfoResponse;
+import com.devticket.event.presentation.dto.internal.InternalBulkStockAdjustmentRequest;
+import com.devticket.event.presentation.dto.internal.InternalEventForceCancelRequest;
+import com.devticket.event.presentation.dto.internal.InternalPagedEventResponse;
+import com.devticket.event.presentation.dto.internal.InternalEndedEventsResponse;
+import com.devticket.event.presentation.dto.internal.InternalStockAdjustmentResponse;
+import com.devticket.event.presentation.dto.internal.InternalEventInfoResponse;
+import com.devticket.event.presentation.dto.internal.InternalPurchaseValidationResponse;
+import com.devticket.event.presentation.dto.internal.InternalSellerEventsResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/internal/events")
+@RequiredArgsConstructor
+@Tag(name = "Event Internal API", description = "Commerce, Payment, Settlement 서비스 연동용 내부 API")
+public class EventInternalController {
+
+    private final EventInternalService eventInternalService;
+    private final EventService eventService;
+
+    @GetMapping
+    public ResponseEntity<SuccessResponse<InternalPagedEventResponse>> getEvents(
+        @RequestParam(required = false) String keyword,
+        @RequestParam(required = false) EventStatus status,
+        @RequestParam(required = false) UUID sellerId,
+        Pageable pageable
+    ) {
+        return ResponseEntity.ok(SuccessResponse.success(
+            eventInternalService.searchEvents(keyword, status, sellerId, pageable)
+        ));
+    }
+
+    /**
+     * API 1: 단건 이벤트 정보 조회
+     * Commerce/Payment 서비스가 id(Long)로 이벤트 기본 정보를 조회할 때 사용
+     */
+    @GetMapping("/{eventId}")
+    public ResponseEntity<SuccessResponse<InternalEventInfoResponse>> getEventInfo(
+        @PathVariable UUID eventId) {
+        return ResponseEntity.ok(SuccessResponse.success(
+            eventInternalService.getEventInfo(eventId)
+        ));
+    }
+
+    /**
+     * API 2: 벌크 이벤트 정보 조회
+     * 없는 ID는 결과에서 누락 (예외 없음) — 부분 결과 반환
+     */
+    @PostMapping("/bulk")
+    public ResponseEntity<SuccessResponse<InternalBulkEventInfoResponse>> getBulkEventInfo(
+        @RequestBody @Valid InternalBulkEventInfoRequest request) {
+        return ResponseEntity.ok(SuccessResponse.success(
+            eventInternalService.getBulkEventInfo(request.eventIds())
+        ));
+    }
+
+    /**
+     * API 3: 구매 가능 여부 검증
+     * 성공: purchasable=true / 실패: purchasable=false + 불가 사유 포함
+     */
+    @GetMapping("/{eventId}/validate-purchase")
+    public ResponseEntity<SuccessResponse<InternalPurchaseValidationResponse>> validatePurchase(
+        @PathVariable UUID eventId,
+        @RequestParam int requestedQuantity) {
+        return ResponseEntity.ok(SuccessResponse.success(
+            eventInternalService.validatePurchase(eventId, requestedQuantity)
+        ));
+    }
+
+    /**
+     * API 4: 벌크 재고 조정 (원자적 처리 — All or Nothing)
+     * delta > 0: 차감, delta < 0: 복원, delta == 0: no-op
+     * 하나라도 실패 시 전체 롤백
+     */
+    @PatchMapping("/stock-adjustments")
+    public ResponseEntity<SuccessResponse<InternalStockAdjustmentResponse>> adjustStockBulk(
+        @RequestBody @Valid InternalBulkStockAdjustmentRequest request) {
+        return ResponseEntity.ok(SuccessResponse.success(
+            eventInternalService.adjustStockBulk(request)
+        ));
+    }
+
+    /**
+     * API 7: 판매자별 이벤트 목록 조회
+     * status=null이면 전체 상태 반환 (Settlement 정산 집계 지원)
+     */
+    @GetMapping("/by-seller/{sellerId}")
+    public ResponseEntity<SuccessResponse<InternalSellerEventsResponse>> getEventsBySeller(
+        @PathVariable UUID sellerId,
+        @RequestParam(required = false) EventStatus status) {
+        return ResponseEntity.ok(SuccessResponse.success(
+            eventInternalService.getEventsBySeller(sellerId, status)
+        ));
+    }
+
+    /**
+     * API 8: 특정 날짜에 개최된 이벤트 목록 조회
+     * eventDateTime의 날짜가 date와 일치하는 이벤트의 id, eventId, sellerId 반환
+     */
+    @GetMapping("/ended")
+    public ResponseEntity<SuccessResponse<InternalEndedEventsResponse>> getEndedEventsByDate(
+        @RequestParam LocalDate date) {
+        return ResponseEntity.ok(SuccessResponse.success(
+            eventInternalService.getEndedEventsByDate(date)
+        ));
+    }
+
+    // 기간 별 판매자 이벤트
+    @GetMapping("/by-seller/{sellerId}/settlement")
+    public ResponseEntity<SuccessResponse<List<InternalEventInfoResponse>>> getEventsBySellerForSettlement(
+        @PathVariable UUID sellerId,
+        @RequestParam String periodStart,
+        @RequestParam String periodEnd) {
+        return ResponseEntity.ok(SuccessResponse.success(
+            eventInternalService.getEventsBySellerForSettlement(sellerId, periodStart, periodEnd)
+        ));
+    }
+
+    /**
+     * API 9: 어드민 강제 취소
+     * Admin 서비스가 호출 — 이벤트를 FORCE_CANCELLED 로 전이하고 event.force-cancelled 발행.
+     * Commerce 가 이벤트를 수신해 환불 fan-out 을 시작한다.
+     */
+    @PatchMapping("/{eventId}/force-cancel")
+    public ResponseEntity<Void> forceCancel(
+        @RequestHeader("X-User-Id") UUID userId,
+        @RequestHeader("X-User-Role") String userRole,
+        @PathVariable UUID eventId,
+        @RequestBody @Valid InternalEventForceCancelRequest request) {
+        eventService.forceCancel(userId, userRole, eventId, request.reason());
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/popular")
+    public ResponseEntity<SuccessResponse<List<InternalPopularEventResponse>>> getPopularEvents(
+        @RequestBody InternalPopularEventRequest request) {
+        return ResponseEntity.ok(SuccessResponse.success(eventInternalService.getPopularEventsByCount(request.needed())));
+    }
+}
