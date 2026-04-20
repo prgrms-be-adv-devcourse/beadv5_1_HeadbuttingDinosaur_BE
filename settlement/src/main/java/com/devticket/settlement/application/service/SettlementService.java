@@ -17,4 +17,6 @@ public interface SettlementService {
     SellerSettlementDetailResponse getSellerSettlementDetail(UUID sellerId, UUID settlementId);
 
     SettlementTargetPreviewResponse previewSettlementTarget(LocalDate targetDate);
+
+    SettlementTargetPreviewResponse collectSettlementTargets(LocalDate targetDate);
 }

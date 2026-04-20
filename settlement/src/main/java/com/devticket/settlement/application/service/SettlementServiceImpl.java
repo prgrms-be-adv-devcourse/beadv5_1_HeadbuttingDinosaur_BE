@@ -72,23 +72,29 @@ public class SettlementServiceImpl implements SettlementService {
     }
 
     /**
+     * 정산대상데이터 요청기능의 수동테스트 진행건.
+     */
+    @Override
+    public SettlementTargetPreviewResponse previewSettlementTarget(LocalDate targetDate) {
+        return collectSettlementTargets(targetDate);
+    }
+
+    /**
      * Event 서비스 → Commerce 서비스 실제 API 호출 후
      * Platform Fee 수수료를 적용하여 orderItem 단위로 SettlementItem을 저장한다.
      * orderItemId 기준으로 중복된 항목은 저장하지 않고 SKIPPED로 표기한다.
      */
     @Override
     @Transactional
-    public SettlementTargetPreviewResponse previewSettlementTarget(LocalDate targetDate) {
-        // 1. Platform Fee 정책 조회
+    public SettlementTargetPreviewResponse collectSettlementTargets(LocalDate targetDate) {
         FeePolicy feePolicy = feePolicyRepository.findByName("PLATFORM_FEE")
             .orElseThrow(() -> new BusinessException(SettlementErrorCode.FEE_POLICY_NOT_FOUND));
-        log.info("[previewSettlementTarget] FeePolicy - name: {}, feeValue: {}",
+        log.info("[collectSettlementTargets] FeePolicy - name: {}, feeValue: {}",
             feePolicy.getName(), feePolicy.getFeeValue());
 
-        // 2. Event 서비스: 해당 날짜에 종료된 이벤트 목록 조회
-        log.info("[previewSettlementTarget] Event 서비스 호출 - targetDate: {}", targetDate);
+        log.info("[collectSettlementTargets] Event 서비스 호출 - targetDate: {}", targetDate);
         List<EndedEventResponse> endedEvents = settlementToEventClient.getEndedEvents(targetDate);
-        log.info("[previewSettlementTarget] 종료된 이벤트 {}건 조회됨", endedEvents.size());
+        log.info("[collectSettlementTargets] 종료된 이벤트 {}건 조회됨", endedEvents.size());
 
         if (endedEvents.isEmpty()) {
             return new SettlementTargetPreviewResponse(
@@ -101,13 +107,11 @@ public class SettlementServiceImpl implements SettlementService {
         Map<UUID, EndedEventResponse> eventMap = endedEvents.stream()
             .collect(Collectors.toMap(EndedEventResponse::eventId, e -> e));
 
-        // 3. Commerce 서비스: 전체 eventId 리스트를 한 번에 전송
         List<UUID> eventIds = endedEvents.stream().map(EndedEventResponse::eventId).toList();
         List<EventTicketSettlementResponse> ticketItems =
             settlementToCommerceClient.getTicketSettlementData(eventIds);
-        log.info("[previewSettlementTarget] Commerce 응답 - orderItem 건수: {}", ticketItems.size());
+        log.info("[collectSettlementTargets] Commerce 응답 - orderItem 건수: {}", ticketItems.size());
 
-        // 4. orderItem 단위로 수수료 계산 후 저장
         List<EventSettlementPreview> previews = new ArrayList<>();
         int savedCount = 0;
         int skippedCount = 0;
@@ -118,7 +122,7 @@ public class SettlementServiceImpl implements SettlementService {
             EndedEventResponse event = eventMap.get(ticketItem.eventId());
 
             if (settlementItemRepository.existsByOrderItemId(ticketItem.orderItemId())) {
-                log.warn("[previewSettlementTarget] 중복 스킵 - orderItemId: {}", ticketItem.orderItemId());
+                log.warn("[collectSettlementTargets] 중복 스킵 - orderItemId: {}", ticketItem.orderItemId());
                 previews.add(new EventSettlementPreview(
                     ticketItem.orderItemId(), event.id(), ticketItem.eventId(), event.sellerId(),
                     ticketItem.salesAmount(), ticketItem.refundAmount(), feeAmount, settlementAmount,
@@ -143,7 +147,7 @@ public class SettlementServiceImpl implements SettlementService {
             settlementItemRepository.save(item);
             savedCount++;
 
-            log.info("[previewSettlementTarget] 저장 완료 - orderItemId: {}, eventId: {}, sales: {}, fee: {}, settlement: {}",
+            log.info("[collectSettlementTargets] 저장 완료 - orderItemId: {}, eventId: {}, sales: {}, fee: {}, settlement: {}",
                 ticketItem.orderItemId(), ticketItem.eventId(),
                 ticketItem.salesAmount(), feeAmount, settlementAmount);
 
@@ -154,7 +158,7 @@ public class SettlementServiceImpl implements SettlementService {
             ));
         }
 
-        log.info("[previewSettlementTarget] 완료 - 저장: {}건, 중복 스킵: {}건", savedCount, skippedCount);
+        log.info("[collectSettlementTargets] 완료 - 저장: {}건, 중복 스킵: {}건", savedCount, skippedCount);
         return new SettlementTargetPreviewResponse(
             targetDate.toString(),
             endedEvents.size(),
