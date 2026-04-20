@@ -1,0 +1,16 @@
+jwt:
+  secret-key: test-jwt-secret-key
+  access-token-ttl: 1800001
+  refresh-token-ttl: 604800000
+
+elasticsearch:
+  uris: http://localhost:9200
+  connection-timeout: 5s
+  socket-timeout: 30s
+
+openai:
+  embedding:
+    enabled: true
+    api-key: ${OPENAI_API_KEY:}
+    model: text-embedding-3-small
+    url: https://api.openai.com/v1/embeddings

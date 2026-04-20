@@ -1,0 +1,226 @@
+{
+  "module": "settlement",
+  "dtoCount": 6,
+  "dtos": [
+    {
+      "module": "settlement",
+      "name": "EventItemResponse",
+      "kind": "record",
+      "fieldCount": 6,
+      "fields": [
+        {
+          "name": "eventId",
+          "type": "String"
+        },
+        {
+          "name": "eventTitle",
+          "type": "String"
+        },
+        {
+          "name": "salesAmount",
+          "type": "Long"
+        },
+        {
+          "name": "refundAmount",
+          "type": "Long"
+        },
+        {
+          "name": "feeAmount",
+          "type": "Long"
+        },
+        {
+          "name": "settlementAmount",
+          "type": "Long"
+        }
+      ],
+      "source": "settlement/src/main/java/com/devticket/settlement/presentation/dto/EventItemResponse.java"
+    },
+    {
+      "module": "settlement",
+      "name": "MonthlyRevenueResponse",
+      "kind": "record",
+      "fieldCount": 4,
+      "fields": [
+        {
+          "name": "yearMonth",
+          "type": "String"
+        },
+        {
+          "name": "totalSales",
+          "type": "Long"
+        },
+        {
+          "name": "totalRefund",
+          "type": "Long"
+        },
+        {
+          "name": "netRevenue",
+          "type": "Long"
+        }
+      ],
+      "source": "settlement/src/main/java/com/devticket/settlement/presentation/dto/MonthlyRevenueResponse.java",
+      "note": "36b33e9b 신규 추가, GET /api/admin/settlements/revenues/{yearMonth} 응답 (필드는 코드 검증 필요)"
+    },
+    {
+      "module": "settlement",
+      "name": "SellerSettlementDetailResponse",
+      "kind": "record",
+      "fieldCount": 10,
+      "fields": [
+        {
+          "name": "settlementId",
+          "type": "String"
+        },
+        {
+          "name": "periodStartAt",
+          "type": "String"
+        },
+        {
+          "name": "periodEnd",
+          "type": "String"
+        },
+        {
+          "name": "totalSalesAmount",
+          "type": "Integer"
+        },
+        {
+          "name": "totalRefundAmount",
+          "type": "Integer"
+        },
+        {
+          "name": "totalFeeAmount",
+          "type": "Integer"
+        },
+        {
+          "name": "finalSettlementAmount",
+          "type": "Integer"
+        },
+        {
+          "name": "status",
+          "type": "String"
+        },
+        {
+          "name": "settledAt",
+          "type": "String"
+        },
+        {
+          "name": "eventItems",
+          "type": "List<EventItemResponse>"
+        }
+      ],
+      "source": "settlement/src/main/java/com/devticket/settlement/presentation/dto/SellerSettlementDetailResponse.java"
+    },
+    {
+      "module": "settlement",
+      "name": "SettlementPeriodResponse",
+      "kind": "record",
+      "fieldCount": 5,
+      "fields": [
+        {
+          "name": "finalSettlementAmount",
+          "type": "Integer"
+        },
+        {
+          "name": "totalFeeAmount",
+          "type": "Integer"
+        },
+        {
+          "name": "totalSalesAmount",
+          "type": "Integer"
+        },
+        {
+          "name": "carriedInAmount",
+          "type": "Integer"
+        },
+        {
+          "name": "settlementItems",
+          "type": "List<EventItemResponse>"
+        }
+      ],
+      "source": "settlement/src/main/java/com/devticket/settlement/presentation/dto/SettlementPeriodResponse.java"
+    },
+    {
+      "module": "settlement",
+      "name": "SettlementResponse",
+      "kind": "record",
+      "fieldCount": 9,
+      "fields": [
+        {
+          "name": "settlementId",
+          "type": "UUID"
+        },
+        {
+          "name": "periodStart",
+          "type": "String"
+        },
+        {
+          "name": "periodEnd",
+          "type": "String"
+        },
+        {
+          "name": "totalSalesAmount",
+          "type": "Integer"
+        },
+        {
+          "name": "totalRefundAmount",
+          "type": "Integer"
+        },
+        {
+          "name": "totalFeeAmount",
+          "type": "Integer"
+        },
+        {
+          "name": "finalSettlementAmount",
+          "type": "Integer"
+        },
+        {
+          "name": "status",
+          "type": "SettlementStatus"
+        },
+        {
+          "name": "settledAt",
+          "type": "String"
+        }
+      ],
+      "source": "settlement/src/main/java/com/devticket/settlement/presentation/dto/SettlementResponse.java"
+    },
+    {
+      "module": "settlement",
+      "name": "SettlementTargetPreviewResponse",
+      "kind": "record",
+      "fieldCount": 7,
+      "fields": [
+        {
+          "name": "targetDate",
+          "type": "String"
+        },
+        {
+          "name": "totalEventCount",
+          "type": "int"
+        },
+        {
+          "name": "savedCount",
+          "type": "int"
+        },
+        {
+          "name": "skippedCount",
+          "type": "int"
+        },
+        {
+          "name": "feePolicyName",
+          "type": "String"
+        },
+        {
+          "name": "feeValue",
+          "type": "String"
+        },
+        {
+          "name": "items",
+          "type": "List<EventSettlementPreview>"
+        }
+      ],
+      "source": "settlement/src/main/java/com/devticket/settlement/presentation/dto/SettlementTargetPreviewResponse.java"
+    }
+  ],
+  "notes": []
+}

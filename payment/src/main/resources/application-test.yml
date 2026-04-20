@@ -1,9 +1,14 @@
 spring:
+  main:
+    allow-bean-definition-overriding: true
   datasource:
     url: jdbc:h2:mem:testdb;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;INIT=CREATE SCHEMA IF NOT EXISTS payment\;CREATE SCHEMA IF NOT EXISTS refund\;CREATE TABLE IF NOT EXISTS payment.shedlock(name VARCHAR(64) NOT NULL PRIMARY KEY, lock_until TIMESTAMP NOT NULL, locked_at TIMESTAMP NOT NULL, locked_by VARCHAR(255) NOT NULL)
     driver-class-name: org.h2.Driver
     username: sa
     password:
+    hikari:
+      maximum-pool-size: 30
+      connection-init-sql: "SET SCHEMA payment"
   jpa:
     database-platform: org.hibernate.dialect.H2Dialect
     hibernate:
@@ -22,6 +27,19 @@ spring:
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+# EmbeddedKafka 환경용 완화 타임아웃 — 불변식 유지
+kafka-producer:
+  max-block-ms: 3000
+  request-timeout-ms: 5000
+  delivery-timeout-ms: 8000
+  send-timeout-ms: 10000
+
+# 테스트는 grace period을 0으로 두어 스케줄러 fallback 경로를 즉시 검증할 수 있도록 한다.
+# 폴링 주기도 짧게 둬 OutboxSchedulerIntegrationTest의 10초 awaitility 안에 픽업되도록 한다.
+outbox:
+  publish-grace-seconds: 0
+  poll-interval-ms: 3000
 
 server:
   port: 8085

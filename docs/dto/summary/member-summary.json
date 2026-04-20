@@ -1,0 +1,879 @@
+{
+  "module": "member",
+  "dtoCount": 40,
+  "dtos": [
+    {
+      "module": "member",
+      "name": "ChangePasswordRequest",
+      "kind": "record",
+      "fieldCount": 3,
+      "fields": [
+        {
+          "name": "currentPassword",
+          "type": "String"
+        },
+        {
+          "name": "newPassword",
+          "type": "String"
+        },
+        {
+          "name": "newPasswordConfirm",
+          "type": "String"
+        }
+      ],
+      "source": "member/src/main/java/com/devticket/member/presentation/dto/request/ChangePasswordRequest.java"
+    },
+    {
+      "module": "member",
+      "name": "ChangePasswordResponse",
+      "kind": "record",
+      "fieldCount": 1,
+      "fields": [
+        {
+          "name": "success",
+          "type": "boolean"
+        }
+      ],
+      "source": "member/src/main/java/com/devticket/member/presentation/dto/response/ChangePasswordResponse.java"
+    },
+    {
+      "module": "member",
+      "name": "GetProfileResponse",
+      "kind": "record",
+      "fieldCount": 9,
+      "fields": [
+        {
+          "name": "userId",
+          "type": "UUID"
+        },
+        {
+          "name": "email",
+          "type": "String"
+        },
+        {
+          "name": "nickname",
+          "type": "String"
+        },
+        {
+          "name": "position",
+          "type": "String"
+        },
+        {
+          "name": "techStacks",
+          "type": "List<TechStackInfo>"
+        },
+        {
+          "name": "profileImageUrl",
+          "type": "String"
+        },
+        {
+          "name": "bio",
+          "type": "String"
+        },
+        {
+          "name": "role",
+          "type": "String"
+        },
+        {
+          "name": "providerType",
+          "type": "String"
+        }
+      ],
+      "source": "member/src/main/java/com/devticket/member/presentation/dto/response/GetProfileResponse.java"
+    },
+    {
+      "module": "member",
+      "name": "InternalAdminTechStackResponse",
+      "kind": "record",
+      "fieldCount": 1,
+      "fields": [
+        {
+          "name": "techStacks",
+          "type": "List<TechStackInfo>"
+        }
+      ],
+      "source": "member/src/main/java/com/devticket/member/presentation/dto/internal/response/InternalAdminTechStackResponse.java"
+    },
+    {
+      "module": "member",
+      "name": "InternalDecideSellerApplicationRequest",
+      "kind": "record",
+      "fieldCount": 1,
+      "fields": [
+        {
+          "name": "decision",
+          "type": "SellerApplicationDecision"
+        }
+      ],
+      "source": "member/src/main/java/com/devticket/member/presentation/dto/internal/request/InternalDecideSellerApplicationRequest.java"
+    },
+    {
+      "module": "member",
+      "name": "InternalDecideSellerApplicationResponse",
+      "kind": "record",
+      "fieldCount": 2,
+      "fields": [
+        {
+          "name": "sellerApplicationId",
+          "type": "String"
+        },
+        {
+          "name": "status",
+          "type": "String"
+        }
+      ],
+      "source": "member/src/main/java/com/devticket/member/presentation/dto/internal/response/InternalDecideSellerApplicationResponse.java"
+    },
+    {
+      "module": "member",
+      "name": "InternalMemberInfoResponse",
+      "kind": "record",
+      "fieldCount": 8,
+      "fields": [
+        {
+          "name": "userId",
+          "type": "UUID"
+        },
+        {
+          "name": "email",
+          "type": "String"
+        },
+        {
+          "name": "nickname",
+          "type": "String"
+        },
+        {
+          "name": "role",
+          "type": "String"
+        },
+        {
+          "name": "status",
+          "type": "String"
+        },
+        {
+          "name": "providerType",
+          "type": "String"
+        },
+        {
+          "name": "createdAt",
+          "type": "LocalDateTime"
+        },
+        {
+          "name": "withdrawnAt",
+          "type": "LocalDateTime"
+        }
+      ],
+      "source": "member/src/main/java/com/devticket/member/presentation/dto/internal/response/InternalMemberInfoResponse.java"
+    },
+    {
+      "module": "member",
+      "name": "InternalMemberRoleResponse",
+      "kind": "record",
+      "fieldCount": 2,
+      "fields": [
+        {
+          "name": "userId",
+          "type": "java.util.UUID"
+        },
+        {
+          "name": "role",
+          "type": "String"
+        }
+      ],
+      "source": "member/src/main/java/com/devticket/member/presentation/dto/internal/response/InternalMemberRoleResponse.java"
+    },
+    {
+      "module": "member",
+      "name": "InternalMemberStatusResponse",
+      "kind": "record",
+      "fieldCount": 2,
+      "fields": [
+        {
+          "name": "userId",
+          "type": "java.util.UUID"
+        },
+        {
+          "name": "status",
+          "type": "String"
+        }
+      ],
+      "source": "member/src/main/java/com/devticket/member/presentation/dto/internal/response/InternalMemberStatusResponse.java"
+    },
+    {
+      "module": "member",
+      "name": "InternalOAuthRequest",
+      "kind": "record",
+      "fieldCount": 4,
+      "fields": [
+        {
+          "name": "provider",
+          "type": "String"
+        },
+        {
+          "name": "providerId",
+          "type": "String"
+        },
+        {
+          "name": "email",
+          "type": "String"
+        },
+        {
+          "name": "name",
+          "type": "String"
+        }
+      ],
+      "source": "member/src/main/java/com/devticket/member/presentation/dto/internal/request/InternalOAuthRequest.java"
+    },
+    {
+      "module": "member",
+      "name": "InternalOAuthResponse",
+      "kind": "record",
+      "fieldCount": 2,
+      "fields": [
+        {
+          "name": "accessToken",
+          "type": "String"
+        },
+        {
+          "name": "refreshToken",
+          "type": "String"
+        }
+      ],
+      "source": "member/src/main/java/com/devticket/member/presentation/dto/internal/response/InternalOAuthResponse.java"
+    },
+    {
+      "module": "member",
+      "name": "InternalPagedMemberResponse",
+      "kind": "record",
+      "fieldCount": 5,
+      "fields": [
+        {
+          "name": "content",
+          "type": "List<InternalMemberInfoResponse>"
+        },
+        {
+          "name": "page",
+          "type": "int"
+        },
+        {
+          "name": "size",
+          "type": "int"
+        },
+        {
+          "name": "totalElements",
+          "type": "long"
+        },
+        {
+          "name": "totalPages",
+          "type": "int"
+        }
+      ],
+      "source": "member/src/main/java/com/devticket/member/presentation/dto/internal/response/InternalPagedMemberResponse.java"
+    },
+    {
+      "module": "member",
+      "name": "InternalSellerApplicationResponse",
+      "kind": "record",
+      "fieldCount": 7,
+      "fields": [
+        {
+          "name": "sellerApplicationId",
+          "type": "String"
+        },
+        {
+          "name": "userId",
+          "type": "String"
+        },
+        {
+          "name": "bankName",
+          "type": "String"
+        },
+        {
+          "name": "accountNumber",
+          "type": "String"
+        },
+        {
+          "name": "accountHolder",
+          "type": "String"
+        },
+        {
+          "name": "status",
+          "type": "String"
+        },
+        {
+          "name": "createdAt",
+          "type": "String"
+        }
+      ],
+      "source": "member/src/main/java/com/devticket/member/presentation/dto/internal/response/InternalSellerApplicationResponse.java"
+    },
+    {
+      "module": "member",
+      "name": "InternalSellerInfoResponse",
+      "kind": "record",
+      "fieldCount": 4,
+      "fields": [
+        {
+          "name": "userId",
+          "type": "UUID"
+        },
+        {
+          "name": "bankName",
+          "type": "String"
+        },
+        {
+          "name": "accountNumber",
+          "type": "String"
+        },
+        {
+          "name": "accountHolder",
+          "type": "String"
+        }
+      ],
+      "source": "member/src/main/java/com/devticket/member/presentation/dto/internal/response/InternalSellerInfoResponse.java"
+    },
+    {
+      "module": "member",
+      "name": "InternalUpdateRoleResponse",
+      "kind": "record",
+      "fieldCount": 2,
+      "fields": [
+        {
+          "name": "userId",
+          "type": "String"
+        },
+        {
+          "name": "role",
+          "type": "String"
+        }
+      ],
+      "source": "member/src/main/java/com/devticket/member/presentation/dto/internal/response/InternalUpdateRoleResponse.java"
+    },
+    {
+      "module": "member",
+      "name": "InternalUpdateStatusResponse",
+      "kind": "record",
+      "fieldCount": 2,
+      "fields": [
+        {
+          "name": "userId",
+          "type": "String"
+        },
+        {
+          "name": "status",
+          "type": "String"
+        }
+      ],
+      "source": "member/src/main/java/com/devticket/member/presentation/dto/internal/response/InternalUpdateStatusResponse.java"
+    },
+    {
+      "module": "member",
+      "name": "InternalUpdateUserRoleRequest",
+      "kind": "record",
+      "fieldCount": 1,
+      "fields": [
+        {
+          "name": "role",
+          "type": "UserRole"
+        }
+      ],
+      "source": "member/src/main/java/com/devticket/member/presentation/dto/internal/request/InternalUpdateUserRoleRequest.java"
+    },
+    {
+      "module": "member",
+      "name": "InternalUpdateUserStatusRequest",
+      "kind": "record",
+      "fieldCount": 1,
+      "fields": [
+        {
+          "name": "status",
+          "type": "UserStatus"
+        }
+      ],
+      "source": "member/src/main/java/com/devticket/member/presentation/dto/internal/request/InternalUpdateUserStatusRequest.java"
+    },
+    {
+      "module": "member",
+      "name": "InternalUserTechStackResponse",
+      "kind": "record",
+      "fieldCount": 2,
+      "fields": [
+        {
+          "name": "userId",
+          "type": "String"
+        },
+        {
+          "name": "techStacks",
+          "type": "List<TechStackInfo>"
+        }
+      ],
+      "source": "member/src/main/java/com/devticket/member/presentation/dto/internal/response/InternalUserTechStackResponse.java"
+    },
+    {
+      "module": "member",
+      "name": "LoginRequest",
+      "kind": "record",
+      "fieldCount": 2,
+      "fields": [
+        {
+          "name": "email",
+          "type": "String"
+        },
+        {
+          "name": "password",
+          "type": "String"
+        }
+      ],
+      "source": "member/src/main/java/com/devticket/member/presentation/dto/request/LoginRequest.java"
+    },
+    {
+      "module": "member",
+      "name": "LoginResponse",
+      "kind": "record",
+      "fieldCount": 6,
+      "fields": [
+        {
+          "name": "userId",
+          "type": "UUID"
+        },
+        {
+          "name": "accessToken",
+          "type": "String"
+        },
+        {
+          "name": "refreshToken",
+          "type": "String"
+        },
+        {
+          "name": "tokenType",
+          "type": "String"
+        },
+        {
+          "name": "expiresIn",
+          "type": "Long"
+        },
+        {
+          "name": "isProfileCompleted",
+          "type": "boolean"
+        }
+      ],
+      "source": "member/src/main/java/com/devticket/member/presentation/dto/response/LoginResponse.java"
+    },
+    {
+      "module": "member",
+      "name": "LogoutResponse",
+      "kind": "record",
+      "fieldCount": 1,
+      "fields": [
+        {
+          "name": "success",
+          "type": "boolean"
+        }
+      ],
+      "source": "member/src/main/java/com/devticket/member/presentation/dto/response/LogoutResponse.java"
+    },
+    {
+      "module": "member",
+      "name": "MemberInternalResponse",
+      "kind": "record",
+      "fieldCount": 5,
+      "fields": [
+        {
+          "name": "id",
+          "type": "Long"
+        },
+        {
+          "name": "email",
+          "type": "String"
+        },
+        {
+          "name": "role",
+          "type": "String"
+        },
+        {
+          "name": "status",
+          "type": "String"
+        },
+        {
+          "name": "providerType",
+          "type": "String"
+        }
+      ],
+      "source": "member/src/main/java/com/devticket/member/presentation/dto/response/MemberInternalResponse.java"
+    },
+    {
+      "module": "member",
+      "name": "MemberRoleResponse",
+      "kind": "record",
+      "fieldCount": 2,
+      "fields": [
+        {
+          "name": "userId",
+          "type": "Long"
+        },
+        {
+          "name": "role",
+          "type": "String"
+        }
+      ],
+      "source": "member/src/main/java/com/devticket/member/presentation/dto/response/MemberRoleResponse.java"
+    },
+    {
+      "module": "member",
+      "name": "MemberStatusResponse",
+      "kind": "record",
+      "fieldCount": 2,
+      "fields": [
+        {
+          "name": "userId",
+          "type": "Long"
+        },
+        {
+          "name": "status",
+          "type": "String"
+        }
+      ],
+      "source": "member/src/main/java/com/devticket/member/presentation/dto/response/MemberStatusResponse.java"
+    },
+    {
+      "module": "member",
+      "name": "SellerApplicationRequest",
+      "kind": "record",
+      "fieldCount": 3,
+      "fields": [
+        {
+          "name": "bankName",
+          "type": "String"
+        },
+        {
+          "name": "accountNumber",
+          "type": "String"
+        },
+        {
+          "name": "accountHolder",
+          "type": "String"
+        }
+      ],
+      "source": "member/src/main/java/com/devticket/member/presentation/dto/request/SellerApplicationRequest.java"
+    },
+    {
+      "module": "member",
+      "name": "SellerApplicationResponse",
+      "kind": "record",
+      "fieldCount": 1,
+      "fields": [
+        {
+          "name": "applicationId",
+          "type": "UUID"
+        }
+      ],
+      "source": "member/src/main/java/com/devticket/member/presentation/dto/response/SellerApplicationResponse.java"
+    },
+    {
+      "module": "member",
+      "name": "SellerApplicationStatusResponse",
+      "kind": "record",
+      "fieldCount": 2,
+      "fields": [
+        {
+          "name": "status",
+          "type": "String"
+        },
+        {
+          "name": "createdAt",
+          "type": "LocalDateTime"
+        }
+      ],
+      "source": "member/src/main/java/com/devticket/member/presentation/dto/response/SellerApplicationStatusResponse.java"
+    },
+    {
+      "module": "member",
+      "name": "SellerInfoResponse",
+      "kind": "record",
+      "fieldCount": 4,
+      "fields": [
+        {
+          "name": "userId",
+          "type": "Long"
+        },
+        {
+          "name": "bankName",
+          "type": "String"
+        },
+        {
+          "name": "accountNumber",
+          "type": "String"
+        },
+        {
+          "name": "accountHolder",
+          "type": "String"
+        }
+      ],
+      "source": "member/src/main/java/com/devticket/member/presentation/dto/response/SellerInfoResponse.java"
+    },
+    {
+      "module": "member",
+      "name": "SignUpProfileRequest",
+      "kind": "record",
+      "fieldCount": 5,
+      "fields": [
+        {
+          "name": "nickname",
+          "type": "String"
+        },
+        {
+          "name": "position",
+          "type": "String"
+        },
+        {
+          "name": "techStackIds",
+          "type": "List<Long>"
+        },
+        {
+          "name": "profileImageUrl",
+          "type": "String"
+        },
+        {
+          "name": "bio",
+          "type": "String"
+        }
+      ],
+      "source": "member/src/main/java/com/devticket/member/presentation/dto/request/SignUpProfileRequest.java"
+    },
+    {
+      "module": "member",
+      "name": "SignUpProfileResponse",
+      "kind": "record",
+      "fieldCount": 3,
+      "fields": [
+        {
+          "name": "profileId",
+          "type": "UUID"
+        },
+        {
+          "name": "accessToken",
+          "type": "String"
+        },
+        {
+          "name": "refreshToken",
+          "type": "String"
+        }
+      ],
+      "source": "member/src/main/java/com/devticket/member/presentation/dto/response/SignUpProfileResponse.java"
+    },
+    {
+      "module": "member",
+      "name": "SignUpRequest",
+      "kind": "record",
+      "fieldCount": 3,
+      "fields": [
+        {
+          "name": "email",
+          "type": "String"
+        },
+        {
+          "name": "password",
+          "type": "String"
+        },
+        {
+          "name": "passwordConfirm",
+          "type": "String"
+        }
+      ],
+      "source": "member/src/main/java/com/devticket/member/presentation/dto/request/SignUpRequest.java"
+    },
+    {
+      "module": "member",
+      "name": "SignUpResponse",
+      "kind": "record",
+      "fieldCount": 6,
+      "fields": [
+        {
+          "name": "userId",
+          "type": "UUID"
+        },
+        {
+          "name": "accessToken",
+          "type": "String"
+        },
+        {
+          "name": "refreshToken",
+          "type": "String"
+        },
+        {
+          "name": "tokenType",
+          "type": "String"
+        },
+        {
+          "name": "expiresIn",
+          "type": "Long"
+        },
+        {
+          "name": "isProfileCompleted",
+          "type": "boolean"
+        }
+      ],
+      "source": "member/src/main/java/com/devticket/member/presentation/dto/response/SignUpResponse.java"
+    },
+    {
+      "module": "member",
+      "name": "SocialSignUpOrLoginRequest",
+      "kind": "record",
+      "fieldCount": 2,
+      "fields": [
+        {
+          "name": "providerType",
+          "type": "String"
+        },
+        {
+          "name": "idToken",
+          "type": "String"
+        }
+      ],
+      "source": "member/src/main/java/com/devticket/member/presentation/dto/request/SocialSignUpOrLoginRequest.java"
+    },
+    {
+      "module": "member",
+      "name": "SocialSignUpOrLoginResponse",
+      "kind": "record",
+      "fieldCount": 7,
+      "fields": [
+        {
+          "name": "userId",
+          "type": "UUID"
+        },
+        {
+          "name": "accessToken",
+          "type": "String"
+        },
+        {
+          "name": "refreshToken",
+          "type": "String"
+        },
+        {
+          "name": "tokenType",
+          "type": "String"
+        },
+        {
+          "name": "expiresIn",
+          "type": "Long"
+        },
+        {
+          "name": "isNewUser",
+          "type": "boolean"
+        },
+        {
+          "name": "isProfileCompleted",
+          "type": "boolean"
+        }
+      ],
+      "source": "member/src/main/java/com/devticket/member/presentation/dto/response/SocialSignUpOrLoginResponse.java"
+    },
+    {
+      "module": "member",
+      "name": "TokenRefreshRequest",
+      "kind": "record",
+      "fieldCount": 1,
+      "fields": [
+        {
+          "name": "refreshToken",
+          "type": "String"
+        }
+      ],
+      "source": "member/src/main/java/com/devticket/member/presentation/dto/request/TokenRefreshRequest.java"
+    },
+    {
+      "module": "member",
+      "name": "TokenRefreshResponse",
+      "kind": "record",
+      "fieldCount": 2,
+      "fields": [
+        {
+          "name": "accessToken",
+          "type": "String"
+        },
+        {
+          "name": "refreshToken",
+          "type": "String"
+        }
+      ],
+      "source": "member/src/main/java/com/devticket/member/presentation/dto/response/TokenRefreshResponse.java"
+    },
+    {
+      "module": "member",
+      "name": "UpdateProfileRequest",
+      "kind": "record",
+      "fieldCount": 5,
+      "fields": [
+        {
+          "name": "nickname",
+          "type": "String"
+        },
+        {
+          "name": "position",
+          "type": "String"
+        },
+        {
+          "name": "profileImageUrl",
+          "type": "String"
+        },
+        {
+          "name": "techStackIds",
+          "type": "List<Long>"
+        },
+        {
+          "name": "bio",
+          "type": "String"
+        }
+      ],
+      "source": "member/src/main/java/com/devticket/member/presentation/dto/request/UpdateProfileRequest.java"
+    },
+    {
+      "module": "member",
+      "name": "UpdateProfileResponse",
+      "kind": "record",
+      "fieldCount": 4,
+      "fields": [
+        {
+          "name": "nickname",
+          "type": "String"
+        },
+        {
+          "name": "position",
+          "type": "String"
+        },
+        {
+          "name": "profileImageUrl",
+          "type": "String"
+        },
+        {
+          "name": "techStackIds",
+          "type": "List<Long>"
+        }
+      ],
+      "source": "member/src/main/java/com/devticket/member/presentation/dto/response/UpdateProfileResponse.java"
+    },
+    {
+      "module": "member",
+      "name": "WithdrawResponse",
+      "kind": "record",
+      "fieldCount": 3,
+      "fields": [
+        {
+          "name": "userId",
+          "type": "UUID"
+        },
+        {
+          "name": "status",
+          "type": "String"
+        },
+        {
+          "name": "withdrawnAt",
+          "type": "LocalDateTime"
+        }
+      ],
+      "source": "member/src/main/java/com/devticket/member/presentation/dto/response/WithdrawResponse.java"
+    }
+  ],
+  "notes": []
+}

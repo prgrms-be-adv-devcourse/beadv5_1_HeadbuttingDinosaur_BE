@@ -1,0 +1,55 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;NON_KEYWORDS=ORDER;INIT=CREATE SCHEMA IF NOT EXISTS commerce
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        default_schema: commerce
+  kafka:
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+    consumer:
+      group-id: commerce-integration-test
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      enable-auto-commit: false
+    listener:
+      ack-mode: manual
+
+# EmbeddedKafka 첫 발행 메타데이터 워밍 수용 — 운영 기본(500/1000/1500/2000)보다 완화
+# 불변식 유지: max.block(3000) < request(5000) ≤ delivery(8000) < send-timeout-ms(10000)
+devticket:
+  outbox:
+    send-timeout-ms: 10000
+    # afterCommit 직접 발행이 우선 처리되도록 짧은 grace 부여 — 스케줄러 중복 발행 방지.
+    publish-grace-seconds: 2
+    # 운영용 60초 폴링은 통합 테스트 응답 시간을 초과하므로 단축한다.
+    scheduler-delay-ms: 1000
+  kafka:
+    producer:
+      delivery-timeout-ms: 8000
+      request-timeout-ms: 5000
+      max-block-ms: 3000
+
+external:
+  event-base-url: http://localhost:8082
+  payment-base-url: http://localhost:8084
+  member-base-url: http://localhost:8081
+
+logging:
+  level:
+    org.hibernate.SQL: WARN
+    com.devticket: INFO
+    org.apache.kafka: WARN
+    org.springframework.kafka: WARN
+    state.change.logger: WARN
+    kafka.server: WARN

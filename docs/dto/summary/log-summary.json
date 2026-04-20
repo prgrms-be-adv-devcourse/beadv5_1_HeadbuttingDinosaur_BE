@@ -1,0 +1,8 @@
+{
+  "module": "log",
+  "dtoCount": 0,
+  "dtos": [],
+  "notes": [
+    "log 모듈은 Fastify/TypeScript 별도 스택. Java DTO 0건 — 정당 누락. TypeScript schema 는 fastify-log/ 디렉토리 참조."
+  ]
+}

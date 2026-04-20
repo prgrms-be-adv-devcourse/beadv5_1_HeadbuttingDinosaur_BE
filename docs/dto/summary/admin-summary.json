@@ -1,0 +1,730 @@
+{
+  "module": "admin",
+  "dtoCount": 27,
+  "dtos": [
+    {
+      "module": "admin",
+      "name": "AdminActionHistorySummary",
+      "kind": "record",
+      "fieldCount": 3,
+      "fields": [
+        {
+          "name": "actionType",
+          "type": "String"
+        },
+        {
+          "name": "adminId",
+          "type": "UUID"
+        },
+        {
+          "name": "createdAt",
+          "type": "LocalDateTime"
+        }
+      ],
+      "source": "admin/src/main/java/com/devticket/admin/presentation/dto/res/AdminActionHistorySummary.java"
+    },
+    {
+      "module": "admin",
+      "name": "AdminDashboardResponse",
+      "kind": "record",
+      "fieldCount": 4,
+      "fields": [
+        {
+          "name": "totalUsers",
+          "type": "Long"
+        },
+        {
+          "name": "totalSellers",
+          "type": "Long"
+        },
+        {
+          "name": "activeEvents",
+          "type": "Long"
+        },
+        {
+          "name": "pendingApplications",
+          "type": "Long"
+        }
+      ],
+      "source": "admin/src/main/java/com/devticket/admin/presentation/dto/res/AdminDashboardResponse.java"
+    },
+    {
+      "module": "admin",
+      "name": "AdminDecideSellerApplicationRequest",
+      "kind": "record",
+      "fieldCount": 1,
+      "fields": [
+        {
+          "name": "decision",
+          "type": "String"
+        }
+      ],
+      "source": "admin/src/main/java/com/devticket/admin/presentation/dto/req/AdminDecideSellerApplicationRequest.java"
+    },
+    {
+      "module": "admin",
+      "name": "AdminEventListResponse",
+      "kind": "record",
+      "fieldCount": 5,
+      "fields": [
+        {
+          "name": "content",
+          "type": "List<AdminEventResponse>"
+        },
+        {
+          "name": "page",
+          "type": "Integer"
+        },
+        {
+          "name": "size",
+          "type": "Integer"
+        },
+        {
+          "name": "totalElements",
+          "type": "Long"
+        },
+        {
+          "name": "totalPages",
+          "type": "Integer"
+        }
+      ],
+      "source": "admin/src/main/java/com/devticket/admin/presentation/dto/res/AdminEventListResponse.java"
+    },
+    {
+      "module": "admin",
+      "name": "AdminEventResponse",
+      "kind": "record",
+      "fieldCount": 8,
+      "fields": [
+        {
+          "name": "eventId",
+          "type": "String"
+        },
+        {
+          "name": "title",
+          "type": "String"
+        },
+        {
+          "name": "sellerNickname",
+          "type": "String"
+        },
+        {
+          "name": "status",
+          "type": "String"
+        },
+        {
+          "name": "eventDateTime",
+          "type": "String"
+        },
+        {
+          "name": "totalQuantity",
+          "type": "Integer"
+        },
+        {
+          "name": "remainingQuantity",
+          "type": "Integer"
+        },
+        {
+          "name": "createdAt",
+          "type": "String"
+        }
+      ],
+      "source": "admin/src/main/java/com/devticket/admin/presentation/dto/res/AdminEventResponse.java"
+    },
+    {
+      "module": "admin",
+      "name": "AdminEventSearchRequest",
+      "kind": "record",
+      "fieldCount": 5,
+      "fields": [
+        {
+          "name": "keyword",
+          "type": "String"
+        },
+        {
+          "name": "status",
+          "type": "String"
+        },
+        {
+          "name": "sellerId",
+          "type": "String"
+        },
+        {
+          "name": "page",
+          "type": "Integer"
+        },
+        {
+          "name": "size",
+          "type": "Integer"
+        }
+      ],
+      "source": "admin/src/main/java/com/devticket/admin/presentation/dto/req/AdminEventSearchRequest.java"
+    },
+    {
+      "module": "admin",
+      "name": "AdminSettlementListResponse",
+      "kind": "record",
+      "fieldCount": 5,
+      "fields": [
+        {
+          "name": "content",
+          "type": "List<SettlementResponse>"
+        },
+        {
+          "name": "page",
+          "type": "Integer"
+        },
+        {
+          "name": "size",
+          "type": "Integer"
+        },
+        {
+          "name": "totalElements",
+          "type": "Long"
+        },
+        {
+          "name": "totalPages",
+          "type": "Integer"
+        }
+      ],
+      "source": "admin/src/main/java/com/devticket/admin/presentation/dto/res/AdminSettlementListResponse.java"
+    },
+    {
+      "module": "admin",
+      "name": "AdminSettlementSearchRequest",
+      "kind": "record",
+      "fieldCount": 6,
+      "fields": [
+        {
+          "name": "status",
+          "type": "String"
+        },
+        {
+          "name": "sellerId",
+          "type": "String"
+        },
+        {
+          "name": "startDate",
+          "type": "String"
+        },
+        {
+          "name": "endDate",
+          "type": "String"
+        },
+        {
+          "name": "page",
+          "type": "Integer"
+        },
+        {
+          "name": "size",
+          "type": "Integer"
+        }
+      ],
+      "source": "admin/src/main/java/com/devticket/admin/presentation/dto/req/AdminSettlementSearchRequest.java"
+    },
+    {
+      "module": "admin",
+      "name": "AdminUserListResponse",
+      "kind": "record",
+      "fieldCount": 5,
+      "fields": [
+        {
+          "name": "content",
+          "type": "List<UserListItem>"
+        },
+        {
+          "name": "page",
+          "type": "int"
+        },
+        {
+          "name": "size",
+          "type": "int"
+        },
+        {
+          "name": "totalElements",
+          "type": "long"
+        },
+        {
+          "name": "totalPages",
+          "type": "int"
+        }
+      ],
+      "source": "admin/src/main/java/com/devticket/admin/presentation/dto/res/AdminUserListResponse.java"
+    },
+    {
+      "module": "admin",
+      "name": "CreateTechStackRequest",
+      "kind": "record",
+      "fieldCount": 1,
+      "fields": [
+        {
+          "name": "name",
+          "type": "String"
+        }
+      ],
+      "source": "admin/src/main/java/com/devticket/admin/presentation/dto/req/CreateTechStackRequest.java"
+    },
+    {
+      "module": "admin",
+      "name": "CreateTechStackResponse",
+      "kind": "record",
+      "fieldCount": 2,
+      "fields": [
+        {
+          "name": "id",
+          "type": "Long"
+        },
+        {
+          "name": "name",
+          "type": "String"
+        }
+      ],
+      "source": "admin/src/main/java/com/devticket/admin/presentation/dto/res/CreateTechStackResponse.java"
+    },
+    {
+      "module": "admin",
+      "name": "DeleteTechStackRequest",
+      "kind": "record",
+      "fieldCount": 1,
+      "fields": [
+        {
+          "name": "id",
+          "type": "Long"
+        }
+      ],
+      "source": "admin/src/main/java/com/devticket/admin/presentation/dto/req/DeleteTechStackRequest.java"
+    },
+    {
+      "module": "admin",
+      "name": "DeleteTechStackResponse",
+      "kind": "record",
+      "fieldCount": 1,
+      "fields": [
+        {
+          "name": "id",
+          "type": "Long"
+        }
+      ],
+      "source": "admin/src/main/java/com/devticket/admin/presentation/dto/res/DeleteTechStackResponse.java"
+    },
+    {
+      "module": "admin",
+      "name": "EventCancelResponse",
+      "kind": "record",
+      "fieldCount": 6,
+      "fields": [
+        {
+          "name": "eventId",
+          "type": "String"
+        },
+        {
+          "name": "previousStatus",
+          "type": "String"
+        },
+        {
+          "name": "currentStatus",
+          "type": "String"
+        },
+        {
+          "name": "reason",
+          "type": "String"
+        },
+        {
+          "name": "affectedPaidOrderCount",
+          "type": "Integer"
+        },
+        {
+          "name": "cancelledAt",
+          "type": "String"
+        }
+      ],
+      "source": "admin/src/main/java/com/devticket/admin/presentation/dto/res/EventCancelResponse.java"
+    },
+    {
+      "module": "admin",
+      "name": "GetTechStackResponse",
+      "kind": "record",
+      "fieldCount": 2,
+      "fields": [
+        {
+          "name": "id",
+          "type": "Long"
+        },
+        {
+          "name": "name",
+          "type": "String"
+        }
+      ],
+      "source": "admin/src/main/java/com/devticket/admin/presentation/dto/res/GetTechStackResponse.java"
+    },
+    {
+      "module": "admin",
+      "name": "InternalMemberDetailResponse",
+      "kind": "record",
+      "fieldCount": 8,
+      "fields": [
+        {
+          "name": "id",
+          "type": "String"
+        },
+        {
+          "name": "email",
+          "type": "String"
+        },
+        {
+          "name": "nickname",
+          "type": "String"
+        },
+        {
+          "name": "role",
+          "type": "String"
+        },
+        {
+          "name": "status",
+          "type": "String"
+        },
+        {
+          "name": "providerType",
+          "type": "String"
+        },
+        {
+          "name": "createdAt",
+          "type": "String"
+        },
+        {
+          "name": "withdrawnAt",
+          "type": "String"
+        }
+      ],
+      "source": "admin/src/main/java/com/devticket/admin/presentation/dto/res/InternalMemberDetailResponse.java"
+    },
+    {
+      "module": "admin",
+      "name": "InternalMemberPageResponse",
+      "kind": "record",
+      "fieldCount": 5,
+      "fields": [
+        {
+          "name": "content",
+          "type": "List<InternalMemberInfoResponse>"
+        },
+        {
+          "name": "page",
+          "type": "int"
+        },
+        {
+          "name": "size",
+          "type": "int"
+        },
+        {
+          "name": "totalElements",
+          "type": "long"
+        },
+        {
+          "name": "totalPages",
+          "type": "int"
+        }
+      ],
+      "source": "admin/src/main/java/com/devticket/admin/presentation/dto/res/InternalMemberPageResponse.java"
+    },
+    {
+      "module": "admin",
+      "name": "SellerApplicationListResponse",
+      "kind": "record",
+      "fieldCount": 7,
+      "fields": [
+        {
+          "name": "applicationId",
+          "type": "String"
+        },
+        {
+          "name": "userId",
+          "type": "String"
+        },
+        {
+          "name": "bankName",
+          "type": "String"
+        },
+        {
+          "name": "accountNumber",
+          "type": "String"
+        },
+        {
+          "name": "accountHolder",
+          "type": "String"
+        },
+        {
+          "name": "status",
+          "type": "String"
+        },
+        {
+          "name": "createdAt",
+          "type": "String"
+        }
+      ],
+      "source": "admin/src/main/java/com/devticket/admin/presentation/dto/res/SellerApplicationListResponse.java"
+    },
+    {
+      "module": "admin",
+      "name": "SettlementResponse",
+      "kind": "record",
+      "fieldCount": 9,
+      "fields": [
+        {
+          "name": "settlementId",
+          "type": "Long"
+        },
+        {
+          "name": "periodStart",
+          "type": "LocalDateTime"
+        },
+        {
+          "name": "periodEnd",
+          "type": "LocalDateTime"
+        },
+        {
+          "name": "totalSalesAmount",
+          "type": "Long"
+        },
+        {
+          "name": "totalRefundAmount",
+          "type": "Long"
+        },
+        {
+          "name": "totalFeeAmount",
+          "type": "Long"
+        },
+        {
+          "name": "finalSettlementAmount",
+          "type": "Long"
+        },
+        {
+          "name": "status",
+          "type": "String"
+        },
+        {
+          "name": "settledAt",
+          "type": "LocalDateTime"
+        }
+      ],
+      "source": "admin/src/main/java/com/devticket/admin/presentation/dto/res/SettlementResponse.java"
+    },
+    {
+      "module": "admin",
+      "name": "UpdateTechStackRequest",
+      "kind": "record",
+      "fieldCount": 2,
+      "fields": [
+        {
+          "name": "id",
+          "type": "Long"
+        },
+        {
+          "name": "name",
+          "type": "String"
+        }
+      ],
+      "source": "admin/src/main/java/com/devticket/admin/presentation/dto/req/UpdateTechStackRequest.java"
+    },
+    {
+      "module": "admin",
+      "name": "UpdateTechStackResponse",
+      "kind": "record",
+      "fieldCount": 2,
+      "fields": [
+        {
+          "name": "id",
+          "type": "Long"
+        },
+        {
+          "name": "name",
+          "type": "String"
+        }
+      ],
+      "source": "admin/src/main/java/com/devticket/admin/presentation/dto/res/UpdateTechStackResponse.java"
+    },
+    {
+      "module": "admin",
+      "name": "UserDetailResponse",
+      "kind": "record",
+      "fieldCount": 9,
+      "fields": [
+        {
+          "name": "userId",
+          "type": "String"
+        },
+        {
+          "name": "email",
+          "type": "String"
+        },
+        {
+          "name": "nickname",
+          "type": "String"
+        },
+        {
+          "name": "role",
+          "type": "String"
+        },
+        {
+          "name": "status",
+          "type": "String"
+        },
+        {
+          "name": "providerType",
+          "type": "String"
+        },
+        {
+          "name": "createdAt",
+          "type": "String"
+        },
+        {
+          "name": "withdrawnAt",
+          "type": "String"
+        },
+        {
+          "name": "penaltyHistory",
+          "type": "List<AdminActionHistorySummary>"
+        }
+      ],
+      "source": "admin/src/main/java/com/devticket/admin/presentation/dto/res/UserDetailResponse.java"
+    },
+    {
+      "module": "admin",
+      "name": "UserListItem",
+      "kind": "record",
+      "fieldCount": 8,
+      "fields": [
+        {
+          "name": "userId",
+          "type": "String"
+        },
+        {
+          "name": "email",
+          "type": "String"
+        },
+        {
+          "name": "nickname",
+          "type": "String"
+        },
+        {
+          "name": "role",
+          "type": "String"
+        },
+        {
+          "name": "status",
+          "type": "String"
+        },
+        {
+          "name": "providerType",
+          "type": "String"
+        },
+        {
+          "name": "createdAt",
+          "type": "String"
+        },
+        {
+          "name": "withdrawnAt",
+          "type": "String"
+        }
+      ],
+      "source": "admin/src/main/java/com/devticket/admin/presentation/dto/res/UserListItem.java"
+    },
+    {
+      "module": "admin",
+      "name": "UserListResponse",
+      "kind": "record",
+      "fieldCount": 8,
+      "fields": [
+        {
+          "name": "userId",
+          "type": "String"
+        },
+        {
+          "name": "email",
+          "type": "String"
+        },
+        {
+          "name": "nickname",
+          "type": "String"
+        },
+        {
+          "name": "role",
+          "type": "String"
+        },
+        {
+          "name": "status",
+          "type": "String"
+        },
+        {
+          "name": "providerType",
+          "type": "String"
+        },
+        {
+          "name": "createdAt",
+          "type": "String"
+        },
+        {
+          "name": "withdrawnAt",
+          "type": "String"
+        }
+      ],
+      "source": "admin/src/main/java/com/devticket/admin/presentation/dto/res/UserListResponse.java"
+    },
+    {
+      "module": "admin",
+      "name": "UserRoleRequest",
+      "kind": "record",
+      "fieldCount": 1,
+      "fields": [
+        {
+          "name": "role",
+          "type": "String"
+        }
+      ],
+      "source": "admin/src/main/java/com/devticket/admin/presentation/dto/req/UserRoleRequest.java"
+    },
+    {
+      "module": "admin",
+      "name": "UserSearchCondition",
+      "kind": "record",
+      "fieldCount": 5,
+      "fields": [
+        {
+          "name": "role",
+          "type": "String"
+        },
+        {
+          "name": "status",
+          "type": "String"
+        },
+        {
+          "name": "keyword",
+          "type": "String"
+        },
+        {
+          "name": "page",
+          "type": "Integer"
+        },
+        {
+          "name": "size",
+          "type": "Integer"
+        }
+      ],
+      "source": "admin/src/main/java/com/devticket/admin/presentation/dto/req/UserSearchCondition.java"
+    },
+    {
+      "module": "admin",
+      "name": "UserStatusRequest",
+      "kind": "record",
+      "fieldCount": 1,
+      "fields": [
+        {
+          "name": "status",
+          "type": "String"
+        }
+      ],
+      "source": "admin/src/main/java/com/devticket/admin/presentation/dto/req/UserStatusRequest.java"
+    }
+  ],
+  "notes": []
+}

@@ -1,0 +1,16 @@
+{
+  "module": "ai",
+  "endpointCount": 1,
+  "endpoints": [
+    {
+      "module": "ai",
+      "controller": "RecommendationController",
+      "method": "recommend",
+      "httpMethod": "POST",
+      "path": "internal/ai/recommendation",
+      "summary": "recommend",
+      "source": "ai/src/main/java/org/example/ai/presentation/controller/RecommendationController.java"
+    }
+  ],
+  "notes": []
+}

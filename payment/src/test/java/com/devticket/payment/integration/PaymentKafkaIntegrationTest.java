@@ -129,9 +129,9 @@ class PaymentKafkaIntegrationTest {
 
             Outbox outbox = Outbox.create(
                 payment.getPaymentId().toString(),
-                "payment.completed",
-                "payment.completed",
                 orderId.toString(),
+                "payment.completed",
+                "payment.completed",
                 payload
             );
             outboxRepository.save(outbox);
@@ -176,9 +176,9 @@ class PaymentKafkaIntegrationTest {
 
             Outbox outbox = Outbox.create(
                 payment.getPaymentId().toString(),
-                "payment.completed",
-                "payment.completed",
                 orderId.toString(),
+                "payment.completed",
+                "payment.completed",
                 payload
             );
             outboxRepository.save(outbox);
@@ -218,9 +218,9 @@ class PaymentKafkaIntegrationTest {
 
             Outbox outbox = Outbox.create(
                 payment.getPaymentId().toString(),
-                "payment.failed",
-                "payment.failed",
                 orderId.toString(),
+                "payment.failed",
+                "payment.failed",
                 payload
             );
             outboxRepository.save(outbox);
@@ -273,8 +273,10 @@ class PaymentKafkaIntegrationTest {
             assertThat(completedPayment.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
 
             // Outbox INSERT 확인
-            List<Outbox> outboxes = outboxRepository.findPendingForRetry(
-                OutboxStatus.PENDING, java.time.Instant.now().plusSeconds(60));
+            List<Outbox> outboxes = outboxRepository.findPendingToPublish(
+                OutboxStatus.PENDING,
+                java.time.Instant.now().plusSeconds(60),
+                java.time.LocalDateTime.now().plusSeconds(60));
             assertThat(outboxes).anyMatch(o ->
                 "payment.completed".equals(o.getEventType())
                 && o.getPartitionKey().equals(orderId.toString())

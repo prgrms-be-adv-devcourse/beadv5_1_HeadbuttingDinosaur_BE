@@ -1,0 +1,175 @@
+package com.devticket.event.common.config;
+
+import co.elastic.clients.elasticsearch.ElasticsearchClient;
+import co.elastic.clients.elasticsearch._types.FieldValue;
+import co.elastic.clients.elasticsearch._types.SortOrder;
+import com.devticket.event.application.ElasticsearchSyncService;
+import com.devticket.event.domain.enums.EventStatus;
+import com.devticket.event.domain.model.Event;
+import com.devticket.event.infrastructure.persistence.EventRepository;
+import com.devticket.event.infrastructure.search.EventDocument;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.annotation.Profile;
+import org.springframework.context.event.EventListener;
+import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.stereotype.Component;
+
+@Slf4j
+@Component
+@Profile("!test")
+@RequiredArgsConstructor
+public class ElasticsearchIndexInitializer {
+
+    private static final List<EventStatus> ACTIVE_STATUSES =
+        List.of(EventStatus.DRAFT, EventStatus.ON_SALE, EventStatus.SOLD_OUT, EventStatus.SALE_ENDED);
+
+    private static final List<EventStatus> TERMINATED_STATUSES =
+        List.of(EventStatus.ENDED, EventStatus.CANCELLED, EventStatus.FORCE_CANCELLED);
+
+    private static final int BATCH_SIZE = 50;
+
+    private final ElasticsearchOperations elasticsearchOperations;
+    private final ElasticsearchClient esClient;
+    private final EventRepository eventRepository;
+    private final ElasticsearchSyncService elasticsearchSyncService;
+
+    @Async
+    @EventListener(ApplicationReadyEvent.class)
+    public void initializeIndex() {
+        try {
+            var indexOps = elasticsearchOperations.indexOps(EventDocument.class);
+
+            if (!indexOps.exists()) {
+                indexOps.createWithMapping();
+                log.info("[ES Index] 'event' 인덱스 생성 완료");
+                reindexAllEvents();
+            } else {
+                syncMissingEvents();
+            }
+
+        } catch (Exception e) {
+            log.error("[ES Index 초기화 실패]", e);
+        }
+    }
+
+    private void syncMissingEvents() {
+        Set<String> activeDbIds = eventRepository.findAllEventIdsByStatusIn(ACTIVE_STATUSES).stream()
+            .map(UUID::toString)
+            .collect(Collectors.toSet());
+
+        Set<String> terminatedDbIds = eventRepository.findAllEventIdsByStatusIn(TERMINATED_STATUSES).stream()
+            .map(UUID::toString)
+            .collect(Collectors.toSet());
+
+        Set<String> esIds = getAllEsDocumentIds();
+
+        // 누락된 활성 이벤트 색인
+        Set<UUID> missingIds = activeDbIds.stream()
+            .filter(id -> !esIds.contains(id))
+            .map(UUID::fromString)
+            .collect(Collectors.toSet());
+
+        if (!missingIds.isEmpty()) {
+            log.info("[ES] 누락 이벤트 {}건 색인 시작", missingIds.size());
+            int count = indexInBatches(new ArrayList<>(missingIds), "[ES 색인 실패]");
+            log.info("[ES] 누락 색인 완료. {}건", count);
+        } else {
+            log.info("[ES] 활성 이벤트 모두 색인됨 ({}건)", activeDbIds.size());
+        }
+
+        // ES에 남아있는 종료 이벤트 삭제
+        Set<String> staleEsIds = terminatedDbIds.stream()
+            .filter(esIds::contains)
+            .collect(Collectors.toSet());
+
+        if (!staleEsIds.isEmpty()) {
+            log.info("[ES] 종료 이벤트 {}건 인덱스에서 삭제 시작", staleEsIds.size());
+            int deleted = 0;
+            for (String id : staleEsIds) {
+                try {
+                    esClient.delete(d -> d.index("event").id(id));
+                    deleted++;
+                } catch (Exception e) {
+                    log.warn("[ES 삭제 실패] eventId: {}", id, e);
+                }
+            }
+            log.info("[ES] 종료 이벤트 삭제 완료. {}건", deleted);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private Set<String> getAllEsDocumentIds() {
+        Set<String> ids = new HashSet<>();
+        final int pageSize = 1000;
+        List<FieldValue> searchAfter = null;
+
+        try {
+            while (true) {
+                final List<FieldValue> cursor = searchAfter;
+                var response = esClient.search(s -> {
+                    var req = s.index("event")
+                        .size(pageSize)
+                        .source(src -> src.fetch(false))
+                        .sort(sort -> sort.field(f -> f.field("_id").order(SortOrder.Asc)))
+                        .query(q -> q.matchAll(m -> m));
+                    if (cursor != null) {
+                        req = req.searchAfter(cursor);
+                    }
+                    return req;
+                }, java.util.Map.class);
+
+                var hits = response.hits().hits();
+                if (hits.isEmpty()) {
+                    break;
+                }
+                hits.forEach(hit -> ids.add(hit.id()));
+                if (hits.size() < pageSize) {
+                    break;
+                }
+                searchAfter = hits.get(hits.size() - 1).sort();
+            }
+        } catch (Exception e) {
+            log.warn("[ES] 전체 ID 조회 실패 - 동기화 스킵", e);
+            return Set.of();
+        }
+        return ids;
+    }
+
+    private void reindexAllEvents() {
+        List<UUID> allEventIds = eventRepository.findAllEventIdsByStatusIn(ACTIVE_STATUSES);
+
+        if (allEventIds.isEmpty()) {
+            log.info("[ES 재색인] 재색인할 이벤트 없음");
+            return;
+        }
+
+        int count = indexInBatches(allEventIds, "[ES 재색인 실패]");
+        log.info("[ES 재색인] 완료. 총 {}건", count);
+    }
+
+    private int indexInBatches(List<UUID> eventIds, String errorLogPrefix) {
+        int count = 0;
+        for (int i = 0; i < eventIds.size(); i += BATCH_SIZE) {
+            List<UUID> batch = eventIds.subList(i, Math.min(i + BATCH_SIZE, eventIds.size()));
+            List<Event> events = eventRepository.findAllWithDetailsByEventIdIn(batch);
+            for (Event event : events) {
+                try {
+                    elasticsearchSyncService.sync(event);
+                    count++;
+                } catch (Exception e) {
+                    log.warn("{} eventId: {}", errorLogPrefix, event.getEventId(), e);
+                }
+            }
+        }
+        return count;
+    }
+}

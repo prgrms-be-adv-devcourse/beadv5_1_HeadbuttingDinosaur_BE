@@ -57,9 +57,9 @@ public class WalletPgTimeoutHandler {
 
         outboxService.save(
             payment.getPaymentId().toString(),
-            KafkaTopics.PAYMENT_FAILED,
-            KafkaTopics.PAYMENT_FAILED,
             payment.getOrderId().toString(),
+            KafkaTopics.PAYMENT_FAILED,
+            KafkaTopics.PAYMENT_FAILED,
             event
         );
 

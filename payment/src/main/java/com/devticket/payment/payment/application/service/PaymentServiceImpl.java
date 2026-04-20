@@ -61,31 +61,51 @@ public class PaymentServiceImpl implements PaymentService {
         validateOrderOwner(userId, order.userId());
         validateOrderPayable(order);
 
-        // 멱등성 가드: 기존 Payment 존재 여부 확인 (PG/WALLET/WALLET_PG 공통)
+        // 기존 Payment 처리 — READY는 재시도/멱등 재사용 허용, 종단 상태는 변경 불가
         Optional<Payment> existing = paymentRepository.findByOrderId(order.id());
+        Payment retryTarget = null;
+
         if (existing.isPresent()) {
-            Payment existingPayment = existing.get();
-            if (existingPayment.getStatus() == PaymentStatus.READY) {
-                log.info("[ReadyPayment] 기존 READY Payment 반환 — orderId={}", order.id());
-                return PaymentReadyResponse.from(existingPayment, request.orderId(), order.orderNumber(), order.status());
+            Payment ep = existing.get();
+
+            if (ep.getStatus() != PaymentStatus.READY) {
+                throw new PaymentException(PaymentErrorCode.ALREADY_PROCESSED_PAYMENT);
             }
-            throw new PaymentException(PaymentErrorCode.ALREADY_PROCESSED_PAYMENT);
+
+            if (isSameReadyRequest(ep, request)) {
+                log.info("[ReadyPayment] 기존 READY Payment 재사용 — orderId={}, method={}",
+                    order.id(), request.paymentMethod());
+                return PaymentReadyResponse.from(
+                    ep, request.orderId(), order.orderNumber(), order.status());
+            }
+
+            if (ep.getPaymentMethod() == PaymentMethod.WALLET_PG
+                && ep.getWalletAmount() != null && ep.getWalletAmount() > 0) {
+                walletService.restoreForWalletPgFail(ep.getUserId(), ep.getWalletAmount(), ep.getOrderId());
+                log.info("[ReadyPayment] 결제수단 변경 — 기존 WALLET_PG 예치금 환원. orderId={}, walletAmount={}",
+                    ep.getOrderId(), ep.getWalletAmount());
+            }
+            retryTarget = ep;
         }
 
         // WALLET_PG 복합결제
         if (request.paymentMethod() == PaymentMethod.WALLET_PG) {
-            return readyWalletPgPayment(userId, request, order);
+            return readyWalletPgPayment(userId, request, order, retryTarget);
         }
 
         // PG 결제
         if (request.paymentMethod() == PaymentMethod.PG) {
-            Payment payment = Payment.create(order.id(), userId, PaymentMethod.PG, order.totalAmount());
+            Payment payment = (retryTarget != null)
+                ? applyRetry(retryTarget, PaymentMethod.PG, order.totalAmount(), 0, 0)
+                : Payment.create(order.id(), userId, PaymentMethod.PG, order.totalAmount());
             Payment savedPayment = paymentRepository.save(payment);
             return PaymentReadyResponse.from(savedPayment, request.orderId(), order.orderNumber(), order.status());
         }
 
         // WALLET 결제
-        Payment payment = Payment.create(order.id(), userId, PaymentMethod.WALLET, order.totalAmount());
+        Payment payment = (retryTarget != null)
+            ? applyRetry(retryTarget, PaymentMethod.WALLET, order.totalAmount(), 0, 0)
+            : Payment.create(order.id(), userId, PaymentMethod.WALLET, order.totalAmount());
         paymentRepository.save(payment);
         List<PaymentCompletedEvent.OrderItem> walletOrderItems = order.orderItems() == null
             ? List.of()
@@ -98,7 +118,8 @@ public class PaymentServiceImpl implements PaymentService {
         return PaymentReadyResponse.from(updated, request.orderId(), order.orderNumber(), order.status());
     }
 
-    private PaymentReadyResponse readyWalletPgPayment(UUID userId, PaymentReadyRequest request, InternalOrderInfoResponse order) {
+    private PaymentReadyResponse readyWalletPgPayment(
+        UUID userId, PaymentReadyRequest request, InternalOrderInfoResponse order, Payment retryTarget) {
         int totalAmount = order.totalAmount();
 
         // 입력값 검증
@@ -112,14 +133,32 @@ public class PaymentServiceImpl implements PaymentService {
         // 예치금 차감 (WalletTransaction USE 기록 포함)
         walletService.deductForWalletPg(userId, order.id(), walletAmount);
 
-        // Payment 생성 (READY, WALLET_PG)
-        Payment payment = Payment.create(order.id(), userId, PaymentMethod.WALLET_PG, totalAmount, walletAmount, pgAmount);
+        // Payment 생성 또는 재초기화 (READY, WALLET_PG)
+        Payment payment = (retryTarget != null)
+            ? applyRetry(retryTarget, PaymentMethod.WALLET_PG, totalAmount, walletAmount, pgAmount)
+            : Payment.create(order.id(), userId, PaymentMethod.WALLET_PG, totalAmount, walletAmount, pgAmount);
         Payment savedPayment = paymentRepository.save(payment);
 
         log.info("[ReadyPayment] WALLET_PG 결제 준비 — orderId={}, walletAmount={}, pgAmount={}",
             order.id(), walletAmount, pgAmount);
 
         return PaymentReadyResponse.from(savedPayment, request.orderId(), order.orderNumber(), order.status());
+    }
+
+    private boolean isSameReadyRequest(Payment existing, PaymentReadyRequest request) {
+        if (existing.getPaymentMethod() != request.paymentMethod()) {
+            return false;
+        }
+        if (request.paymentMethod() == PaymentMethod.WALLET_PG) {
+            Integer reqWallet = request.walletAmount();
+            return reqWallet != null && reqWallet.equals(existing.getWalletAmount());
+        }
+        return true;
+    }
+
+    private Payment applyRetry(Payment target, PaymentMethod method, Integer amount, Integer walletAmount, Integer pgAmount) {
+        target.resetForRetry(method, amount, walletAmount, pgAmount);
+        return target;
     }
 
     @Override
@@ -160,9 +199,9 @@ public class PaymentServiceImpl implements PaymentService {
             .build();
         outboxService.save(
             payment.getPaymentId().toString(),
-            KafkaTopics.PAYMENT_COMPLETED,
-            KafkaTopics.PAYMENT_COMPLETED,
             payment.getOrderId().toString(),
+            KafkaTopics.PAYMENT_COMPLETED,
+            KafkaTopics.PAYMENT_COMPLETED,
             event
         );
 
@@ -245,9 +284,9 @@ public class PaymentServiceImpl implements PaymentService {
             .build();
         outboxService.save(
             payment.getPaymentId().toString(),
-            KafkaTopics.PAYMENT_FAILED,
-            KafkaTopics.PAYMENT_FAILED,
             payment.getOrderId().toString(),
+            KafkaTopics.PAYMENT_FAILED,
+            KafkaTopics.PAYMENT_FAILED,
             event
         );
 

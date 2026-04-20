@@ -1,0 +1,117 @@
+{
+  "module": "settlement",
+  "endpointCount": 12,
+  "endpoints": [
+    {
+      "module": "settlement",
+      "controller": "SettlementAdminController",
+      "method": "getSettlements",
+      "httpMethod": "GET",
+      "path": "/api/admin/settlements",
+      "summary": "get settlements",
+      "source": "settlement/src/main/java/com/devticket/settlement/presentation/controller/SettlementAdminController.java"
+    },
+    {
+      "module": "settlement",
+      "controller": "BatchController",
+      "method": "launchDailyJob",
+      "httpMethod": "POST",
+      "path": "/api/admin/settlements/batch/daily",
+      "summary": "일별 정산대상 수집 배치 수동 실행 (b368f4af, date 미입력 시 어제)",
+      "source": "settlement/src/main/java/com/devticket/settlement/presentation/controller/BatchController.java"
+    },
+    {
+      "module": "settlement",
+      "controller": "BatchController",
+      "method": "launchMonthlyJob",
+      "httpMethod": "POST",
+      "path": "/api/admin/settlements/batch/monthly",
+      "summary": "월별 정산서 생성 배치 수동 실행 (b368f4af, yearMonth 미입력 시 전월)",
+      "source": "settlement/src/main/java/com/devticket/settlement/presentation/controller/BatchController.java"
+    },
+    {
+      "module": "settlement",
+      "controller": "SettlementAdminController",
+      "method": "createSettlementFromItems",
+      "httpMethod": "POST",
+      "path": "/api/admin/settlements/create-from-items",
+      "summary": "create settlement from items",
+      "source": "settlement/src/main/java/com/devticket/settlement/presentation/controller/SettlementAdminController.java"
+    },
+    {
+      "module": "settlement",
+      "controller": "SettlementAdminController",
+      "method": "getMonthlyRevenue",
+      "httpMethod": "GET",
+      "path": "/api/admin/settlements/revenues/{yearMonth}",
+      "summary": "관리자 월별 수익 조회 (36b33e9b, PathVariable YearMonth, 29d099fa로 RequestParam→PathVariable 정정)",
+      "source": "settlement/src/main/java/com/devticket/settlement/presentation/controller/SettlementAdminController.java"
+    },
+    {
+      "module": "settlement",
+      "controller": "SettlementAdminController",
+      "method": "runSettlement",
+      "httpMethod": "POST",
+      "path": "/api/admin/settlements/run",
+      "summary": "run settlement",
+      "source": "settlement/src/main/java/com/devticket/settlement/presentation/controller/SettlementAdminController.java"
+    },
+    {
+      "module": "settlement",
+      "controller": "SettlementAdminController",
+      "method": "getSettlementDetail",
+      "httpMethod": "GET",
+      "path": "/api/admin/settlements/{settlementId}",
+      "summary": "get settlement detail",
+      "source": "settlement/src/main/java/com/devticket/settlement/presentation/controller/SettlementAdminController.java"
+    },
+    {
+      "module": "settlement",
+      "controller": "SettlementAdminController",
+      "method": "cancelSettlement",
+      "httpMethod": "POST",
+      "path": "/api/admin/settlements/{settlementId}/cancel",
+      "summary": "cancel settlement",
+      "source": "settlement/src/main/java/com/devticket/settlement/presentation/controller/SettlementAdminController.java"
+    },
+    {
+      "module": "settlement",
+      "controller": "SettlementAdminController",
+      "method": "processPayment",
+      "httpMethod": "POST",
+      "path": "/api/admin/settlements/{settlementId}/payment",
+      "summary": "process payment",
+      "source": "settlement/src/main/java/com/devticket/settlement/presentation/controller/SettlementAdminController.java"
+    },
+    {
+      "module": "settlement",
+      "controller": "SettlementController",
+      "method": "getSettlementPreview",
+      "httpMethod": "GET",
+      "path": "/api/seller/settlements/preview",
+      "summary": "판매자 당월 예상 정산 미리보기",
+      "source": "settlement/src/main/java/com/devticket/settlement/presentation/controller/SettlementController.java"
+    },
+    {
+      "module": "settlement",
+      "controller": "SettlementController",
+      "method": "getSettlementByPeriod",
+      "httpMethod": "GET",
+      "path": "/api/seller/settlements/{yearMonth:[0-9]{6}}",
+      "summary": "판매자 월별 정산 조회",
+      "source": "settlement/src/main/java/com/devticket/settlement/presentation/controller/SettlementController.java"
+    },
+    {
+      "module": "settlement",
+      "controller": "SettlementController",
+      "method": "previewSettlementTarget",
+      "httpMethod": "GET",
+      "path": "/api/test/settlement-target/preview",
+      "summary": "[테스트] 정산대상 데이터 수집 미리보기",
+      "source": "settlement/src/main/java/com/devticket/settlement/presentation/controller/SettlementController.java"
+    }
+  ],
+  "notes": [
+    "신규 API 3건 추가: getMonthlyRevenue (36b33e9b), launchDailyJob/launchMonthlyJob (b368f4af)."
+  ]
+}

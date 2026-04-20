@@ -1,0 +1,716 @@
+{
+  "module": "payment",
+  "dtoCount": 25,
+  "dtos": [
+    {
+      "module": "payment",
+      "name": "AdminEventCancelRequest",
+      "kind": "record",
+      "fieldCount": 1,
+      "fields": [
+        {
+          "name": "reason",
+          "type": "String"
+        }
+      ],
+      "source": "payment/src/main/java/com/devticket/payment/refund/presentation/dto/AdminEventCancelRequest.java"
+    },
+    {
+      "module": "payment",
+      "name": "InternalPaymentInfoResponse",
+      "kind": "record",
+      "fieldCount": 8,
+      "fields": [
+        {
+          "name": "id",
+          "type": "Long"
+        },
+        {
+          "name": "orderId",
+          "type": "UUID"
+        },
+        {
+          "name": "paymentKey",
+          "type": "String"
+        },
+        {
+          "name": "paymentMethod",
+          "type": "String"
+        },
+        {
+          "name": "amount",
+          "type": "Integer"
+        },
+        {
+          "name": "status",
+          "type": "String"
+        },
+        {
+          "name": "approvedAt",
+          "type": "LocalDateTime"
+        },
+        {
+          "name": "failureReason",
+          "type": "String"
+        }
+      ],
+      "source": "payment/src/main/java/com/devticket/payment/payment/presentation/dto/InternalPaymentInfoResponse.java"
+    },
+    {
+      "module": "payment",
+      "name": "OrderRefundResponse",
+      "kind": "record",
+      "fieldCount": 7,
+      "fields": [
+        {
+          "name": "refundId",
+          "type": "UUID"
+        },
+        {
+          "name": "orderRefundId",
+          "type": "UUID"
+        },
+        {
+          "name": "orderId",
+          "type": "UUID"
+        },
+        {
+          "name": "refundAmount",
+          "type": "int"
+        },
+        {
+          "name": "refundRate",
+          "type": "int"
+        },
+        {
+          "name": "paymentMethod",
+          "type": "String"
+        },
+        {
+          "name": "refundStatus",
+          "type": "String"
+        }
+      ],
+      "source": "payment/src/main/java/com/devticket/payment/refund/presentation/dto/OrderRefundResponse.java"
+    },
+    {
+      "module": "payment",
+      "name": "PaymentConfirmRequest",
+      "kind": "record",
+      "fieldCount": 4,
+      "fields": [
+        {
+          "name": "paymentKey",
+          "type": "String"
+        },
+        {
+          "name": "paymentId",
+          "type": "UUID"
+        },
+        {
+          "name": "orderId",
+          "type": "UUID"
+        },
+        {
+          "name": "amount",
+          "type": "Integer"
+        }
+      ],
+      "source": "payment/src/main/java/com/devticket/payment/payment/presentation/dto/PaymentConfirmRequest.java"
+    },
+    {
+      "module": "payment",
+      "name": "PaymentConfirmResponse",
+      "kind": "record",
+      "fieldCount": 6,
+      "fields": [
+        {
+          "name": "paymentId",
+          "type": "String"
+        },
+        {
+          "name": "orderId",
+          "type": "String"
+        },
+        {
+          "name": "paymentMethod",
+          "type": "PaymentMethod"
+        },
+        {
+          "name": "status",
+          "type": "PaymentStatus"
+        },
+        {
+          "name": "amount",
+          "type": "Integer"
+        },
+        {
+          "name": "approvedAt",
+          "type": "LocalDateTime"
+        }
+      ],
+      "source": "payment/src/main/java/com/devticket/payment/payment/presentation/dto/PaymentConfirmResponse.java"
+    },
+    {
+      "module": "payment",
+      "name": "PaymentFailRequest",
+      "kind": "record",
+      "fieldCount": 3,
+      "fields": [
+        {
+          "name": "orderId",
+          "type": "UUID"
+        },
+        {
+          "name": "code",
+          "type": "String"
+        },
+        {
+          "name": "message",
+          "type": "String"
+        }
+      ],
+      "source": "payment/src/main/java/com/devticket/payment/payment/presentation/dto/PaymentFailRequest.java"
+    },
+    {
+      "module": "payment",
+      "name": "PaymentFailResponse",
+      "kind": "record",
+      "fieldCount": 4,
+      "fields": [
+        {
+          "name": "paymentId",
+          "type": "String"
+        },
+        {
+          "name": "orderId",
+          "type": "String"
+        },
+        {
+          "name": "status",
+          "type": "PaymentStatus"
+        },
+        {
+          "name": "failureReason",
+          "type": "String"
+        }
+      ],
+      "source": "payment/src/main/java/com/devticket/payment/payment/presentation/dto/PaymentFailResponse.java"
+    },
+    {
+      "module": "payment",
+      "name": "PaymentReadyRequest",
+      "kind": "record",
+      "fieldCount": 3,
+      "fields": [
+        {
+          "name": "orderId",
+          "type": "UUID"
+        },
+        {
+          "name": "paymentMethod",
+          "type": "PaymentMethod"
+        },
+        {
+          "name": "walletAmount",
+          "type": "Integer"
+        }
+      ],
+      "source": "payment/src/main/java/com/devticket/payment/payment/presentation/dto/PaymentReadyRequest.java"
+    },
+    {
+      "module": "payment",
+      "name": "PaymentReadyResponse",
+      "kind": "record",
+      "fieldCount": 10,
+      "fields": [
+        {
+          "name": "orderId",
+          "type": "UUID"
+        },
+        {
+          "name": "orderNumber",
+          "type": "String"
+        },
+        {
+          "name": "paymentId",
+          "type": "String"
+        },
+        {
+          "name": "paymentMethod",
+          "type": "String"
+        },
+        {
+          "name": "orderStatus",
+          "type": "String"
+        },
+        {
+          "name": "paymentStatus",
+          "type": "PaymentStatus"
+        },
+        {
+          "name": "amount",
+          "type": "Integer"
+        },
+        {
+          "name": "walletAmount",
+          "type": "Integer"
+        },
+        {
+          "name": "pgAmount",
+          "type": "Integer"
+        },
+        {
+          "name": "approvedAt",
+          "type": "String"
+        }
+      ],
+      "source": "payment/src/main/java/com/devticket/payment/payment/presentation/dto/PaymentReadyResponse.java"
+    },
+    {
+      "module": "payment",
+      "name": "PgRefundRequest",
+      "kind": "record",
+      "fieldCount": 1,
+      "fields": [
+        {
+          "name": "reason",
+          "type": "String"
+        }
+      ],
+      "source": "payment/src/main/java/com/devticket/payment/refund/presentation/dto/PgRefundRequest.java"
+    },
+    {
+      "module": "payment",
+      "name": "PgRefundResponse",
+      "kind": "record",
+      "fieldCount": 8,
+      "fields": [
+        {
+          "name": "ticketId",
+          "type": "String"
+        },
+        {
+          "name": "orderId",
+          "type": "UUID"
+        },
+        {
+          "name": "paymentAmount",
+          "type": "int"
+        },
+        {
+          "name": "refundAmount",
+          "type": "int"
+        },
+        {
+          "name": "refundRate",
+          "type": "int"
+        },
+        {
+          "name": "paymentMethod",
+          "type": "String"
+        },
+        {
+          "name": "refundStatus",
+          "type": "String"
+        },
+        {
+          "name": "refundedAt",
+          "type": "LocalDateTime"
+        }
+      ],
+      "source": "payment/src/main/java/com/devticket/payment/refund/presentation/dto/PgRefundResponse.java"
+    },
+    {
+      "module": "payment",
+      "name": "RefundDetailResponse",
+      "kind": "record",
+      "fieldCount": 9,
+      "fields": [
+        {
+          "name": "refundId",
+          "type": "String"
+        },
+        {
+          "name": "orderId",
+          "type": "UUID"
+        },
+        {
+          "name": "paymentId",
+          "type": "UUID"
+        },
+        {
+          "name": "paymentMethod",
+          "type": "String"
+        },
+        {
+          "name": "refundAmount",
+          "type": "Integer"
+        },
+        {
+          "name": "refundRate",
+          "type": "Integer"
+        },
+        {
+          "name": "status",
+          "type": "String"
+        },
+        {
+          "name": "requestedAt",
+          "type": "LocalDateTime"
+        },
+        {
+          "name": "completedAt",
+          "type": "LocalDateTime"
+        }
+      ],
+      "source": "payment/src/main/java/com/devticket/payment/refund/presentation/dto/RefundDetailResponse.java"
+    },
+    {
+      "module": "payment",
+      "name": "RefundInfoResponse",
+      "kind": "record",
+      "fieldCount": 9,
+      "fields": [
+        {
+          "name": "ticketId",
+          "type": "String"
+        },
+        {
+          "name": "eventTitle",
+          "type": "String"
+        },
+        {
+          "name": "eventDate",
+          "type": "LocalDateTime"
+        },
+        {
+          "name": "originalAmount",
+          "type": "Integer"
+        },
+        {
+          "name": "refundAmount",
+          "type": "Integer"
+        },
+        {
+          "name": "refundRate",
+          "type": "Integer"
+        },
+        {
+          "name": "dDay",
+          "type": "long"
+        },
+        {
+          "name": "refundable",
+          "type": "boolean"
+        },
+        {
+          "name": "paymentMethod",
+          "type": "String"
+        }
+      ],
+      "source": "payment/src/main/java/com/devticket/payment/refund/presentation/dto/RefundInfoResponse.java"
+    },
+    {
+      "module": "payment",
+      "name": "RefundListItemResponse",
+      "kind": "record",
+      "fieldCount": 8,
+      "fields": [
+        {
+          "name": "refundId",
+          "type": "String"
+        },
+        {
+          "name": "orderId",
+          "type": "UUID"
+        },
+        {
+          "name": "paymentId",
+          "type": "UUID"
+        },
+        {
+          "name": "refundAmount",
+          "type": "Integer"
+        },
+        {
+          "name": "refundRate",
+          "type": "Integer"
+        },
+        {
+          "name": "status",
+          "type": "String"
+        },
+        {
+          "name": "requestedAt",
+          "type": "LocalDateTime"
+        },
+        {
+          "name": "completedAt",
+          "type": "LocalDateTime"
+        }
+      ],
+      "source": "payment/src/main/java/com/devticket/payment/refund/presentation/dto/RefundListItemResponse.java"
+    },
+    {
+      "module": "payment",
+      "name": "SellerEventCancelRequest",
+      "kind": "record",
+      "fieldCount": 1,
+      "fields": [
+        {
+          "name": "reason",
+          "type": "String"
+        }
+      ],
+      "source": "payment/src/main/java/com/devticket/payment/refund/presentation/dto/SellerEventCancelRequest.java"
+    },
+    {
+      "module": "payment",
+      "name": "SellerRefundListItemResponse",
+      "kind": "record",
+      "fieldCount": 9,
+      "fields": [
+        {
+          "name": "refundId",
+          "type": "String"
+        },
+        {
+          "name": "orderId",
+          "type": "UUID"
+        },
+        {
+          "name": "paymentId",
+          "type": "UUID"
+        },
+        {
+          "name": "refundAmount",
+          "type": "Integer"
+        },
+        {
+          "name": "refundRate",
+          "type": "Integer"
+        },
+        {
+          "name": "status",
+          "type": "String"
+        },
+        {
+          "name": "paymentMethod",
+          "type": "String"
+        },
+        {
+          "name": "requestedAt",
+          "type": "LocalDateTime"
+        },
+        {
+          "name": "completedAt",
+          "type": "LocalDateTime"
+        }
+      ],
+      "source": "payment/src/main/java/com/devticket/payment/refund/presentation/dto/SellerRefundListItemResponse.java"
+    },
+    {
+      "module": "payment",
+      "name": "SettlementDepositRequest",
+      "kind": "record",
+      "fieldCount": 3,
+      "fields": [
+        {
+          "name": "settlementId",
+          "type": "UUID"
+        },
+        {
+          "name": "userId",
+          "type": "UUID"
+        },
+        {
+          "name": "amount",
+          "type": "int"
+        }
+      ],
+      "source": "payment/src/main/java/com/devticket/payment/wallet/presentation/dto/SettlementDepositRequest.java"
+    },
+    {
+      "module": "payment",
+      "name": "WalletBalanceResponse",
+      "kind": "record",
+      "fieldCount": 2,
+      "fields": [
+        {
+          "name": "walletId",
+          "type": "String"
+        },
+        {
+          "name": "balance",
+          "type": "Integer"
+        }
+      ],
+      "source": "payment/src/main/java/com/devticket/payment/wallet/presentation/dto/WalletBalanceResponse.java"
+    },
+    {
+      "module": "payment",
+      "name": "WalletChargeConfirmRequest",
+      "kind": "record",
+      "fieldCount": 3,
+      "fields": [
+        {
+          "name": "paymentKey",
+          "type": "String"
+        },
+        {
+          "name": "chargeId",
+          "type": "String"
+        },
+        {
+          "name": "amount",
+          "type": "Integer"
+        }
+      ],
+      "source": "payment/src/main/java/com/devticket/payment/wallet/presentation/dto/WalletChargeConfirmRequest.java"
+    },
+    {
+      "module": "payment",
+      "name": "WalletChargeConfirmResponse",
+      "kind": "record",
+      "fieldCount": 5,
+      "fields": [
+        {
+          "name": "transactionId",
+          "type": "String"
+        },
+        {
+          "name": "amount",
+          "type": "Integer"
+        },
+        {
+          "name": "balance",
+          "type": "Integer"
+        },
+        {
+          "name": "status",
+          "type": "String"
+        },
+        {
+          "name": "approvedAt",
+          "type": "LocalDateTime"
+        }
+      ],
+      "source": "payment/src/main/java/com/devticket/payment/wallet/presentation/dto/WalletChargeConfirmResponse.java"
+    },
+    {
+      "module": "payment",
+      "name": "WalletChargeRequest",
+      "kind": "record",
+      "fieldCount": 1,
+      "fields": [
+        {
+          "name": "amount",
+          "type": "Integer"
+        }
+      ],
+      "source": "payment/src/main/java/com/devticket/payment/wallet/presentation/dto/WalletChargeRequest.java"
+    },
+    {
+      "module": "payment",
+      "name": "WalletChargeResponse",
+      "kind": "record",
+      "fieldCount": 5,
+      "fields": [
+        {
+          "name": "chargeId",
+          "type": "String"
+        },
+        {
+          "name": "userId",
+          "type": "String"
+        },
+        {
+          "name": "amount",
+          "type": "Integer"
+        },
+        {
+          "name": "status",
+          "type": "String"
+        },
+        {
+          "name": "createdAt",
+          "type": "String"
+        }
+      ],
+      "source": "payment/src/main/java/com/devticket/payment/wallet/presentation/dto/WalletChargeResponse.java"
+    },
+    {
+      "module": "payment",
+      "name": "WalletTransactionListResponse",
+      "kind": "record",
+      "fieldCount": 4,
+      "fields": [
+        {
+          "name": "items",
+          "type": "List<Item>"
+        },
+        {
+          "name": "currentPage",
+          "type": "int"
+        },
+        {
+          "name": "totalPages",
+          "type": "int"
+        },
+        {
+          "name": "totalElements",
+          "type": "long"
+        }
+      ],
+      "source": "payment/src/main/java/com/devticket/payment/wallet/presentation/dto/WalletTransactionListResponse.java"
+    },
+    {
+      "module": "payment",
+      "name": "WalletWithdrawRequest",
+      "kind": "record",
+      "fieldCount": 1,
+      "fields": [
+        {
+          "name": "amount",
+          "type": "Integer"
+        }
+      ],
+      "source": "payment/src/main/java/com/devticket/payment/wallet/presentation/dto/WalletWithdrawRequest.java"
+    },
+    {
+      "module": "payment",
+      "name": "WalletWithdrawResponse",
+      "kind": "record",
+      "fieldCount": 6,
+      "fields": [
+        {
+          "name": "walletId",
+          "type": "String"
+        },
+        {
+          "name": "transactionId",
+          "type": "String"
+        },
+        {
+          "name": "withdrawnAmount",
+          "type": "Integer"
+        },
+        {
+          "name": "balance",
+          "type": "Integer"
+        },
+        {
+          "name": "status",
+          "type": "String"
+        },
+        {
+          "name": "requestedAt",
+          "type": "LocalDateTime"
+        }
+      ],
+      "source": "payment/src/main/java/com/devticket/payment/wallet/presentation/dto/WalletWithdrawResponse.java"
+    }
+  ],
+  "notes": []
+}
