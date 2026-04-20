@@ -28,7 +28,8 @@
 | processed_message 생성 | 신규 테이블 | id, message_id(UNIQUE), topic, processed_at | @Entity 추가 → 자동 |
 | shedlock 생성 | 신규 테이블 | Outbox 스케줄러 분산 락 | 수동 CREATE TABLE |
 | order 엔티티 | `version` | BIGINT 컬럼 추가 (@Version) | 엔티티 필드 추가 → 자동 |
-| order 엔티티 | `cart_hash` | VARCHAR(64) 컬럼 추가, 인덱스 (user_id, cart_hash), 해시 대상: (itemId, quantity) — unitPrice 미포함 (팀 합의) | 엔티티 필드 추가 → 자동 |
+| order 엔티티 | `cart_hash` | VARCHAR(64) 컬럼 추가, 인덱스 (user_id, cart_hash), 해시 대상: (eventId, quantity) — unitPrice 미포함 (팀 합의) ✅ 완료 (2026-04-19) | 엔티티 필드 추가 → 자동 |
+| cart_item 엔티티 | `(cart_id, event_id)` UNIQUE | 광클 동시성 결함 방어 + cart_hash 분기 삭제(A안) 매칭 로직 단순화 — 사전 점검: 중복 row 없음 확인 (2026-04-19) | 엔티티 필드 추가 → 자동 |
 
 > **코드 수정 연계 (DB 외)**
 > - `Order.create()` 초기 status `CREATED` (주문생성 Phase 코드 취합 완료 — `stock.deducted` 수신 후 `PAYMENT_PENDING` 전이)
@@ -98,17 +99,18 @@ CREATE TABLE event.shedlock (
 
 ---
 
-## 추후 스코프 — WALLET_PG 복합결제
+## 현재 스코프(완료) — WALLET_PG 복합결제
 
 ### Payment
 
-| 분류 | 대상 | 변경 내용 | 방법 |
-|------|------|-----------|------|
-| payment 엔티티 | `wallet_amount` | INTEGER 컬럼 추가 — PG/WALLET 단독결제 시 0, WALLET_PG 시 예치금 차감 금액 | 엔티티 필드 추가 → 자동 |
-| payment 엔티티 | `pg_amount` | INTEGER 컬럼 추가 — PG/WALLET 단독결제 시 0, WALLET_PG 시 PG 결제 금액 | 엔티티 필드 추가 → 자동 |
+| 분류 | 대상 | 변경 내용 | 방법 | 상태 |
+|------|------|-----------|------|------|
+| payment 엔티티 | `wallet_amount` | INTEGER 컬럼 추가 — PG/WALLET 단독결제 시 0, WALLET_PG 시 예치금 차감 금액 | 엔티티 필드 추가 → 자동 | ✅ 완료 |
+| payment 엔티티 | `pg_amount` | INTEGER 컬럼 추가 — PG/WALLET 단독결제 시 0, WALLET_PG 시 PG 결제 금액 | 엔티티 필드 추가 → 자동 | ✅ 완료 |
 
 > 기존 `amount`는 총 결제금액 유지. WALLET_PG일 때 `amount = walletAmount + pgAmount`.
-> `PaymentMethod` enum에 `WALLET_PG` 추가는 코드 레벨 (DB 스키마 변경 없음).
+> `PaymentMethod` enum에 `WALLET_PG` 추가는 코드 레벨 (DB 스키마 변경 없음) — ✅ 완료.
+> 최근 커밋 `c8dd686 feat/payment-kafka 머지 — WALLET_PG 복합결제 develop/payment 반영`으로 병합됨.
 
 ---
 

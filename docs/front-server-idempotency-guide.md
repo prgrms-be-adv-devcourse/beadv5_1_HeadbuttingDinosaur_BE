@@ -129,12 +129,13 @@
 **cartHash 생성 규칙:**
 
 - 생성 주체: **서버** (클라이언트 전달값 신뢰 금지 — 조작 가능)
-- 해시 대상: 장바구니 내 `(itemId, quantity)` 리스트 — unitPrice 미포함 (팀 합의)
-- 생성 방법: itemId 기준 오름차순 정렬 → JSON 직렬화 → SHA-256
+- 해시 대상: 장바구니 내 `(eventId, quantity)` 리스트 — unitPrice 미포함 (팀 합의)
+- 생성 방법: eventId 기준 오름차순 정렬 → 문자열 직렬화 (`eventId:quantity`, `,` 구분) → SHA-256
 
 ```
-예시 입력: [{"itemId":3,"qty":1},{"itemId":1,"qty":2}]
-정렬 후:  [{"itemId":1,"qty":2},{"itemId":3,"qty":1}]
+예시 입력: [{"eventId":"<UUID-3>","qty":1},{"eventId":"<UUID-1>","qty":2}]
+정렬 후 (eventId asc): [{"eventId":"<UUID-1>","qty":2},{"eventId":"<UUID-3>","qty":1}]
+직렬화:   "<UUID-1>:2,<UUID-3>:1"
 결과:     SHA-256(직렬화 문자열) → cart_hash 컬럼에 저장
 ```
 
@@ -151,8 +152,8 @@
 ```
 0. 장바구니 내용 해시 생성 (서버 사이드)
    → cartId로 현재 장바구니 상품 목록 조회
-   → (itemId, quantity) 리스트를 itemId 기준 정렬 — unitPrice 미포함 (팀 합의)
-   → JSON 직렬화 후 SHA-256 해시 생성 → cartHash 확보
+   → (eventId, quantity) 리스트를 eventId 기준 정렬 — unitPrice 미포함 (팀 합의)
+   → 문자열 직렬화 (`eventId:quantity`, `,` 구분) 후 SHA-256 해시 생성 → cartHash 확보
    → 이후 모든 중복 판단에 cartHash 포함
  
 1. cart 기준으로 먼저 직렬화 대상 확보
@@ -478,7 +479,7 @@ Wallet은 비즈니스 상태만으로 중복 판단이 불가능한 유일한 A
 
 **타임아웃 처리 기준:**
 
-Outbox 재시도 정책 기준 최대 대기 시간은 31초 (kafka-design.md §4 기준).
+Outbox 재시도 정책 기준 누적 최대 대기 시간은 약 10분 (선형 백오프 `retryCount * 60초`, MAX_RETRY=5 — kafka-design.md §4 기준).
 이 시간이 지나도 종단 상태에 도달하지 않으면 서버 장애 또는 DLT 이동 상황이다.
 
 ```

@@ -70,8 +70,8 @@ Outbox INSERT (message_id = UUID.randomUUID()) → 커밋
 
 ### 2-5. Outbox 재시도 간격 (Exponential Backoff)
 
-> 재시도 횟수·간격·지수 백오프 확정값은 [kafka-design.md §4 — 재시도 정책](kafka-design.md#4-outbox-패턴) 참조
-> (6회 시도, 즉시→1→2→4→8→16초, 총 최대 대기 31초)
+> 재시도 횟수·간격·선형 백오프 확정값은 [kafka-design.md §4 — 재시도 정책](kafka-design.md#4-outbox-패턴) 참조
+> (최대 5회 재시도, `retryCount * 60초`, 누적 최대 대기 약 10분)
 
 - **FAILED 수동 재발행**: Admin API로 FAILED → PENDING 전환 후 재발행 (이번 스코프 포함)
 
@@ -753,8 +753,8 @@ DLT 재처리 워커/Admin API를 구현할 때 **반드시 원본 메시지의 
 
 ## 13. 공통 모듈 패키지 구조
 
-Kafka 관련 공통 코드는 `common` 모듈 아래에 위치합니다.
-각 서비스(Commerce, Event, Payment)는 이 모듈을 의존하여 사용합니다.
+Kafka 관련 공통 코드는 각 서비스의 `common` 하위에 위치합니다.
+아래는 **기준 레이아웃**이며, 서비스(Commerce / Event / Payment)마다 실제 경로가 일부 다를 수 있으므로 아래 "모듈별 실제 위치 차이" 주석을 반드시 확인하세요.
 
 ```
 common/
@@ -777,6 +777,18 @@ common/
       ├── OutboxScheduler.java        // @Scheduled + ShedLock, 폴링 → 발행
       └── OutboxEventMessage.java     // 스케줄러 → Producer 전달용 VO
 ```
+
+### 모듈별 실제 위치 차이
+
+서비스별로 이벤트 DTO·Consumer 위치가 도메인 모듈 쪽에 놓여 있는 경우가 있습니다. 아래 표를 기준으로 파악하세요.
+
+| 서비스 | 이벤트 DTO (`***Event.java`) | Consumer | 비고 |
+|---|---|---|---|
+| Payment | `wallet/application/event/` (`PaymentCompletedEvent`, `RefundCompletedEvent`, `EventCancelledEvent`, `PaymentFailedEvent`) | `wallet/infrastructure/kafka/WalletEventConsumer.java` | `common/messaging/event/` 미사용 — 도메인(wallet) 모듈 하위 배치 |
+| Event | `infrastructure/messaging/event/` (`PaymentFailedEvent` 등) | `presentation/consumer/PaymentFailedConsumer.java` | `KafkaTopics`도 `infrastructure/messaging/` 아래 |
+| Commerce | 각 도메인 모듈의 `messaging/event/` | `presentation/consumer/` | `PaymentCompletedConsumer`, `PaymentFailedConsumer` 등 |
+
+> 신규 서비스 추가 시에는 위 기준 레이아웃을 권장하되, 기존 서비스의 레이아웃은 코드 파악 편의상 현 상태 유지. 리팩터링을 위해 이동할 때는 계약(토픽·JSON 스키마) 불변만 지키면 된다.
 
 ### 구현 시 주의사항
 

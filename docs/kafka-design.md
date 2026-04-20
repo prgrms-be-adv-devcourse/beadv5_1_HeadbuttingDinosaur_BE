@@ -65,7 +65,7 @@ Kafka 관련 코드의 **계층 배치·네이밍·Lombok·테스트·보안·PR
 |---|---|---|
 | Commerce | `order.created`, `ticket.issue-failed`, `refund.requested` (fan-out), `refund.order.done`, `refund.order.failed`, `refund.ticket.done`, `refund.ticket.failed`, `action.log` (CART_ADD / CART_REMOVE) | `stock.deducted`, `stock.failed`, `payment.completed`, `payment.failed`, `ticket.issue-failed`, `refund.completed`, `event.force-cancelled`, `refund.order.cancel`, `refund.ticket.cancel`, `refund.order.compensate`, `refund.ticket.compensate` |
 | Event | `stock.deducted`, `stock.failed`, `event.force-cancelled`, `event.sale-stopped`, `refund.stock.done`, `refund.stock.failed`, `action.log` (VIEW / DETAIL_VIEW / DWELL_TIME) | `order.created`, `payment.failed`, `refund.completed`, `refund.stock.restore` |
-| Payment (Orchestrator 포함) | `payment.completed`, `payment.failed`, `refund.completed`, `refund.order.cancel`, `refund.ticket.cancel`, `refund.stock.restore`, `refund.order.compensate`, `refund.ticket.compensate` | `refund.completed` (예치금 복구), `ticket.issue-failed`, `event.sale-stopped`, `refund.requested`, `refund.order.done`, `refund.order.failed`, `refund.ticket.done`, `refund.ticket.failed`, `refund.stock.done`, `refund.stock.failed` |
+| Payment (Orchestrator 포함) | `payment.completed`, `payment.failed`, `refund.completed`, `refund.order.cancel`, `refund.ticket.cancel`, `refund.stock.restore`, `refund.order.compensate`, `refund.ticket.compensate` | `refund.completed` (예치금 복구), `ticket.issue-failed`, `event.force-cancelled`, `event.sale-stopped`, `refund.requested`, `refund.order.done`, `refund.order.failed`, `refund.ticket.done`, `refund.ticket.failed`, `refund.stock.done`, `refund.stock.failed` |
 | **Log** (별도 스택 — Fastify/TS, 상세: [actionLog.md](actionLog.md)) | — (Kafka 재발행 없음, DB INSERT 전용) | `action.log`, `payment.completed` (PURCHASE 직접 INSERT) |
 
 ### Producer 발행 시점
@@ -375,7 +375,7 @@ public enum ActionType {
 | message_id | UUID | `UUID.randomUUID()`로 생성 — Kafka 헤더로 전달, Consumer dedup 키로 사용 |
 | aggregate_id | VARCHAR(36) | 비즈니스 키 UUID — 운영 추적용 (orderId, paymentId 등) |
 | partition_key | VARCHAR(36) | Kafka Partition Key — orderId 기준 순서 보장용 (kafka-design.md §6) |
-| event_type | VARCHAR(128) | 이벤트 유형 (ORDER_CREATED, STOCK_DEDUCTED 등) |
+| event_type | VARCHAR(128) | 이벤트 유형. **현 구현은 토픽명과 동일 문자열을 저장** (예: `"payment.completed"`). 추적성을 높이려면 별도 enum-style 문자열(`PAYMENT_COMPLETED` 등)로 분리하는 리팩터 고려 가능 |
 | topic | VARCHAR(128) | Kafka 토픽명 |
 | payload | TEXT | JSON 직렬화된 이벤트 |
 | status | VARCHAR(20) | PENDING / SENT / FAILED |
@@ -402,12 +402,13 @@ public enum ActionType {
 
 > `event_type` 컬럼은 멱등성 자체에는 필수가 아니지만,
 > 운영 중 "이 aggregate에서 어떤 이벤트가 몇 번 발행됐는지" 추적하는 데 유용합니다.
+> 단, **현 구현은 이 컬럼에 토픽명 문자열을 그대로 저장**하므로 `topic` 컬럼과 값이 동일하여 추적 기능은 제한적입니다 (`OutboxService.save(...)` 호출부 전수: `PaymentServiceImpl.java:152, 237`, `WalletServiceImpl.java:375`, `WalletPgTimeoutHandler.java:58`).
 
 ### Outbox 엔티티 변경사항 (기존 배포 마이그레이션)
 
 ```sql
 ALTER TABLE outbox
-    ADD COLUMN next_retry_at TIMESTAMP NULL;           -- 지수 백오프 기반 재시도 시각
+    ADD COLUMN next_retry_at TIMESTAMP NULL;           -- 선형 백오프 기반 재시도 시각 (retryCount * 60초)
 
 -- aggregate_id: DB PK(BIGINT)가 아닌 비즈니스 키(paymentId, orderId 등) UUID 사용
 ALTER TABLE outbox
@@ -418,18 +419,18 @@ ALTER TABLE outbox
     ADD COLUMN partition_key VARCHAR(36) NOT NULL;
 ```
 
-### 재시도 정책 (지수 백오프)
+### 재시도 정책 (선형 백오프)
 
-> 전체 토픽 단일 정책 적용 — 총 최대 대기 시간 31초 (UX 기준 허용 범위)
+> 전체 토픽 단일 정책 적용 — `nextRetryAt = now + retryCount * 60초` (`Outbox.increaseRetryCount()`), `MAX_RETRY = 5` 도달 시 FAILED
 
-| 시도 | 대기 시간 |
+| 시도 | 대기 시간 (직전 실패 기준) |
 |---|---|
-| 1회 | 즉시 |
-| 2회 | 1초 |
-| 3회 | 2초 |
-| 4회 | 4초 |
-| 5회 | 8초 |
-| 6회 (최대) | 16초 → FAILED |
+| 1회 (최초 발행) | 즉시 |
+| 2회 | 60초 |
+| 3회 | 120초 |
+| 4회 | 180초 |
+| 5회 | 240초 |
+| 6회 (= retryCount 5 도달) | FAILED 전환 (더 이상 재시도하지 않음) |
 
 ### 스케줄러 락 전략: ShedLock 채택
 
@@ -461,9 +462,11 @@ public void publishPendingEvents() { ... }
 
 ```java
 // OutboxRepository
-List<Outbox> findTop50ByStatusAndNextRetryAtBeforeOrNextRetryAtIsNullOrderByCreatedAtAsc(
-    OutboxStatus status, Instant now
-);
+@Query("SELECT o FROM Outbox o WHERE o.status = :status " +
+       "AND (o.nextRetryAt IS NULL OR o.nextRetryAt <= :now) " +
+       "ORDER BY o.createdAt ASC LIMIT 50")
+List<Outbox> findPendingForRetry(@Param("status") OutboxStatus status,
+                                 @Param("now") Instant now);
 ```
 
 ---
@@ -518,8 +521,8 @@ CREATE TABLE processed_message (
 | `CANCELLED` | 없음 (종단) | PG 자동 취소 보상 흐름에서 사용 |
 | `REFUNDED` | 없음 (종단) | |
 
-> ✅ `PaymentStatus.canTransitionTo()` 구현 완료. 
-> ⚠️ **부분 미구현:** `approve()` / `fail()` / `cancel()` / `refund()` 메서드 내부에서 `canTransitionTo()` 가드를 호출하지 않음. 메서드 진입 시 검증 로직 추가 필요.
+> ✅ `PaymentStatus.canTransitionTo()` 구현 완료.
+> ✅ `approve()` / `fail()` / `cancel()` / `refund()` 메서드 진입 시 `validateTransition()` 가드 호출 적용 완료.
 
 **Stock** ⏸ **Refund Saga 단계 결정** — 현 스코프는 enum 도입 보류
 
@@ -598,6 +601,8 @@ if (!order.canTransitionTo(targetStatus)) {
 
 패턴: `{서비스명}-{topic명}`
 
+> **예외:** Payment가 `event.force-cancelled` / `event.sale-stopped`를 동일 핸들러(`WalletEventConsumer.consumeEventCancelled`)로 처리하므로 두 토픽이 단일 groupId `payment-event-cancel-group`을 공유한다. 일괄 환불 로직 관점에서 두 토픽은 동등하므로 파티션 분산을 하나의 컨슈머 그룹 안에서 공유하는 것이 자연스럽다.
+
 | 서비스 | 소비 토픽 | groupId |
 |---|---|---|
 | Commerce | `stock.deducted` | `commerce-stock.deducted` |
@@ -612,7 +617,8 @@ if (!order.canTransitionTo(targetStatus)) {
 | Payment | `refund.completed` | `payment-refund.completed` |
 | Payment | `ticket.issue-failed` | `payment-ticket.issue-failed` |
 | Commerce | `event.force-cancelled` | `commerce-event.force-cancelled` |
-| Payment | `event.sale-stopped` | `payment-event.sale-stopped` |
+| Payment | `event.force-cancelled` | `payment-event-cancel-group` ⚠️ 네이밍 규칙 예외 |
+| Payment | `event.sale-stopped` | `payment-event-cancel-group` ⚠️ 네이밍 규칙 예외 |
 | Payment (Orchestrator) | `refund.requested` | `payment-refund.requested` |
 | Payment (Orchestrator) | `refund.order.done` | `payment-refund.order.done` |
 | Payment (Orchestrator) | `refund.order.failed` | `payment-refund.order.failed` |
@@ -694,9 +700,8 @@ kafkaTemplate.send("order.created", orderId.toString(), payload);
 
 ```java
 // KafkaConsumerConfig.java
-ExponentialBackOffWithMaxRetries backOff = new ExponentialBackOffWithMaxRetries(3);
-backOff.setInitialInterval(2_000L);   // 2초
-backOff.setMultiplier(2.0);           // 2→4→8초
+ExponentialBackOff backOff = new ExponentialBackOff(2000L, 2.0); // 2→4→8초
+backOff.setMaxAttempts(3); // 최대 3회 재시도
 // 총 4회 시도 (최초 1회 + 재시도 3회)
 // 소진 시 DLT(topic.DLT)로 이동
 ```
@@ -985,7 +990,7 @@ topic: event.force-cancelled  → DLT: event.force-cancelled.DLT
 | 2 | dedupe 키 스코프 (message_id+topic 복합키는 fan-out 구조에서 Consumer 간 dedup 공유 문제 발생 → 모듈별 별도 테이블로 구독자 스코프 격리) | 격리 단위 = 서비스 DB, Outbox UUID를 Kafka 헤더로 전달 | `X-Message-Id` 헤더 + 모듈별 `processed_message` + `UNIQUE(message_id)` | Payment·Event 적용 완료 / Commerce 미적용 |
 | 3 | 메시지 순서 역전 | 3분류 처리 — ① 이미 목표 상태: 멱등 스킵 + ACK ② 설명 가능한 순서 역전(만료·보상 등): 정책적 스킵 + ACK ③ 설명 불가능한 상태: throw → 재시도 → DLT (단순 스킵 금지 — 정합성 문제 소거 위험) | `canTransitionTo()` + 예외 타입 3분류 | 미구현 |
 | 4 | Producer 재발행 시 dedupe | `Outbox.messageId` 생성 시 고정, 재발행 시 동일 ID | 현재 구현 유지 | 구현됨, 문서화 누락 |
-| 5 | Outbox 락·재시도 | ShedLock 채택, `next_retry_at` 컬럼 추가 | ShedLock + 지수 백오프 | 락 미구현 → ShedLock 적용 예정 |
+| 5 | Outbox 락·재시도 | ShedLock 채택, `next_retry_at` 컬럼 추가 | ShedLock + 선형 백오프 (`retryCount * 60초`, MAX_RETRY=5) | ShedLock 적용 완료 |
 | 6 | DLT 재처리 중복 반영 | ① `markProcessed()`는 성공 후 마지막에 호출 ② DLT 재처리 워커/Admin API에서 원본 토픽 재발행 시 반드시 원본 `X-Message-Id` 헤더 보존 (새 UUID 생성 시 dedup 우회 → 중복 처리 발생) | 코드 순서 원칙 + DLT 재발행 구현 정책 | ① 구현됨 ② Admin API 미구현 |
 | 7 | 보상 이벤트 중복 처리 | processed_message dedup + 보상 Consumer별 비즈니스 상태 확인 이중 방어 (이미 보상 완료 상태면 성공으로 간주 스킵) — 상태 확인은 별도 플래그 없이 기존 상태 전이 검증(`canTransitionTo()`)으로 커버 | 모든 보상 Consumer에 dedupe 강제 + `canTransitionTo()` (Case 3과 동일) | 원칙 미수립 |
 | 8 | 상태 전이 검증 없음 | processed_message + 상태 전이 검증 두 방어선 필수 | Case 3 동일, 예외 타입 분리 | 미구현 |

@@ -153,6 +153,8 @@ sequenceDiagram
 
 ### 2-5. 운영 취소 이벤트 — event.force-cancelled
 
+> ⚠️ **현재 미구현 (설계 전용)** — Payment 쪽 `WalletEventConsumer.consumeEventCancelled`는 현재 `UnsupportedOperationException`을 던져 DLT로 이동시키는 상태. RefundSagaOrchestrator(본 문서 §3-1)가 완성되면 아래 플로우로 활성화 예정.
+
 ```mermaid
 sequenceDiagram
     actor Admin
@@ -173,6 +175,8 @@ sequenceDiagram
 ```
 
 ### 2-6. 운영 취소 이벤트 — event.sale-stopped
+
+> ⚠️ **현재 미구현 (설계 전용)** — Payment의 `event.sale-stopped` 핸들러는 `event.force-cancelled`와 동일 핸들러(`consumeEventCancelled`)에서 처리하며 현재 `UnsupportedOperationException`만 던진다. Refund 모듈 완성 후 활성화 예정.
 
 ```mermaid
 sequenceDiagram
@@ -294,34 +298,34 @@ sequenceDiagram
 > 예: 주문 10만원 → 예치금 3만원 차감 + PG 7만원 결제.
 
 *도메인 변경*
-- [ ] `PaymentMethod` enum에 `WALLET_PG` 추가
-- [ ] `Payment` 엔티티에 `walletAmount(Integer)`, `pgAmount(Integer)` 필드 추가 — PG/WALLET 단독결제 시 각각 0 저장, WALLET_PG 시 양쪽 모두 값 저장. 기존 `amount`는 총 결제금액 유지
-- [ ] `Payment.create()` 오버로딩 팩토리 추가 — `create(orderId, userId, method, amount, walletAmount, pgAmount)` (기존 PG/WALLET 호출부는 수정 불필요)
-- [ ] `PaymentReadyRequest`에 `walletAmount(Integer)` 필드 추가 — WALLET_PG일 때만 사용, PG/WALLET일 때는 null
-- [ ] `PaymentReadyResponse`에 `walletAmount(Integer)`, `pgAmount(Integer)` 필드 추가 — 프론트가 결제 구성 표시 + Toss SDK에 pgAmount 전달용
+- [x] ✅ `PaymentMethod` enum에 `WALLET_PG` 추가 완료
+- [x] ✅ `Payment` 엔티티에 `walletAmount(Integer)`, `pgAmount(Integer)` 필드 추가 완료 — PG/WALLET 단독결제 시 각각 0 저장, WALLET_PG 시 양쪽 모두 값 저장. 기존 `amount`는 총 결제금액 유지
+- [x] ✅ `Payment.create()` 오버로딩 팩토리 추가 완료 — `create(orderId, userId, method, amount, walletAmount, pgAmount)` (기존 PG/WALLET 호출부 수정 없음)
+- [x] ✅ `PaymentReadyRequest`에 `walletAmount(Integer)` 필드 추가 완료 — WALLET_PG일 때만 사용
+- [x] ✅ `PaymentReadyResponse`에 `walletAmount(Integer)`, `pgAmount(Integer)` 필드 추가 완료 — 프론트 구성 표시 + Toss SDK에 pgAmount 전달용
 
 *readyPayment 멱등성 가드 (PG/WALLET/WALLET_PG 공통)*
-- [ ] `readyPayment()` 진입 시 orderId 기준 기존 Payment 조회 → READY면 기존 결과 반환, SUCCESS/FAILED면 에러 — 현재 코드에 미구현, WALLET_PG에서 누락 시 예치금 이중 차감 발생 (상세: front-server-idempotency-guide.md §4-2)
+- [ ] `readyPayment()` 진입 시 orderId 기준 기존 Payment 조회 → READY면 기존 결과 반환, SUCCESS/FAILED면 에러 (상세: front-server-idempotency-guide.md §4-2)
 - [ ] WALLET_PG 동시성 2차 방어선: WalletTransaction transactionKey("USE_" + orderId) UNIQUE 제약 — 극단적 경쟁 조건에서 두 요청이 동시에 Payment 조회를 통과하더라도 하나만 성공
 
 *readyPayment WALLET_PG 분기*
-- [ ] `readyPayment()` 내 `PaymentMethod.WALLET_PG` 분기 추가
-- [ ] 입력값 검증: `walletAmount > 0`, `walletAmount < totalAmount`, 잔액 >= walletAmount
-- [ ] `pgAmount = totalAmount - walletAmount` 계산
-- [ ] `WalletService.deductForWalletPg(userId, orderId, walletAmount)` 호출 — 예치금 차감 + WalletTransaction(USE, "USE_" + orderId) 기록
-- [ ] Payment 생성 (READY, WALLET_PG, walletAmount/pgAmount 저장)
-- [ ] 응답에 pgAmount 포함하여 반환 → 프론트에서 pgAmount로 Toss 결제창 오픈
+- [x] ✅ `readyPayment()` 내 `PaymentMethod.WALLET_PG` 분기 추가 완료 (`PaymentServiceImpl.java:78~118`)
+- [x] ✅ 입력값 검증 적용 완료 — `walletAmount > 0`, `walletAmount < totalAmount`, 잔액 >= walletAmount
+- [x] ✅ `pgAmount = totalAmount - walletAmount` 계산 적용
+- [x] ✅ `WalletService.deductForWalletPg(userId, orderId, walletAmount)` 호출 — 예치금 차감 + WalletTransaction(USE, "USE_" + orderId) 기록
+- [x] ✅ Payment 생성 완료 (READY, WALLET_PG, walletAmount/pgAmount 저장)
+- [x] ✅ 응답에 pgAmount 포함 반환 (`PaymentReadyResponse`)
 
 *confirmPgPayment 수정*
-- [ ] `validatePaymentAmount()`: WALLET_PG이면 `payment.getPgAmount()` 기준으로 검증 (기존 PG는 `payment.getAmount()` 유지)
+- [x] ✅ `validatePaymentAmount()` WALLET_PG 분기 적용 완료 — WALLET_PG이면 `payment.getPgAmount()` 기준, 그 외는 `payment.getAmount()` (`PaymentServiceImpl.java:185~187`)
 
 *failPgPayment 수정*
-- [ ] `failPgPayment()` 내 WALLET_PG 분기 추가: `WalletService.restoreForWalletPgFail(userId, walletAmount, orderId)` 호출 — 예치금 복구 + WalletTransaction(REFUND, "PG_WALLET_RESTORE_" + orderId) 기록
+- [x] ✅ `failPgPayment()` 내 WALLET_PG 분기 추가 완료: `WalletService.restoreForWalletPgFail(userId, walletAmount, orderId)` 호출 — 예치금 복구 + WalletTransaction(REFUND, "PG_WALLET_RESTORE_" + orderId) 기록 (`PaymentServiceImpl.java:213~216`)
 
 *WalletService 메서드 추가*
-- [ ] `WalletService` 인터페이스에 `deductForWalletPg(UUID userId, UUID orderId, int walletAmount)` 추가 — 차감만 수행, Payment approve/Outbox 발행 안 함 (processWalletPayment과 구분)
-- [ ] `WalletService` 인터페이스에 `restoreForWalletPgFail(UUID userId, int walletAmount, UUID orderId)` 추가 — 기존 restoreBalance와 용도/transactionKey가 다르므로 별도 메서드
-- [ ] `WalletServiceImpl` 위 두 메서드 구현
+- [x] ✅ `WalletService.deductForWalletPg(UUID userId, UUID orderId, int walletAmount)` 구현 완료
+- [x] ✅ `WalletService.restoreForWalletPgFail(UUID userId, int walletAmount, UUID orderId)` 구현 완료
+- [x] ✅ `WalletServiceImpl` 위 두 메서드 구현 완료
 
 *타임아웃 스케줄러 (WALLET_PG READY 방치 대응)*
 - [ ] READY 상태 WALLET_PG 결제가 일정 시간(팀 합의 필요, 예: 30분) 경과 시 자동 FAILED 처리 + 예치금 복구
@@ -453,7 +457,7 @@ sequenceDiagram
 
 **Outbox 패턴**
 - [ ] Outbox 패턴 구현 — 비즈니스 로직 + `outboxService.save()` 반드시 단일 `@Transactional` 경계 안에 위치
-- [ ] `OutboxScheduler` ShedLock 적용 (6회, 즉시→1→2→4→8→16초, 총 최대 31초 — 상세: kafka-design.md §4)
+- [ ] `OutboxScheduler` ShedLock 적용 (최대 5회, `retryCount * 60초` 선형 백오프, 누적 최대 약 10분 — 상세: kafka-design.md §4)
 - [ ] Outbox 발행 시 Partition Key 설정 — `stock.deducted` / `stock.failed` / `refund.stock.done` / `refund.stock.failed` → `orderId`, `event.force-cancelled` / `event.sale-stopped` → `eventId` (상세: kafka-design.md §6)
 
 **Consumer 멱등성**
