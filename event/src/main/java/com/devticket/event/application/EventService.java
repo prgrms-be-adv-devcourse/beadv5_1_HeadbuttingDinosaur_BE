@@ -38,6 +38,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -335,10 +336,14 @@ public class EventService {
         OrderCreatedEvent event = deserialize(payload, OrderCreatedEvent.class);
 
         // Phase 1: 모든 항목 재고 차감 — 실패 시 StockDeductionException throw (전체 롤백)
+        List<OrderCreatedEvent.OrderItem> sortedItems = event.orderItems().stream()
+            .sorted(Comparator.comparing(OrderCreatedEvent.OrderItem::eventId))
+            .toList();
+
         List<StockDeductedEvent> deductedEvents = new ArrayList<>();
-        for (OrderCreatedEvent.OrderItem item : event.orderItems()) {
+        for (OrderCreatedEvent.OrderItem item : sortedItems) {
             Event e = eventRepository.findByEventIdWithLock(item.eventId())
-                .orElseThrow(() -> new BusinessException(EventErrorCode.EVENT_NOT_FOUND));
+                .orElseThrow(() -> new StockDeductionException(event.orderId(), item.eventId(), "이벤트를 찾을 수 없습니다"));
             try {
                 e.deductStock(item.quantity());
             } catch (BusinessException ex) {
