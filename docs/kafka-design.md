@@ -63,9 +63,10 @@ Kafka 관련 코드의 **계층 배치·네이밍·Lombok·테스트·보안·PR
 
 | 서비스 | Producer (발행) | Consumer (소비) |
 |---|---|---|
-| Commerce | `order.created`, `ticket.issue-failed`, `refund.requested` (fan-out), `refund.order.done`, `refund.order.failed`, `refund.ticket.done`, `refund.ticket.failed` | `stock.deducted`, `stock.failed`, `payment.completed`, `payment.failed`, `ticket.issue-failed`, `refund.completed`, `event.force-cancelled`, `refund.order.cancel`, `refund.ticket.cancel`, `refund.order.compensate`, `refund.ticket.compensate` |
-| Event | `stock.deducted`, `stock.failed`, `event.force-cancelled`, `event.sale-stopped`, `refund.stock.done`, `refund.stock.failed` | `order.created`, `payment.failed`, `refund.completed`, `refund.stock.restore` |
+| Commerce | `order.created`, `ticket.issue-failed`, `refund.requested` (fan-out), `refund.order.done`, `refund.order.failed`, `refund.ticket.done`, `refund.ticket.failed`, `action.log` (CART_ADD / CART_REMOVE) | `stock.deducted`, `stock.failed`, `payment.completed`, `payment.failed`, `ticket.issue-failed`, `refund.completed`, `event.force-cancelled`, `refund.order.cancel`, `refund.ticket.cancel`, `refund.order.compensate`, `refund.ticket.compensate` |
+| Event | `stock.deducted`, `stock.failed`, `event.force-cancelled`, `event.sale-stopped`, `refund.stock.done`, `refund.stock.failed`, `action.log` (VIEW / DETAIL_VIEW / DWELL_TIME) | `order.created`, `payment.failed`, `refund.completed`, `refund.stock.restore` |
 | Payment (Orchestrator 포함) | `payment.completed`, `payment.failed`, `refund.completed`, `refund.order.cancel`, `refund.ticket.cancel`, `refund.stock.restore`, `refund.order.compensate`, `refund.ticket.compensate` | `refund.completed` (예치금 복구), `ticket.issue-failed`, `event.sale-stopped`, `refund.requested`, `refund.order.done`, `refund.order.failed`, `refund.ticket.done`, `refund.ticket.failed`, `refund.stock.done`, `refund.stock.failed` |
+| **Log** (별도 스택 — Fastify/TS, 상세: [actionLog.md](actionLog.md)) | — (Kafka 재발행 없음, DB INSERT 전용) | `action.log`, `payment.completed` (PURCHASE 직접 INSERT) |
 
 ### Producer 발행 시점
 
@@ -89,9 +90,16 @@ Kafka 관련 코드의 **계층 배치·네이밍·Lombok·테스트·보안·PR
 | `refund.order.done` / `refund.order.failed` | Commerce | `OrderRefundConsumer` | Order 취소 처리 성공/실패 시 |
 | `refund.ticket.done` / `refund.ticket.failed` | Commerce | `TicketRefundConsumer` | Ticket 취소 처리 성공/실패 시 |
 | `refund.stock.done` / `refund.stock.failed` | Event | `StockRestoreConsumer` | Stock 복구 처리 성공/실패 시 |
+| `action.log` (VIEW) | Event | 이벤트 목록 조회 API 핸들러 | API 호출 시 (트랜잭션 경계 밖 비동기 발행, `acks=0`) |
+| `action.log` (DETAIL_VIEW) | Event | 이벤트 상세 조회 API 핸들러 | API 호출 시 (동일 정책) |
+| `action.log` (DWELL_TIME) | Event | 프론트 이탈 API 핸들러 | API 호출 시 (동일 정책, `dwellTimeSeconds` 포함) |
+| `action.log` (CART_ADD) | Commerce | 장바구니 담기 API 핸들러 | API 호출 시 (동일 정책) |
+| `action.log` (CART_REMOVE) | Commerce | 장바구니 삭제 API 핸들러 | API 호출 시 (동일 정책) |
+| `action.log` (PURCHASE) | **Log 서비스 자체 Consumer** | `payment.completed` 수신 → **Kafka 재발행 없이 `log.action_log`에 직접 INSERT** | 상세: [actionLog.md](actionLog.md) §3 |
 
 > 위 메서드명은 설계 기준이며, 구현 시 네이밍이 달라질 수 있음.
 > 핵심은 **비즈니스 로직 + Outbox INSERT가 단일 `@Transactional` 안에 있어야 한다**는 것.
+> 예외: `action.log`는 Outbox 미사용·`acks=0` — §6 Producer 설정 참조.
 
 ---
 
@@ -129,6 +137,9 @@ public final class KafkaTopics {
     public static final String REFUND_STOCK_FAILED       = "refund.stock.failed";
     public static final String REFUND_ORDER_COMPENSATE   = "refund.order.compensate";
     public static final String REFUND_TICKET_COMPENSATE  = "refund.ticket.compensate";
+
+    // 행동 로그 (analytics — acks=0, Outbox 미사용, DLT 없음)
+    public static final String ACTION_LOG                = "action.log";
 
     // -- 이번 스코프 제외 (추후 논의 예정) --
     // public static final String MEMBER_SUSPENDED = "member.suspended";
@@ -299,6 +310,50 @@ public record RefundSagaStepEvent(
     Instant timestamp
 ) {}
 ```
+
+### ActionLogEvent (analytics — `action.log` 전용)
+
+> **예외 이벤트**: 기존 비즈니스 이벤트와 달리 `acks=0` + Outbox 미사용. 단일 DTO + nullable 필드 방식. 검증은 Consumer(Log 서비스, Fastify)에서 수행.
+> Consumer 측 DTO는 TypeScript interface(`fastify-log/src/model/action-log.model.ts`)로 정의되어 있으며, 아래 Java record와 **동일한 JSON 스키마**를 공유한다.
+
+```java
+public record ActionLogEvent(
+    UUID userId,                     // 필수
+    UUID eventId,                    // VIEW는 nullable (목록 조회 시 특정 이벤트 없음)
+    ActionType actionType,           // 필수
+    String searchKeyword,            // nullable — 검색어 (VIEW 시 분석용)
+    String stackFilter,              // nullable — 기술스택 필터 (VIEW 시 분석용)
+    Integer dwellTimeSeconds,        // nullable — DWELL_TIME 시에만
+    Integer quantity,                // nullable — CART_ADD / PURCHASE 시 수량
+    Long totalAmount,                // nullable — PURCHASE 시 금액
+    Instant timestamp                // 필수
+) {}
+
+public enum ActionType {
+    VIEW,         // 이벤트 목록 조회
+    DETAIL_VIEW,  // 이벤트 상세 조회
+    CART_ADD,     // 장바구니 담기
+    CART_REMOVE,  // 장바구니 삭제
+    PURCHASE,     // 결제 완료 (payment.completed 수신 시 Log 서비스가 직접 INSERT)
+    DWELL_TIME,   // 페이지 이탈 시 체류 시간 기록
+    REFUND        // 환불 (향후 환불 스코프 사전 반영 — 현 스코프 미사용)
+}
+```
+
+**필드별 actionType 적용 매트릭스**
+
+| 필드 | VIEW | DETAIL_VIEW | DWELL_TIME | CART_ADD | CART_REMOVE | PURCHASE |
+|---|:-:|:-:|:-:|:-:|:-:|:-:|
+| `userId` | 필수 | 필수 | 필수 | 필수 | 필수 | 필수 |
+| `eventId` | nullable | 필수 | 필수 | 필수 | 필수 | 필수 |
+| `searchKeyword` | 선택 | — | — | — | — | — |
+| `stackFilter` | 선택 | — | — | — | — | — |
+| `dwellTimeSeconds` | — | — | 필수 | — | — | — |
+| `quantity` | — | — | — | 선택 | — | 선택 |
+| `totalAmount` | — | — | — | — | — | 선택 |
+| `timestamp` | 필수 | 필수 | 필수 | 필수 | 필수 | 필수 |
+
+> **상세 요구사항**: [actionLog.md](actionLog.md) §3.2
 
 ---
 
@@ -602,9 +657,30 @@ kafkaTemplate.send("order.created", orderId.toString(), payload);
 | `refund.ticket.cancel` / `refund.ticket.done` / `refund.ticket.failed` | `orderId` | 동일 주문의 Refund Saga 단계 순서 보장 |
 | `refund.stock.restore` / `refund.stock.done` / `refund.stock.failed` | `orderId` | 동일 주문의 Refund Saga 단계 순서 보장 |
 | `refund.order.compensate` / `refund.ticket.compensate` | `orderId` | 동일 주문의 보상 트랜잭션 순서 보장 |
+| `action.log` | `userId` | AI 행동분석 시 **동일 사용자 이벤트 시퀀스 순서 보장** (시퀀스 학습·이탈 예측 전제) |
 
 > 참고: 현재 설계는 상태전이 검증(`canTransitionTo`)으로 순서 역전을 방어하고 있음.
 > Partition Key는 추가 방어선으로, 설정하지 않아도 멱등성은 유지되지만 설정 시 Consumer 재시도 빈도가 줄어든다.
+
+---
+
+### action.log Producer 예외 설정
+
+> **기존 비즈니스 이벤트와 정책이 완전히 다른 별도 Producer 경로.** 상세: [actionLog.md](actionLog.md) §1~§2.
+
+| 항목 | action.log | 기존 비즈니스 이벤트 |
+|---|---|---|
+| `acks` | **`0`** (fire-and-forget) | `acks=all` |
+| `retries` | `0` | 재시도 활성화 |
+| `enable.idempotence` | `false` | `true` |
+| Outbox 패턴 | **미사용** (트랜잭션 경계 밖 비동기 발행) | 필수 (원자성) |
+| `X-Message-Id` 헤더 | 미사용 | 필수 (Consumer dedup용) |
+| KafkaTemplate / Producer Bean | **전용 Bean 분리 필요** | 공유 |
+
+**핵심 원칙**
+- **손실 허용**: 로그 데이터 성격상 네트워크/브로커 장애 시 일부 메시지 손실 허용 → 재시도·DLT 운영 오버헤드 제거
+- **비즈니스 API 응답 지연 제로**: 트랜잭션 경계 밖에서 비동기 발행 → API 응답 시간에 영향 없음
+- **구현 주의**: 기존 Producer Bean과 설정이 완전히 다르므로 **반드시 전용 `KafkaProducerConfig` Bean을 별도로 등록**해 공유하지 말 것
 
 ---
 
@@ -640,6 +716,19 @@ public class JacksonConfig {
     }
 }
 ```
+
+### action.log Consumer 예외 (Log 서비스, Fastify/TS 별도 스택)
+
+> **기존 Java `common` 모듈(AckMode, ExponentialBackOff, JacksonConfig 등) 재사용 불가.** Node.js 별도 스택(`fastify-log/`, kafkajs)으로 운영. 상세: [actionLog.md](actionLog.md) §1.
+
+| 항목 | 값 / 정책 |
+|---|---|
+| 구독 토픽 | `action.log` (VIEW/DETAIL_VIEW/DWELL_TIME/CART_ADD/CART_REMOVE 수신) + `payment.completed` (PURCHASE 수신용 — **Log 서비스가 Kafka 재발행 없이 `log.action_log`에 직접 INSERT**) |
+| groupId | `log-group` |
+| 커밋 | `autoCommit=false` — 수동 offset commit |
+| 예외 처리 | **예외 시 로깅 + 스킵 + offset commit** — at-most-once (재시도·DLT 없음) |
+| dedup | **미적용** — 상류(`payment.completed`)에서 이미 `processed_message` 보장. Kafka rebalance edge case 중복은 리포트 쿼리로 사후 보정 |
+| 상태 전이 검증 | 해당 없음 (단순 INSERT — 도메인 상태 머신 없음) |
 
 ---
 
@@ -901,7 +990,7 @@ topic: event.force-cancelled  → DLT: event.force-cancelled.DLT
 | 7 | 보상 이벤트 중복 처리 | processed_message dedup + 보상 Consumer별 비즈니스 상태 확인 이중 방어 (이미 보상 완료 상태면 성공으로 간주 스킵) — 상태 확인은 별도 플래그 없이 기존 상태 전이 검증(`canTransitionTo()`)으로 커버 | 모든 보상 Consumer에 dedupe 강제 + `canTransitionTo()` (Case 3과 동일) | 원칙 미수립 |
 | 8 | 상태 전이 검증 없음 | processed_message + 상태 전이 검증 두 방어선 필수 | Case 3 동일, 예외 타입 분리 | 미구현 |
 | 9 | 스케줄러·Consumer 충돌 | ShedLock + processed_message + 상태 전이 검증 + 낙관적 락 4레이어 | `@Version` 추가 | 미구현 |
-| 10 | 동일 계정 멀티 세션 동시 주문 (같은 장바구니를 여러 탭·기기에서 동시 주문) | userId + cartId SELECT FOR UPDATE 직렬화 후, 서버가 장바구니 내용 해시(cartHash) 계산 → 활성 주문 조회 시 userId + cartId + cartHash 3개 일치 여부 기준으로 중복 판단. cartHash 불일치(내용 변경)면 새 주문 허용. Orders 테이블에 `cart_hash VARCHAR(64)` 컬럼 추가 필요 | `SELECT FOR UPDATE` + cartHash 서버 계산((itemId, quantity) 정렬 후 SHA-256 — unitPrice 미포함, 팀 합의) + 활성 주문 조회 기준 변경 | 미구현 |
+| 10 | 동일 계정 멀티 세션 동시 주문 (같은 장바구니를 여러 탭·기기에서 동시 주문) | userId + cartId SELECT FOR UPDATE 직렬화 후, 서버가 장바구니 내용 해시(cartHash) 계산 → 활성 주문 조회 시 userId + cartId + cartHash 3개 일치 여부 기준으로 중복 판단. cartHash 불일치(내용 변경)면 새 주문 허용. Orders 테이블에 `cart_hash VARCHAR(64)` 컬럼 추가 필요 | `SELECT FOR UPDATE` + cartHash 서버 계산((eventId, quantity) 정렬 후 SHA-256 — unitPrice 미포함, 팀 합의) + 활성 주문 조회 기준 변경 | ✅ 구현 완료 (2026-04-19) |
 
 ---
 

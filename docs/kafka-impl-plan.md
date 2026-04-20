@@ -51,6 +51,7 @@ Kafka를 통해 서비스 간에 오가는 모든 이벤트를 한 눈에 확인
 | `refund.stock.done` / `refund.stock.failed` | Event | Payment (Orchestrator) | Stock 복구 처리 결과 | — | ⬜ 미구현 |
 | `refund.order.compensate` | Payment (Orchestrator) | Commerce | Order 취소 보상 (롤백) | — | ⬜ 미구현 |
 | `refund.ticket.compensate` | Payment (Orchestrator) | Commerce | Ticket 취소 보상 (롤백) | — | ⬜ 미구현 |
+| `action.log` (analytics) | Event (VIEW/DETAIL_VIEW/DWELL_TIME), Commerce (CART_ADD/CART_REMOVE), **Log 자체 consume**(PURCHASE) | **Log 서비스** (Fastify, 별도 스택) | 각 API 호출 시 (`acks=0`, Outbox 미사용). PURCHASE는 Log 서비스가 `payment.completed` 수신 → `log.action_log` 직접 INSERT | **없음** (at-most-once — 손실 허용) | ⬜ 미구현 (상세: [actionLog.md](actionLog.md)) |
 
 **구현 상태 범례**
 
@@ -355,10 +356,10 @@ sequenceDiagram
 
 **DB 스키마**
 - [ ] `Order` 엔티티 필드 추가 (ddl-auto 자동 반영)
-  - `cart_hash VARCHAR(64)` — 장바구니 내용 해시 (itemId 정렬 후 SHA-256), 중복 주문 판단 기준 *(주문생성 Phase 스코프)*
+  - [x] ✅ `cart_hash VARCHAR(64)` — 장바구니 내용 해시 (eventId 정렬 후 SHA-256), 중복 주문 판단 기준 — 구현 완료 (2026-04-19, `CartHashUtil`)
   - `expires_at DATETIME` — 주문 만료 시각 *(주문생성 Phase 스코프 — 현재는 런타임에 `created_at + 30분`으로 계산)*
   - [x] ✅ `version BIGINT` — 낙관적 락 (`@Version`)
-- [ ] `Order` 엔티티 인덱스 추가: `(user_id, cart_hash)` — 활성 주문 중복 판단 조회용 *(주문생성 Phase 스코프)*
+- [x] ✅ `Order` 엔티티 인덱스 추가: `(user_id, cart_hash)` — `idx_order_user_cart_hash` 구현 완료 (2026-04-19)
 - [ ] `Order.create()` 수정: 초기 status `PAYMENT_PENDING` → `CREATED` 변경, `expires_at = now() + 30분` 설정 추가 *(주문생성 Phase 스코프)*
 - [x] ✅ `outbox` 테이블 신규 생성 — JPA `@Entity` 추가 시 ddl-auto 자동 생성
 - [x] ✅ `processed_message` 테이블 신규 생성 — JPA `@Entity` 추가 시 ddl-auto 자동 생성
@@ -422,6 +423,12 @@ sequenceDiagram
 - [x] ✅ Consumer 순서 역전 3분류 처리 구현 (payment.completed / payment.failed) — ①이미 목표 상태(멱등 스킵+ACK) ②정책적 스킵(PAID 후 CANCELLED/FAILED 도착 등) ③이상 상태(throw→재시도→DLT)
 - [x] ✅ Outbox 스케줄러와 Consumer 동시 처리 충돌 방지 — payment.* Consumer 경로 `@Version` + `canTransitionTo()` 양쪽 가드 적용 (`OrderExpirationScheduler`도 동일)
 
+**`action.log` Producer (analytics — 신규 적용)** *(상세: [actionLog.md](actionLog.md))*
+- [ ] 전용 `ActionLogKafkaProducerConfig` Bean 분리 — `acks=0`, `retries=0`, `enable.idempotence=false` (기존 Producer Bean과 공유 금지)
+- [ ] `CART_ADD` 발행 — 장바구니 담기 API 핸들러 내 트랜잭션 경계 **밖**에서 비동기 발행 (Partition Key: `userId`)
+- [ ] `CART_REMOVE` 발행 — 장바구니 삭제 API 핸들러 내 트랜잭션 경계 **밖**에서 비동기 발행
+- [ ] Outbox 미사용 확인 (비즈니스 트랜잭션에 INSERT 포함 금지)
+
 > 설계 기준: kafka-design.md §12 참조 (이 문서가 상세 구현 체크리스트)
 
 ### 3-3. Event (신규 적용)
@@ -476,7 +483,31 @@ sequenceDiagram
 - [ ] Consumer 순서 역전 3분류 처리 구현 — ①이미 목표 상태(멱등 스킵+ACK) ②설명 가능한 역전(정책적 스킵+ACK) ③설명 불가능한 상태(throw→재시도→DLT) — 상세: kafka-design.md §5
 - [ ] Outbox 스케줄러와 Consumer 동시 처리 충돌 방지 — `@Version` 낙관적 락 + 상태 전이 검증 양쪽 적용
 
+**`action.log` Producer (analytics — 신규 적용)** *(상세: [actionLog.md](actionLog.md))*
+- [ ] 전용 `ActionLogKafkaProducerConfig` Bean 분리 — `acks=0`, `retries=0`, `enable.idempotence=false` (기존 Producer Bean과 공유 금지)
+- [ ] `VIEW` 발행 — 이벤트 목록 조회 API 핸들러 내 트랜잭션 경계 **밖**에서 비동기 발행 (Partition Key: `userId`, `searchKeyword` / `stackFilter`가 있으면 포함)
+- [ ] `DETAIL_VIEW` 발행 — 이벤트 상세 조회 API 핸들러 내 트랜잭션 경계 **밖**에서 비동기 발행
+- [ ] `DWELL_TIME` 발행 — 프론트 이탈 시 호출 API 핸들러 내 트랜잭션 경계 **밖**에서 비동기 발행 (`dwellTimeSeconds` 필수)
+- [ ] Outbox 미사용 확인 (비즈니스 트랜잭션에 INSERT 포함 금지)
+
 > 설계 기준: kafka-design.md §12 / §5 Stock 상태 전이 표 참조 (이 문서가 상세 구현 체크리스트)
+
+### 3-4. Log 서비스 확장 (Fastify/TS — 별도 스택)
+
+> **기반 이미 존재**: `fastify-log/` 브랜치(`develop/log`)에 `action.log` Consumer 파이프라인(kafkajs, DB 스키마 `log.action_log`, enum 7종) 구현 완료. 본 항목은 **PURCHASE 처리를 위한 `payment.completed` 추가 구독 확장**.
+> 상세: [actionLog.md](actionLog.md) §1, §4
+
+**확장 작업**
+- [ ] `payment.completed` 토픽 **추가 구독** (`fastify-log/src/consumer/`에 전용 핸들러 추가)
+- [ ] `payment.completed` payload → PURCHASE 레코드 매핑 (`userId`, `eventId`, `actionType=PURCHASE`, `quantity`, `totalAmount`, `timestamp`)
+- [ ] `log.action_log`에 **직접 INSERT** (Kafka 재발행 없이)
+- [ ] 예외 처리는 기존 `action.log` Consumer와 동일 정책(스킵 + offset commit, at-most-once) 적용
+- [ ] `env.ts` 토픽 설정에 `KAFKA_PAYMENT_COMPLETED_TOPIC` 추가 (또는 `subscribe` 시 토픽 배열 확장)
+
+**유지 (변경 없음)**
+- groupId `log-group`
+- `autoCommit=false`, 수동 offset commit
+- dedup 미적용
 
 ---
 
@@ -535,12 +566,17 @@ sequenceDiagram
 > `OrderService.processPaymentCompleted()` 내부 장바구니 삭제 로직 현재는 **userId 기준 전체 삭제**로 구현됨. 사용자가 카트에 담은 상품 중 일부만 결제한 경우 미결제 상품까지 함께 삭제되는 UX 문제 존재.  
 > **관련 서비스:** `[Commerce]`
 
-- [ ] **`cart_hash` 도입 후 분기 로직 추가**  
-  분기 조건:
-  - `cart_hash` == 현재 카트 전체 내역 해시 → 카트 전체가 결제됨 → **전체 삭제** (현 동작 유지)
-  - `cart_hash` != 현재 카트 내역 해시 → 카트에 추가 아이템 있음 → **결제된 `cart_hash` 내역만 삭제**
+- [ ] **분기 없이 항상 `(eventId, min(orderQty, cartQty))` 매칭 차감 적용 (A안 — 2026-04-19 합의)**
+  - 결정 배경:
+    - 분기 분리는 결과상 redundant — "cartHash 일치" 케이스에서도 (c) 매칭 결과 = 전체 삭제 결과 동일
+    - 분기 분리 시 **비교/삭제 갭에서 동시성 위험** — 결제 처리 중 사용자가 카트에 신규 아이템 추가 시 함께 삭제될 위험 잔존
+  - 매칭 로직:
+    - 결제된 `OrderItem` 목록을 `eventId` 기준 그룹핑
+    - 카트의 `(cart_id, event_id)`별로 매칭 — `min(orderQty, cartQty)`만큼 차감
+    - 차감 후 `quantity = 0`이면 row 삭제, 그 외는 quantity 갱신
+  - **전제 조건 (동반 작업)**: `CartItem` 테이블 `(cart_id, event_id)` UNIQUE 제약 + `CartService.addOrUpdateCartItem` race catch 보강 — 광클 동시성 결함 해소 (별도 작업, 같은 PR에 묶음)
 
-- [ ] **의존 관계**: 주문생성 Phase에서 `Order` 엔티티에 `cart_hash VARCHAR(64)` 컬럼 추가 (§3-2 DB 스키마 항목) 완료 후 활성화
+- [x] ✅ **의존 관계 해소**: `Order.cart_hash` 컬럼 + 인덱스 + `CartHashUtil` 모두 구현 완료 — 본 작업 진입 가능
 
 ---
 

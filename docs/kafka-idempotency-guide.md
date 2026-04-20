@@ -802,13 +802,43 @@ common/
 
 ---
 
-## 추후 구현 예정
+## 15. action.log (사용자 행동 로그)
 
-> 이번 스코프에서 제외된 항목입니다. Log 서비스 완성 후 구현 예정입니다.
+> **본 장의 나머지 규칙(Outbox·processed_message·canTransitionTo·재시도·DLT)과 정책이 완전히 다른 예외 이벤트.**
+> 상세 설계·결정 사항: [actionLog.md](actionLog.md)
 
-### action.log Consumer (Admin)
+### 15.1 기본 정보
 
-- groupId: `admin-action.log`
-- 토픽: `action.log`
-- Consumer 서비스: Admin (임시), 이후 Log 서비스로 이전
-- Producer: 각 서비스 (actorType에 따라 USER / SELLER / ADMIN / SYSTEM)
+| 항목 | 값 |
+|---|---|
+| 토픽 | `action.log` |
+| groupId | `log-group` *(기존 "admin-action.log"는 폐기)* |
+| Producer | Event (VIEW / DETAIL_VIEW / DWELL_TIME), Commerce (CART_ADD / CART_REMOVE) |
+| Consumer | **Log 서비스** (Fastify/TS, `fastify-log/`) — 별도 스택, Java `common` 모듈 재사용 불가 |
+| PURCHASE 예외 | Log 서비스가 `payment.completed` 추가 구독 → **Kafka 재발행 없이 `log.action_log` 직접 INSERT** |
+
+### 15.2 정책 요약 — 기존 비즈니스 이벤트와의 차이
+
+| 구간 | 기존 비즈니스 이벤트 | `action.log` |
+|---|---|---|
+| Producer acks | `acks=all` | **`acks=0`** (fire-and-forget) |
+| Outbox 패턴 | 필수 | **미사용** (트랜잭션 경계 밖 비동기 발행) |
+| Partition Key | `orderId` / `eventId` | **`userId`** (AI 행동 시퀀스 순서 보장) |
+| `X-Message-Id` 헤더 | 필수 | 미사용 |
+| Consumer dedup | `processed_message` 적용 | **미적용** (상류 `payment.completed`에서 이미 보장) |
+| Consumer AckMode | `MANUAL` + `ExponentialBackOff` + DLT | **수동 offset commit + 예외 시 스킵** (at-most-once) |
+| DLT | 토픽별 존재 | **없음** (손실 허용) |
+| 상태 전이 검증 | `canTransitionTo()` 필수 | 해당 없음 (단순 INSERT) |
+
+### 15.3 결정 사항
+
+- **actionType 7종**: VIEW / DETAIL_VIEW / CART_ADD / CART_REMOVE / PURCHASE / DWELL_TIME / REFUND *(REFUND는 환불 스코프 사전 반영)*
+- **DTO**: 단일 `ActionLogEvent` + nullable 필드 방식 — 검증은 Consumer(Log 서비스)에서 수행. 상세: [kafka-design.md §3 ActionLogEvent](kafka-design.md#actionlogevent-analytics--actionlog-전용)
+- **`actorType` 미추가** (PO 결정 Q1→A): 현 스코프 6종은 전부 USER 행동. Seller/Admin/SYSTEM 로그 수집이 현 로드맵에 없음 → YAGNI
+- **`sessionId` 미추가** (PO 결정 Q2→C): 현 스코프 단순화 우선. AI 분석 품질은 `userId + timestamp` 근사로 대응. 필요 시 V3 마이그레이션으로 재도입
+- **Consumer dedup 미적용**: at-most-once 정책 일관성. Kafka rebalance edge case 시 PURCHASE 중복은 리포트 쿼리(`GROUP BY` / `DISTINCT ON`)로 사후 보정
+- **PURCHASE 처리 방식**: 상류 `payment.completed`는 Outbox + `processed_message` dedup 보장. Log 서비스에서 `action.log` 재발행 없이 직접 INSERT하여 셀프 루프 제거 및 `acks=0` 중간 손실 리스크 회피
+
+### 15.4 구현 체크리스트
+
+구현 체크리스트는 [kafka-impl-plan.md 섹션 3-2 / 3-3 / 3-4](kafka-impl-plan.md) 참조.
