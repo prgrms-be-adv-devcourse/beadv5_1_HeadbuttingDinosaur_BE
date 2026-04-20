@@ -168,7 +168,9 @@ public class PaymentServiceImplTest {
             given(commerceInternalClient.getOrderInfo(EXTERNAL_ORDER_ID)).willReturn(orderInfo);
             given(paymentRepository.save(any(Payment.class)))
                 .willAnswer(invocation -> invocation.getArgument(0));
-            given(paymentRepository.findByOrderId(orderInfo.id())).willReturn(Optional.of(savedPayment));
+            given(paymentRepository.findByOrderId(orderInfo.id()))
+                .willReturn(Optional.empty())
+                .willReturn(Optional.of(savedPayment));
 
             // when
             PaymentReadyResponse response = paymentService.readyPayment(USER_ID, request);
