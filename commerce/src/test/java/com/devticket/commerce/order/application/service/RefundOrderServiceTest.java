@@ -10,6 +10,7 @@ import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.never;
 
 import com.devticket.commerce.common.enums.OrderStatus;
+import com.devticket.commerce.common.enums.PaymentMethod;
 import com.devticket.commerce.common.messaging.KafkaTopics;
 import com.devticket.commerce.common.messaging.MessageDeduplicationService;
 import com.devticket.commerce.common.messaging.event.refund.RefundCompletedEvent;
@@ -17,8 +18,9 @@ import com.devticket.commerce.common.messaging.event.refund.RefundOrderCancelEve
 import com.devticket.commerce.common.messaging.event.refund.RefundOrderCompensateEvent;
 import com.devticket.commerce.common.outbox.OutboxService;
 import com.devticket.commerce.order.domain.model.Order;
-import com.devticket.commerce.order.domain.repository.OrderItemRepository;
 import com.devticket.commerce.order.domain.repository.OrderRepository;
+import com.devticket.commerce.ticket.domain.enums.TicketStatus;
+import com.devticket.commerce.ticket.domain.model.Ticket;
 import com.devticket.commerce.ticket.domain.repository.TicketRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -40,7 +42,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class RefundOrderServiceTest {
 
     @Mock private OrderRepository orderRepository;
-    @Mock private OrderItemRepository orderItemRepository;
     @Mock private TicketRepository ticketRepository;
     @Mock private OutboxService outboxService;
     @Mock private MessageDeduplicationService deduplicationService;
@@ -55,7 +56,7 @@ class RefundOrderServiceTest {
     @BeforeEach
     void setUp() {
         refundOrderService = new RefundOrderService(
-            orderRepository, orderItemRepository, ticketRepository,
+            orderRepository, ticketRepository,
             outboxService, deduplicationService, objectMapper
         );
     }
@@ -88,9 +89,10 @@ class RefundOrderServiceTest {
         @Test
         void PAID_주문을_REFUND_PENDING_으로_전이하고_done_outbox_발행() {
             UUID messageId = UUID.randomUUID();
+            UUID refundId = UUID.randomUUID();
             Order order = orderIn(OrderStatus.PAID);
             RefundOrderCancelEvent event = new RefundOrderCancelEvent(
-                order.getOrderId(), UUID.randomUUID(), 10_000, Instant.now());
+                refundId, order.getOrderId(), true, Instant.now());
             given(deduplicationService.isDuplicate(messageId)).willReturn(false);
             given(orderRepository.findByOrderId(order.getOrderId())).willReturn(Optional.of(order));
 
@@ -124,7 +126,7 @@ class RefundOrderServiceTest {
             UUID messageId = UUID.randomUUID();
             Order order = orderIn(OrderStatus.REFUND_PENDING);
             RefundOrderCancelEvent event = new RefundOrderCancelEvent(
-                order.getOrderId(), UUID.randomUUID(), 10_000, Instant.now());
+                UUID.randomUUID(), order.getOrderId(), true, Instant.now());
             given(deduplicationService.isDuplicate(messageId)).willReturn(false);
             given(orderRepository.findByOrderId(order.getOrderId())).willReturn(Optional.of(order));
 
@@ -143,7 +145,7 @@ class RefundOrderServiceTest {
             UUID messageId = UUID.randomUUID();
             Order order = orderIn(OrderStatus.CANCELLED);
             RefundOrderCancelEvent event = new RefundOrderCancelEvent(
-                order.getOrderId(), UUID.randomUUID(), 10_000, Instant.now());
+                UUID.randomUUID(), order.getOrderId(), true, Instant.now());
             given(deduplicationService.isDuplicate(messageId)).willReturn(false);
             given(orderRepository.findByOrderId(order.getOrderId())).willReturn(Optional.of(order));
 
@@ -161,7 +163,7 @@ class RefundOrderServiceTest {
             UUID messageId = UUID.randomUUID();
             Order order = orderIn(OrderStatus.CREATED);
             RefundOrderCancelEvent event = new RefundOrderCancelEvent(
-                order.getOrderId(), UUID.randomUUID(), 10_000, Instant.now());
+                UUID.randomUUID(), order.getOrderId(), true, Instant.now());
             given(deduplicationService.isDuplicate(messageId)).willReturn(false);
             given(orderRepository.findByOrderId(order.getOrderId())).willReturn(Optional.of(order));
 
@@ -183,7 +185,7 @@ class RefundOrderServiceTest {
             UUID messageId = UUID.randomUUID();
             Order order = orderIn(OrderStatus.REFUND_PENDING);
             RefundOrderCompensateEvent event = new RefundOrderCompensateEvent(
-                order.getOrderId(), "ticket cancel failed", Instant.now());
+                UUID.randomUUID(), order.getOrderId(), "ticket cancel failed", Instant.now());
             given(deduplicationService.isDuplicate(messageId)).willReturn(false);
             given(orderRepository.findByOrderId(order.getOrderId())).willReturn(Optional.of(order));
 
@@ -199,7 +201,7 @@ class RefundOrderServiceTest {
             UUID messageId = UUID.randomUUID();
             Order order = orderIn(OrderStatus.PAID);
             RefundOrderCompensateEvent event = new RefundOrderCompensateEvent(
-                order.getOrderId(), "reason", Instant.now());
+                UUID.randomUUID(), order.getOrderId(), "reason", Instant.now());
             given(deduplicationService.isDuplicate(messageId)).willReturn(false);
             given(orderRepository.findByOrderId(order.getOrderId())).willReturn(Optional.of(order));
 
@@ -215,7 +217,7 @@ class RefundOrderServiceTest {
             UUID messageId = UUID.randomUUID();
             Order order = orderIn(OrderStatus.REFUNDED);
             RefundOrderCompensateEvent event = new RefundOrderCompensateEvent(
-                order.getOrderId(), "reason", Instant.now());
+                UUID.randomUUID(), order.getOrderId(), "reason", Instant.now());
             given(deduplicationService.isDuplicate(messageId)).willReturn(false);
             given(orderRepository.findByOrderId(order.getOrderId())).willReturn(Optional.of(order));
 
@@ -232,20 +234,32 @@ class RefundOrderServiceTest {
     class ProcessRefundCompleted {
 
         @Test
-        void REFUND_PENDING_에서_REFUNDED_로_최종_확정_및_금액_차감() {
+        void REFUND_PENDING_에서_REFUNDED_로_최종_확정_및_금액_차감_및_티켓_일괄_REFUNDED() {
             UUID messageId = UUID.randomUUID();
             Order order = orderIn(OrderStatus.REFUND_PENDING);
             int before = order.getTotalAmount();
+
+            Ticket t1 = Ticket.create(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
+            Ticket t2 = Ticket.create(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
+            setTicketStatus(t1, TicketStatus.CANCELLED);
+            setTicketStatus(t2, TicketStatus.CANCELLED);
+
             RefundCompletedEvent event = new RefundCompletedEvent(
-                order.getOrderId(), List.of(), 10_000, Instant.now());
+                UUID.randomUUID(), order.getOrderId(), UUID.randomUUID(), UUID.randomUUID(),
+                PaymentMethod.PG, 10_000, 100, Instant.now());
+
             given(deduplicationService.isDuplicate(messageId)).willReturn(false);
             given(orderRepository.findByOrderId(order.getOrderId())).willReturn(Optional.of(order));
+            given(ticketRepository.findAllByOrderIdAndStatus(order.getId(), TicketStatus.CANCELLED))
+                .willReturn(List.of(t1, t2));
 
             refundOrderService.processRefundCompleted(
                 messageId, KafkaTopics.REFUND_COMPLETED, toJson(event));
 
             assertThat(order.getStatus()).isEqualTo(OrderStatus.REFUNDED);
             assertThat(order.getTotalAmount()).isEqualTo(before - 10_000);
+            assertThat(t1.getStatus()).isEqualTo(TicketStatus.REFUNDED);
+            assertThat(t2.getStatus()).isEqualTo(TicketStatus.REFUNDED);
             then(deduplicationService).should().markProcessed(messageId, KafkaTopics.REFUND_COMPLETED);
         }
 
@@ -254,7 +268,8 @@ class RefundOrderServiceTest {
             UUID messageId = UUID.randomUUID();
             Order order = orderIn(OrderStatus.REFUNDED);
             RefundCompletedEvent event = new RefundCompletedEvent(
-                order.getOrderId(), List.of(), 10_000, Instant.now());
+                UUID.randomUUID(), order.getOrderId(), UUID.randomUUID(), UUID.randomUUID(),
+                PaymentMethod.PG, 10_000, 100, Instant.now());
             given(deduplicationService.isDuplicate(messageId)).willReturn(false);
             given(orderRepository.findByOrderId(order.getOrderId())).willReturn(Optional.of(order));
 
@@ -262,6 +277,17 @@ class RefundOrderServiceTest {
                 messageId, KafkaTopics.REFUND_COMPLETED, toJson(event));
 
             then(deduplicationService).should().markProcessed(messageId, KafkaTopics.REFUND_COMPLETED);
+            then(ticketRepository).shouldHaveNoInteractions();
+        }
+    }
+
+    private static void setTicketStatus(Ticket ticket, TicketStatus status) {
+        try {
+            Field field = Ticket.class.getDeclaredField("status");
+            field.setAccessible(true);
+            field.set(ticket, status);
+        } catch (ReflectiveOperationException e) {
+            throw new RuntimeException(e);
         }
     }
 }

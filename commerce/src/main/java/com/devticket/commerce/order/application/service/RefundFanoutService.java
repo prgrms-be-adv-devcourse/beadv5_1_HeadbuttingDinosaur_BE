@@ -8,6 +8,9 @@ import com.devticket.commerce.common.messaging.event.refund.RefundRequestedEvent
 import com.devticket.commerce.common.outbox.OutboxService;
 import com.devticket.commerce.order.domain.model.Order;
 import com.devticket.commerce.order.domain.repository.OrderRepository;
+import com.devticket.commerce.ticket.domain.enums.TicketStatus;
+import com.devticket.commerce.ticket.domain.model.Ticket;
+import com.devticket.commerce.ticket.domain.repository.TicketRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Instant;
@@ -19,13 +22,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Admin 이벤트 강제 취소 / Seller 이벤트 취소 fan-out 처리.
+ * Admin/Seller 이벤트 강제 취소 fan-out.
  *
- * event.force-cancelled 수신 시 해당 eventId 의 PAID Order 를 조회하여
- * orderId 별로 refund.requested Outbox 발행 — 개별 Saga 진입은 Payment Orchestrator 담당.
- *
- * 멱등성: 수신자(Payment Orchestrator) 측 dedup 에 위임.
- * 본 서비스 자체 진입은 event.force-cancelled 메시지 단위로 이미 dedup 됨.
+ * event.force-cancelled 수신 → 해당 eventId 의 PAID Order 조회 →
+ * orderId 별 refund.requested 발행 (refundId Commerce 에서 생성, 원장 upsert 는 Payment 담당).
  */
 @Slf4j
 @Service
@@ -33,6 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class RefundFanoutService {
 
     private final OrderRepository orderRepository;
+    private final TicketRepository ticketRepository;
     private final OutboxService outboxService;
     private final MessageDeduplicationService deduplicationService;
     private final ObjectMapper objectMapper;
@@ -46,7 +47,6 @@ public class RefundFanoutService {
 
         EventForceCancelledEvent event = parsePayload(payload, EventForceCancelledEvent.class);
 
-        // 대량 케이스 대비 페이지네이션은 후속 개선 — 현재는 단일 배치 처리.
         List<Order> orders = orderRepository.findAllByEventIdAndStatus(
             event.eventId(), OrderStatus.PAID);
 
@@ -57,12 +57,34 @@ public class RefundFanoutService {
         }
 
         Instant now = Instant.now();
+        String reason = "event-force-cancelled:" + event.eventId();
+
         for (Order order : orders) {
+            // 대상 티켓 — 이 이벤트에 해당하면서 ISSUED 인 것만
+            List<Ticket> orderTickets = ticketRepository
+                .findAllByOrderIdAndStatus(order.getId(), TicketStatus.ISSUED);
+            List<UUID> ticketIds = orderTickets.stream()
+                .filter(t -> t.getEventId().equals(event.eventId()))
+                .map(Ticket::getTicketId)
+                .toList();
+
+            if (ticketIds.isEmpty()) {
+                log.warn("[event.force-cancelled] ISSUED 티켓 없음 — skip. orderId={}, eventId={}",
+                    order.getOrderId(), event.eventId());
+                continue;
+            }
+
             RefundRequestedEvent request = new RefundRequestedEvent(
+                UUID.randomUUID(),           // refundId — Commerce 생성
+                null,                         // orderRefundId — Payment 가 upsert
                 order.getOrderId(),
                 order.getUserId(),
-                event.reason(),
-                null,
+                order.getPaymentId(),         // payment.completed 수신 시 기록된 값
+                order.getPaymentMethod(),
+                ticketIds,
+                order.getTotalAmount(),       // 전체 환불 금액
+                100,                           // refundRate — 강제 취소는 100%
+                reason,
                 now
             );
             outboxService.save(

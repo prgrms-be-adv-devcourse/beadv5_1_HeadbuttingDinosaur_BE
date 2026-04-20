@@ -53,6 +53,10 @@ public class Order extends BaseEntity {
     @Column(name = "payment_method")
     PaymentMethod paymentMethod;
 
+    // Payment 서비스의 paymentId — payment.completed 수신 시 기록. 환불 Saga 페이로드에 필요.
+    @Column(name = "payment_id")
+    UUID paymentId;
+
     @Column(name = "total_amount")
     int totalAmount;
 
@@ -149,6 +153,13 @@ public class Order extends BaseEntity {
             throw new BusinessException(OrderErrorCode.CANNOT_COMPLETE_PAYMENT);
         }
         this.status = OrderStatus.PAID;
+    }
+
+    // payment.completed 수신 시 paymentId/paymentMethod 기록 — 환불 Saga 페이로드용.
+    public void completePayment(UUID paymentId, PaymentMethod paymentMethod) {
+        completePayment();
+        this.paymentId = paymentId;
+        this.paymentMethod = paymentMethod;
     }
 
     // stock.failed 수신: CREATED → FAILED

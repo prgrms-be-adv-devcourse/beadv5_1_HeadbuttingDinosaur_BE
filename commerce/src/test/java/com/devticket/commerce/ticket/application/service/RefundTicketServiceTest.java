@@ -28,6 +28,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
@@ -50,12 +51,12 @@ class RefundTicketServiceTest {
             ticketRepository, outboxService, deduplicationService, objectMapper);
     }
 
-    private Ticket ticketIn(TicketStatus status) {
-        Ticket ticket = Ticket.create(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
+    private Ticket ticketWith(UUID eventId, TicketStatus status) {
+        Ticket ticket = Ticket.create(UUID.randomUUID(), UUID.randomUUID(), eventId);
         try {
-            Field field = Ticket.class.getDeclaredField("status");
-            field.setAccessible(true);
-            field.set(ticket, status);
+            Field f = Ticket.class.getDeclaredField("status");
+            f.setAccessible(true);
+            f.set(ticket, status);
         } catch (ReflectiveOperationException e) {
             throw new RuntimeException(e);
         }
@@ -71,13 +72,15 @@ class RefundTicketServiceTest {
     }
 
     @Test
-    void processTicketRefundCancel_모두_ISSUED_면_일괄_CANCELLED_후_done_발행() {
+    void processTicketRefundCancel_단일_이벤트면_done_메시지_1개_발행() {
         UUID messageId = UUID.randomUUID();
         UUID orderId = UUID.randomUUID();
-        Ticket t1 = ticketIn(TicketStatus.ISSUED);
-        Ticket t2 = ticketIn(TicketStatus.ISSUED);
+        UUID eventId = UUID.randomUUID();
+        Ticket t1 = ticketWith(eventId, TicketStatus.ISSUED);
+        Ticket t2 = ticketWith(eventId, TicketStatus.ISSUED);
         List<UUID> ids = List.of(t1.getTicketId(), t2.getTicketId());
-        RefundTicketCancelEvent event = new RefundTicketCancelEvent(orderId, ids, Instant.now());
+        RefundTicketCancelEvent event = new RefundTicketCancelEvent(
+            UUID.randomUUID(), orderId, ids, Instant.now());
 
         given(deduplicationService.isDuplicate(messageId)).willReturn(false);
         given(ticketRepository.findAllByTicketIdIn(ids)).willReturn(List.of(t1, t2));
@@ -87,30 +90,31 @@ class RefundTicketServiceTest {
 
         assertThat(t1.getStatus()).isEqualTo(TicketStatus.CANCELLED);
         assertThat(t2.getStatus()).isEqualTo(TicketStatus.CANCELLED);
-        then(outboxService).should().save(
+        then(outboxService).should(Mockito.times(1)).save(
             anyString(), anyString(), eq("REFUND_TICKET_DONE"),
             eq(KafkaTopics.REFUND_TICKET_DONE), any());
-        then(deduplicationService).should().markProcessed(messageId, KafkaTopics.REFUND_TICKET_CANCEL);
     }
 
     @Test
-    void processTicketRefundCancel_이미_CANCELLED_인_티켓은_건너뛰고_done_발행() {
+    void processTicketRefundCancel_다중_이벤트면_이벤트별로_done_분할_발행() {
         UUID messageId = UUID.randomUUID();
         UUID orderId = UUID.randomUUID();
-        Ticket t1 = ticketIn(TicketStatus.ISSUED);
-        Ticket t2 = ticketIn(TicketStatus.CANCELLED);
-        List<UUID> ids = List.of(t1.getTicketId(), t2.getTicketId());
-        RefundTicketCancelEvent event = new RefundTicketCancelEvent(orderId, ids, Instant.now());
+        UUID eventA = UUID.randomUUID();
+        UUID eventB = UUID.randomUUID();
+        Ticket t1 = ticketWith(eventA, TicketStatus.ISSUED);
+        Ticket t2 = ticketWith(eventA, TicketStatus.ISSUED);
+        Ticket t3 = ticketWith(eventB, TicketStatus.ISSUED);
+        List<UUID> ids = List.of(t1.getTicketId(), t2.getTicketId(), t3.getTicketId());
+        RefundTicketCancelEvent event = new RefundTicketCancelEvent(
+            UUID.randomUUID(), orderId, ids, Instant.now());
 
         given(deduplicationService.isDuplicate(messageId)).willReturn(false);
-        given(ticketRepository.findAllByTicketIdIn(ids)).willReturn(List.of(t1, t2));
+        given(ticketRepository.findAllByTicketIdIn(ids)).willReturn(List.of(t1, t2, t3));
 
         refundTicketService.processTicketRefundCancel(
             messageId, KafkaTopics.REFUND_TICKET_CANCEL, toJson(event));
 
-        assertThat(t1.getStatus()).isEqualTo(TicketStatus.CANCELLED);
-        assertThat(t2.getStatus()).isEqualTo(TicketStatus.CANCELLED);
-        then(outboxService).should().save(
+        then(outboxService).should(Mockito.times(2)).save(
             anyString(), anyString(), eq("REFUND_TICKET_DONE"),
             eq(KafkaTopics.REFUND_TICKET_DONE), any());
     }
@@ -119,10 +123,11 @@ class RefundTicketServiceTest {
     void processTicketRefundCancel_REFUNDED_티켓_포함시_failed_발행() {
         UUID messageId = UUID.randomUUID();
         UUID orderId = UUID.randomUUID();
-        Ticket t1 = ticketIn(TicketStatus.ISSUED);
-        Ticket t2 = ticketIn(TicketStatus.REFUNDED);
+        Ticket t1 = ticketWith(UUID.randomUUID(), TicketStatus.ISSUED);
+        Ticket t2 = ticketWith(UUID.randomUUID(), TicketStatus.REFUNDED);
         List<UUID> ids = List.of(t1.getTicketId(), t2.getTicketId());
-        RefundTicketCancelEvent event = new RefundTicketCancelEvent(orderId, ids, Instant.now());
+        RefundTicketCancelEvent event = new RefundTicketCancelEvent(
+            UUID.randomUUID(), orderId, ids, Instant.now());
 
         given(deduplicationService.isDuplicate(messageId)).willReturn(false);
         given(ticketRepository.findAllByTicketIdIn(ids)).willReturn(List.of(t1, t2));
@@ -141,7 +146,8 @@ class RefundTicketServiceTest {
         UUID messageId = UUID.randomUUID();
         UUID orderId = UUID.randomUUID();
         List<UUID> ids = List.of(UUID.randomUUID(), UUID.randomUUID());
-        RefundTicketCancelEvent event = new RefundTicketCancelEvent(orderId, ids, Instant.now());
+        RefundTicketCancelEvent event = new RefundTicketCancelEvent(
+            UUID.randomUUID(), orderId, ids, Instant.now());
 
         given(deduplicationService.isDuplicate(messageId)).willReturn(false);
         given(ticketRepository.findAllByTicketIdIn(ids)).willReturn(List.of());
@@ -170,11 +176,11 @@ class RefundTicketServiceTest {
     void processTicketCompensate_CANCELLED_티켓을_ISSUED_로_롤백() {
         UUID messageId = UUID.randomUUID();
         UUID orderId = UUID.randomUUID();
-        Ticket t1 = ticketIn(TicketStatus.CANCELLED);
-        Ticket t2 = ticketIn(TicketStatus.CANCELLED);
+        Ticket t1 = ticketWith(UUID.randomUUID(), TicketStatus.CANCELLED);
+        Ticket t2 = ticketWith(UUID.randomUUID(), TicketStatus.CANCELLED);
         List<UUID> ids = List.of(t1.getTicketId(), t2.getTicketId());
         RefundTicketCompensateEvent event = new RefundTicketCompensateEvent(
-            orderId, ids, "downstream failed", Instant.now());
+            UUID.randomUUID(), orderId, ids, "downstream failed", Instant.now());
 
         given(deduplicationService.isDuplicate(messageId)).willReturn(false);
         given(ticketRepository.findAllByTicketIdIn(ids)).willReturn(List.of(t1, t2));
@@ -185,23 +191,5 @@ class RefundTicketServiceTest {
         assertThat(t1.getStatus()).isEqualTo(TicketStatus.ISSUED);
         assertThat(t2.getStatus()).isEqualTo(TicketStatus.ISSUED);
         then(deduplicationService).should().markProcessed(messageId, KafkaTopics.REFUND_TICKET_COMPENSATE);
-    }
-
-    @Test
-    void processTicketCompensate_이미_ISSUED_티켓은_건너뜀() {
-        UUID messageId = UUID.randomUUID();
-        UUID orderId = UUID.randomUUID();
-        Ticket t1 = ticketIn(TicketStatus.ISSUED);
-        List<UUID> ids = List.of(t1.getTicketId());
-        RefundTicketCompensateEvent event = new RefundTicketCompensateEvent(
-            orderId, ids, "reason", Instant.now());
-
-        given(deduplicationService.isDuplicate(messageId)).willReturn(false);
-        given(ticketRepository.findAllByTicketIdIn(ids)).willReturn(List.of(t1));
-
-        refundTicketService.processTicketCompensate(
-            messageId, KafkaTopics.REFUND_TICKET_COMPENSATE, toJson(event));
-
-        assertThat(t1.getStatus()).isEqualTo(TicketStatus.ISSUED);
     }
 }

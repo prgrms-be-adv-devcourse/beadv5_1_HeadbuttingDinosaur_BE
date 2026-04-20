@@ -409,8 +409,8 @@ public class OrderService implements OrderUsecase {
                     "Invalid transition: " + order.getStatus() + " -> PAID, orderId=" + event.orderId());
         }
 
-        // Step 3. 비즈니스 로직
-        order.completePayment();
+        // Step 3. 비즈니스 로직 — paymentId/paymentMethod 기록하면서 PAID 전이
+        order.completePayment(event.paymentId(), event.paymentMethod());
 
         // 티켓 발급 (직접 호출 — @Transactional 프록시 경유 시 rollback-only 오염 방지)
         List<OrderItem> orderItems = orderItemRepository.findAllByOrderId(order.getId());
@@ -419,13 +419,11 @@ public class OrderService implements OrderUsecase {
             log.error("[processPaymentCompleted] 티켓 발급 실패 — OrderItem 없음. orderId={}", event.orderId());
             order.cancel();
 
-            List<TicketIssueFailedEvent.FailedItem> failedItems = List.of();
-
             TicketIssueFailedEvent failedEvent = new TicketIssueFailedEvent(
                     event.orderId(),
                     event.userId(),
                     event.paymentId(),
-                    failedItems,
+                    List.of(),
                     event.totalAmount(),
                     "OrderItem not found",
                     Instant.now()
@@ -455,15 +453,11 @@ public class OrderService implements OrderUsecase {
                     event.orderId(), e.getMessage());
             order.cancel();
 
-            List<TicketIssueFailedEvent.FailedItem> failedItems = orderItems.stream()
-                    .map(item -> new TicketIssueFailedEvent.FailedItem(item.getEventId(), item.getQuantity()))
-                    .toList();
-
             TicketIssueFailedEvent failedEvent = new TicketIssueFailedEvent(
                     event.orderId(),
                     event.userId(),
                     event.paymentId(),
-                    failedItems,
+                    List.of(),
                     event.totalAmount(),
                     e.getMessage(),
                     Instant.now()
@@ -718,6 +712,47 @@ public class OrderService implements OrderUsecase {
             .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
 
         return InternalOrderItemResponse.from(orderItem);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public com.devticket.commerce.order.presentation.dto.res.InternalOrderTicketsResponse
+        getOrderTickets(UUID orderId, com.devticket.commerce.ticket.domain.enums.TicketStatus status) {
+
+        Order order = orderRepository.findByOrderId(orderId)
+            .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
+
+        List<Ticket> tickets = (status == null)
+            ? ticketRepository.findAllByOrderId(order.getId())
+            : ticketRepository.findAllByOrderIdAndStatus(order.getId(), status);
+
+        // price 조회용 OrderItem map — orderItemId → OrderItem
+        Map<UUID, OrderItem> itemsByOrderItemId = orderItemRepository.findAllByOrderId(order.getId())
+            .stream()
+            .collect(Collectors.toMap(OrderItem::getOrderItemId, oi -> oi));
+
+        List<com.devticket.commerce.order.presentation.dto.res.InternalOrderTicketsResponse.TicketItem> ticketItems = tickets.stream()
+            .map(t -> new com.devticket.commerce.order.presentation.dto.res.InternalOrderTicketsResponse.TicketItem(
+                t.getTicketId(),
+                t.getEventId(),
+                itemsByOrderItemId.getOrDefault(t.getOrderItemId(),
+                    OrderItem.builder().price(0).build()).getPrice(),
+                t.getStatus()
+            ))
+            .toList();
+
+        int remainingAmount = ticketItems.stream()
+            .mapToInt(com.devticket.commerce.order.presentation.dto.res.InternalOrderTicketsResponse.TicketItem::amount)
+            .sum();
+
+        return new com.devticket.commerce.order.presentation.dto.res.InternalOrderTicketsResponse(
+            order.getOrderId(),
+            order.getUserId(),
+            order.getPaymentId(),
+            order.getTotalAmount(),
+            remainingAmount,
+            ticketItems
+        );
     }
 
 }

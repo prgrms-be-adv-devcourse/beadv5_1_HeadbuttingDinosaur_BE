@@ -5,7 +5,9 @@ import com.devticket.commerce.order.application.usecase.OrderUsecase;
 import com.devticket.commerce.order.presentation.dto.res.InternalOrderInfoResponse;
 import com.devticket.commerce.order.presentation.dto.res.InternalOrderItemResponse;
 import com.devticket.commerce.order.presentation.dto.res.InternalOrderItemsResponse;
+import com.devticket.commerce.order.presentation.dto.res.InternalOrderTicketsResponse;
 import com.devticket.commerce.order.presentation.dto.res.InternalSettlementDataResponse;
+import com.devticket.commerce.ticket.domain.enums.TicketStatus;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -74,6 +76,15 @@ public class InternalOrderController {
     public ResponseEntity<InternalOrderItemResponse> getOrderItemByTicketId(@PathVariable Long ticketId) {
         InternalOrderItemResponse response = orderUsecase.getOrderItemByTicketId(ticketId);
         return ResponseEntity.ok(response);
+    }
+
+    // Payment -> Commerce : 오더 환불 산정용 티켓 목록 조회.
+    // status 쿼리로 필터 (예: ISSUED) — 없으면 전체 티켓 반환.
+    @GetMapping("/orders/{orderId}/tickets")
+    public ResponseEntity<InternalOrderTicketsResponse> getOrderTickets(
+            @PathVariable UUID orderId,
+            @RequestParam(required = false) TicketStatus status) {
+        return ResponseEntity.ok(orderUsecase.getOrderTickets(orderId, status));
     }
 
     // 환불 완료 HTTP 동기 엔드포인트 제거 — refund.completed Kafka 경로로 대체됨.

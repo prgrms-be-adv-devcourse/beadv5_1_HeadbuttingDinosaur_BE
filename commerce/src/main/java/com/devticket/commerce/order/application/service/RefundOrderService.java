@@ -12,8 +12,6 @@ import com.devticket.commerce.common.messaging.event.refund.RefundOrderFailedEve
 import com.devticket.commerce.common.outbox.OutboxService;
 import com.devticket.commerce.order.domain.exception.OrderErrorCode;
 import com.devticket.commerce.order.domain.model.Order;
-import com.devticket.commerce.order.domain.model.OrderItem;
-import com.devticket.commerce.order.domain.repository.OrderItemRepository;
 import com.devticket.commerce.order.domain.repository.OrderRepository;
 import com.devticket.commerce.ticket.domain.enums.TicketStatus;
 import com.devticket.commerce.ticket.domain.model.Ticket;
@@ -22,9 +20,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -41,7 +37,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class RefundOrderService {
 
     private final OrderRepository orderRepository;
-    private final OrderItemRepository orderItemRepository;
     private final TicketRepository ticketRepository;
     private final OutboxService outboxService;
     private final MessageDeduplicationService deduplicationService;
@@ -66,7 +61,7 @@ public class RefundOrderService {
         // 3분류 ① 멱등 스킵
         if (order.getStatus() == OrderStatus.REFUND_PENDING) {
             log.info("[refund.order.cancel] 멱등 스킵 — 이미 REFUND_PENDING. orderId={}", event.orderId());
-            publishOrderDone(event.orderId(), event.refundAmount());
+            publishOrderDone(event.refundId(), event.orderId());
             deduplicationService.markProcessed(messageId, topic);
             return;
         }
@@ -76,7 +71,7 @@ public class RefundOrderService {
             if (isExplainableSkip(order.getStatus())) {
                 log.warn("[refund.order.cancel] 정책적 스킵 — orderId={}, 현재상태={}",
                     event.orderId(), order.getStatus());
-                publishOrderFailed(event.orderId(),
+                publishOrderFailed(event.refundId(), event.orderId(),
                     "Order already in terminal state: " + order.getStatus());
                 deduplicationService.markProcessed(messageId, topic);
                 return;
@@ -88,7 +83,7 @@ public class RefundOrderService {
         }
 
         order.requestRefund();
-        publishOrderDone(event.orderId(), event.refundAmount());
+        publishOrderDone(event.refundId(), event.orderId());
         deduplicationService.markProcessed(messageId, topic);
     }
 
@@ -107,7 +102,6 @@ public class RefundOrderService {
         Order order = orderRepository.findByOrderId(event.orderId())
             .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
 
-        // ① 멱등 스킵 — 이미 PAID 로 롤백된 상태
         if (order.getStatus() == OrderStatus.PAID) {
             log.info("[refund.order.compensate] 멱등 스킵 — 이미 PAID. orderId={}", event.orderId());
             deduplicationService.markProcessed(messageId, topic);
@@ -115,7 +109,6 @@ public class RefundOrderService {
         }
 
         if (!order.canTransitionTo(OrderStatus.PAID)) {
-            // ② 정책적 스킵 — 이미 종단 상태(REFUNDED 등)
             if (order.getStatus() == OrderStatus.REFUNDED
                 || order.getStatus() == OrderStatus.CANCELLED
                 || order.getStatus() == OrderStatus.FAILED) {
@@ -124,7 +117,6 @@ public class RefundOrderService {
                 deduplicationService.markProcessed(messageId, topic);
                 return;
             }
-            // ③ 이상 상태
             throw new IllegalStateException(String.format(
                 "[refund.order.compensate] 허용되지 않는 전이: %s → PAID, orderId=%s",
                 order.getStatus(), event.orderId()));
@@ -135,9 +127,10 @@ public class RefundOrderService {
     }
 
     /**
-     * refund.completed 수신: REFUND_PENDING → REFUNDED 최종 확정.
-     * Ticket CANCELLED → REFUNDED 일괄 전이 + OrderItem 수량 차감 + Order 총액 차감.
-     * Event 재고 복구는 Payment↔Event refund.stock.restore 경로가 담당하므로 여기서는 제외.
+     * refund.completed 수신: Saga 최종 확정.
+     *  - Order REFUND_PENDING → REFUNDED + 총액 차감
+     *  - 해당 Order 의 CANCELLED 티켓 → REFUNDED 일괄 전이
+     * 페이로드에 ticketIds 없음 — orderId 기준으로 찾아 일괄 전이.
      */
     @Transactional
     public void processRefundCompleted(UUID messageId, String topic, String payload) {
@@ -151,7 +144,6 @@ public class RefundOrderService {
         Order order = orderRepository.findByOrderId(event.orderId())
             .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
 
-        // ① 멱등 스킵
         if (order.getStatus() == OrderStatus.REFUNDED) {
             log.info("[refund.completed] 멱등 스킵 — 이미 REFUNDED. orderId={}", event.orderId());
             deduplicationService.markProcessed(messageId, topic);
@@ -159,43 +151,25 @@ public class RefundOrderService {
         }
 
         if (!order.canTransitionTo(OrderStatus.REFUNDED)) {
-            // ② 정책적 스킵
             if (order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.FAILED) {
                 log.warn("[refund.completed] 정책적 스킵 — orderId={}, 현재상태={}",
                     event.orderId(), order.getStatus());
                 deduplicationService.markProcessed(messageId, topic);
                 return;
             }
-            // ③ 이상 상태
             throw new IllegalStateException(String.format(
                 "[refund.completed] 허용되지 않는 전이: %s → REFUNDED, orderId=%s",
                 order.getStatus(), event.orderId()));
         }
 
-        // Order 최종 확정
         order.completeRefund();
         order.adjustAmountForRefund(event.refundAmount());
 
-        // 대상 티켓 최종 확정 + OrderItem 수량 차감
-        List<UUID> ticketIds = event.ticketIds();
-        if (ticketIds != null && !ticketIds.isEmpty()) {
-            List<Ticket> tickets = ticketRepository.findAllByTicketIdIn(ticketIds);
-
-            Map<UUID, OrderItem> orderItemsById = orderItemRepository
-                .findAllByOrderId(order.getId())
-                .stream()
-                .collect(Collectors.toMap(OrderItem::getOrderItemId, oi -> oi));
-
-            for (Ticket ticket : tickets) {
-                if (ticket.getStatus() == TicketStatus.REFUNDED) {
-                    continue;
-                }
-                ticket.refundTicket();
-                OrderItem orderItem = orderItemsById.get(ticket.getOrderItemId());
-                if (orderItem != null) {
-                    orderItem.refundOneQuantity();
-                }
-            }
+        // CANCELLED 티켓 일괄 REFUNDED 전이 — 전액 환불 경로 가정 (REFUND_PENDING 도달 = 전액 환불)
+        List<Ticket> cancelledTickets = ticketRepository
+            .findAllByOrderIdAndStatus(order.getId(), TicketStatus.CANCELLED);
+        for (Ticket ticket : cancelledTickets) {
+            ticket.refundTicket();
         }
 
         deduplicationService.markProcessed(messageId, topic);
@@ -203,23 +177,23 @@ public class RefundOrderService {
 
     //---- 내부 헬퍼 ----
 
-    private void publishOrderDone(UUID orderId, int refundAmount) {
+    private void publishOrderDone(UUID refundId, UUID orderId) {
         outboxService.save(
             orderId.toString(),
             orderId.toString(),
             "REFUND_ORDER_DONE",
             KafkaTopics.REFUND_ORDER_DONE,
-            new RefundOrderDoneEvent(orderId, refundAmount, Instant.now())
+            new RefundOrderDoneEvent(refundId, orderId, Instant.now())
         );
     }
 
-    private void publishOrderFailed(UUID orderId, String reason) {
+    private void publishOrderFailed(UUID refundId, UUID orderId, String reason) {
         outboxService.save(
             orderId.toString(),
             orderId.toString(),
             "REFUND_ORDER_FAILED",
             KafkaTopics.REFUND_ORDER_FAILED,
-            new RefundOrderFailedEvent(orderId, reason, Instant.now())
+            new RefundOrderFailedEvent(refundId, orderId, reason, Instant.now())
         );
     }
 
