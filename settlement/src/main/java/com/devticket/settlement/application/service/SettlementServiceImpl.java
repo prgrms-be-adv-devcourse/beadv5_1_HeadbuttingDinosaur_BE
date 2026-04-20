@@ -3,22 +3,36 @@ package com.devticket.settlement.application.service;
 import com.devticket.settlement.common.exception.BusinessException;
 import com.devticket.settlement.common.exception.CommonErrorCode;
 import com.devticket.settlement.domain.exception.SettlementErrorCode;
+import com.devticket.settlement.domain.model.FeePolicy;
 import com.devticket.settlement.domain.model.Settlement;
 import com.devticket.settlement.domain.model.SettlementItem;
+import com.devticket.settlement.domain.model.SettlementItemStatus;
+import com.devticket.settlement.domain.repository.FeePolicyRepository;
 import com.devticket.settlement.domain.repository.SettlementItemRepository;
 import com.devticket.settlement.domain.repository.SettlementRepository;
 import com.devticket.settlement.infrastructure.client.SettlementToCommerceClient;
+import com.devticket.settlement.infrastructure.client.SettlementToEventClient;
 import com.devticket.settlement.infrastructure.client.dto.req.InternalSettlementDataRequest;
+import com.devticket.settlement.infrastructure.client.dto.res.EndedEventResponse;
+import com.devticket.settlement.infrastructure.client.dto.res.EventTicketSettlementResponse;
 import com.devticket.settlement.infrastructure.client.dto.res.InternalSettlementDataResponse;
 import com.devticket.settlement.presentation.dto.EventItemResponse;
 import com.devticket.settlement.presentation.dto.SellerSettlementDetailResponse;
 import com.devticket.settlement.presentation.dto.SettlementResponse;
+import com.devticket.settlement.presentation.dto.SettlementTargetPreviewResponse;
+import com.devticket.settlement.presentation.dto.SettlementTargetPreviewResponse.EventSettlementPreview;
+import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -26,7 +40,9 @@ public class SettlementServiceImpl implements SettlementService {
 
     private final SettlementRepository settlementRepository;
     private final SettlementItemRepository settlementItemRepository;
+    private final FeePolicyRepository feePolicyRepository;
     private final SettlementToCommerceClient settlementToCommerceClient;
+    private final SettlementToEventClient settlementToEventClient;
 
     @Override
     public InternalSettlementDataResponse fetchSettlementData(UUID sellerId, String periodStart, String periodEnd) {
@@ -34,7 +50,6 @@ public class SettlementServiceImpl implements SettlementService {
         return settlementToCommerceClient.getSettlementData(request);
     }
 
-    // 정산 내역 목록 조회
     @Override
     public List<SettlementResponse> getSellerSettlements(UUID sellerId) {
         List<Settlement> settlements = settlementRepository.findBySellerId(sellerId);
@@ -43,8 +58,6 @@ public class SettlementServiceImpl implements SettlementService {
             .toList();
     }
 
-
-    // 정산 내역 상세 조회
     @Override
     public SellerSettlementDetailResponse getSellerSettlementDetail(UUID sellerId, UUID settlementId) {
         Settlement settlement = settlementRepository.findBySettlementId(settlementId)
@@ -58,17 +71,108 @@ public class SettlementServiceImpl implements SettlementService {
         return toResponse(settlement, settlementItems);
     }
 
+    /**
+     * Event 서비스 → Commerce 서비스 실제 API 호출 후
+     * Platform Fee 수수료를 적용하여 orderItem 단위로 SettlementItem을 저장한다.
+     * orderItemId 기준으로 중복된 항목은 저장하지 않고 SKIPPED로 표기한다.
+     */
+    @Override
+    @Transactional
+    public SettlementTargetPreviewResponse previewSettlementTarget(LocalDate targetDate) {
+        // 1. Platform Fee 정책 조회
+        FeePolicy feePolicy = feePolicyRepository.findByName("PLATFORM_FEE")
+            .orElseThrow(() -> new BusinessException(SettlementErrorCode.FEE_POLICY_NOT_FOUND));
+        log.info("[previewSettlementTarget] FeePolicy - name: {}, feeValue: {}",
+            feePolicy.getName(), feePolicy.getFeeValue());
 
-    //    사용자 인가 확인 메서드
+        // 2. Event 서비스: 해당 날짜에 종료된 이벤트 목록 조회
+        log.info("[previewSettlementTarget] Event 서비스 호출 - targetDate: {}", targetDate);
+        List<EndedEventResponse> endedEvents = settlementToEventClient.getEndedEvents(targetDate);
+        log.info("[previewSettlementTarget] 종료된 이벤트 {}건 조회됨", endedEvents.size());
+
+        if (endedEvents.isEmpty()) {
+            return new SettlementTargetPreviewResponse(
+                targetDate.toString(), 0, 0, 0,
+                feePolicy.getName(), feePolicy.getFeeValue().toPlainString(),
+                List.of()
+            );
+        }
+
+        Map<UUID, EndedEventResponse> eventMap = endedEvents.stream()
+            .collect(Collectors.toMap(EndedEventResponse::eventId, e -> e));
+
+        // 3. Commerce 서비스: 전체 eventId 리스트를 한 번에 전송
+        List<UUID> eventIds = endedEvents.stream().map(EndedEventResponse::eventId).toList();
+        List<EventTicketSettlementResponse> ticketItems =
+            settlementToCommerceClient.getTicketSettlementData(eventIds);
+        log.info("[previewSettlementTarget] Commerce 응답 - orderItem 건수: {}", ticketItems.size());
+
+        // 4. orderItem 단위로 수수료 계산 후 저장
+        List<EventSettlementPreview> previews = new ArrayList<>();
+        int savedCount = 0;
+        int skippedCount = 0;
+
+        for (EventTicketSettlementResponse ticketItem : ticketItems) {
+            Long feeAmount = feePolicy.calculateFee(ticketItem.salesAmount());
+            Long settlementAmount = ticketItem.salesAmount() - ticketItem.refundAmount() - feeAmount;
+            EndedEventResponse event = eventMap.get(ticketItem.eventId());
+
+            if (settlementItemRepository.existsByOrderItemId(ticketItem.orderItemId())) {
+                log.warn("[previewSettlementTarget] 중복 스킵 - orderItemId: {}", ticketItem.orderItemId());
+                previews.add(new EventSettlementPreview(
+                    ticketItem.orderItemId(), event.id(), ticketItem.eventId(), event.sellerId(),
+                    ticketItem.salesAmount(), ticketItem.refundAmount(), feeAmount, settlementAmount,
+                    "SKIPPED"
+                ));
+                skippedCount++;
+                continue;
+            }
+
+            SettlementItem item = SettlementItem.builder()
+                .orderItemId(ticketItem.orderItemId())
+                .eventId(event.id())
+                .eventUUID(ticketItem.eventId())
+                .sellerId(event.sellerId())
+                .salesAmount(ticketItem.salesAmount())
+                .refundAmount(ticketItem.refundAmount())
+                .feeAmount(feeAmount)
+                .settlementAmount(settlementAmount)
+                .status(SettlementItemStatus.READY)
+                .build();
+
+            settlementItemRepository.save(item);
+            savedCount++;
+
+            log.info("[previewSettlementTarget] 저장 완료 - orderItemId: {}, eventId: {}, sales: {}, fee: {}, settlement: {}",
+                ticketItem.orderItemId(), ticketItem.eventId(),
+                ticketItem.salesAmount(), feeAmount, settlementAmount);
+
+            previews.add(new EventSettlementPreview(
+                ticketItem.orderItemId(), event.id(), ticketItem.eventId(), event.sellerId(),
+                ticketItem.salesAmount(), ticketItem.refundAmount(), feeAmount, settlementAmount,
+                "SAVED"
+            ));
+        }
+
+        log.info("[previewSettlementTarget] 완료 - 저장: {}건, 중복 스킵: {}건", savedCount, skippedCount);
+        return new SettlementTargetPreviewResponse(
+            targetDate.toString(),
+            endedEvents.size(),
+            savedCount,
+            skippedCount,
+            feePolicy.getName(),
+            feePolicy.getFeeValue().toPlainString(),
+            previews
+        );
+    }
+
+
     private void validateSellerAccess(UUID sellerId, Settlement settlement) {
         if (!sellerId.equals(settlement.getSellerId())) {
             throw new BusinessException(CommonErrorCode.ACCESS_DENIED);
         }
     }
 
-
-    //    dto 변환 메서드 : "toResponse"
-    // 1. Settlement -> SettlementResponse 변환 메서드
     private SettlementResponse toResponse(Settlement settlement) {
         return new SettlementResponse(
             settlement.getSettlementId(),
@@ -83,9 +187,7 @@ public class SettlementServiceImpl implements SettlementService {
         );
     }
 
-    // 2. SettlementItem, settlement -> SellerSettlementDetailResponse 변환 메서드
     private SellerSettlementDetailResponse toResponse(Settlement settlement, List<SettlementItem> settlementItems) {
-        // e
         List<EventItemResponse> eventItems = settlementItems.stream()
             .map(this::toResponse)
             .toList();
@@ -104,7 +206,6 @@ public class SettlementServiceImpl implements SettlementService {
         );
     }
 
-    // 3. SettlementItem -> EventItems
     private EventItemResponse toResponse(SettlementItem settlementItem) {
         return new EventItemResponse(
             settlementItem.getEventId().toString(),
@@ -115,5 +216,4 @@ public class SettlementServiceImpl implements SettlementService {
             settlementItem.getSettlementAmount()
         );
     }
-
 }

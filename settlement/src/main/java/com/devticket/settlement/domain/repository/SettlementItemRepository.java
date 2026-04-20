@@ -10,4 +10,8 @@ public interface SettlementItemRepository {
 
     List<SettlementItem> findBySettlementId(UUID settlementId);
 
+    boolean existsByOrderItemId(UUID orderItemId);
+
+    SettlementItem save(SettlementItem settlementItem);
+
 }

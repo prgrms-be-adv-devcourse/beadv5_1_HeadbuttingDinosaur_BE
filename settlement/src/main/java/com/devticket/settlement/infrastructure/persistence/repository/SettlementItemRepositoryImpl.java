@@ -17,4 +17,14 @@ public class SettlementItemRepositoryImpl implements SettlementItemRepository {
     public List<SettlementItem> findBySettlementId(UUID settlementId) {
         return settlementItemJpaRepository.findBySettlementId(settlementId);
     }
+
+    @Override
+    public boolean existsByOrderItemId(UUID orderItemId) {
+        return settlementItemJpaRepository.existsByOrderItemId(orderItemId);
+    }
+
+    @Override
+    public SettlementItem save(SettlementItem settlementItem) {
+        return settlementItemJpaRepository.save(settlementItem);
+    }
 }
