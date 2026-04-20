@@ -60,6 +60,10 @@ public class SettlementToCommerceClient {
      * Response     : { "items": [ { eventId, orderItemId, salesAmount, refundAmount }, ... ] }
      */
     public List<EventTicketSettlementResponse> getTicketSettlementData(List<UUID> eventIds) {
+        if (eventIds == null || eventIds.isEmpty()) {
+            log.warn("[SettlementToCommerceClient] eventIds가 null 또는 빈 리스트 - 외부 호출 생략");
+            return List.of();
+        }
         try {
             log.info("[SettlementToCommerceClient] getTicketSettlementData - eventIds 수: {}", eventIds.size());
 
