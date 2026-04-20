@@ -11,9 +11,7 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 export async function save(raw: unknown): Promise<void> {
   const event = validateAndParse(raw);
   const logs = toActionLogs(event);
-  for (const log of logs) {
-    await actionLogRepository.insertActionLog(log);
-  }
+  await actionLogRepository.insertActionLogs(logs);
 }
 
 function validateAndParse(raw: unknown): PaymentCompletedEvent {

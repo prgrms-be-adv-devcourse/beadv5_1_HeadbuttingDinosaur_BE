@@ -6,6 +6,7 @@ import { actionLogRepository } from '../../src/repository/action-log.repository'
 vi.mock('../../src/repository/action-log.repository', () => ({
   actionLogRepository: {
     insertActionLog: vi.fn().mockResolvedValue(undefined),
+    insertActionLogs: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
@@ -13,7 +14,7 @@ vi.mock('../../src/config/database', () => ({
   pool: { query: vi.fn() },
 }));
 
-const mockInsert = vi.mocked(actionLogRepository.insertActionLog);
+const mockInsert = vi.mocked(actionLogRepository.insertActionLogs);
 
 const USER_UUID = '550e8400-e29b-41d4-a716-446655440000';
 const ORDER_UUID = '7c9e6679-7425-40de-944b-e07fc1f90ae7';
@@ -45,7 +46,7 @@ describe('PaymentCompletedService', () => {
       await paymentCompletedService.save(baseEvent());
 
       expect(mockInsert).toHaveBeenCalledOnce();
-      expect(mockInsert).toHaveBeenCalledWith(
+      expect(mockInsert).toHaveBeenCalledWith([
         expect.objectContaining({
           userId: USER_UUID,
           eventId: EVENT_UUID_1,
@@ -54,10 +55,10 @@ describe('PaymentCompletedService', () => {
           totalAmount: 100000,
           timestamp: TIMESTAMP,
         }),
-      );
+      ]);
     });
 
-    it('다건 주문 → OrderItem 당 1건 fan-out, totalAmount 중복 방지 위해 null', async () => {
+    it('다건 주문 → 단일 호출에 OrderItem 당 1건 fan-out, totalAmount 중복 방지 위해 null', async () => {
       const event = baseEvent({
         orderItems: [
           { eventId: EVENT_UUID_1, quantity: 2 },
@@ -68,35 +69,31 @@ describe('PaymentCompletedService', () => {
 
       await paymentCompletedService.save(event);
 
-      expect(mockInsert).toHaveBeenCalledTimes(2);
-      expect(mockInsert).toHaveBeenNthCalledWith(
-        1,
+      expect(mockInsert).toHaveBeenCalledOnce();
+      expect(mockInsert).toHaveBeenCalledWith([
         expect.objectContaining({
           eventId: EVENT_UUID_1,
           quantity: 2,
           totalAmount: null,
         }),
-      );
-      expect(mockInsert).toHaveBeenNthCalledWith(
-        2,
         expect.objectContaining({
           eventId: EVENT_UUID_2,
           quantity: 3,
           totalAmount: null,
         }),
-      );
+      ]);
     });
 
     it('PURCHASE 레코드의 unused 필드는 null로 채운다', async () => {
       await paymentCompletedService.save(baseEvent());
 
-      expect(mockInsert).toHaveBeenCalledWith(
+      expect(mockInsert).toHaveBeenCalledWith([
         expect.objectContaining({
           searchKeyword: null,
           stackFilter: null,
           dwellTimeSeconds: null,
         }),
-      );
+      ]);
     });
   });
 
@@ -168,9 +165,9 @@ describe('PaymentCompletedService', () => {
       await paymentCompletedService.save(baseEvent({ totalAmount: 0 }));
 
       expect(mockInsert).toHaveBeenCalledOnce();
-      expect(mockInsert).toHaveBeenCalledWith(
+      expect(mockInsert).toHaveBeenCalledWith([
         expect.objectContaining({ totalAmount: 0 }),
-      );
+      ]);
     });
 
     it('totalAmount 음수 → 에러', async () => {
@@ -188,6 +185,23 @@ describe('PaymentCompletedService', () => {
       await expect(paymentCompletedService.save(baseEvent())).rejects.toThrow(
         'DB connection failed',
       );
+    });
+
+    it('다건 주문 저장은 단일 호출 — 부분 저장 가능성 없음', async () => {
+      mockInsert.mockRejectedValueOnce(new Error('DB connection failed'));
+
+      const event = baseEvent({
+        orderItems: [
+          { eventId: EVENT_UUID_1, quantity: 2 },
+          { eventId: EVENT_UUID_2, quantity: 3 },
+        ],
+        totalAmount: 250000,
+      });
+
+      await expect(paymentCompletedService.save(event)).rejects.toThrow(
+        'DB connection failed',
+      );
+      expect(mockInsert).toHaveBeenCalledOnce();
     });
   });
 });
