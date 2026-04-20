@@ -219,7 +219,8 @@ public class OrderService implements OrderUsecase {
     public InternalOrderInfoResponse getOrderInfo(UUID orderId) {
         Order order = orderRepository.findByOrderId(orderId)
             .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
-        return InternalOrderInfoResponse.from(order);
+        List<OrderItem> orderItems = orderItemRepository.findAllByOrderId(order.getId());
+        return InternalOrderInfoResponse.from(order, orderItems);
     }
 
     @Override

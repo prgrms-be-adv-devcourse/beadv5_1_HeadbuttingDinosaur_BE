@@ -245,7 +245,8 @@ class PaymentCompletedCartIntegrationTest {
 
     private String paymentCompletedPayload(UUID orderId, UUID userId, int totalAmount) throws Exception {
         PaymentCompletedEvent event = new PaymentCompletedEvent(
-                orderId, userId, UUID.randomUUID(), PaymentMethod.PG, totalAmount, Instant.now());
+                orderId, userId, UUID.randomUUID(), PaymentMethod.PG, totalAmount,
+                List.of(), Instant.now());
         return objectMapper.writeValueAsString(event);
     }
 }

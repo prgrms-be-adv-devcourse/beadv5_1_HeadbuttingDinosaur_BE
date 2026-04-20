@@ -8,6 +8,7 @@ import com.devticket.commerce.order.infrastructure.external.client.dto.InternalS
 import com.devticket.commerce.order.infrastructure.external.client.dto.InternalStockAdjustmentResponse;
 import com.devticket.commerce.order.infrastructure.external.client.dto.InternalStockAdjustmentWrapper;
 import com.devticket.commerce.ticket.infrastructure.external.client.dto.InternalBulkEventInfoRequest;
+import com.devticket.commerce.ticket.infrastructure.external.client.dto.InternalBulkEventInfoResponse;
 import com.devticket.commerce.ticket.infrastructure.external.client.dto.InternalEventInfoResponse;
 import java.util.List;
 import java.util.UUID;
@@ -62,9 +63,9 @@ public class OrderToEventClient {
                 .onStatus(HttpStatusCode::isError, (req, res) -> {
                     throw new BusinessException(CommonErrorCode.EXTERNAL_SERVICE_ERROR);
                 })
-                .body(new ParameterizedTypeReference<EventSuccessResponse<List<InternalEventInfoResponse>>>() {
+                .body(new ParameterizedTypeReference<EventSuccessResponse<InternalBulkEventInfoResponse>>() {
                 });
-            return response.data();
+            return response.data().events();
         } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {
