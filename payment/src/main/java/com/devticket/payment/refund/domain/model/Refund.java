@@ -10,6 +10,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.time.LocalDateTime;
 import java.util.UUID;
 import lombok.AccessLevel;
@@ -26,8 +27,15 @@ public class Refund extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Version
+    @Column(name = "version")
+    private Long version;
+
     @Column(name = "refund_id", nullable = false, unique = true)
     private UUID refundId;
+
+    @Column(name = "order_refund_id")
+    private UUID orderRefundId;
 
     @Column(name = "user_id", nullable = false)
     private UUID userId;
@@ -68,8 +76,20 @@ public class Refund extends BaseEntity {
         Integer amount,
         Integer refundRate
     ) {
+        return create(null, orderId, paymentId, userId, amount, refundRate);
+    }
+
+    public static Refund create(
+        UUID orderRefundId,
+        UUID orderId,
+        UUID paymentId,
+        UUID userId,
+        Integer amount,
+        Integer refundRate
+    ) {
         Refund refund = new Refund();
         refund.refundId = UUID.randomUUID();
+        refund.orderRefundId = orderRefundId;
         refund.orderId = orderId;
         refund.paymentId = paymentId;
         refund.userId = userId;
