@@ -533,6 +533,7 @@ CREATE TABLE processed_message (
 
 > 본 프로젝트는 별도 Stock 엔티티 없이 `Event.remainingQuantity` 단일 컬럼으로 재고 관리.
 > 현 스코프(`payment.failed` → 재고 복구)는 **dedup + EventStatus 정책적 스킵(CANCELLED/FORCE_CANCELLED) + Event `@Version`** 3중 방어선으로 멱등성 충족.
+> EventStatus 정책적 스킵 판정은 상태 머신 기반 `EventInternalService.resolveReason()` (hotfix `f2d7377`)과 동일 정책(취소류 > 품절 > 판매종료)을 공유한다.
 > Stock enum / `canTransitionTo()` / 별도 `@Version` 도입은 Refund Saga(`refund.stock.restore`) 진입 시 도메인 모델 변경 동반 여부와 함께 재논의.
 >
 > `RESERVED` 상태 미채택 근거: Event Consumer 내에서 재고 차감이 원자적으로 즉시 발생하므로 "차감 중" 중간 상태가 생길 틈이 없음. RESERVED는 차감과 확정 사이에 시간 간격이 있는 2단계 구조일 때만 필요 — 이 프로젝트는 1단계 즉시 차감 방식 채택. 비관적 락(`PESSIMISTIC_WRITE`)으로 동시성 제어.
@@ -580,7 +581,10 @@ if (!order.canTransitionTo(targetStatus)) {
 }
 ```
 
-> **현재 상태: 미구현** — Order·Payment 도메인 모두 `canTransitionTo()` 없음. Kafka Consumer 구현 전 반드시 추가 필요.
+> **현재 상태:**
+> - **Order**: `canTransitionTo()` 미구현 — Kafka Consumer 구현 전 추가 필요
+> - **Payment**: `PaymentStatus.canTransitionTo()` 구현 완료 + `approve()` / `fail()` / `cancel()` / `refund()` 내부 가드 호출 완료
+> - **Event**: 표준 `canTransitionTo()` 형태는 미구현이나, 부분 가드 메서드(`Event.canBeUpdated()`, `canBeCancelled()`, `cancel()`) 및 상태 머신 기반 `EventInternalService.resolveReason()` (hotfix `f2d7377` — CANCELLED/FORCE_CANCELLED → SOLD_OUT → SALE_ENDED 우선순위)로 현재 스코프(`payment.failed` 수신 시 정책적 스킵)는 커버됨. Refund Saga(`refund.stock.restore`) 진입 시 Stock 도메인 모델 변경과 함께 재논의.
 
 ---
 
@@ -1049,20 +1053,28 @@ topic: event.force-cancelled  → DLT: event.force-cancelled.DLT
 ### Event (신규 적용)
 
 **구현 완료**
-- [x] ✅ `KafkaTopics` 상수 클래스 신규 생성 (`infrastructure/messaging/KafkaTopics.java`) — Consumer/Producer 토픽 모두 선반영
-- [x] ✅ `MessageDeduplicationService` 구현 + `processed_message` 테이블 (`topic` 컬럼 포함, schema=`event`)
-- [x] ✅ `payment.failed` Consumer 구현 (`PaymentFailedConsumer` + `StockRestoreService`) — dedup, EventStatus 정책적 스킵, 비관적 락 정렬 조회, `markProcessed()` 트랜잭션 내부, `@Version` / UNIQUE 충돌 핸들링
-- [x] ✅ `Event` 엔티티 낙관적 락 (`@Version`) 적용
+- [x] ✅ `KafkaTopics` 상수 클래스 (`common/messaging/KafkaTopics.java`) — Consumer/Producer 토픽 모두 선반영
+  > ⚠️ `infrastructure/messaging/KafkaTopics.java` 사본이 로컬 untracked로 존재 — 사용처 없음, 후속 정리 필요
+- [x] ✅ `JacksonConfig` 빈 (`common/config/JacksonConfig.java`) — Jackson 2 `ObjectMapper` `@Primary`, `JavaTimeModule` + `WRITE_DATES_AS_TIMESTAMPS` disable
+  > 참고: `StockRestoreService`는 Jackson 3(`tools.jackson`) `JsonMapper`도 병행 DI. Spring Boot 4 auto-config이 자동 등록 — Jackson 2/3 공존 상태
+- [x] ✅ `KafkaProducerConfig` — `acks=all`, `enable.idempotence=true`, `retries=3`, `max.in.flight.requests=5`, StringSerializer
+- [x] ✅ `ShedLockConfig` — `JdbcTemplateLockProvider` + `.usingDbTime()`, `lockAtMostFor=30s`
 - [x] ✅ `KafkaConsumerConfig` — `ExponentialBackOff(2→4→8초, 3회)` + `AckMode.MANUAL`
-- [x] ✅ `PaymentFailedEvent` record (`infrastructure/messaging/event/`, `List<OrderItem>` 구조)
+- [x] ✅ `MessageDeduplicationService` 구현 + `processed_message` 테이블 (`topic` 컬럼 포함, schema=`event`)
+- [x] ✅ Outbox 패키지 전체 (`common/outbox/`) — `Outbox` 엔티티, `OutboxStatus`, `OutboxEventMessage`, `OutboxRepository`(nextRetryAt 조건 포함), `OutboxService`(save MANDATORY 트랜잭션), `OutboxScheduler`(`@SchedulerLock`, fixedDelay=3s, 선형 백오프 5회), `OutboxEventProducer`(X-Message-Id 헤더 + partition key)
+- [x] ✅ `Event` 엔티티 낙관적 락 (`@Version`) 적용
+- [x] ✅ 이벤트 DTO record 신규 (`common/messaging/event/`): `OrderCreatedEvent(List<OrderItem>)`, `StockDeductedEvent`, `StockFailedEvent`, `PaymentFailedEvent(List<OrderItem>)` — 모두 UUID/Instant/enum 타입 준수
+  > ⚠️ `infrastructure/messaging/event/PaymentFailedEvent.java` 사본이 로컬 untracked로 존재 — 사용처 없음, 후속 정리 필요
+- [x] ✅ `payment.failed` Consumer (`PaymentFailedConsumer` + `StockRestoreService`) — dedup, EventStatus 정책적 스킵, 비관적 락 정렬 조회, `markProcessed()` 트랜잭션 내부, `@Version` / UNIQUE 충돌 핸들링, groupId `event-payment.failed`
+- [x] ✅ `order.created` Consumer (`OrderCreatedConsumer` + `EventService.processOrderCreated()` + `saveStockFailed()`) — groupId `event-order.created`, dedup → All-or-Nothing 재고 차감 → `stock.deducted` Outbox 저장 → markProcessed 단일 트랜잭션. 재고 차감 실패 시 `StockDeductionException` → 별도 트랜잭션 `saveStockFailed()`로 `stock.failed` 발행
+- [x] ✅ `StockDeductionException` (`domain/exception/`) — `orderId`, `eventId` 필드, `OUT_OF_STOCK`/`PURCHASE_NOT_ALLOWED`/이벤트 미존재 상황 래핑
 
 **미구현**
-- [ ] `JacksonConfig` 추가
-- [ ] Outbox 패턴 구현 (비즈니스 + save 단일 트랜잭션)
-- [ ] ShedLock 적용
-- [ ] 잔여 Consumer dedup 패턴 적용 (`order.created`, `refund.completed`, `refund.stock.restore`)
+- [ ] `shedlock` 테이블 수동 CREATE (DDL 미실행)
+- [ ] 잔여 Consumer dedup 패턴 적용 (`refund.completed`, `refund.stock.restore`)
 - [ ] Consumer 순서 역전 3분류 처리 구현
 - [ ] `StockRestoreConsumer`: `refund.stock.restore` 수신 → 재고 복구 → `refund.stock.done/failed` 발행
+- [ ] 운영 취소 Producer — `event.force-cancelled` / `event.sale-stopped` Outbox 발행 (`EventService.forceCancel()` / `stopSale()`)
 
 **⏸ Refund Saga 단계 결정**
 - [ ] `StockStatus` enum / Stock `canTransitionTo()` / Stock `@Version` (별도 엔티티 도입 여부 포함)
