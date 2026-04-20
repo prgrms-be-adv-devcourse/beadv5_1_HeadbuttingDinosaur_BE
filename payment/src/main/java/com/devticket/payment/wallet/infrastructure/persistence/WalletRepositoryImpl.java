@@ -22,7 +22,7 @@ public class WalletRepositoryImpl implements WalletRepository {
 
     @Override
     public void insertWalletIfAbsent(UUID userId) {
-        walletJpaRepository.insertIfAbsent(userId);
+        walletJpaRepository.insertIfAbsent(UUID.randomUUID(), userId);
     }
 
     @Override
