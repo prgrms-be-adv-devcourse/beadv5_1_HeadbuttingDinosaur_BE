@@ -11,6 +11,7 @@ import com.devticket.event.infrastructure.search.EventSearchRepository;
 import com.devticket.event.presentation.dto.internal.InternalAdminEventResponse;
 import com.devticket.event.presentation.dto.internal.InternalBulkEventInfoResponse;
 import com.devticket.event.presentation.dto.internal.InternalBulkStockAdjustmentRequest;
+import com.devticket.event.presentation.dto.internal.InternalEndedEventsResponse;
 import com.devticket.event.presentation.dto.internal.InternalEventInfoResponse;
 import com.devticket.event.presentation.dto.internal.InternalPagedEventResponse;
 import com.devticket.event.presentation.dto.internal.InternalPurchaseValidationResponse;
@@ -278,8 +279,12 @@ public class EventInternalService {
         if (status == EventStatus.SOLD_OUT) {
             return PurchaseUnavailableReason.SOLD_OUT;
         }
-        LocalDateTime now = LocalDateTime.now();
-        if (now.isBefore(event.getSaleStartAt()) || now.isAfter(event.getSaleEndAt())) {
+        // InstantType으로 수정 필요 그래야 올바른 시간 비교 가능해짐
+        // LocalDateTime now = LocalDateTime.now();
+        // if (now.isBefore(event.getSaleStartAt()) || now.isAfter(event.getSaleEndAt())) {
+        //     return PurchaseUnavailableReason.SALE_ENDED;
+        // }
+        if (status == EventStatus.SALE_ENDED) {
             return PurchaseUnavailableReason.SALE_ENDED;
         }
         if (requestedQuantity > event.getMaxQuantity()) {
@@ -288,6 +293,21 @@ public class EventInternalService {
         return PurchaseUnavailableReason.INSUFFICIENT_STOCK;
     }
 
+    //종료 이벤트조회
+    public InternalEndedEventsResponse getEndedEventsByDate(LocalDate date) {
+        LocalDateTime startOfDay = date.atStartOfDay();
+        LocalDateTime startOfNextDay = date.plusDays(1).atStartOfDay();
+
+        List<InternalEndedEventsResponse.EndedEventItem> items =
+            eventRepository.findAllByEventDate(startOfDay, startOfNextDay)
+                .stream()
+                .map(e -> new InternalEndedEventsResponse.EndedEventItem(
+                    e.getId(), e.getEventId(), e.getSellerId()
+                ))
+                .toList();
+
+        return new InternalEndedEventsResponse(items);
+    }
 
     // 기간 별 판매자 이벤트
     public List<InternalEventInfoResponse> getEventsBySellerForSettlement(UUID sellerId, String periodStart, String periodEnd) {

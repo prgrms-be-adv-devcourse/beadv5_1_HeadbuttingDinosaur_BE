@@ -15,11 +15,20 @@ spring:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
     consumer:
       group-id: devticket-event
-      auto-offset-reset: latest
+      auto-offset-reset: earliest
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
   elasticsearch:
     uris: ${ELASTICSEARCH_URI}
     connection-timeout: 5s
     socket-timeout: 30s
+
+openai:
+  embedding:
+    enabled: true
+    api-key: ${OPENAI_API_KEY}
+    model: text-embedding-3-small
 
 service:
   member:

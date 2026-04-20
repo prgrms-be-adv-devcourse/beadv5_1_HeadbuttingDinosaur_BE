@@ -3,6 +3,7 @@ package com.devticket.event.infrastructure.persistence;
 import com.devticket.event.domain.enums.EventStatus;
 import com.devticket.event.domain.model.Event;
 import jakarta.persistence.LockModeType;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -86,6 +87,14 @@ public interface EventRepository extends JpaRepository<Event, Long> {
         @Param("sellerId") UUID sellerId,
         @Param("periodStart") LocalDateTime periodStart,
         @Param("periodEnd") LocalDateTime periodEnd
+    );
+
+    @Query("SELECT e FROM Event e " +
+        "WHERE e.eventDateTime >= :startOfDay " +
+        "AND e.eventDateTime < :startOfNextDay")
+    List<Event> findAllByEventDate(
+        @Param("startOfDay") LocalDateTime startOfDay,
+        @Param("startOfNextDay") LocalDateTime startOfNextDay
     );
 
 }
