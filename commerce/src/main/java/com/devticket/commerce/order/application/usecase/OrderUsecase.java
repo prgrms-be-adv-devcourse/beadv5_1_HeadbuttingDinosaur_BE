@@ -42,5 +42,10 @@ public interface OrderUsecase {
     // 결제 전 주문 취소
     OrderCancelResponse cancelOrder(UUID userId, UUID orderId);
 
+    // Kafka Consumer 처리용
+    void processPaymentCompleted(UUID messageId, String topic, String payload);
+
+    void processPaymentFailed(UUID messageId, String topic, String payload);
+
 }
 

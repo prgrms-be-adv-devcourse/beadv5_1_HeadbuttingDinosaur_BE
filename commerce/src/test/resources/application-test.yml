@@ -1,0 +1,40 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;NON_KEYWORDS=ORDER;INIT=CREATE SCHEMA IF NOT EXISTS commerce
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        default_schema: commerce
+  kafka:
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+    consumer:
+      group-id: commerce-integration-test
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      enable-auto-commit: false
+    listener:
+      ack-mode: manual
+
+external:
+  event-base-url: http://localhost:8082
+  payment-base-url: http://localhost:8084
+  member-base-url: http://localhost:8081
+
+logging:
+  level:
+    org.hibernate.SQL: WARN
+    com.devticket: INFO
+    org.apache.kafka: WARN
+    org.springframework.kafka: WARN
+    state.change.logger: WARN
+    kafka.server: WARN

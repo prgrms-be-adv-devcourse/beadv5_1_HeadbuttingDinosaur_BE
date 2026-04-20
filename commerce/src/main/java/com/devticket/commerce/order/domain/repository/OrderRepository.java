@@ -22,6 +22,8 @@ public interface OrderRepository {
 
     Page<Order> findAllByUserId(UUID userId, OrderStatus status, Pageable pageable);
 
+    List<Order> findExpiredOrders(OrderStatus status, int expirationMinutes);
+
     // 중복 주문 방어 — userId + cartHash 기준 활성 주문 조회
     Optional<Order> findActiveOrder(UUID userId, String cartHash, List<OrderStatus> activeStatuses);
 
