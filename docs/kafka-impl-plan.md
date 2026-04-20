@@ -285,9 +285,19 @@ sequenceDiagram
 
 **이벤트 DTO** *(타입 수정 완료)*
 - [x] ✅ `PaymentCompletedEvent`: record 타입, `UUID` / `PaymentMethod enum` / `Instant` 적용 완료
+- [x] ✅ `PaymentCompletedEvent`: `List<OrderItem> orderItems` 필드 추가 완료 — Log 서비스 PURCHASE 직접 INSERT(actionLog.md §2 #12) 지원. nested `OrderItem(UUID eventId, int quantity)` 정의. `@JsonIgnoreProperties(ignoreUnknown=true)` 적용으로 하위 Consumer DTO 복사본 동기화 지연 시 DLT 적재 방지
 - [x] ✅ `RefundCompletedEvent`: record 타입, `UUID` / `PaymentMethod enum` / `Instant` 적용 완료
 - [x] ✅ `EventCancelledEvent`: record 타입, `UUID` / `CancelledBy enum` / `Instant` 적용 완료
 - [x] ✅ `PaymentFailedEvent`: record 신규 생성 완료
+
+**PaymentCompletedEvent.orderItems 매핑 체크리스트** *(PURCHASE 수집 체인 블로커 해제)*
+- [x] ✅ `PaymentServiceImpl.confirmPgPayment()`: `order.orderItems()` → `PaymentCompletedEvent.OrderItem` 매핑 후 Outbox 저장
+- [x] ✅ `PaymentServiceImpl.readyPayment()` WALLET 분기: `order.orderItems()`을 `WalletService.processWalletPayment()`로 전달
+- [x] ✅ `WalletServiceImpl.processWalletPayment()`: 파라미터로 받은 `List<OrderItem>` 을 `PaymentCompletedEvent`에 포함하여 Outbox 저장 (null 방어)
+- [x] ✅ `WalletService` 인터페이스: `processWalletPayment()` 시그니처에 `List<PaymentCompletedEvent.OrderItem> orderItems` 파라미터 추가
+- [x] ✅ `WalletPgTimeoutHandler`: `PaymentFailedEvent`만 발행 (PaymentCompletedEvent 미발행) — 별도 수정 불필요
+- [x] ✅ `JacksonConfig`: `DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES = false` 적용 — 글로벌 하위 호환성 보장
+- [ ] **배포 순서 전제**: Commerce / Event DTO 복사본에 `orderItems` 필드 추가가 **Payment Producer 배포 이전에 선배포**되어야 한다 (actionlog 기능 구현 단계 발행 이슈 참조)
 
 **비즈니스 로직**
 - [x] ✅ `WalletServiceImpl.processWalletPayment()`: Wallet 결제 완료 시 `payment.completed` Outbox 이벤트 발행으로 전환 — Commerce가 이벤트 수신하여 Order 상태 전이 처리 (Saga 설계 §9-1 기준)

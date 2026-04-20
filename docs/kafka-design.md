@@ -185,9 +185,17 @@ public record PaymentCompletedEvent(
     UUID paymentId,
     PaymentMethod paymentMethod,   // enum: WALLET | PG | WALLET_PG
     int totalAmount,
+    List<OrderItem> orderItems,    // PURCHASE 레코드 fan-out 키 (Log 서비스 PURCHASE INSERT 용)
     Instant timestamp
-) {}
+) {
+    public record OrderItem(
+        UUID eventId,
+        int quantity
+    ) {}
+}
 ```
+
+> **호환성 주의** — `orderItems` 필드는 Log 서비스의 `action_log.PURCHASE` 직접 INSERT 정책(actionLog.md §2 #12) 지원을 위해 추가된 필드이다. Commerce / Event 등 기존 Consumer 측 DTO 복사본 동기화(`@JsonIgnoreProperties(ignoreUnknown=true)` 또는 DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES=false)가 **Payment Producer 배포 이전에 선행**되어야 한다. 역순 배포 시 역직렬화 실패로 DLT 적재 위험.
 
 ### PaymentFailedEvent
 
