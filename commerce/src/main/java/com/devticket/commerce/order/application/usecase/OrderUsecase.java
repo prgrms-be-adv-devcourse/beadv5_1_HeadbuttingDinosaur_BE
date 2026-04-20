@@ -10,6 +10,7 @@ import com.devticket.commerce.order.presentation.dto.res.OrderCancelResponse;
 import com.devticket.commerce.order.presentation.dto.res.OrderDetailResponse;
 import com.devticket.commerce.order.presentation.dto.res.OrderListResponse;
 import com.devticket.commerce.order.presentation.dto.res.OrderResponse;
+import com.devticket.commerce.order.presentation.dto.res.OrderStatusResponse;
 import java.util.UUID;
 
 public interface OrderUsecase {
@@ -22,6 +23,9 @@ public interface OrderUsecase {
 
     //주문 상세 조회
     OrderDetailResponse getOrderDetail(UUID userId, UUID orderId);
+
+    //주문 상태 폴링
+    OrderStatusResponse getOrderStatus(UUID userId, UUID orderId);
 
     InternalOrderInfoResponse getOrderInfo(UUID orderId);
 

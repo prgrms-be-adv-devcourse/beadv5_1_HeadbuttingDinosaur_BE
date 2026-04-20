@@ -27,8 +27,10 @@ import com.devticket.commerce.order.domain.model.OrderItem;
 import com.devticket.commerce.order.domain.repository.OrderItemRepository;
 import com.devticket.commerce.order.domain.repository.OrderRepository;
 import com.devticket.commerce.order.infrastructure.external.client.OrderToEventClient;
+import com.devticket.commerce.order.domain.exception.OrderErrorCode;
 import com.devticket.commerce.order.presentation.dto.req.CartOrderRequest;
 import com.devticket.commerce.order.presentation.dto.res.OrderResponse;
+import com.devticket.commerce.order.presentation.dto.res.OrderStatusResponse;
 import com.devticket.commerce.ticket.application.usecase.TicketUsecase;
 import com.devticket.commerce.ticket.domain.repository.TicketRepository;
 import com.devticket.commerce.ticket.infrastructure.external.client.dto.InternalEventInfoResponse;
@@ -37,6 +39,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -47,6 +50,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class OrderServiceTest {
@@ -483,6 +487,69 @@ class OrderServiceTest {
     }
 
     // ── ProcessStockFailed ────────────────────────────────────────────
+
+    @Nested
+    class 주문_상태_폴링 {
+
+        @Test
+        void CREATED_상태와_updatedAt을_반환한다() {
+            UUID userId = UUID.randomUUID();
+            Order order = Order.create(userId, 10_000, "hash");
+            LocalDateTime now = LocalDateTime.now();
+            ReflectionTestUtils.setField(order, "updatedAt", now);
+            UUID orderId = UUID.randomUUID();
+
+            given(orderRepository.findByOrderId(orderId)).willReturn(Optional.of(order));
+
+            OrderStatusResponse response = orderService.getOrderStatus(userId, orderId);
+
+            assertThat(response.status()).isEqualTo(OrderStatus.CREATED);
+            assertThat(response.orderId()).isEqualTo(order.getOrderId());
+            assertThat(response.updatedAt()).isEqualTo(now);
+        }
+
+        @Test
+        void PAYMENT_PENDING_상태를_반환한다() {
+            UUID userId = UUID.randomUUID();
+            Order order = Order.create(userId, 10_000, "hash");
+            order.pendingPayment();
+            UUID orderId = UUID.randomUUID();
+
+            given(orderRepository.findByOrderId(orderId)).willReturn(Optional.of(order));
+
+            OrderStatusResponse response = orderService.getOrderStatus(userId, orderId);
+
+            assertThat(response.status()).isEqualTo(OrderStatus.PAYMENT_PENDING);
+        }
+
+        @Test
+        void 존재하지_않는_주문이면_ORDER_NOT_FOUND_예외를_던진다() {
+            UUID userId = UUID.randomUUID();
+            UUID orderId = UUID.randomUUID();
+
+            given(orderRepository.findByOrderId(orderId)).willReturn(Optional.empty());
+
+            assertThatThrownBy(() -> orderService.getOrderStatus(userId, orderId))
+                    .isInstanceOf(BusinessException.class)
+                    .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
+                            .isEqualTo(OrderErrorCode.ORDER_NOT_FOUND));
+        }
+
+        @Test
+        void 다른_유저의_주문이면_ORDER_FORBIDDEN_예외를_던진다() {
+            UUID userId = UUID.randomUUID();
+            UUID otherUserId = UUID.randomUUID();
+            UUID orderId = UUID.randomUUID();
+            Order order = Order.create(otherUserId, 10_000, "hash");
+
+            given(orderRepository.findByOrderId(orderId)).willReturn(Optional.of(order));
+
+            assertThatThrownBy(() -> orderService.getOrderStatus(userId, orderId))
+                    .isInstanceOf(BusinessException.class)
+                    .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
+                            .isEqualTo(OrderErrorCode.ORDER_FORBIDDEN));
+        }
+    }
 
     @Nested
     class ProcessStockFailed {
