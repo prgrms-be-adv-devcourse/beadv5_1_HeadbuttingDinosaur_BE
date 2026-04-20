@@ -173,7 +173,8 @@ public class PaymentServiceImplTest {
                 .willAnswer(invocation -> invocation.getArgument(0));
             // 첫 호출(멱등성 가드): empty → 통과, 두 번째 호출(wallet 처리 후 재조회): SUCCESS Payment 반환
             given(paymentRepository.findByOrderId(orderInfo.id()))
-                .willReturn(Optional.empty(), Optional.of(savedPayment));
+                .willReturn(Optional.empty())
+                .willReturn(Optional.of(savedPayment));
 
             // when
             PaymentReadyResponse response = paymentService.readyPayment(USER_ID, request);

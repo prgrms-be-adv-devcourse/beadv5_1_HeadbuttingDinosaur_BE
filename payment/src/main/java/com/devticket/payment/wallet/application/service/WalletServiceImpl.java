@@ -1,8 +1,6 @@
 package com.devticket.payment.wallet.application.service;
 
 import java.time.Instant;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -10,11 +8,11 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.devticket.payment.common.messaging.KafkaTopics;
@@ -29,7 +27,7 @@ import com.devticket.payment.payment.infrastructure.client.CommerceInternalClien
 import com.devticket.payment.payment.infrastructure.external.PgPaymentClient;
 import com.devticket.payment.payment.infrastructure.external.dto.TossPaymentStatusResponse;
 import com.devticket.payment.wallet.application.event.PaymentCompletedEvent;
-import com.devticket.payment.wallet.domain.WalletPolicyConstants;
+import com.devticket.payment.wallet.application.service.support.WalletChargeTransactionService;
 import com.devticket.payment.wallet.domain.exception.WalletErrorCode;
 import com.devticket.payment.wallet.domain.exception.WalletException;
 import com.devticket.payment.wallet.domain.model.Wallet;
@@ -62,54 +60,31 @@ public class WalletServiceImpl implements WalletService {
     private final PgPaymentClient pgPaymentClient;
     private final OutboxService outboxService;
     private final CommerceInternalClient commerceInternalClient;
+    private final WalletChargeTransactionService walletChargeTransactionService;
 
     // =====================================================================
     // 충전 시작(결제인증에 필요한 WalletCharge생성-chargeId)
     // =====================================================================
 
-    //예치금 충전시 PG사 결제창을 띄우기위한 chargeId와 결제정보 생성.
     @Override
-    @Transactional
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public WalletChargeResponse charge(UUID userId, WalletChargeRequest request,
         String idempotencyKey) {
 
-        //멱등성 체크
+        // 1차 멱등성 체크 (트랜잭션 없음 — 빠른 반환)
         Optional<WalletCharge> existing =
             walletChargeRepository.findByUserIdAndIdempotencyKey(userId, idempotencyKey);
         if (existing.isPresent()) {
             return WalletChargeResponse.from(existing.get());
         }
 
-        //예치금 지갑 조회 — 비관적 락으로 한도 체크 구간 직렬화
-        // 동일 사용자의 동시 충전 요청이 같은 todayTotal을 읽고 모두 한도를 통과하는 오류 수정
-        Wallet wallet;
-        try {
-            wallet = walletRepository.findByUserIdForUpdate(userId)
-                .orElseGet(() -> walletRepository.save(Wallet.create(userId)));
-        } catch (DataIntegrityViolationException e) {
-            wallet = walletRepository.findByUserIdForUpdate(userId)
-                .orElseThrow(() -> e);
-        }
+        // TX1: 비관적 락으로 지갑 조회/생성 → 커밋 후 락 해제
+        walletChargeTransactionService.getWallet(userId);
 
-        //일일 충전 한도 체크
-        LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
-        int todayTotal = walletChargeRepository.sumTodayChargeAmount(userId, startOfDay);
-        if (todayTotal + request.amount() > WalletPolicyConstants.DAILY_CHARGE_LIMIT) {
-            throw new WalletException(WalletErrorCode.DAILY_CHARGE_LIMIT_EXCEEDED);
-        }
-
-        //WalletCharge생성(PG결제를 위한 chargeId생성됨)
-        try {
-            WalletCharge walletCharge = WalletCharge.create(
-                wallet.getId(), userId, request.amount(), idempotencyKey);
-            walletChargeRepository.save(walletCharge);
-            return WalletChargeResponse.from(walletCharge);
-        } catch (DataIntegrityViolationException e) {
-            return walletChargeRepository.findByUserIdAndIdempotencyKey(userId, idempotencyKey)
-                .map(WalletChargeResponse::from)
-                .orElseThrow(() -> e);
-        }
+        // TX2: 2차 멱등성 체크 + 한도 체크 + WalletCharge 생성
+        return walletChargeTransactionService.createChargeWithLimitCheck(userId, request, idempotencyKey);
     }
+
 
     // =====================================================================
     // 충전 승인
@@ -119,12 +94,13 @@ public class WalletServiceImpl implements WalletService {
     // 비관적 락 구간을 최소화하기 위해 3단계로 트랜잭션 분리:
     // 1) 락 + 선점(PENDING→PROCESSING)  2) PG 호출(락 없음)  3) 결과 반영
     @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)  //클래스 레벨에 @Transactional(readOnly = true)가 붙어 있는 상황에서, confirmCharge 메서드만 트랜잭션 없이 실행하도록 설정.
     public WalletChargeConfirmResponse confirmCharge(UUID userId,
         WalletChargeConfirmRequest request) {
 
         // ── 1단계: 비관적 락으로 상태 선점 (PENDING → PROCESSING) ──
         UUID chargeId = parseUUID(request.chargeId());
-        claimChargeForProcessing(userId, chargeId, request.amount());
+        walletChargeTransactionService.claimChargeForProcessing(userId, chargeId, request.amount());
 
         // ── 2단계: 락 해제 후 PG 호출 (DB 커넥션 점유 없음) ──
         PgPaymentConfirmResult pgResult;
@@ -134,7 +110,7 @@ public class WalletServiceImpl implements WalletService {
             ));
         } catch (Exception e) {
             log.error("[WalletCharge] PG 승인 실패 — chargeId={}, error={}", chargeId, e.getMessage());
-            failProcessingCharge(chargeId);
+            walletChargeTransactionService.failProcessingCharge(chargeId);
             return WalletChargeConfirmResponse.from(
                 chargeId.toString(), request.amount(),
                 null, "FAILED", null
@@ -142,75 +118,7 @@ public class WalletServiceImpl implements WalletService {
         }
 
         // ── 3단계: 새 트랜잭션에서 결과 반영 ──
-        return completeChargeAfterPg(userId, chargeId, pgResult);
-    }
-
-    /**
-     * 비관적 락으로 PENDING → PROCESSING 선점. 락은 트랜잭션 종료 시 즉시 해제.
-     */
-    @Transactional
-    public void claimChargeForProcessing(UUID userId, UUID chargeId, Integer expectedAmount) {
-        WalletCharge walletCharge = walletChargeRepository.findByChargeIdForUpdate(chargeId)
-            .orElseThrow(() -> new WalletException(WalletErrorCode.CHARGE_NOT_FOUND));
-
-        if (!walletCharge.getUserId().equals(userId)) {
-            throw new WalletException(WalletErrorCode.CHARGE_NOT_FOUND);
-        }
-        if (!walletCharge.isPending()) {
-            throw new WalletException(WalletErrorCode.CHARGE_NOT_PENDING);
-        }
-        if (!walletCharge.getAmount().equals(expectedAmount)) {
-            throw new WalletException(WalletErrorCode.CHARGE_AMOUNT_MISMATCH);
-        }
-
-        walletCharge.markProcessing();
-    }
-
-    /**
-     * PG 실패 시 PROCESSING → FAILED 원복.
-     */
-    @Transactional
-    public void failProcessingCharge(UUID chargeId) {
-        WalletCharge walletCharge = walletChargeRepository.findByChargeId(chargeId)
-            .orElseThrow(() -> new WalletException(WalletErrorCode.CHARGE_NOT_FOUND));
-        walletCharge.fail();
-    }
-
-    /**
-     * PG 승인 성공 후 잔액 반영 + WalletTransaction 생성.
-     */
-    @Transactional
-    public WalletChargeConfirmResponse completeChargeAfterPg(UUID userId, UUID chargeId,
-        PgPaymentConfirmResult pgResult) {
-        WalletCharge walletCharge = walletChargeRepository.findByChargeId(chargeId)
-            .orElseThrow(() -> new WalletException(WalletErrorCode.CHARGE_NOT_FOUND));
-
-        walletCharge.complete(pgResult.paymentKey());
-        walletRepository.chargeBalanceAtomic(userId, walletCharge.getAmount());
-
-        Wallet wallet = walletRepository.findByUserId(userId)
-            .orElseThrow(() -> new WalletException(WalletErrorCode.WALLET_NOT_FOUND));
-
-        String transactionKey = "CHARGE:" + pgResult.paymentKey();
-        if (walletTransactionRepository.existsByTransactionKey(transactionKey)) {
-            log.warn("[WalletCharge] WalletTransaction 이미 존재 — transactionKey={}", transactionKey);
-            return WalletChargeConfirmResponse.from(
-                walletCharge.getChargeId().toString(), walletCharge.getAmount(),
-                wallet.getBalance(), walletCharge.getStatus().name(), null
-            );
-        }
-        WalletTransaction walletTransaction = WalletTransaction.createCharge(
-            wallet.getId(), userId, transactionKey, walletCharge.getAmount(), wallet.getBalance()
-        );
-        walletTransactionRepository.save(walletTransaction);
-
-        log.info("[WalletCharge] 충전 승인 완료 — chargeId={}, amount={}, balance={}",
-            chargeId, walletCharge.getAmount(), wallet.getBalance());
-
-        return WalletChargeConfirmResponse.from(
-            walletCharge.getChargeId().toString(), walletCharge.getAmount(),
-            wallet.getBalance(), walletCharge.getStatus().name(), walletTransaction.getCreatedAt()
-        );
+        return walletChargeTransactionService.completeChargeAfterPg(userId, chargeId, pgResult);
     }
 
     // =====================================================================

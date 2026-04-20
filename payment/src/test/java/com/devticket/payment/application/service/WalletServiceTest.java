@@ -22,6 +22,7 @@ import com.devticket.payment.payment.infrastructure.client.CommerceInternalClien
 import com.devticket.payment.payment.infrastructure.external.PgPaymentClient;
 import com.devticket.payment.wallet.application.event.PaymentCompletedEvent;
 import com.devticket.payment.wallet.application.service.WalletServiceImpl;
+import com.devticket.payment.wallet.application.service.support.WalletChargeTransactionService;
 import com.devticket.payment.payment.infrastructure.external.dto.TossPaymentStatusResponse;
 import com.devticket.payment.wallet.domain.enums.WalletChargeStatus;
 import com.devticket.payment.wallet.domain.exception.WalletErrorCode;
@@ -32,17 +33,24 @@ import com.devticket.payment.wallet.domain.model.WalletTransaction;
 import com.devticket.payment.wallet.domain.repository.WalletChargeRepository;
 import com.devticket.payment.wallet.domain.repository.WalletRepository;
 import com.devticket.payment.wallet.domain.repository.WalletTransactionRepository;
+import com.devticket.payment.payment.application.dto.PgPaymentConfirmResult;
 import com.devticket.payment.wallet.infrastructure.client.dto.InternalEventOrdersResponse;
 import com.devticket.payment.wallet.presentation.dto.WalletBalanceResponse;
+import com.devticket.payment.wallet.presentation.dto.WalletChargeConfirmRequest;
+import com.devticket.payment.wallet.presentation.dto.WalletChargeConfirmResponse;
+import com.devticket.payment.wallet.presentation.dto.WalletChargeRequest;
+import com.devticket.payment.wallet.presentation.dto.WalletChargeResponse;
 import com.devticket.payment.wallet.presentation.dto.WalletTransactionListResponse;
 import com.devticket.payment.wallet.presentation.dto.WalletWithdrawRequest;
 import com.devticket.payment.wallet.presentation.dto.WalletWithdrawResponse;
+import org.springframework.dao.DataIntegrityViolationException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -68,6 +76,7 @@ class WalletServiceTest {
     @Mock private PgPaymentClient pgPaymentClient;
     @Mock private OutboxService outboxService;
     @Mock private CommerceInternalClient commerceInternalClient;
+    @Mock private WalletChargeTransactionService walletChargeTransactionService;
 
     @Spy
     private ObjectMapper objectMapper = new ObjectMapper()
@@ -78,6 +87,299 @@ class WalletServiceTest {
     private WalletServiceImpl walletService;
 
     private static final UUID USER_ID = UUID.randomUUID();
+
+    @BeforeEach
+    void setUp() {
+        ReflectionTestUtils.setField(walletService, "walletChargeTransactionService", walletChargeTransactionService);
+    }
+
+    // =====================================================================
+    // 충전 요청 (charge)
+    // =====================================================================
+
+    @Nested
+    @DisplayName("충전 요청 (charge)")
+    class Charge {
+
+        private final String IDEMPOTENCY_KEY = UUID.randomUUID().toString();
+
+        @Test
+        void 정상_충전_요청_생성() {
+            // given
+            Wallet wallet = walletWithBalance(0);
+            WalletCharge chargeFixture = pendingCharge(UUID.randomUUID(), USER_ID, 10_000);
+            WalletChargeResponse expectedResponse = WalletChargeResponse.from(chargeFixture);
+
+            given(walletChargeRepository.findByUserIdAndIdempotencyKey(USER_ID, IDEMPOTENCY_KEY))
+                .willReturn(Optional.empty());
+            given(walletChargeTransactionService.getWallet(USER_ID)).willReturn(wallet);
+            given(walletChargeTransactionService.createChargeWithLimitCheck(
+                eq(USER_ID), any(WalletChargeRequest.class), eq(IDEMPOTENCY_KEY)))
+                .willReturn(expectedResponse);
+
+            // when
+            WalletChargeResponse response = walletService.charge(
+                USER_ID, new WalletChargeRequest(10_000), IDEMPOTENCY_KEY);
+
+            // then
+            assertThat(response).isNotNull();
+            assertThat(response.amount()).isEqualTo(10_000);
+            assertThat(response.status()).isEqualTo(WalletChargeStatus.PENDING.name());
+            then(walletChargeTransactionService).should(times(1)).getWallet(USER_ID);
+            then(walletChargeTransactionService).should(times(1))
+                .createChargeWithLimitCheck(eq(USER_ID), any(WalletChargeRequest.class), eq(IDEMPOTENCY_KEY));
+        }
+
+        @Test
+        void 지갑이_없으면_신규_생성_후_충전_요청() {
+            // given: getWallet이 신규 지갑을 생성·반환하고, createChargeWithLimitCheck가 WalletCharge를 생성
+            Wallet newWallet = walletWithBalance(0);
+            WalletCharge chargeFixture = pendingCharge(UUID.randomUUID(), USER_ID, 10_000);
+            WalletChargeResponse expectedResponse = WalletChargeResponse.from(chargeFixture);
+
+            given(walletChargeRepository.findByUserIdAndIdempotencyKey(USER_ID, IDEMPOTENCY_KEY))
+                .willReturn(Optional.empty());
+            given(walletChargeTransactionService.getWallet(USER_ID)).willReturn(newWallet);
+            given(walletChargeTransactionService.createChargeWithLimitCheck(any(), any(), any()))
+                .willReturn(expectedResponse);
+
+            // when
+            WalletChargeResponse response = walletService.charge(
+                USER_ID, new WalletChargeRequest(10_000), IDEMPOTENCY_KEY);
+
+            // then
+            assertThat(response).isNotNull();
+            then(walletChargeTransactionService).should(times(1)).getWallet(USER_ID);
+            then(walletChargeTransactionService).should(times(1)).createChargeWithLimitCheck(any(), any(), any());
+        }
+
+        @Test
+        void 동일_idempotency_key_재요청시_기존_충전건_반환() {
+            // given: 이미 같은 idempotency key로 생성된 충전건이 존재 → 1차 멱등 체크에서 즉시 반환
+            UUID chargeId = UUID.randomUUID();
+            WalletCharge existingCharge = pendingCharge(chargeId, USER_ID, 10_000);
+            given(walletChargeRepository.findByUserIdAndIdempotencyKey(USER_ID, IDEMPOTENCY_KEY))
+                .willReturn(Optional.of(existingCharge));
+
+            // when
+            WalletChargeResponse response = walletService.charge(
+                USER_ID, new WalletChargeRequest(10_000), IDEMPOTENCY_KEY);
+
+            // then: 트랜잭션 서비스 호출 없이 기존 건 반환
+            assertThat(response.chargeId()).isEqualTo(chargeId.toString());
+            then(walletChargeTransactionService).should(never()).getWallet(any());
+            then(walletChargeTransactionService).should(never()).createChargeWithLimitCheck(any(), any(), any());
+        }
+
+        @Test
+        void 일일_한도_초과시_실패() {
+            // given: createChargeWithLimitCheck 내부에서 한도 초과 예외 발생
+            given(walletChargeRepository.findByUserIdAndIdempotencyKey(USER_ID, IDEMPOTENCY_KEY))
+                .willReturn(Optional.empty());
+            given(walletChargeTransactionService.getWallet(USER_ID)).willReturn(walletWithBalance(0));
+            given(walletChargeTransactionService.createChargeWithLimitCheck(any(), any(), any()))
+                .willThrow(new WalletException(WalletErrorCode.DAILY_CHARGE_LIMIT_EXCEEDED));
+
+            // when & then
+            assertThatThrownBy(() ->
+                walletService.charge(USER_ID, new WalletChargeRequest(10_000), IDEMPOTENCY_KEY))
+                .isInstanceOf(WalletException.class)
+                .extracting(e -> ((WalletException) e).getErrorCode())
+                .isEqualTo(WalletErrorCode.DAILY_CHARGE_LIMIT_EXCEEDED);
+        }
+
+        @Test
+        void 일일_한도_경계값_정확히_도달시_성공() {
+            // given: 정확히 한도에 도달 → createChargeWithLimitCheck 정상 반환
+            WalletCharge chargeFixture = pendingCharge(UUID.randomUUID(), USER_ID, 10_000);
+            WalletChargeResponse expectedResponse = WalletChargeResponse.from(chargeFixture);
+
+            given(walletChargeRepository.findByUserIdAndIdempotencyKey(USER_ID, IDEMPOTENCY_KEY))
+                .willReturn(Optional.empty());
+            given(walletChargeTransactionService.getWallet(USER_ID)).willReturn(walletWithBalance(0));
+            given(walletChargeTransactionService.createChargeWithLimitCheck(any(), any(), any()))
+                .willReturn(expectedResponse);
+
+            // when
+            WalletChargeResponse response = walletService.charge(
+                USER_ID, new WalletChargeRequest(10_000), IDEMPOTENCY_KEY);
+
+            // then: 990,000 + 10,000 = 1,000,000 (> 조건 불충족) → 정상 생성
+            assertThat(response).isNotNull();
+            then(walletChargeTransactionService).should(times(1)).createChargeWithLimitCheck(any(), any(), any());
+        }
+
+        @Test
+        void WalletCharge_저장시_중복_예외_발생시_멱등_처리() {
+            // given: createChargeWithLimitCheck 내 2차 멱등 체크에서 기존 충전건 반환
+            UUID chargeId = UUID.randomUUID();
+            WalletCharge existingCharge = pendingCharge(chargeId, USER_ID, 10_000);
+            WalletChargeResponse expectedResponse = WalletChargeResponse.from(existingCharge);
+
+            given(walletChargeRepository.findByUserIdAndIdempotencyKey(USER_ID, IDEMPOTENCY_KEY))
+                .willReturn(Optional.empty());
+            given(walletChargeTransactionService.getWallet(USER_ID)).willReturn(walletWithBalance(0));
+            given(walletChargeTransactionService.createChargeWithLimitCheck(any(), any(), any()))
+                .willReturn(expectedResponse);
+
+            // when
+            WalletChargeResponse response = walletService.charge(
+                USER_ID, new WalletChargeRequest(10_000), IDEMPOTENCY_KEY);
+
+            // then
+            assertThat(response.chargeId()).isEqualTo(chargeId.toString());
+        }
+    }
+
+    // =====================================================================
+    // 충전 승인 (confirmCharge)
+    // =====================================================================
+
+    @Nested
+    @DisplayName("충전 승인 (confirmCharge)")
+    class ConfirmCharge {
+
+        @Test
+        void 정상_PG_확정_잔액_반영_및_거래기록_생성() {
+            // given
+            UUID chargeId = UUID.randomUUID();
+            String paymentKey = "pk-confirm-123";
+            PgPaymentConfirmResult pgResult = new PgPaymentConfirmResult(
+                paymentKey, chargeId.toString(), "카드", "DONE", 10_000, "2024-01-01T12:00:00");
+            WalletChargeConfirmResponse expectedResponse = WalletChargeConfirmResponse.from(
+                chargeId.toString(), 10_000, 60_000, WalletChargeStatus.COMPLETED.name(), null);
+
+            given(pgPaymentClient.confirm(any())).willReturn(pgResult);
+            given(walletChargeTransactionService.completeChargeAfterPg(USER_ID, chargeId, pgResult))
+                .willReturn(expectedResponse);
+
+            // when
+            WalletChargeConfirmResponse response = walletService.confirmCharge(
+                USER_ID, new WalletChargeConfirmRequest(paymentKey, chargeId.toString(), 10_000));
+
+            // then
+            assertThat(response.balance()).isEqualTo(60_000);
+            assertThat(response.status()).isEqualTo(WalletChargeStatus.COMPLETED.name());
+            then(walletChargeTransactionService).should(times(1))
+                .claimChargeForProcessing(USER_ID, chargeId, 10_000);
+            then(walletChargeTransactionService).should(times(1))
+                .completeChargeAfterPg(eq(USER_ID), eq(chargeId), any());
+        }
+
+        @Test
+        void 존재하지_않는_chargeId이면_실패() {
+            // given: claimChargeForProcessing에서 CHARGE_NOT_FOUND 예외 발생
+            UUID chargeId = UUID.randomUUID();
+            org.mockito.BDDMockito.willThrow(new WalletException(WalletErrorCode.CHARGE_NOT_FOUND))
+                .given(walletChargeTransactionService)
+                .claimChargeForProcessing(USER_ID, chargeId, 10_000);
+
+            // when & then
+            assertThatThrownBy(() -> walletService.confirmCharge(
+                USER_ID, new WalletChargeConfirmRequest("pk-key", chargeId.toString(), 10_000)))
+                .isInstanceOf(WalletException.class)
+                .extracting(e -> ((WalletException) e).getErrorCode())
+                .isEqualTo(WalletErrorCode.CHARGE_NOT_FOUND);
+        }
+
+        @Test
+        void 다른_사용자의_충전건_확정_시도시_실패() {
+            // given: claimChargeForProcessing에서 CHARGE_NOT_FOUND 예외 발생
+            UUID chargeId = UUID.randomUUID();
+            org.mockito.BDDMockito.willThrow(new WalletException(WalletErrorCode.CHARGE_NOT_FOUND))
+                .given(walletChargeTransactionService)
+                .claimChargeForProcessing(USER_ID, chargeId, 10_000);
+
+            // when & then
+            assertThatThrownBy(() -> walletService.confirmCharge(
+                USER_ID, new WalletChargeConfirmRequest("pk-key", chargeId.toString(), 10_000)))
+                .isInstanceOf(WalletException.class)
+                .extracting(e -> ((WalletException) e).getErrorCode())
+                .isEqualTo(WalletErrorCode.CHARGE_NOT_FOUND);
+        }
+
+        @Test
+        void PENDING이_아닌_충전건_확정_시도시_실패() {
+            // given: claimChargeForProcessing에서 CHARGE_NOT_PENDING 예외 발생
+            UUID chargeId = UUID.randomUUID();
+            org.mockito.BDDMockito.willThrow(new WalletException(WalletErrorCode.CHARGE_NOT_PENDING))
+                .given(walletChargeTransactionService)
+                .claimChargeForProcessing(USER_ID, chargeId, 10_000);
+
+            // when & then
+            assertThatThrownBy(() -> walletService.confirmCharge(
+                USER_ID, new WalletChargeConfirmRequest("pk-key", chargeId.toString(), 10_000)))
+                .isInstanceOf(WalletException.class)
+                .extracting(e -> ((WalletException) e).getErrorCode())
+                .isEqualTo(WalletErrorCode.CHARGE_NOT_PENDING);
+        }
+
+        @Test
+        void 금액_불일치시_실패() {
+            // given: claimChargeForProcessing에서 CHARGE_AMOUNT_MISMATCH 예외 발생
+            UUID chargeId = UUID.randomUUID();
+            org.mockito.BDDMockito.willThrow(new WalletException(WalletErrorCode.CHARGE_AMOUNT_MISMATCH))
+                .given(walletChargeTransactionService)
+                .claimChargeForProcessing(USER_ID, chargeId, 20_000);
+
+            // when & then
+            assertThatThrownBy(() -> walletService.confirmCharge(
+                USER_ID, new WalletChargeConfirmRequest("pk-key", chargeId.toString(), 20_000)))
+                .isInstanceOf(WalletException.class)
+                .extracting(e -> ((WalletException) e).getErrorCode())
+                .isEqualTo(WalletErrorCode.CHARGE_AMOUNT_MISMATCH);
+        }
+
+        @Test
+        void PG_승인_실패시_FAILED_상태_응답_반환() {
+            // given: PG 네트워크 오류
+            UUID chargeId = UUID.randomUUID();
+            given(pgPaymentClient.confirm(any())).willThrow(new RuntimeException("PG timeout"));
+
+            // when
+            WalletChargeConfirmResponse response = walletService.confirmCharge(
+                USER_ID, new WalletChargeConfirmRequest("pk-key", chargeId.toString(), 10_000));
+
+            // then: failProcessingCharge 호출, 잔액 미반영
+            assertThat(response.status()).isEqualTo("FAILED");
+            then(walletChargeTransactionService).should(times(1)).failProcessingCharge(chargeId);
+            then(walletChargeTransactionService).should(never()).completeChargeAfterPg(any(), any(), any());
+        }
+
+        @Test
+        void transactionKey_중복시_잔액_반영_후_거래기록_생성_생략() {
+            // given: completeChargeAfterPg에서 중복 transactionKey 감지 후 WalletTransaction 생성 생략
+            UUID chargeId = UUID.randomUUID();
+            String paymentKey = "pk-dup-tx";
+            PgPaymentConfirmResult pgResult = new PgPaymentConfirmResult(
+                paymentKey, chargeId.toString(), "카드", "DONE", 10_000, "2024-01-01T12:00:00");
+            WalletChargeConfirmResponse expectedResponse = WalletChargeConfirmResponse.from(
+                chargeId.toString(), 10_000, 60_000, WalletChargeStatus.COMPLETED.name(), null);
+
+            given(pgPaymentClient.confirm(any())).willReturn(pgResult);
+            given(walletChargeTransactionService.completeChargeAfterPg(USER_ID, chargeId, pgResult))
+                .willReturn(expectedResponse);
+
+            // when
+            WalletChargeConfirmResponse response = walletService.confirmCharge(
+                USER_ID, new WalletChargeConfirmRequest(paymentKey, chargeId.toString(), 10_000));
+
+            // then
+            assertThat(response.status()).isEqualTo(WalletChargeStatus.COMPLETED.name());
+            then(walletChargeTransactionService).should(times(1))
+                .completeChargeAfterPg(eq(USER_ID), eq(chargeId), any());
+        }
+
+        @Test
+        void 잘못된_chargeId_형식이면_실패() {
+            // given: UUID 파싱 불가 문자열
+            assertThatThrownBy(() -> walletService.confirmCharge(
+                USER_ID, new WalletChargeConfirmRequest("pk-key", "not-a-uuid", 10_000)))
+                .isInstanceOf(WalletException.class)
+                .extracting(e -> ((WalletException) e).getErrorCode())
+                .isEqualTo(WalletErrorCode.INVALID_CHARGE_REQUEST);
+        }
+    }
 
     // =====================================================================
     // 충전 실패 처리
@@ -197,6 +499,39 @@ class WalletServiceTest {
                 .isInstanceOf(WalletException.class)
                 .extracting(e -> ((WalletException) e).getErrorCode())
                 .isEqualTo(WalletErrorCode.WALLET_NOT_FOUND);
+        }
+
+        @Test
+        void 잔액과_동일한_금액_출금시_성공하고_잔액이_0원이_됨() {
+            // given: 잔액 30,000원, 정확히 30,000원 출금 → 잔액 0원 (경계값)
+            Wallet wallet = walletWithBalance(0);
+            WalletTransaction tx = WalletTransaction.createWithdraw(1L, USER_ID, "WITHDRAW:key", 30_000, 0);
+            given(walletRepository.useBalanceAtomic(USER_ID, 30_000)).willReturn(1);
+            given(walletRepository.findByUserId(USER_ID)).willReturn(Optional.of(wallet));
+            given(walletTransactionRepository.save(any())).willReturn(tx);
+
+            // when
+            WalletWithdrawResponse response = walletService.withdraw(USER_ID, new WalletWithdrawRequest(30_000));
+
+            // then
+            assertThat(response.balance()).isEqualTo(0);
+            assertThat(response.withdrawnAmount()).isEqualTo(30_000);
+            assertThat(response.status()).isEqualTo("COMPLETED");
+        }
+
+        @Test
+        void 잔액보다_1원_초과_출금시_잔액부족_실패() {
+            // given: atomic update 0 rows (잔액 부족) + 지갑 존재 (경계값)
+            given(walletRepository.useBalanceAtomic(USER_ID, 30_001)).willReturn(0);
+            given(walletRepository.findByUserId(USER_ID)).willReturn(Optional.of(walletWithBalance(30_000)));
+
+            // when & then
+            assertThatThrownBy(() -> walletService.withdraw(USER_ID, new WalletWithdrawRequest(30_001)))
+                .isInstanceOf(WalletException.class)
+                .extracting(e -> ((WalletException) e).getErrorCode())
+                .isEqualTo(WalletErrorCode.INSUFFICIENT_BALANCE);
+
+            then(walletTransactionRepository).should(never()).save(any());
         }
     }
 

@@ -61,13 +61,16 @@ public class PaymentServiceImpl implements PaymentService {
         validateOrderOwner(userId, order.userId());
         validateOrderPayable(order);
 
-        // 멱등성 가드: 기존 Payment 존재 여부 확인 (PG/WALLET/WALLET_PG 공통)
+        // 중복 요청: 동일 orderId + 동일 결제수단의 READY Payment면 재사용, 그 외는 ALREADY_PROCESSED
         Optional<Payment> existing = paymentRepository.findByOrderId(order.id());
         if (existing.isPresent()) {
             Payment existingPayment = existing.get();
-            if (existingPayment.getStatus() == PaymentStatus.READY) {
-                log.info("[ReadyPayment] 기존 READY Payment 반환 — orderId={}", order.id());
-                return PaymentReadyResponse.from(existingPayment, request.orderId(), order.orderNumber(), order.status());
+            if (existingPayment.getPaymentMethod() == request.paymentMethod()
+                && existingPayment.getStatus() == PaymentStatus.READY) {
+                log.info("[ReadyPayment] 기존 READY Payment 재사용 — orderId={}, method={}",
+                    order.id(), request.paymentMethod());
+                return PaymentReadyResponse.from(
+                    existingPayment, request.orderId(), order.orderNumber(), order.status());
             }
             throw new PaymentException(PaymentErrorCode.ALREADY_PROCESSED_PAYMENT);
         }
