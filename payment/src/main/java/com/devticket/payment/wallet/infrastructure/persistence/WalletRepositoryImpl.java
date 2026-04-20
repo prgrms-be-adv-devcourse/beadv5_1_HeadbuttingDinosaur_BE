@@ -21,6 +21,11 @@ public class WalletRepositoryImpl implements WalletRepository {
     }
 
     @Override
+    public void insertWalletIfAbsent(UUID userId) {
+        walletJpaRepository.insertIfAbsent(userId);
+    }
+
+    @Override
     public Optional<Wallet> findByUserIdForUpdate(UUID userId) {
         return walletJpaRepository.findByUserIdForUpdate(userId);
     }

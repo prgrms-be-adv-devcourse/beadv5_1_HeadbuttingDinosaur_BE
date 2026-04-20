@@ -14,6 +14,13 @@ public interface WalletJpaRepository extends JpaRepository<Wallet, Long> {
 
     Optional<Wallet> findByUserId(UUID userId);
 
+    @Modifying
+    @Query(value = "INSERT INTO payment.wallet (wallet_id, user_id, balance, version, created_at, updated_at) " +
+                   "VALUES (gen_random_uuid(), :userId, 0, 0, NOW(), NOW()) " +
+                   "ON CONFLICT (user_id) DO NOTHING",
+           nativeQuery = true)
+    void insertIfAbsent(@Param("userId") UUID userId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT w FROM Wallet w WHERE w.userId = :userId")
     Optional<Wallet> findByUserIdForUpdate(@Param("userId") UUID userId);
