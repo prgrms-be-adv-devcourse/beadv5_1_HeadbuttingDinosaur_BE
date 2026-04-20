@@ -33,12 +33,12 @@ Kafka를 통해 서비스 간에 오가는 모든 이벤트를 한 눈에 확인
 
 | 이벤트 토픽 | Producer 서비스 | Consumer 서비스 | 트리거 조건 | DLT 여부 | 구현 상태 |
 |------------|----------------|----------------|-----------|---------|---------|
-| `order.created` | Commerce | Event | 주문 생성 + Outbox INSERT 커밋 시 | `order.created.DLT` | 🚧 Commerce Producer / ✅ Event Consumer |
-| `stock.deducted` | Event | Commerce | `order.created` 수신 후 재고 차감 성공 시 | `stock.deducted.DLT` | ✅ Event Producer / ⬜ Commerce Consumer |
-| `stock.failed` | Event | Commerce | `order.created` 수신 후 재고 부족 판정 시 | `stock.failed.DLT` | ✅ Event Producer / ⬜ Commerce Consumer |
-| `payment.completed` | Payment | Commerce | PG 승인 성공 + 내부 상태 반영 커밋 시 | `payment.completed.DLT` | 🚧 진행중 |
-| `payment.failed` | Payment | Commerce, Event | PG 승인 실패 또는 내부 검증 실패 시 | `payment.failed.DLT` | 🚧 Producer / ⬜ Commerce Consumer / ✅ Event Consumer |
-| `ticket.issue-failed` | Commerce | Commerce, Payment | 결제 성공 후 티켓 발급 실패 감지 시 | `ticket.issue-failed.DLT` | ⬜ 미구현 |
+| `order.created` | Commerce | Event | 주문 생성 + Outbox INSERT 커밋 시 | `order.created.DLT` | ✅ Commerce Producer / ✅ Event Consumer |
+| `stock.deducted` | Event | Commerce | `order.created` 수신 후 재고 차감 성공 시 | `stock.deducted.DLT` | ✅ Event Producer / ✅ Commerce Consumer |
+| `stock.failed` | Event | Commerce | `order.created` 수신 후 재고 부족 판정 시 | `stock.failed.DLT` | ✅ Event Producer / ✅ Commerce Consumer |
+| `payment.completed` | Payment | Commerce | PG 승인 성공 + 내부 상태 반영 커밋 시 | `payment.completed.DLT` | ✅ Payment Producer (WALLET_PG 머지 완료) / ✅ Commerce Consumer |
+| `payment.failed` | Payment | Commerce, Event | PG 승인 실패 또는 내부 검증 실패 시 | `payment.failed.DLT` | ✅ Payment Producer / ✅ Commerce Consumer / ✅ Event Consumer |
+| `ticket.issue-failed` | Commerce | Commerce, Payment | 결제 성공 후 티켓 발급 실패 감지 시 | `ticket.issue-failed.DLT` | ✅ Commerce Producer (Outbox) / ⬜ Commerce 자체 소비 / ⬜ Payment Consumer |
 | `refund.completed` | Payment | Commerce, Event, Payment | PG 취소 완료 + 내부 환불 상태 반영 커밋 시 | `refund.completed.DLT` | 🚧 진행중 |
 | `event.force-cancelled` | Event | Commerce | Admin 강제 취소 API 호출 시 | `event.force-cancelled.DLT` | ⬜ 미구현 |
 | `event.sale-stopped` | Event | Payment | Admin/Seller 판매 중지 API 호출 시 | `event.sale-stopped.DLT` | ⬜ 미구현 |
@@ -359,12 +359,13 @@ sequenceDiagram
 ### 3-2. Commerce (신규 적용)
 
 **DB 스키마**
-- [ ] `Order` 엔티티 필드 추가 (ddl-auto 자동 반영)
+- [x] ✅ `Order` 엔티티 필드 추가 완료
   - [x] ✅ `cart_hash VARCHAR(64)` — 장바구니 내용 해시 (eventId 정렬 후 SHA-256), 중복 주문 판단 기준 — 구현 완료 (2026-04-19, `CartHashUtil`)
-  - `expires_at DATETIME` — 주문 만료 시각 *(주문생성 Phase 스코프 — 현재는 런타임에 `created_at + 30분`으로 계산)*
+  - ~~`expires_at DATETIME`~~ **폐기** — `BaseEntity.updated_at` 재활용으로 대체 (`PAYMENT_PENDING` 진입 시각 기준, `OrderExpirationScheduler`). `created_at` 기준은 `stock.deducted` 지연 시 결제 시간 단축 문제 발생 → 폐기
   - [x] ✅ `version BIGINT` — 낙관적 락 (`@Version`)
 - [x] ✅ `Order` 엔티티 인덱스 추가: `(user_id, cart_hash)` — `idx_order_user_cart_hash` 구현 완료 (2026-04-19)
-- [ ] `Order.create()` 수정: 초기 status `PAYMENT_PENDING` → `CREATED` 변경, `expires_at = now() + 30분` 설정 추가 *(주문생성 Phase 스코프)*
+- [x] ✅ `CartItem` 엔티티 UNIQUE 제약 추가: `(cart_id, event_id)` — `uk_cart_item_cart_event` 구현 완료 (#416, 2026-04-19) — 광클 동시성 방어 + A안 매칭 차감 단순화
+- [x] ✅ `Order.create()` 수정: 초기 status `CREATED`로 설정 완료 (`Order.java:111`). *`expires_at` 컬럼은 폐기 — `BaseEntity.updated_at` 재활용 방식으로 전환됨 (#4-2 참조)*
 - [x] ✅ `outbox` 테이블 신규 생성 — JPA `@Entity` 추가 시 ddl-auto 자동 생성
 - [x] ✅ `processed_message` 테이블 신규 생성 — JPA `@Entity` 추가 시 ddl-auto 자동 생성
 - [x] ✅ `shedlock` 테이블 생성 — `commerce/src/main/resources/schema.sql` 수동 CREATE
@@ -383,16 +384,16 @@ sequenceDiagram
 - [x] ✅ `OutboxScheduler` ShedLock 적용 (`lockAtMostFor=30s`, `lockAtLeastFor=5s`)
 - [x] ✅ Outbox 발행 시 Partition Key 설정 — `ticket.issue-failed` → `orderId` 적용 완료 *(`order.created` / `refund.*` 는 해당 Producer 스코프에서 적용)*
 - [x] ✅ `OutboxEventProducer`: Kafka 발행 시 `X-Message-Id` 헤더 세팅 (Outbox messageId 그대로 전달)
-- [ ] `OrderService.createOrderByCart()` 내 동기 HTTP 재고 차감 코드(`orderToEventClient.adjustStocks()`) 제거 *(주문생성 Phase 스코프)*
+- [x] ✅ `OrderService.createOrderByCart()` 내 동기 HTTP 재고 차감 코드(`orderToEventClient.adjustStocks()`) 제거 완료 — `order.created` Outbox 발행으로 전환 (`OrderService.java:153-159`)
 
 **Consumer 멱등성**
 - [x] ✅ `MessageDeduplicationService` 구현 + `processed_message` 테이블 생성 (`ProcessedMessage`, `ProcessedMessageRepository`)
 - [x] ✅ `KafkaConsumerConfig`: AckMode MANUAL, ExponentialBackOff (2→4→8초, 3회 재시도) + DLT Recoverer (`{topic}.DLT`)
 - [x] ✅ `payment.completed` Consumer dedup 적용 (`commerce-payment.completed`)
 - [x] ✅ `payment.failed` Consumer dedup 적용 (`commerce-payment.failed`)
-- [ ] 나머지 Consumer dedup 적용 *(스코프 외 — 각 Phase에서 처리)*
-  - `stock.deducted` / `stock.failed` — 주문생성 Phase
-  - `ticket.issue-failed` 자체 소비 / `refund.*` / `event.force-cancelled` — 환불 Saga 스코프
+- [x] ✅ `stock.deducted` / `stock.failed` Consumer dedup 적용 완료 — `StockEventConsumer` (groupId `commerce-stock.deducted` / `commerce-stock.failed`, `processed_message` UNIQUE 충돌 catch)
+- [ ] 나머지 Consumer dedup 적용 *(환불 Saga 스코프 — 본 스코프 외)*
+  - `ticket.issue-failed` 자체 소비 / `refund.*` / `event.force-cancelled`
 
 **payment.completed / payment.failed Consumer 비즈니스 로직 (내 스코프 §8)**
 - [x] ✅ `PaymentCompletedConsumer` (`presentation.consumer`) — `X-Message-Id` 헤더 우선, 본문 `messageId` fallback, Outbox wrapper payload 추출
@@ -401,16 +402,17 @@ sequenceDiagram
 - [x] ✅ `OrderService.processPaymentFailed()` — Dedup → `canTransitionTo(FAILED)` → `failPayment()` → markProcessed (단일 `@Transactional`)
 - [x] ✅ 티켓 발급 성공 경로 — `OrderItem × quantity` 만큼 `Ticket.create()` → `ticketRepository.saveAll()`
 - [x] ✅ 티켓 발급 실패 경로 — Order `cancel()` + `ticket.issue-failed` Outbox 발행 (경로 ① OrderItem 없음 / 경로 ② `saveAll()` 예외) *(추후 재검토: §4-3 참조)*
-- [x] ✅ 장바구니 삭제 — `payment.completed` 수신 시 userId 기준 CartItem 전체 삭제 *(단건/전체 분기 TODO: §4-4 참조)*
+- [x] ✅ 장바구니 매칭 차감 (A안, #427/#436) — `payment.completed` 수신 시 결제된 `OrderItem` × `CartItem(cart_id, event_id)` 매칭하여 `min(orderQty, cartQty)` 차감, 0 도달 시 row 삭제. 분기 없이 단일 경로 적용 (동시성 위험 제거)
 
 **주문 만료 스케줄러 (내 스코프)**
-- [x] ✅ `OrderExpirationScheduler` 신규 — `@Scheduled(fixedDelay=60_000)` + `@SchedulerLock(name="order-expiration-scheduler", lockAtMostFor="50s", lockAtLeastFor="10s")`
-- [ ] 🚧 만료 조건: `PAYMENT_PENDING` 상태 + **`updated_at + 30분 경과`** (PAYMENT_PENDING 진입 시각 기준)
-  - 기존 `created_at` 기준은 `CREATED` 진입 시각이라 `stock.deducted` 지연 시 결제 시간 단축 문제 발생 (PR #426 Codex P2 지적)
+- [x] ✅ `OrderExpirationScheduler` 구현 완료 — `@Scheduled(fixedDelay=60_000)` + `@SchedulerLock(name="order-expiration-scheduler", lockAtMostFor="2m", lockAtLeastFor="10s")`
+  - `lockAtMostFor=2m` (fixedDelay의 2배) — PR #426 멘토 피드백 반영. `lockAtMostFor < fixedDelay`면 락 만료 후 타 인스턴스 중복 진입 가능
+- [x] ✅ 만료 조건: `PAYMENT_PENDING` 상태 + **`updated_at + 30분 경과`** (PAYMENT_PENDING 진입 시각 기준)
+  - 기존 `created_at` 기준은 `CREATED` 진입 시각이라 `stock.deducted` 지연 시 결제 시간 단축 문제 발생 (PR #426 Codex P2 지적) → 폐기
   - `BaseEntity.updated_at` (`@LastModifiedDate`) 재활용 — `pendingPayment()` 호출 시 자동 갱신
-  - ⚠️ 가정: PAYMENT_PENDING 상태에서 Order 엔티티 수정 경로 없음 (`Order.updateTotalAmount()` dead code 확인). 향후 mutation 추가 시 `payment_pending_at` 전용 컬럼 신설로 이관 검토
-- [ ] 🚧 만료 취소 시 재고 복구 — `payment.failed` Outbox 발행 (`reason="ORDER_TIMEOUT"`) → Event 모듈 `PaymentFailedConsumer`가 재고 `DEDUCTED → RESTORED` 전이
-  - `OrderExpirationCancelService`에서 Order `CANCELLED` 전이 + OrderItem 조회 + `PaymentFailedEvent` Outbox INSERT를 단일 `@Transactional` 보장
+  - ⚠️ 가정: PAYMENT_PENDING 상태에서 Order 엔티티 수정 경로 없음 (`Order.updateTotalAmount()` `@Deprecated(forRemoval=true)` 처리 완료, `Order.java:121-133`). 향후 mutation 추가 시 `payment_pending_at` 전용 컬럼 신설로 이관 검토
+- [x] ✅ 만료 취소 시 재고 복구 — `OrderExpirationCancelService`에서 Order `CANCELLED` 전이 + OrderItem 조회 + `PaymentFailedEvent` Outbox INSERT를 단일 `@Transactional`로 보장, `payment.failed` Outbox 발행 (`reason="ORDER_TIMEOUT"`)
+  - Event 모듈 `PaymentFailedConsumer`가 수신하여 재고 `DEDUCTED → RESTORED` 전이
   - `reason` 허용값 정의: `docs/kafka-design.md §3 PaymentFailedEvent` 참조
 - [x] ✅ 동시성 방어: `canTransitionTo(CANCELLED)` 선가드 + `ObjectOptimisticLockingFailureException` 재조회 후 종단 상태(PAID/FAILED/CANCELLED)면 스킵
 

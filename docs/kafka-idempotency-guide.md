@@ -139,6 +139,8 @@ payment.failed 이벤트:
 > processed_message 테이블 스키마(컬럼·타입·UNIQUE 제약)는 [kafka-design.md §5 — Consumer 멱등성 설계](kafka-design.md#5-consumer-멱등성-설계) 참조
 
 - **UNIQUE 제약: `(message_id)` 단독** — Outbox `UUID.randomUUID()`를 Kafka 헤더(`X-Message-Id`)로 전달받아 저장, 전역 고유이므로 topic 복합키 불필요
+  - 실제 제약명: `uk_processed_message_message_id_topic` (JPA `@Column(unique=true)` 자동 생성 — 이름은 복합처럼 보이지만 컬럼은 `message_id` 단독)
+  - Consumer UNIQUE 충돌 catch 시 이 제약명으로 비교 (예: `StockEventConsumer.isProcessedMessageUniqueConflict()`)
 - Consumer group 정보는 별도로 넣지 않음 — 테이블 자체가 모듈별로 분리되어 있으므로 불필요
 
 ### 3-4. UNIQUE 제약은 최종 레이스 방어선

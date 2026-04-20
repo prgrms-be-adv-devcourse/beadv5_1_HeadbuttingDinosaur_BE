@@ -490,9 +490,11 @@ CREATE TABLE processed_message (
     topic        VARCHAR(128) NOT NULL,   -- 운영 디버깅용
     processed_at TIMESTAMP    NOT NULL,
     PRIMARY KEY (id),
-    CONSTRAINT uk_message_id UNIQUE (message_id)
+    CONSTRAINT uk_processed_message_message_id_topic UNIQUE (message_id)
 );
 ```
+
+> ⚠️ 제약명(`uk_processed_message_message_id_topic`)은 JPA `@Column(unique=true)`가 자동 생성한 이름이라 복합키처럼 보이지만, **실제 UNIQUE 컬럼은 `message_id` 단독**이다. Consumer UNIQUE 충돌 catch 시 이 제약명으로 비교한다 (`isProcessedMessageUniqueConflict()` 참조).
 
 > MessageDeduplicationService 사용 원칙, messageId 생성 방식(코드 패턴)은
 > [kafka-idempotency-guide.md §3-5, §3-6](kafka-idempotency-guide.md) 참조
@@ -503,7 +505,7 @@ CREATE TABLE processed_message (
 
 | 현재 상태 | 허용 전이 | 비고 |
 |---|---|---|
-| `CREATED` | → `PAYMENT_PENDING` | `pendingPayment()` — 현재 `create()`가 바로 `PAYMENT_PENDING` 설정하므로 실질 미사용 |
+| `CREATED` | → `PAYMENT_PENDING`, `FAILED` | `pendingPayment()` (stock.deducted 수신) / `failByStock()` (stock.failed 수신) / `expire()` (만료 스케줄러 — CREATED 상태 만료 시) |
 | `PAYMENT_PENDING` | → `PAID`, `FAILED`, `CANCELLED` | `completePayment()` / `failPayment()` / `cancel()` |
 | `PAID` | → `CANCELLED` | `cancel()` / ⚠️ `PAID → REFUND_PENDING` 전이 허용 여부는 §4-1 미결사항 해결 전까지 사용 금지 |
 | `FAILED` | 없음 (종단) | |
@@ -545,10 +547,12 @@ CREATE TABLE processed_message (
 Consumer가 Kafka 메시지 수신 시 dedup 체크 통과 후 **반드시 상태 전이 가능 여부를 검증**해야 한다.
 
 ```java
-// Order 도메인 — canTransitionTo() 구현 예시
+// Order 도메인 — canTransitionTo() 구현 (실제 코드: order/domain/model/Order.java)
 public boolean canTransitionTo(OrderStatus target) {
     return switch (this.status) {
-        case CREATED         -> target == OrderStatus.PAYMENT_PENDING;
+        // CREATED: 재고 확인 대기 중 — stock.deducted(→PAYMENT_PENDING) 또는 stock.failed/만료(→FAILED)
+        case CREATED         -> target == OrderStatus.PAYMENT_PENDING
+                             || target == OrderStatus.FAILED;
         case PAYMENT_PENDING -> target == OrderStatus.PAID
                              || target == OrderStatus.FAILED
                              || target == OrderStatus.CANCELLED;
@@ -582,7 +586,7 @@ if (!order.canTransitionTo(targetStatus)) {
 ```
 
 > **현재 상태:**
-> - **Order**: `canTransitionTo()` 미구현 — Kafka Consumer 구현 전 추가 필요
+> - **Order**: ✅ 구현 완료 — `order/domain/model/Order.java:200-214` (CREATED→PAYMENT_PENDING/FAILED, PAYMENT_PENDING→PAID/FAILED/CANCELLED, PAID→CANCELLED) + 각 상태 전이 메서드 내부 가드 호출
 > - **Payment**: `PaymentStatus.canTransitionTo()` 구현 완료 + `approve()` / `fail()` / `cancel()` / `refund()` 내부 가드 호출 완료
 > - **Event**: 표준 `canTransitionTo()` 형태는 미구현이나, 부분 가드 메서드(`Event.canBeUpdated()`, `canBeCancelled()`, `cancel()`) 및 상태 머신 기반 `EventInternalService.resolveReason()` (hotfix `f2d7377` — CANCELLED/FORCE_CANCELLED → SOLD_OUT → SALE_ENDED 우선순위)로 현재 스코프(`payment.failed` 수신 시 정책적 스킵)는 커버됨. Refund Saga(`refund.stock.restore`) 진입 시 Stock 도메인 모델 변경과 함께 재논의.
 
@@ -1038,15 +1042,22 @@ topic: event.force-cancelled  → DLT: event.force-cancelled.DLT
 
 ### Commerce (신규 적용)
 
-- [ ] `JacksonConfig` 추가
-- [ ] `KafkaTopics` 상수 클래스에 Commerce 발행 토픽 + Orchestration 토픽 추가
-- [ ] Outbox 패턴 구현 (비즈니스 + save 단일 트랜잭션)
-- [ ] `MessageDeduplicationService` 구현 + `processed_message` 테이블
-- [ ] ShedLock 적용
-- [ ] 모든 Consumer에 dedup 패턴 적용 (`event.force-cancelled` 포함 전체 Consumer)
-- [ ] 상태 전이 검증 구현 (`canTransitionTo()`)
-- [ ] 도메인 엔티티 낙관적 락 (`@Version`)
+**구현 완료 (주문생성 ~ 결제완료 Phase)**
+- [x] ✅ `JacksonConfig` (`common/config/JacksonConfig.java`)
+- [x] ✅ `KafkaTopics` 상수 클래스 — Saga 6개 + 환불 1개 + 이벤트 관리 2개 + Orchestration 12개 (`common/messaging/KafkaTopics.java`)
+- [x] ✅ Outbox 패턴 구현 (`Outbox`, `OutboxService`, `OutboxEventProducer`, `OutboxScheduler` + ShedLock)
+- [x] ✅ `MessageDeduplicationService` + `processed_message` 테이블 (제약명: `uk_processed_message_message_id_topic`, 실제 `message_id` 단독 UNIQUE)
+- [x] ✅ ShedLock 적용 (`OutboxScheduler` / `OrderExpirationScheduler`)
+- [x] ✅ Consumer dedup 패턴 적용 — `StockEventConsumer`, `PaymentCompletedConsumer`, `PaymentFailedConsumer`
+- [x] ✅ 상태 전이 검증 `canTransitionTo()` — `Order.java:200-214` (CREATED→PAYMENT_PENDING/FAILED, PAYMENT_PENDING→PAID/FAILED/CANCELLED, PAID→CANCELLED)
+- [x] ✅ Order 엔티티 낙관적 락 (`@Version`)
+- [x] ✅ 주문 만료 스케줄러 + 재고 복구 Outbox 발행 (`OrderExpirationScheduler` + `OrderExpirationCancelService`)
+- [x] ✅ 결제 완료 시 장바구니 매칭 차감 (A안, #427/#436)
+
+**환불 Saga 스코프 (본 스코프 외)**
 - [ ] Refund Saga 연동 — `RefundFanoutService`, `OrderRefundConsumer`, `TicketRefundConsumer`, `OrderCompensateConsumer`, `TicketCompensateConsumer`
+
+> 상세 구현 체크리스트 및 미결 사항: kafka-impl-plan.md §3-2 참조
 
 > 전체 구현 체크리스트: kafka-impl-plan.md §3-2 참조
 

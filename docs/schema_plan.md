@@ -29,7 +29,7 @@
 | shedlock 생성 | 신규 테이블 | Outbox 스케줄러 분산 락 | 수동 CREATE TABLE |
 | order 엔티티 | `version` | BIGINT 컬럼 추가 (@Version) | 엔티티 필드 추가 → 자동 |
 | order 엔티티 | `cart_hash` | VARCHAR(64) 컬럼 추가, 인덱스 (user_id, cart_hash), 해시 대상: (eventId, quantity) — unitPrice 미포함 (팀 합의) ✅ 완료 (2026-04-19) | 엔티티 필드 추가 → 자동 |
-| cart_item 엔티티 | `(cart_id, event_id)` UNIQUE | 광클 동시성 결함 방어 + cart_hash 분기 삭제(A안) 매칭 로직 단순화 — 사전 점검: 중복 row 없음 확인 (2026-04-19) | 엔티티 필드 추가 → 자동 |
+| cart_item 엔티티 | `(cart_id, event_id)` UNIQUE ✅ | 광클 동시성 결함 방어 + cart_hash 분기 삭제(A안) 매칭 로직 단순화 — 구현 완료 (#416, 2026-04-19, 제약명 `uk_cart_item_cart_event`) | 엔티티 필드 추가 → 자동 |
 
 > **코드 수정 연계 (DB 외)**
 > - `Order.create()` 초기 status `CREATED` (주문생성 Phase 코드 취합 완료 — `stock.deducted` 수신 후 `PAYMENT_PENDING` 전이)
