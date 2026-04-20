@@ -104,7 +104,7 @@ public class PaymentServiceImplTest {
         @DisplayName("PG 결제 준비 성공 — READY 상태 반환")
         void PG_결제_준비_성공() {
             // given
-            PaymentReadyRequest request = new PaymentReadyRequest(EXTERNAL_ORDER_ID, PaymentMethod.PG);
+            PaymentReadyRequest request = new PaymentReadyRequest(EXTERNAL_ORDER_ID, PaymentMethod.PG, null);
 
             given(commerceInternalClient.getOrderInfo(EXTERNAL_ORDER_ID)).willReturn(orderInfo);
             given(paymentRepository.save(any(Payment.class)))
@@ -126,7 +126,7 @@ public class PaymentServiceImplTest {
         @DisplayName("다른 사용자의 주문 — 예외")
         void 다른_사용자의_주문() {
             // given
-            PaymentReadyRequest request = new PaymentReadyRequest(EXTERNAL_ORDER_ID, PaymentMethod.PG);
+            PaymentReadyRequest request = new PaymentReadyRequest(EXTERNAL_ORDER_ID, PaymentMethod.PG, null);
 
             given(commerceInternalClient.getOrderInfo(EXTERNAL_ORDER_ID)).willReturn(orderInfo);
 
@@ -141,7 +141,7 @@ public class PaymentServiceImplTest {
         @DisplayName("주문 상태가 PAYMENT_PENDING이 아닌 경우 — 예외")
         void 주문_상태가_결제_대기가_아닌_경우() {
             // given
-            PaymentReadyRequest request = new PaymentReadyRequest(EXTERNAL_ORDER_ID, PaymentMethod.PG);
+            PaymentReadyRequest request = new PaymentReadyRequest(EXTERNAL_ORDER_ID, PaymentMethod.PG, null);
             InternalOrderInfoResponse paidOrder = new InternalOrderInfoResponse(
                 ORDER_ID, USER_ID, "ORD-001", 130000, "PAID",
                 LocalDateTime.of(2025, 8, 15, 14, 30).toString(),
@@ -161,7 +161,7 @@ public class PaymentServiceImplTest {
         @DisplayName("예치금 결제 준비 성공 — WalletService로 위임")
         void 예치금_결제_준비_성공() {
             // given
-            PaymentReadyRequest request = new PaymentReadyRequest(EXTERNAL_ORDER_ID, PaymentMethod.WALLET);
+            PaymentReadyRequest request = new PaymentReadyRequest(EXTERNAL_ORDER_ID, PaymentMethod.WALLET, null);
             Payment savedPayment = createReadyPayment();
             savedPayment.approve("WALLET-" + savedPayment.getPaymentId());
 
