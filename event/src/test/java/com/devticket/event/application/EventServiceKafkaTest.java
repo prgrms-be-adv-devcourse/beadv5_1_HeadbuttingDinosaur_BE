@@ -179,7 +179,7 @@ class EventServiceKafkaTest {
     }
 
     @Test
-    void 이벤트가_존재하지_않으면_BusinessException을_던진다() {
+    void 이벤트가_존재하지_않으면_StockDeductionException을_던진다() {
         // given
         UUID orderId = UUID.randomUUID();
         UUID eventId = UUID.randomUUID();
@@ -191,8 +191,12 @@ class EventServiceKafkaTest {
 
         // when & then
         assertThatThrownBy(() -> eventService.processOrderCreated(MESSAGE_ID, TOPIC, payload))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining(EventErrorCode.EVENT_NOT_FOUND.getMessage());
+                .isInstanceOf(StockDeductionException.class)
+                .satisfies(ex -> {
+                    StockDeductionException sde = (StockDeductionException) ex;
+                    assertThat(sde.getOrderId()).isEqualTo(orderId);
+                    assertThat(sde.getEventId()).isEqualTo(eventId);
+                });
 
         then(outboxService).shouldHaveNoInteractions();
     }
@@ -201,21 +205,22 @@ class EventServiceKafkaTest {
     void 다건_주문_중_하나_재고_부족_시_실패한_항목의_eventId로_StockDeductionException을_던진다() {
         // given
         UUID orderId = UUID.randomUUID();
-        UUID eventId1 = UUID.randomUUID(); // 성공
-        UUID eventId2 = UUID.randomUUID(); // 재고 부족
+        // 락 획득 순서(eventId 오름차순)를 명시적으로 고정
+        UUID smallId = UUID.fromString("00000000-0000-0000-0000-000000000001"); // 성공
+        UUID largeId = UUID.fromString("ffffffff-ffff-ffff-ffff-ffffffffffff"); // 재고 부족
 
         given(deduplicationService.isDuplicate(MESSAGE_ID)).willReturn(false);
-        given(eventRepository.findByEventIdWithLock(eventId1)).willReturn(Optional.of(onSaleEvent(eventId1, 10, 5)));
-        given(eventRepository.findByEventIdWithLock(eventId2)).willReturn(Optional.of(onSaleEvent(eventId2, 1, 10)));
+        given(eventRepository.findByEventIdWithLock(smallId)).willReturn(Optional.of(onSaleEvent(smallId, 10, 5)));
+        given(eventRepository.findByEventIdWithLock(largeId)).willReturn(Optional.of(onSaleEvent(largeId, 1, 10)));
 
-        String payload = toJson(multiItemEvent(orderId, eventId1, eventId2, 3, 5)); // eventId2: 잔여 1 < 요청 5
+        String payload = toJson(multiItemEvent(orderId, smallId, largeId, 3, 5)); // largeId: 잔여 1 < 요청 5
 
         // when & then
         assertThatThrownBy(() -> eventService.processOrderCreated(MESSAGE_ID, TOPIC, payload))
                 .isInstanceOf(StockDeductionException.class)
                 .satisfies(ex -> {
                     StockDeductionException sde = (StockDeductionException) ex;
-                    assertThat(sde.getEventId()).isEqualTo(eventId2); // 두 번째 항목에서 실패
+                    assertThat(sde.getEventId()).isEqualTo(largeId);
                 });
 
         then(outboxService).shouldHaveNoInteractions(); // 부분 커밋 없음
