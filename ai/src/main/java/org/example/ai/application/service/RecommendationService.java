@@ -15,7 +15,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.example.ai.common.exception.BusinessException;
 import org.example.ai.domain.exception.AiErrorCode;
 import org.example.ai.domain.model.UserVector;
+import org.example.ai.domain.repository.EventRepository;
+import org.example.ai.domain.repository.MemberRepository;
+import org.example.ai.domain.repository.TechStackEmbeddingRepository;
 import org.example.ai.domain.repository.UserVectorRepository;
+import org.example.ai.infrastructure.external.client.EventServiceClient;
+import org.example.ai.infrastructure.external.client.MemberServiceClient;
+import org.example.ai.infrastructure.external.dto.req.PopularEventListRequest;
+import org.example.ai.infrastructure.external.dto.res.PopularEventListResponse;
+import org.example.ai.infrastructure.external.dto.res.UserTechStackResponse;
 import org.example.ai.presentation.dto.req.RecommendationRequest;
 import org.example.ai.presentation.dto.res.RecommendationResponse;
 import org.springframework.stereotype.Service;
@@ -26,13 +34,17 @@ import org.springframework.stereotype.Service;
 public class RecommendationService {
 
     private final UserVectorRepository userVectorRepository;
+    private final TechStackEmbeddingRepository techStackEmbeddingRepository;
     private final ElasticsearchClient elasticsearchClient;
+    private final MemberRepository memberRepository;
+    private final EventRepository eventRepository;
 
 
 
 
 
-    // ================ 실질적인 Service단 유일 메서드(추천 기능) ================= //
+
+    // ================ 일반 유저 추천 메서드 ================= //
     public RecommendationResponse recommendByUserVector(RecommendationRequest request){
 
         // 1. 추천 요청한 UserId 기준으로 UserVector 조회
@@ -40,28 +52,33 @@ public class RecommendationService {
         UserVector userVector = userVectorRepository.findById(userId)
             .orElse(null);
 
-        if(userVector == null){
-            log.warn("[Recommendation] UserVector 없음 - userId: {}", userId);
-            return new RecommendationResponse(userId, List.of());
+        // 2. 콜드 스타트 정책 : 로그 weightSum의 합 < 20이면, 신규 유저
+        float logWeightSum = userVector == null ? 0f
+            : userVector.getPreferenceWeightSum()
+                + userVector.getCartWeightSum()
+                + userVector.getNegativeWeightSum();
+
+        if(logWeightSum < 20){
+            return recommendByColdStart(request, userVector);
         }
 
-        // 2. 가중합 벡터(방향 + 크기) 연산
+        // 3. 가중합 벡터(방향 + 크기) 연산
         float[] combinedVector = combineVectorByWeight(
             getOrEmpty(userVector.getPreferenceVector()),
             getOrEmpty(userVector.getCartVector()),
             getOrEmpty(userVector.getRecentVector())
         );
 
-        // 3. 정규화 벡터(정규화 -> 크기 제거)
+        // 4. 정규화 벡터(정규화 -> 크기 제거)
          float[] normalizedVector = normalize(combinedVector);
 
-         // 4. 정규화 벡터 -> kNN 검색 -> 이벤트 후보군 30 개 추출
-        List<Map<String, Object>> candidates = searchKnn(normalizedVector);
+         // 5. 정규화 벡터 -> kNN 검색 -> 이벤트 후보군 30 개 추출
+        List<Map<String, Object>> candidates = searchKnn(normalizedVector, 30);
 
-        // 5. 모든 이벤트 후보군 -> 유저 벡터(4 가지)와 cosine 연산 -> 랭킹 정렬
+        // 6. 모든 이벤트 후보군 -> 유저 벡터(4 가지)와 cosine 연산 -> 랭킹 정렬
         List<ScoredEvent> listedScore = reRank(candidates, userVector);
 
-        // 6. -> 5 개 추출
+        // 7. -> 5 개 추출
         List<String> topEventIds = listedScore.stream()
             .sorted(Comparator.comparingDouble(ScoredEvent::score).reversed())
             .limit(5)
@@ -72,11 +89,63 @@ public class RecommendationService {
         }
 
 
+    // ================ 신규 유저 추천 메서드 ================= //
+
+    public RecommendationResponse recommendByColdStart(RecommendationRequest request, UserVector userVector){
+
+        String userId = request.userId();
+
+        // 1. 테크 스택들의 임베딩 전체 조회
+        List<float[]> embeddingList = memberRepository.getUserTechStack(userId).techStacks()
+            .stream()
+            .map(stack -> getEmbed(stack))
+            .filter(Objects::nonNull)
+            .toList();
+
+        // 1.1 임베딩 값이 비었을 경우
+        if(embeddingList.isEmpty()){
+            PopularEventListRequest popularEventRquest = new PopularEventListRequest(5);
+            PopularEventListResponse response = eventRepository.getPopularEvents(popularEventRquest);
+            List<String> popularEventIds = response.events().stream()
+                .map(PopularEventListResponse.EventInfo::eventId)
+                .toList();
+
+            return new RecommendationResponse(userId, popularEventIds);
+        }
+
+        // 2. 테크 스택의 평균 벡터 연산
+        float[] queryVector = combineVector(embeddingList);
+
+        // 3. knn 검색
+        List<Map<String, Object>> events = searchKnn(queryVector,5);
+
+        // 4. event_id 담기
+        List<String> eventIds = events.stream()
+            .map(event -> event.get("eventId").toString())
+            .toList();
+
+        // 5. 추천 event가 5 개 이하일 경우, 부족한 추천 갯수 채우기
+        if(eventIds.size() < 5){
+            int neededCount = 5 - eventIds.size();
+
+            PopularEventListRequest popularEventRquest = new PopularEventListRequest(neededCount);
+            PopularEventListResponse response = eventRepository.getPopularEvents(popularEventRquest);
+
+            List<String> popularEventIds = response.events().stream()
+                .map(PopularEventListResponse.EventInfo::eventId)
+                .toList();
+
+            List<String> combined = new ArrayList<>(eventIds);
+            combined.addAll(popularEventIds);
+
+            return new RecommendationResponse(userId, combined);
+        }
+
+        return new RecommendationResponse(userId, eventIds);
+    }
 
 
-
-
-    // =============== 하위 함수 모음(가중합 * 유저 벡터 -> 가중합 벡터) =============== //
+    // =============== 일반 추천 하위 함수 모음(가중합 * 유저 벡터 -> 가중합 벡터) =============== //
     // 1. 가중치 기반 벡터합
     private float[] combineVectorByWeight(float[] preferenceVector, float[] cartVector, float[] recentVector){
         float[] combinedVector = new float[preferenceVector.length];
@@ -113,7 +182,7 @@ public class RecommendationService {
     }
 
     // 3. normalize된 벡터 -> kNN 검색
-    public List<Map<String, Object>> searchKnn(float[] normalizedVector){
+    public List<Map<String, Object>> searchKnn(float[] normalizedVector, int searchNum){
 
         try{
             List<Float> queryList = new ArrayList<>();
@@ -129,7 +198,7 @@ public class RecommendationService {
                         .field("embedding")
                         .queryVector(queryList)
                         .numCandidates(100)
-                        .k(30)
+                        .k(searchNum)
                         .filter(f -> f
                             .term(t -> t
                                 .field("status")
@@ -222,6 +291,30 @@ public class RecommendationService {
     }
     // ================================================================ //
     // ================================================================ //
+
+    // =============== 신규 회원 하위 함수 모음 =============== //
+    // 1. 테크스택 임베딩 조회
+    private float[] getEmbed(UserTechStackResponse.TechStackInfo stack){
+        return techStackEmbeddingRepository.findEmbeddingByName(stack.name())
+            .orElse(null);
+    }
+
+    // 2. 벡터 합 연산
+    private float[] combineVector(List<float[]> embeddingList){
+        float[] combinedVector = new float[1536];
+
+        for(int i = 0; i < embeddingList.size(); i++){
+            for(int j = 0; j < embeddingList.get(i).length; j++){
+                combinedVector[j] += embeddingList.get(i)[j];
+            }
+        }
+
+        for(int i = 0; i < combinedVector.length; i++){
+            combinedVector[i] /= embeddingList.size();
+        }
+
+        return combinedVector;
+    }
 
 
 
