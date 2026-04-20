@@ -23,7 +23,7 @@ public interface CartItemJpaRepository extends JpaRepository<CartItem, Long> {
 
     List<CartItem> findAllByCartId(Long cartId);
 
-    @Modifying
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(value = """
         INSERT INTO commerce.cart_item (cart_item_id, cart_id, event_id, quantity, added_at, created_at, updated_at)
         VALUES (gen_random_uuid(), :cartId, :eventId, :quantity, NOW(), NOW(), NOW())
