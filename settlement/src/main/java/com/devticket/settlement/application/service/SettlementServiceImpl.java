@@ -118,9 +118,16 @@ public class SettlementServiceImpl implements SettlementService {
         int skippedCount = 0;
 
         for (EventTicketSettlementResponse ticketItem : ticketItems) {
+            EndedEventResponse event = eventMap.get(ticketItem.eventId());
+            if (event == null) {
+                log.warn("[collectSettlementTargets] Event 서비스 응답에 없는 eventId 스킵 - orderItemId: {}, eventId: {}",
+                    ticketItem.orderItemId(), ticketItem.eventId());
+                skippedCount++;
+                continue;
+            }
+
             Long feeAmount = feePolicy.calculateFee(ticketItem.salesAmount());
             Long settlementAmount = ticketItem.salesAmount() - ticketItem.refundAmount() - feeAmount;
-            EndedEventResponse event = eventMap.get(ticketItem.eventId());
 
             if (settlementItemRepository.existsByOrderItemId(ticketItem.orderItemId())) {
                 log.warn("[collectSettlementTargets] 중복 스킵 - orderItemId: {}", ticketItem.orderItemId());
