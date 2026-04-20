@@ -52,4 +52,9 @@ public class TicketRepositoryAdapter implements TicketRepository {
     public List<Ticket> findAllByEventIdIn(List<UUID> eventIds) {
         return ticketJpaRepository.findAllByEventIdIn(eventIds);
     }
+
+    @Override
+    public List<Ticket> findAllByTicketIdIn(List<UUID> ticketIds) {
+        return ticketJpaRepository.findAllByTicketIdIn(ticketIds);
+    }
 }

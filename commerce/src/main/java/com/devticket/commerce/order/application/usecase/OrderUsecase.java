@@ -35,8 +35,6 @@ public interface OrderUsecase {
 
     InternalOrderItemResponse getOrderItemByTicketId(Long ticketId);
 
-    void completeRefund(Long ticketId);
-
     //InternalEventOrdersResponse getOrdersByEvent(Long eventId, String status);
 
     // 결제 전 주문 취소

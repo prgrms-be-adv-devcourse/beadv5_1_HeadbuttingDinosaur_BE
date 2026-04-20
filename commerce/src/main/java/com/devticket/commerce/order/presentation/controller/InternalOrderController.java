@@ -76,11 +76,6 @@ public class InternalOrderController {
         return ResponseEntity.ok(response);
     }
 
-    //Refund -> Commerce : 환불 완료 후 ticket.status REFUNDED 변경 + orderItem.deletedAt 기록
-    @PatchMapping("/tickets/{ticketId}/refund-completed")
-    public ResponseEntity<Void> completeRefund(@PathVariable Long ticketId) {
-        orderUsecase.completeRefund(ticketId);
-        return ResponseEntity.ok().build();
-    }
-
+    // 환불 완료 HTTP 동기 엔드포인트 제거 — refund.completed Kafka 경로로 대체됨.
+    // Consumer: RefundOrderConsumer#consumeRefundCompleted → RefundOrderService#processRefundCompleted
 }

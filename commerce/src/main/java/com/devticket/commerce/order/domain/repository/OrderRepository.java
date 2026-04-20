@@ -27,4 +27,7 @@ public interface OrderRepository {
     // 중복 주문 방어 — userId + cartHash 기준 활성 주문 조회
     Optional<Order> findActiveOrder(UUID userId, String cartHash, List<OrderStatus> activeStatuses);
 
+    // Admin/Seller 이벤트 강제 취소 fan-out — 해당 eventId의 특정 상태 Order 들을 조회
+    List<Order> findAllByEventIdAndStatus(UUID eventId, OrderStatus status);
+
 }

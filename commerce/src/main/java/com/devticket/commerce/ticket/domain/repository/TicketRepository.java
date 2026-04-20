@@ -23,4 +23,6 @@ public interface TicketRepository {
     Page<Ticket> findAllByEventId(UUID eventId, SellerEventParticipantListRequest request);
 
     List<Ticket> findAllByEventIdIn(List<UUID> eventIds);
+
+    List<Ticket> findAllByTicketIdIn(List<UUID> ticketIds);
 }

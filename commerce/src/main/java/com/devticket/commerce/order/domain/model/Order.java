@@ -194,6 +194,30 @@ public class Order extends BaseEntity {
         this.totalAmount -= refundAmount;
     }
 
+    // refund.order.cancel 수신: PAID → REFUND_PENDING (Refund Saga 1단계)
+    public void requestRefund() {
+        if (!canTransitionTo(OrderStatus.REFUND_PENDING)) {
+            throw new BusinessException(OrderErrorCode.REFUND_NOT_REFUNDABLE);
+        }
+        this.status = OrderStatus.REFUND_PENDING;
+    }
+
+    // refund.completed 수신: REFUND_PENDING → REFUNDED (Saga 최종 확정)
+    public void completeRefund() {
+        if (!canTransitionTo(OrderStatus.REFUNDED)) {
+            throw new BusinessException(OrderErrorCode.REFUND_COMPLETE_INVALID);
+        }
+        this.status = OrderStatus.REFUNDED;
+    }
+
+    // refund.order.compensate 수신: REFUND_PENDING → PAID (보상 롤백)
+    public void rollbackRefund() {
+        if (!canTransitionTo(OrderStatus.PAID)) {
+            throw new BusinessException(OrderErrorCode.REFUND_ROLLBACK_INVALID);
+        }
+        this.status = OrderStatus.PAID;
+    }
+
     //---- 상태 전이 검증 ------------------------------
 
     // Consumer 멱등 처리 및 상태 전이 방어용 — canTransitionTo() 기반으로 모든 도메인 메서드 가드 구현
@@ -206,9 +230,13 @@ public class Order extends BaseEntity {
             case PAYMENT_PENDING -> target == OrderStatus.PAID
                                  || target == OrderStatus.FAILED
                                  || target == OrderStatus.CANCELLED;
-            // PAID: 결제 완료 — 취소(환불 흐름)만 허용
-            case PAID            -> target == OrderStatus.CANCELLED;
-            // FAILED, CANCELLED, REFUND_PENDING, REFUNDED: 종단 상태 — 전이 불가
+            // PAID: 결제 완료 — 취소 또는 환불 Saga 진입 허용
+            case PAID            -> target == OrderStatus.CANCELLED
+                                 || target == OrderStatus.REFUND_PENDING;
+            // REFUND_PENDING: 환불 Saga 진행 중 — 최종 확정(REFUNDED) 또는 보상 롤백(PAID)
+            case REFUND_PENDING  -> target == OrderStatus.REFUNDED
+                                 || target == OrderStatus.PAID;
+            // FAILED, CANCELLED, REFUNDED: 종단 상태 — 전이 불가
             default              -> false;
         };
     }
