@@ -14,6 +14,15 @@ public interface WalletJpaRepository extends JpaRepository<Wallet, Long> {
 
     Optional<Wallet> findByUserId(UUID userId);
 
+    //TODO : 향후 제약 추가에 대비하여 "ON CONFLICT (user_id)" 수정 고려
+    // 현시점 ci환경 H2에서 ON CONFLICT 미지원되어 추후 제약조건 추가시 수정필요.
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(value = "INSERT INTO wallet (wallet_id, user_id, balance, version, created_at, updated_at) " +
+                   "VALUES (:walletId, :userId, 0, 0, NOW(), NOW()) " +
+                   "ON CONFLICT DO NOTHING",
+           nativeQuery = true)
+    void insertIfAbsent(@Param("walletId") UUID walletId, @Param("userId") UUID userId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT w FROM Wallet w WHERE w.userId = :userId")
     Optional<Wallet> findByUserIdForUpdate(@Param("userId") UUID userId);
