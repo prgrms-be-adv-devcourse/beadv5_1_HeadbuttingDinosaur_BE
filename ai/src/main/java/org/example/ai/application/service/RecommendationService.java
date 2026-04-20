@@ -15,6 +15,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.example.ai.common.exception.BusinessException;
 import org.example.ai.domain.exception.AiErrorCode;
 import org.example.ai.domain.model.UserVector;
+import org.example.ai.domain.repository.EventRepository;
+import org.example.ai.domain.repository.MemberRepository;
 import org.example.ai.domain.repository.TechStackEmbeddingRepository;
 import org.example.ai.domain.repository.UserVectorRepository;
 import org.example.ai.infrastructure.external.client.EventServiceClient;
@@ -34,8 +36,9 @@ public class RecommendationService {
     private final UserVectorRepository userVectorRepository;
     private final TechStackEmbeddingRepository techStackEmbeddingRepository;
     private final ElasticsearchClient elasticsearchClient;
-    private final MemberServiceClient memberServiceClient;
-    private final EventServiceClient eventServiceClient;
+    private final MemberRepository memberRepository;
+    private final EventRepository eventRepository;
+
 
 
 
@@ -93,11 +96,22 @@ public class RecommendationService {
         String userId = request.userId();
 
         // 1. 테크 스택들의 임베딩 전체 조회
-        List<float[]> embeddingList = memberServiceClient.getUserTechStack(userId).techStacks()
+        List<float[]> embeddingList = memberRepository.getUserTechStack(userId).techStacks()
             .stream()
             .map(stack -> getEmbed(stack))
             .filter(Objects::nonNull)
             .toList();
+
+        // 1.1 임베딩 값이 비었을 경우
+        if(embeddingList.isEmpty()){
+            PopularEventListRequest popularEventRquest = new PopularEventListRequest(5);
+            PopularEventListResponse response = eventRepository.getPopularEvents(popularEventRquest);
+            List<String> popularEventIds = response.events().stream()
+                .map(PopularEventListResponse.EventInfo::eventId)
+                .toList();
+
+            return new RecommendationResponse(userId, popularEventIds);
+        }
 
         // 2. 테크 스택의 평균 벡터 연산
         float[] queryVector = combineVector(embeddingList);
@@ -115,7 +129,7 @@ public class RecommendationService {
             int neededCount = 5 - eventIds.size();
 
             PopularEventListRequest popularEventRquest = new PopularEventListRequest(neededCount);
-            PopularEventListResponse response = eventServiceClient.getPopularEvents(popularEventRquest);
+            PopularEventListResponse response = eventRepository.getPopularEvents(popularEventRquest);
 
             List<String> popularEventIds = response.events().stream()
                 .map(PopularEventListResponse.EventInfo::eventId)
@@ -184,7 +198,7 @@ public class RecommendationService {
                         .field("embedding")
                         .queryVector(queryList)
                         .numCandidates(100)
-                        .k(30)
+                        .k(searchNum)
                         .filter(f -> f
                             .term(t -> t
                                 .field("status")

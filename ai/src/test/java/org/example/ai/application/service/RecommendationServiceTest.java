@@ -15,10 +15,11 @@ import java.util.Optional;
 import org.example.ai.common.exception.BusinessException;
 import org.example.ai.domain.exception.AiErrorCode;
 import org.example.ai.domain.model.UserVector;
+import org.example.ai.domain.repository.EventRepository;
+import org.example.ai.domain.repository.MemberRepository;
 import org.example.ai.domain.repository.TechStackEmbeddingRepository;
 import org.example.ai.domain.repository.UserVectorRepository;
-import org.example.ai.infrastructure.external.client.EventServiceClient;
-import org.example.ai.infrastructure.external.client.MemberServiceClient;
+
 import org.example.ai.infrastructure.external.dto.res.PopularEventListResponse;
 import org.example.ai.infrastructure.external.dto.res.UserTechStackResponse;
 import org.example.ai.presentation.dto.req.RecommendationRequest;
@@ -42,13 +43,13 @@ public class RecommendationServiceTest {
     private UserVectorRepository userVectorRepository;
 
     @Mock
-    private MemberServiceClient memberServiceClient;
+    private MemberRepository memberRepository;
 
     @Mock
     private TechStackEmbeddingRepository techStackEmbeddingRepository;
 
     @Mock
-    private EventServiceClient eventServiceClient;
+    private EventRepository eventRepository;
 
     private UserVector buildNormalUserVector() {
         return UserVector.builder()
@@ -89,13 +90,13 @@ public class RecommendationServiceTest {
         given(userVectorRepository.findById("user-1"))
             .willReturn(Optional.empty());
 
-        given(memberServiceClient.getUserTechStack("user-1"))
+        given(memberRepository.getUserTechStack("user-1"))
             .willReturn(new UserTechStackResponse("user-1", List.of()));
 
-        given(eventServiceClient.getPopularEvents(any()))
+        given(eventRepository.getPopularEvents(any()))
             .willReturn(new PopularEventListResponse(List.of()));
 
-        doReturn(List.of()).when(recommendationService).searchKnn(any(), eq(5));
+
 
         // when
         RecommendationResponse response = recommendationService
