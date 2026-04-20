@@ -164,10 +164,6 @@ export interface ActionLogMessage {
 
 ## 4. 후속 작업 (본 스코프 Phase 3~4 완료 후 착수)
 
-- 설계문서 3종 갱신 (단일 커밋)
-  - `docs/kafka-design.md` — 역할 표 / 토픽 목록 / DTO 계약 / Producer 예외 설정(`acks=0`, Outbox 미사용)
-  - `docs/kafka-impl-plan.md` — 이벤트 매트릭스에 `action.log` 추가 / Log 모듈 체크리스트 추가
-  - `docs/kafka-idempotency-guide.md` — "추후 구현 예정" 블록을 **정식 스펙 섹션으로 승격**, `groupId`를 `admin-action.log` → `log-group`으로 정정
 - Producer 측 구현 (신규)
   - **Event 서비스**: VIEW / DETAIL_VIEW / DWELL_TIME — 각 API 핸들러에서 트랜잭션 경계 밖 비동기 발행
   - **Commerce 서비스**: CART_ADD / CART_REMOVE — 동일 정책
