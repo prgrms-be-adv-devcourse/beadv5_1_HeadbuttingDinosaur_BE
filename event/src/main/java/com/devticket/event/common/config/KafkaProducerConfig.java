@@ -31,6 +31,12 @@ public class KafkaProducerConfig {
         props.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
         props.put(ProducerConfig.RETRIES_CONFIG, 3);
         props.put(ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION, 5);
+        // Scheduler lockAtMostFor(5m) 내에서 발행 실패 판정이 끝나도록 타임아웃 경계 고정
+        //   delivery.timeout.ms  ≥ linger.ms + request.timeout.ms
+        //   max.block.ms         = send() 블로킹 상한 (metadata/buffer 대기)
+        props.put(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, 1500);
+        props.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, 1000);
+        props.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, 500);
         return new DefaultKafkaProducerFactory<>(props);
     }
 

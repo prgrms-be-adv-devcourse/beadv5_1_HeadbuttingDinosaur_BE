@@ -7,6 +7,7 @@ import java.util.concurrent.TimeoutException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.header.internals.RecordHeader;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
@@ -27,7 +28,7 @@ import org.springframework.stereotype.Component;
 public class OutboxEventProducer {
 
     private static final String MESSAGE_ID_HEADER = "X-Message-Id";
-    private static final long SEND_TIMEOUT_SECONDS = 5L;
+    private static final long SEND_TIMEOUT_SECONDS = 2L;
 
     private final KafkaTemplate<String, String> kafkaTemplate;
 
@@ -43,12 +44,20 @@ public class OutboxEventProducer {
             kafkaTemplate.send(record).get(SEND_TIMEOUT_SECONDS, TimeUnit.SECONDS);
             log.debug("Outbox 발행 성공 — topic={}, messageId={}", message.topic(), message.messageId());
             return true;
-        } catch (ExecutionException | InterruptedException | TimeoutException e) {
-            log.error("Outbox 발행 실패 — topic={}, messageId={}, error={}",
+        } catch (ExecutionException | TimeoutException e) {
+            // future 결과 대기 중 실패 — broker ack 실패 / send 타임아웃
+            log.error("Outbox 발행 실패 (future) — topic={}, messageId={}, error={}",
                     message.topic(), message.messageId(), e.getMessage());
-            if (e instanceof InterruptedException) {
-                Thread.currentThread().interrupt();
-            }
+            return false;
+        } catch (InterruptedException e) {
+            log.error("Outbox 발행 인터럽트 — topic={}, messageId={}", message.topic(), message.messageId());
+            Thread.currentThread().interrupt();
+            return false;
+        } catch (KafkaException e) {
+            // send() 호출 시점 런타임 예외 — max.block.ms 초과(TimeoutException),
+            // 직렬화 실패(SerializationException), 메타데이터 실패 등
+            log.error("Outbox 발행 실패 (send) — topic={}, messageId={}, error={}",
+                    message.topic(), message.messageId(), e.getMessage());
             return false;
         }
     }
