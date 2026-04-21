@@ -8,21 +8,21 @@ import com.devticket.commerce.cart.domain.repository.CartItemRepository;
 import com.devticket.commerce.cart.domain.repository.CartRepository;
 import com.devticket.commerce.common.enums.OrderStatus;
 import com.devticket.commerce.common.exception.BusinessException;
+import com.devticket.commerce.common.messaging.KafkaTopics;
 import com.devticket.commerce.common.messaging.MessageDeduplicationService;
+import com.devticket.commerce.common.messaging.event.OrderCreatedEvent;
 import com.devticket.commerce.common.messaging.event.PaymentCompletedEvent;
 import com.devticket.commerce.common.messaging.event.PaymentFailedEvent;
 import com.devticket.commerce.common.messaging.event.StockDeductedEvent;
 import com.devticket.commerce.common.messaging.event.StockFailedEvent;
 import com.devticket.commerce.common.messaging.event.TicketIssueFailedEvent;
+import com.devticket.commerce.common.outbox.OutboxService;
 import com.devticket.commerce.order.application.usecase.OrderUsecase;
 import com.devticket.commerce.order.domain.exception.OrderErrorCode;
 import com.devticket.commerce.order.domain.model.Order;
 import com.devticket.commerce.order.domain.model.OrderItem;
 import com.devticket.commerce.order.domain.repository.OrderItemRepository;
 import com.devticket.commerce.order.domain.repository.OrderRepository;
-import com.devticket.commerce.common.messaging.KafkaTopics;
-import com.devticket.commerce.common.messaging.event.OrderCreatedEvent;
-import com.devticket.commerce.common.outbox.OutboxService;
 import com.devticket.commerce.order.domain.util.CartHashUtil;
 import com.devticket.commerce.order.infrastructure.external.client.OrderToEventClient;
 import com.devticket.commerce.order.infrastructure.external.client.dto.InternalBulkStockAdjustmentRequest;
@@ -46,12 +46,12 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Instant;
 import java.util.HashSet;
-import java.util.stream.IntStream;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -389,7 +389,7 @@ public class OrderService implements OrderUsecase {
 
         // Step 2. 상태 전이 유효성 검증 (3분류)
         Order order = orderRepository.findByOrderId(event.orderId())
-                .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
+            .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
 
         if (!order.canTransitionTo(OrderStatus.PAID)) {
             if (order.getStatus() == OrderStatus.PAID) {
@@ -400,13 +400,13 @@ public class OrderService implements OrderUsecase {
             if (order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.FAILED) {
                 // ② 정책적 스킵: 보상/만료가 먼저 처리됨
                 log.warn("[processPaymentCompleted] 정책적 스킵 — orderId={}, 현재상태={}",
-                        event.orderId(), order.getStatus());
+                    event.orderId(), order.getStatus());
                 deduplicationService.markProcessed(messageId, topic);
                 return;
             }
             // ③ 이상 상태 → throw → 재시도 → DLT
             throw new IllegalStateException(
-                    "Invalid transition: " + order.getStatus() + " -> PAID, orderId=" + event.orderId());
+                "Invalid transition: " + order.getStatus() + " -> PAID, orderId=" + event.orderId());
         }
 
         // Step 3. 비즈니스 로직 — paymentId/paymentMethod 기록하면서 PAID 전이
@@ -420,21 +420,21 @@ public class OrderService implements OrderUsecase {
             order.cancel();
 
             TicketIssueFailedEvent failedEvent = new TicketIssueFailedEvent(
-                    event.orderId(),
-                    event.userId(),
-                    event.paymentId(),
-                    List.of(),
-                    event.totalAmount(),
-                    "OrderItem not found",
-                    Instant.now()
+                event.orderId(),
+                event.userId(),
+                event.paymentId(),
+                List.of(),
+                event.totalAmount(),
+                "OrderItem not found",
+                Instant.now()
             );
 
             outboxService.save(
-                    event.orderId().toString(),
-                    event.orderId().toString(),
-                    "TICKET_ISSUE_FAILED",
-                    KafkaTopics.TICKET_ISSUE_FAILED,
-                    failedEvent
+                event.orderId().toString(),
+                event.orderId().toString(),
+                "TICKET_ISSUE_FAILED",
+                KafkaTopics.TICKET_ISSUE_FAILED,
+                failedEvent
             );
 
             deduplicationService.markProcessed(messageId, topic);
@@ -443,32 +443,32 @@ public class OrderService implements OrderUsecase {
 
         try {
             List<Ticket> tickets = orderItems.stream()
-                    .flatMap(item -> IntStream.range(0, item.getQuantity())
-                            .mapToObj(i -> Ticket.create(item.getOrderItemId(), item.getUserId(), item.getEventId())))
-                    .collect(Collectors.toList());
+                .flatMap(item -> IntStream.range(0, item.getQuantity())
+                    .mapToObj(i -> Ticket.create(item.getOrderItemId(), item.getUserId(), item.getEventId())))
+                .collect(Collectors.toList());
             ticketRepository.saveAll(tickets);
         } catch (Exception e) {
             // 영구 실패: 티켓 발급 실패 → Order CANCELLED + ticket.issue-failed Outbox 발행
             log.error("[processPaymentCompleted] 티켓 발급 실패 — orderId={}, error={}",
-                    event.orderId(), e.getMessage());
+                event.orderId(), e.getMessage());
             order.cancel();
 
             TicketIssueFailedEvent failedEvent = new TicketIssueFailedEvent(
-                    event.orderId(),
-                    event.userId(),
-                    event.paymentId(),
-                    List.of(),
-                    event.totalAmount(),
-                    e.getMessage(),
-                    Instant.now()
+                event.orderId(),
+                event.userId(),
+                event.paymentId(),
+                List.of(),
+                event.totalAmount(),
+                e.getMessage(),
+                Instant.now()
             );
 
             outboxService.save(
-                    event.orderId().toString(),
-                    event.orderId().toString(),
-                    "TICKET_ISSUE_FAILED",
-                    KafkaTopics.TICKET_ISSUE_FAILED,
-                    failedEvent
+                event.orderId().toString(),
+                event.orderId().toString(),
+                "TICKET_ISSUE_FAILED",
+                KafkaTopics.TICKET_ISSUE_FAILED,
+                failedEvent
             );
 
             deduplicationService.markProcessed(messageId, topic);
@@ -500,7 +500,7 @@ public class OrderService implements OrderUsecase {
 
         // Step 2. 상태 전이 유효성 검증 (3분류)
         Order order = orderRepository.findByOrderId(event.orderId())
-                .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
+            .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
 
         if (!order.canTransitionTo(OrderStatus.FAILED)) {
             if (order.getStatus() == OrderStatus.FAILED) {
@@ -511,13 +511,13 @@ public class OrderService implements OrderUsecase {
             if (order.getStatus() == OrderStatus.CANCELLED) {
                 // ② 정책적 스킵
                 log.warn("[processPaymentFailed] 정책적 스킵 — orderId={}, 현재상태={}",
-                        event.orderId(), order.getStatus());
+                    event.orderId(), order.getStatus());
                 deduplicationService.markProcessed(messageId, topic);
                 return;
             }
             // ③ 이상 상태 → throw → 재시도 → DLT
             throw new IllegalStateException(
-                    "Invalid transition: " + order.getStatus() + " -> FAILED, orderId=" + event.orderId());
+                "Invalid transition: " + order.getStatus() + " -> FAILED, orderId=" + event.orderId());
         }
 
         // Step 3. 비즈니스 로직
@@ -537,9 +537,8 @@ public class OrderService implements OrderUsecase {
 
     /**
      * stock.deducted 수신 처리: Order CREATED → PAYMENT_PENDING 전이
-     *
-     * 처리 순서 :
-     * isDuplicate → canTransitionTo(3분류) → pendingPayment() → markProcessed
+     * <p>
+     * 처리 순서 : isDuplicate → canTransitionTo(3분류) → pendingPayment() → markProcessed
      */
     @Transactional
     public void processStockDeducted(UUID messageId, String topic, String payload) {
@@ -704,20 +703,23 @@ public class OrderService implements OrderUsecase {
 
     @Override
     @Transactional(readOnly = true)
-    public InternalOrderItemResponse getOrderItemByTicketId(Long ticketId) {
-        Ticket ticket = ticketRepository.findById(ticketId)
+    public InternalOrderItemResponse getOrderItemByTicketId(UUID ticketId) {
+        Ticket ticket = ticketRepository.findByTicketId(ticketId)
             .orElseThrow(() -> new BusinessException(TicketErrorCode.TICKET_NOT_FOUND));
 
         OrderItem orderItem = orderItemRepository.findByOrderItemId(ticket.getOrderItemId())
             .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
 
-        return InternalOrderItemResponse.from(orderItem);
+        Order order = orderRepository.findById(orderItem.getOrderId())
+            .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
+
+        return InternalOrderItemResponse.from(orderItem, order.getOrderId());
     }
 
     @Override
     @Transactional(readOnly = true)
     public com.devticket.commerce.order.presentation.dto.res.InternalOrderTicketsResponse
-        getOrderTickets(UUID orderId, com.devticket.commerce.ticket.domain.enums.TicketStatus status) {
+    getOrderTickets(UUID orderId, com.devticket.commerce.ticket.domain.enums.TicketStatus status) {
 
         Order order = orderRepository.findByOrderId(orderId)
             .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));

@@ -7,11 +7,11 @@ import com.devticket.commerce.order.presentation.dto.res.InternalOrderItemRespon
 import com.devticket.commerce.order.presentation.dto.res.InternalOrderItemsResponse;
 import com.devticket.commerce.order.presentation.dto.res.InternalOrderTicketsResponse;
 import com.devticket.commerce.order.presentation.dto.res.InternalSettlementDataResponse;
-import com.devticket.commerce.ticket.domain.enums.TicketStatus;
 import com.devticket.commerce.order.presentation.dto.res.OrderCancelResponse;
 import com.devticket.commerce.order.presentation.dto.res.OrderDetailResponse;
 import com.devticket.commerce.order.presentation.dto.res.OrderListResponse;
 import com.devticket.commerce.order.presentation.dto.res.OrderResponse;
+import com.devticket.commerce.ticket.domain.enums.TicketStatus;
 import java.util.UUID;
 
 public interface OrderUsecase {
@@ -35,7 +35,7 @@ public interface OrderUsecase {
 
     InternalSettlementDataResponse getSettelmentData(UUID sellerId, String periodStart, String periodEnd);
 
-    InternalOrderItemResponse getOrderItemByTicketId(Long ticketId);
+    InternalOrderItemResponse getOrderItemByTicketId(UUID ticketId);
 
     // Payment -> Commerce : 환불 산정용 오더 티켓 목록 조회 (status 필터 옵션)
     InternalOrderTicketsResponse getOrderTickets(UUID orderId, TicketStatus status);

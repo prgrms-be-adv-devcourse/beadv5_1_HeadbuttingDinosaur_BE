@@ -73,7 +73,7 @@ public class InternalOrderController {
 
     //Ticket -> Commerce : ticketId(PK)로 해당 OrderItem 전체 정보 조회
     @GetMapping("/order-items/by-ticket/{ticketId}")
-    public ResponseEntity<InternalOrderItemResponse> getOrderItemByTicketId(@PathVariable Long ticketId) {
+    public ResponseEntity<InternalOrderItemResponse> getOrderItemByTicketId(@PathVariable UUID ticketId) {
         InternalOrderItemResponse response = orderUsecase.getOrderItemByTicketId(ticketId);
         return ResponseEntity.ok(response);
     }
@@ -82,8 +82,8 @@ public class InternalOrderController {
     // status 쿼리로 필터 (예: ISSUED) — 없으면 전체 티켓 반환.
     @GetMapping("/orders/{orderId}/tickets")
     public ResponseEntity<InternalOrderTicketsResponse> getOrderTickets(
-            @PathVariable UUID orderId,
-            @RequestParam(required = false) TicketStatus status) {
+        @PathVariable UUID orderId,
+        @RequestParam(required = false) TicketStatus status) {
         return ResponseEntity.ok(orderUsecase.getOrderTickets(orderId, status));
     }
 

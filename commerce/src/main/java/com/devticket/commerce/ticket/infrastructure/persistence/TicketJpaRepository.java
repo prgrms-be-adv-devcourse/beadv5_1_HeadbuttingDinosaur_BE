@@ -39,6 +39,6 @@ public interface TicketJpaRepository extends JpaRepository<Ticket, Long> {
           AND t.status = :status
         """)
     List<Ticket> findAllByOrderIdAndStatus(
-            @Param("orderId") Long orderId,
-            @Param("status") TicketStatus status);
+        @Param("orderId") Long orderId,
+        @Param("status") TicketStatus status);
 }

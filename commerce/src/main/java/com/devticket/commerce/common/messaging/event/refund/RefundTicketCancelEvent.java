@@ -5,8 +5,11 @@ import java.util.List;
 import java.util.UUID;
 
 public record RefundTicketCancelEvent(
-        UUID refundId,
-        UUID orderId,
-        List<UUID> ticketIds,
-        Instant timestamp
-) {}
+    UUID refundId,
+    UUID orderId,
+    List<UUID> ticketIds,
+    boolean wholeOrder,
+    Instant timestamp
+) {
+
+}

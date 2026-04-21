@@ -23,9 +23,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Admin/Seller 이벤트 강제 취소 fan-out.
- *
- * event.force-cancelled 수신 → 해당 eventId 의 PAID Order 조회 →
- * orderId 별 refund.requested 발행 (refundId Commerce 에서 생성, 원장 upsert 는 Payment 담당).
+ * <p>
+ * event.force-cancelled 수신 → 해당 eventId 의 PAID Order 조회 → orderId 별 refund.requested 발행 (refundId Commerce 에서 생성, 원장
+ * upsert 는 Payment 담당).
  */
 @Slf4j
 @Service
@@ -83,7 +83,8 @@ public class RefundFanoutService {
                 order.getPaymentMethod(),
                 ticketIds,
                 order.getTotalAmount(),       // 전체 환불 금액
-                100,                           // refundRate — 강제 취소는 100%
+                100,                          // refundRate — 강제 취소는 100%
+                true,                         // wholeOrder — 강제 취소는 항상 전체 환불
                 reason,
                 now
             );

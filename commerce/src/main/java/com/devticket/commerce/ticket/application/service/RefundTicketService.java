@@ -8,6 +8,9 @@ import com.devticket.commerce.common.messaging.event.refund.RefundTicketCompensa
 import com.devticket.commerce.common.messaging.event.refund.RefundTicketDoneEvent;
 import com.devticket.commerce.common.messaging.event.refund.RefundTicketFailedEvent;
 import com.devticket.commerce.common.outbox.OutboxService;
+import com.devticket.commerce.order.domain.exception.OrderErrorCode;
+import com.devticket.commerce.order.domain.model.Order;
+import com.devticket.commerce.order.domain.repository.OrderRepository;
 import com.devticket.commerce.ticket.domain.enums.TicketStatus;
 import com.devticket.commerce.ticket.domain.exception.TicketErrorCode;
 import com.devticket.commerce.ticket.domain.model.Ticket;
@@ -26,9 +29,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Refund Saga — Commerce 측 Ticket 일괄 상태 전이.
- *
- * refund.ticket.done 은 Stock 복구 단계 연결용으로 eventId·quantity 를 포함해 발행.
- * 동일 오더 내 티켓이 여러 이벤트에 걸쳐 있으면 eventId 별로 메시지를 분할 발행.
+ * <p>
+ * refund.ticket.done 은 Stock 복구 단계 연결용으로 eventId·quantity 를 포함해 발행. 동일 오더 내 티켓이 여러 이벤트에 걸쳐 있으면 eventId 별로 메시지를 분할 발행.
  */
 @Slf4j
 @Service
@@ -38,6 +40,7 @@ public class RefundTicketService {
     private final TicketRepository ticketRepository;
     private final OutboxService outboxService;
     private final MessageDeduplicationService deduplicationService;
+    private final OrderRepository orderRepository;
     private final ObjectMapper objectMapper;
 
     @Transactional
@@ -50,18 +53,36 @@ public class RefundTicketService {
         RefundTicketCancelEvent event = parsePayload(payload, RefundTicketCancelEvent.class);
         List<UUID> requestedIds = event.ticketIds();
 
-        if (requestedIds == null || requestedIds.isEmpty()) {
-            throw new IllegalArgumentException(
-                "[refund.ticket.cancel] ticketIds 비어있음. orderId=" + event.orderId());
-        }
+        List<Ticket> tickets;
 
-        List<Ticket> tickets = ticketRepository.findAllByTicketIdIn(requestedIds);
-        if (tickets.size() != requestedIds.size()) {
-            log.error("[refund.ticket.cancel] 티켓 일부 조회 실패 — 요청={}, 조회={}",
-                requestedIds.size(), tickets.size());
-            publishTicketFailed(event.refundId(), event.orderId(), "Some tickets not found");
-            deduplicationService.markProcessed(messageId, topic);
-            return;
+        // wholeOrder=true AND ticketIds 비어있음 → Order 의 ISSUED 티켓 전체 조회
+        if (requestedIds == null || requestedIds.isEmpty()) {
+            if (!event.wholeOrder()) {
+                throw new IllegalArgumentException(
+                    "[refund.ticket.cancel] ticketIds 비어있음 + wholeOrder=false. orderId=" + event.orderId());
+            }
+            Order order = orderRepository.findByOrderId(event.orderId())
+                .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
+            tickets = ticketRepository.findAllByOrderIdAndStatus(order.getId(), TicketStatus.ISSUED);
+            if (tickets.isEmpty()) {
+                log.warn("[refund.ticket.cancel] ISSUED 티켓 없음 — wholeOrder 이지만 취소할 티켓 없음. orderId={}",
+                    event.orderId());
+                publishTicketFailed(event.refundId(), event.orderId(), "No ISSUED tickets for wholeOrder refund");
+                deduplicationService.markProcessed(messageId, topic);
+                return;
+            }
+            log.info("[refund.ticket.cancel] wholeOrder — Order 의 ISSUED 티켓 {}건 조회. orderId={}",
+                tickets.size(), event.orderId());
+        } else {
+            // 부분 환불 — 요청된 ticketIds 만
+            tickets = ticketRepository.findAllByTicketIdIn(requestedIds);
+            if (tickets.size() != requestedIds.size()) {
+                log.error("[refund.ticket.cancel] 티켓 일부 조회 실패 — 요청={}, 조회={}",
+                    requestedIds.size(), tickets.size());
+                publishTicketFailed(event.refundId(), event.orderId(), "Some tickets not found");
+                deduplicationService.markProcessed(messageId, topic);
+                return;
+            }
         }
 
         boolean anyInvalid = tickets.stream()

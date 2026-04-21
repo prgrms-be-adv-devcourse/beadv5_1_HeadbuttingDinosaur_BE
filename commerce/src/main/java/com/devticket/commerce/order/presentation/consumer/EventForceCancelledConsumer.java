@@ -1,7 +1,9 @@
 package com.devticket.commerce.order.presentation.consumer;
 
 import com.devticket.commerce.common.messaging.KafkaTopics;
+import com.devticket.commerce.common.messaging.PayloadExtractor;
 import com.devticket.commerce.order.application.service.RefundFanoutService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -16,7 +18,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * Admin 이벤트 강제 취소 / Seller 이벤트 취소 fan-out 진입점.
- *
+ * <p>
  * event.force-cancelled 수신 → 해당 eventId 의 PAID Order 들에 대해 refund.requested fan-out.
  */
 @Slf4j
@@ -25,6 +27,7 @@ import org.springframework.stereotype.Component;
 public class EventForceCancelledConsumer {
 
     private final RefundFanoutService refundFanoutService;
+    private final ObjectMapper objectMapper;
 
     @KafkaListener(
         topics = KafkaTopics.EVENT_FORCE_CANCELLED,
@@ -32,8 +35,9 @@ public class EventForceCancelledConsumer {
     )
     public void consume(ConsumerRecord<String, String> record, Acknowledgment ack) {
         UUID messageId = extractMessageId(record.headers());
+        String payload = PayloadExtractor.extract(objectMapper, record.value());
         try {
-            refundFanoutService.processEventForceCancelled(messageId, record.topic(), record.value());
+            refundFanoutService.processEventForceCancelled(messageId, record.topic(), payload);
             ack.acknowledge();
         } catch (DataIntegrityViolationException e) {
             if (isProcessedMessageUniqueConflict(e)) {
@@ -49,7 +53,7 @@ public class EventForceCancelledConsumer {
         Header header = headers.lastHeader("X-Message-Id");
         if (header == null) {
             throw new IllegalArgumentException(
-                "X-Message-Id 헤더 누락 — Outbox Producer 설정 확인 필요 (kafka-idempotency-guide.md §3-5)");
+                "X-Message-Id 헤더 누락 — Outbox Producer 설정 확인 필요");
         }
         return UUID.fromString(new String(header.value(), StandardCharsets.UTF_8));
     }

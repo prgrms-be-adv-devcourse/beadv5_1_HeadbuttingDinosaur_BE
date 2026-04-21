@@ -28,7 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Refund Saga — Commerce 측 Order 상태 전이 처리.
- *
+ * <p>
  * 공통 처리 순서: isDuplicate → canTransitionTo(3분류) → 비즈니스 → Outbox → markProcessed.
  */
 @Slf4j
@@ -43,11 +43,12 @@ public class RefundOrderService {
     private final ObjectMapper objectMapper;
 
     /**
-     * refund.order.cancel 수신: PAID → REFUND_PENDING 전이 후 refund.order.done 발행.
-     * 실패 시 refund.order.failed 발행으로 Saga 중단.
+     * refund.order.cancel 수신: PAID → REFUND_PENDING 전이 후 refund.order.done 발행. 실패 시 refund.order.failed 발행으로 Saga 중단.
      */
     @Transactional
     public void processOrderRefundCancel(UUID messageId, String topic, String payload) {
+        log.info("[RefundOrderService] processOrderRefundCancel start. messageId={}, topic={}, payload={}",
+            messageId, topic, payload);
         if (deduplicationService.isDuplicate(messageId)) {
             log.debug("[refund.order.cancel] 중복 메시지 스킵. messageId={}", messageId);
             return;
@@ -55,8 +56,11 @@ public class RefundOrderService {
 
         RefundOrderCancelEvent event = parsePayload(payload, RefundOrderCancelEvent.class);
 
+        log.info("[RefundOrderService] order 조회 시작. orderId={}", event.orderId());
         Order order = orderRepository.findByOrderId(event.orderId())
             .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
+        log.info("[RefundOrderService] order 조회 성공. orderId={}, status={}",
+            order.getOrderId(), order.getStatus());
 
         // 3분류 ① 멱등 스킵
         if (order.getStatus() == OrderStatus.REFUND_PENDING) {
@@ -66,6 +70,8 @@ public class RefundOrderService {
             return;
         }
 
+        log.info("[RefundOrderService] 주문 상태 변경 시도. orderId={}, currentStatus={}, targetStatus=REFUND_PENDING",
+            order.getOrderId(), order.getStatus());
         if (!order.canTransitionTo(OrderStatus.REFUND_PENDING)) {
             // ② 정책적 스킵 — 이미 환불 완료/취소/만료된 주문
             if (isExplainableSkip(order.getStatus())) {
@@ -128,9 +134,8 @@ public class RefundOrderService {
 
     /**
      * refund.completed 수신: Saga 최종 확정.
-     *  - Order REFUND_PENDING → REFUNDED + 총액 차감
-     *  - 해당 Order 의 CANCELLED 티켓 → REFUNDED 일괄 전이
-     * 페이로드에 ticketIds 없음 — orderId 기준으로 찾아 일괄 전이.
+     * - Order REFUND_PENDING → REFUNDED + 총액 차감
+     * - 해당 Order 의 CANCELLED 티켓 → REFUNDED 일괄 전이 페이로드에 ticketIds 없음 — orderId 기준으로 찾아 일괄 전이.
      */
     @Transactional
     public void processRefundCompleted(UUID messageId, String topic, String payload) {
