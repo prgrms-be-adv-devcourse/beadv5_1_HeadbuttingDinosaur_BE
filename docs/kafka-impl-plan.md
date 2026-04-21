@@ -274,7 +274,7 @@ sequenceDiagram
 - [x] ✅ `Outbox`: 엔티티 필드 수정 완료 — `topic`, `partitionKey`, `nextRetryAt`, `sentAt` 포함, `create()` 파라미터 반영
 - [x] ✅ `OutboxScheduler`: `outbox.getTopic()` + `outbox.getPartitionKey()` 사용으로 수정 완료
 - [x] ✅ `OutboxRepository`: 스케줄러 쿼리에 `next_retry_at IS NULL OR next_retry_at <= :now` 조건 추가 완료
-- [x] ✅ `OutboxScheduler`: ShedLock 적용 완료 (`@SchedulerLock(name = "outbox-scheduler", lockAtMostFor = "30s", lockAtLeastFor = "5s")`)
+- [x] ✅ `OutboxScheduler`: ShedLock 적용 완료 (`@SchedulerLock(name = "outbox-scheduler", lockAtMostFor = "5m", lockAtLeastFor = "5s")`) — `lockAtMostFor`는 2026-04-21 결정 이후 기준. 기존 `30s`는 최악 처리 시간(50건×건당 타임아웃)보다 짧아 중복 진입 경로 존재
 - [x] ✅ Outbox 발행 시 Partition Key 설정 완료 — `outbox.getPartitionKey()` (fallback: aggregateId)
 - [x] ✅ `OutboxEventProducer`: Kafka 발행 시 `X-Message-Id` 헤더 세팅 완료 — ProducerRecord 헤더에 Outbox messageId 포함
 
@@ -382,7 +382,8 @@ sequenceDiagram
 - [x] ✅ `shedlock` 테이블 생성 — `commerce/src/main/resources/schema.sql` 수동 CREATE
 
 **기반 인프라**
-- [x] ✅ `JacksonConfig` 추가 (JavaTimeModule + WRITE_DATES_AS_TIMESTAMPS=false)
+- [x] ✅ **config 패키지 이전 (2026-04-21)** — `common/config/*` 8파일(`JacksonConfig`·`AsyncConfig`·`KafkaProducerConfig`·`KafkaConsumerConfig`·`ShedLockConfig`·`ActionLogKafkaProducerConfig`·`OpenApiConfig`·`TransactionConfig`) → **`infrastructure/config/*`** 로 이전 (AGENTS.md §2.1 규정 정합). Event·Payment 모듈은 여전히 `common/config/` 유지 (scope 외, 추후 리팩터링 트랙)
+- [x] ✅ `JacksonConfig` 추가 (JavaTimeModule + WRITE_DATES_AS_TIMESTAMPS=false) — `infrastructure/config/JacksonConfig.java`
 - [x] ✅ `KafkaTopics` 상수 클래스 생성 — Saga 6개 (`order.created`, `stock.deducted`, `stock.failed`, `payment.completed`, `payment.failed`, `ticket.issue-failed`) + 환불 1개 (`refund.completed`) + 이벤트 관리 2개 (`event.force-cancelled`, `event.sale-stopped`) + Orchestration 12개
 
 **이벤트 DTO**
@@ -392,7 +393,7 @@ sequenceDiagram
 
 **Outbox 패턴**
 - [x] ✅ Outbox 패턴 구현 — `Outbox`, `OutboxService`, `OutboxEventProducer`, `OutboxRepository`, `OutboxStatus`, `OutboxEventMessage`, `OutboxPublishException` — 비즈니스 로직 + `outboxService.save()` 단일 `@Transactional` 경계 준수
-- [x] ✅ `OutboxScheduler` ShedLock 적용 (`lockAtMostFor=30s`, `lockAtLeastFor=5s`)
+- [x] ✅ `OutboxScheduler` ShedLock 적용 (`lockAtMostFor=5m`, `lockAtLeastFor=5s`) — 2026-04-21 `30s → 5m` 확장 결정 반영 (최악 100s 대비 안전계수 3배)
 - [x] ✅ Outbox 발행 시 Partition Key 설정 — `ticket.issue-failed` → `orderId` 적용 완료 *(`order.created` / `refund.*` 는 해당 Producer 스코프에서 적용)*
 - [x] ✅ `OutboxEventProducer`: Kafka 발행 시 `X-Message-Id` 헤더 세팅 (Outbox messageId 그대로 전달)
 - [x] ✅ `OrderService.createOrderByCart()` 내 동기 HTTP 재고 차감 코드(`orderToEventClient.adjustStocks()`) 제거 완료 — `order.created` Outbox 발행으로 전환 (`OrderService.java:153-159`)
@@ -480,9 +481,9 @@ sequenceDiagram
 - [x] ✅ Outbox 패턴 구현 완료 — `common/outbox/` 전체 (`Outbox`, `OutboxStatus`, `OutboxEventMessage`, `OutboxRepository`, `OutboxService`, `OutboxScheduler`, `OutboxEventProducer`)
   - `OutboxService.save()`: `@Transactional(propagation=MANDATORY)` — 외부 트랜잭션 필수(단일 경계 강제)
   - `OutboxRepository.findPendingOutboxes()`: `status=PENDING AND (nextRetryAt IS NULL OR nextRetryAt <= now)`, `ORDER BY createdAt ASC`, `LIMIT 50`
-  - `OutboxEventProducer.publish()`: KafkaTemplate 동기 전송(5초 타임아웃) + `X-Message-Id` 헤더 세팅 + partition key 지정
-- [x] ✅ `OutboxScheduler` ShedLock 적용 완료 — `@SchedulerLock(name="outbox-scheduler", lockAtMostFor="30s", lockAtLeastFor="5s")`, `@Scheduled(fixedDelay=3_000)`
-  > ⚠️ 현 구현은 지수 백오프 6회(즉시→1→2→4→8→16초)로 코드에 반영됨 — 스펙(선형 백오프 `retryCount * 60초`, MAX_RETRY=5)과 drift 상태. 추후 스펙 반영 필요
+  - `OutboxEventProducer.publish()`: KafkaTemplate 동기 전송(2초 타임아웃 — 2026-04-21 공통값 결정) + `X-Message-Id` 헤더 세팅 + partition key 지정
+- [x] ✅ `OutboxScheduler` ShedLock 적용 완료 — `@SchedulerLock(name="outbox-scheduler", lockAtMostFor="5m", lockAtLeastFor="5s")`, `@Scheduled(fixedDelay=3_000)` — 2026-04-21 `30s → 5m` 확장 결정 반영
+  > 2026-04-21 결정: 지수 백오프 6회(즉시→1→2→4→8→16초)를 **스펙으로 확정**. Payment의 기존 선형 5회(`retryCount*60s`)는 본 정책으로 수렴 예정. `kafka-design.md §4 재시도 정책` 동기화 완료
 - [x] ✅ Outbox 발행 시 Partition Key 설정 — 호출부가 `outboxService.save(aggregateId, partitionKey, ...)` 시그니처로 지정 (`stock.deducted` / `stock.failed` = `orderId`, 향후 `event.force-cancelled` / `event.sale-stopped` 발행 시 `eventId` 준수 필요)
 
 **Consumer 멱등성**
@@ -532,6 +533,7 @@ sequenceDiagram
 - [ ] `DETAIL_VIEW` 발행 — 이벤트 상세 조회 API 핸들러 내 트랜잭션 경계 **밖**에서 비동기 발행 (필수: `userId`/`eventId`/`actionType`/`timestamp`)
 - [ ] `DWELL_TIME` 발행 — 프론트 이탈 시 호출 API 핸들러 내 트랜잭션 경계 **밖**에서 비동기 발행 (`dwellTimeSeconds` 필수)
 - [ ] **DWELL_TIME 전용 신규 API 엔드포인트 구현** — Event 모듈에 현재 부재 상태 확인됨 (grep 0건). 얇은 Controller(Path Variable `eventId` + Body `{ dwellTimeSeconds: Integer }`) + `ApplicationEventPublisher.publishEvent(ActionLogDomainEvent)` 호출 — 기존 Publisher 재사용. 응답 `204 No Content`. **프론트 스펙(경로/body/트리거 이벤트) 합의 선결**
+- [ ] **Producer 측 Bean Validation** — `DwellRequest.dwellTimeSeconds`에 `@NotNull @Positive` + Controller 파라미터에 `@Valid` 적용. 근거: `acks=0` + Consumer dedup 미적용 정책상 Producer validation이 `log.action_log` 오염 방지의 **최종 방어선** (숫자/필수 필드 스키마 검증 전담, 의미 검증은 Consumer=Log Fastify). 상세: [actionLog.md](actionLog.md) §2 #2 / §4 ③ / AGENTS.md §6.10 #7~#8
 - [ ] Outbox 미사용 확인 (비즈니스 트랜잭션에 INSERT 포함 금지)
 - [ ] 권장 구현 패턴: `ApplicationEventPublisher.publishEvent(ActionLogEvent)` → `@TransactionalEventListener(phase = AFTER_COMMIT)` + `@Async` → `actionLogKafkaTemplate.send(...)` (commit 후 발행 보장 + API 응답 지연 제로)
 - [ ] 실패 허용 정책 — 발행 예외 시 로깅만, 조회 API 응답에 영향 주지 말 것 (at-most-once)
@@ -546,7 +548,7 @@ sequenceDiagram
 > 상세: [actionLog.md](actionLog.md) §1, §4
 
 **확장 작업 ✅ 구현 완료**
-- [x] ✅ `payment.completed` 토픽 **추가 구독** — `fastify-log/src/consumer/payment-completed.consumer.ts` 전용 핸들러 추가
+- [x] ✅ `payment.completed` 토픽 **추가 구독** — `fastify-log/src/consumer/action-log.consumer.ts` `dispatchMessage` topic 분기에서 `paymentCompletedService.save()` 직접 호출 (전용 consumer 파일 없이 평탄화, 1a469ce5)
 - [x] ✅ `payment.completed` payload → PURCHASE 레코드 매핑 (`userId`, `eventId`, `actionType=PURCHASE`, `quantity`, `totalAmount`, `timestamp`) — `service/payment-completed.service.ts` (`toActionLogs()`, 단건/다건 `totalAmount` 분배 정책은 [actionLog.md](actionLog.md) §3.2 참조)
 - [x] ✅ `log.action_log`에 **직접 INSERT** (Kafka 재발행 없이) — `repository/action-log.repository.ts` (`insertActionLogs` 원자적 다중 INSERT)
 - [x] ✅ 예외 처리: 스킵 + offset commit (at-most-once) — `consumer/action-log.consumer.ts` (`dispatchMessage`)

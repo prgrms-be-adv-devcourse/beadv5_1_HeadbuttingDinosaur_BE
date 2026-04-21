@@ -450,7 +450,7 @@ public record OutboxEventMessage(
 
 - outer JSON 파싱 → `payload` 필드 문자열 추출 → **다시 `JSON.parse` / Jackson `readValue`** 로 실제 이벤트 DTO 복원
 - Java Consumer 예: `commerce/order/application/service/OrderService.java:405` `deserialize(payload, PaymentCompletedEvent.class)`
-- Node.js Consumer 예: `fastify-log/src/consumer/payment-completed.consumer.ts` `unwrapOutboxPayload()`
+- Node.js Consumer 예: `fastify-log/src/service/payment-completed.service.ts` `unwrapOutboxPayload()` (consumer는 `src/consumer/action-log.consumer.ts` `dispatchMessage`가 topic 분기 후 service 호출 — 1a469ce5에서 전용 consumer 파일 평탄화)
 - **신규 Consumer 구현 시 이 2단계 파싱을 반드시 적용**해야 함 — 누락 시 역직렬화 실패로 DLT 적재 위험
 
 ---
@@ -459,7 +459,7 @@ public record OutboxEventMessage(
 
 ```sql
 ALTER TABLE outbox
-    ADD COLUMN next_retry_at TIMESTAMP NULL;           -- 선형 백오프 기반 재시도 시각 (retryCount * 60초)
+    ADD COLUMN next_retry_at TIMESTAMP NULL;           -- 지수 백오프 기반 재시도 시각 (2^(retryCount-1)초)
 
 -- aggregate_id: DB PK(BIGINT)가 아닌 비즈니스 키(paymentId, orderId 등) UUID 사용
 ALTER TABLE outbox
@@ -470,18 +470,21 @@ ALTER TABLE outbox
     ADD COLUMN partition_key VARCHAR(36) NOT NULL;
 ```
 
-### 재시도 정책 (선형 백오프)
+### 재시도 정책 (지수 백오프)
 
-> 전체 토픽 단일 정책 적용 — `nextRetryAt = now + retryCount * 60초` (`Outbox.increaseRetryCount()`), `MAX_RETRY = 5` 도달 시 FAILED
+> 전체 토픽 단일 정책 적용 — `nextRetryAt = now + 2^(retryCount-1)초` (`Outbox.markFailed()`), `retryCount >= 6` 도달 시 FAILED
+> 3개 모듈(Commerce/Event/Payment) 통일 기준. Payment의 기존 `선형 5회(retryCount*60s)` 는 본 정책으로 수렴 예정.
 
 | 시도 | 대기 시간 (직전 실패 기준) |
 |---|---|
 | 1회 (최초 발행) | 즉시 |
-| 2회 | 60초 |
-| 3회 | 120초 |
-| 4회 | 180초 |
-| 5회 | 240초 |
-| 6회 (= retryCount 5 도달) | FAILED 전환 (더 이상 재시도하지 않음) |
+| 2회 | 1초 |
+| 3회 | 2초 |
+| 4회 | 4초 |
+| 5회 | 8초 |
+| 6회 | 16초 |
+
+> 6회 실패 후 `retryCount=6` 도달 시 `FAILED` 전환 (더 이상 재시도하지 않음). 총 시도 횟수 = 6회 (최초 1 + 재시도 5).
 
 ### 스케줄러 락 전략: ShedLock 채택
 
@@ -505,9 +508,30 @@ CREATE TABLE shedlock (
 
 ```java
 @Scheduled(fixedDelay = 3000)
-@SchedulerLock(name = "outbox-scheduler", lockAtMostFor = "30s", lockAtLeastFor = "5s")
+@SchedulerLock(name = "outbox-scheduler", lockAtMostFor = "5m", lockAtLeastFor = "5s")
 public void publishPendingEvents() { ... }
 ```
+
+> `lockAtMostFor="5m"` 산정 근거: 50건 × 건당 `.get(2s)` = 최악 100초 + DB save 오버헤드. 기존 `30s`는 최악 처리 시간보다 짧아 **처리 중 락 만료 → 타 인스턴스 재진입 → 동일 Outbox 이중 발행** 경로가 열려 있었음 (`kafka-impl-plan.md §4-18` OrderExpirationScheduler 원칙과 동일 — `lockAtMostFor < 최악 처리 시간`이면 중복 진입 가능). 안전계수 3배 적용.
+
+### Producer 타임아웃 정합 (이중 발행 차단)
+
+앱 측 `KafkaTemplate.send(record).get(2s)`와 Kafka Producer 내부 타임아웃을 정합시켜 **백그라운드 재시도 경로의 이중 발행**을 차단한다.
+
+문제: `.get(2s)` 타임아웃이 터져도 Kafka Producer는 `delivery.timeout.ms`(기본 120s) 동안 백그라운드 재시도를 지속 → 앱은 `markFailed()` + `nextRetryAt=+1s` 로 스케줄러 재발행 예약 → 1초 뒤 재선택되어 재발행 → 그 사이 첫 send도 뒤늦게 성공하면 Kafka에 2회 도달 (Consumer dedup으로 business-level 중복은 커버되지만 자원 낭비 + 최후의 방어선에만 의존하는 구조).
+
+해결: Producer 내부 타임아웃을 앱 `.get()` 타임아웃 이하로 강제.
+
+```java
+// KafkaProducerConfig
+config.put(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, 1500); // .get(2s) 이전에 재시도 확정 종료
+config.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, 1000);
+config.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, 500);
+```
+
+- 일시 실패 시 재시도는 **Outbox 레벨 지수 백오프(§위 재시도 정책)** 가 단일 메커니즘으로 수행
+- `enable.idempotence=true` 전제 유지 (`retries>=1`, `max.in.flight<=5`, `acks=all` 자동 충족)
+- 3개 모듈(Commerce/Event/Payment) 공통 적용
 
 스케줄러 쿼리: `next_retry_at <= now()` 조건 추가
 
@@ -545,7 +569,7 @@ CREATE TABLE processed_message (
 );
 ```
 
-> ⚠️ 제약명(`uk_processed_message_message_id_topic`)은 JPA `@Column(unique=true)`가 자동 생성한 이름이라 복합키처럼 보이지만, **실제 UNIQUE 컬럼은 `message_id` 단독**이다. Consumer UNIQUE 충돌 catch 시 이 제약명으로 비교한다 (`isProcessedMessageUniqueConflict()` 참조).
+> ⚠️ 제약명(`uk_processed_message_message_id_topic`)은 엔티티 `ProcessedMessage`의 `@Table(uniqueConstraints = @UniqueConstraint(name = "uk_processed_message_message_id_topic", columnNames = "message_id"))` 로 **명시 고정**되어 있다 (Hibernate 자동 생성 이름이 아니므로 벤더/버전에 관계없이 안정적). 이름이 복합키처럼 보이지만 **실제 UNIQUE 컬럼은 `message_id` 단독**이며, Consumer UNIQUE 충돌 catch 시 이 제약명으로 비교한다 (`isProcessedMessageUniqueConflict()` 참조).
 
 > MessageDeduplicationService 사용 원칙, messageId 생성 방식(코드 패턴)은
 > [kafka-idempotency-guide.md §3-5, §3-6](kafka-idempotency-guide.md) 참조
@@ -751,6 +775,7 @@ kafkaTemplate.send("order.created", orderId.toString(), payload);
 - **비즈니스 API 응답 지연 제로**: 트랜잭션 경계 밖에서 비동기 발행 → API 응답 시간에 영향 없음
 - **구현 주의**: 기존 Producer Bean과 설정이 완전히 다르므로 **반드시 전용 `KafkaProducerConfig` Bean을 별도로 등록**해 공유하지 말 것
 - **Bean 분리 방식**: 동일 타입 `KafkaTemplate<String, Object>` 2개 공존 시 `NoUniqueBeanDefinitionException` 방지를 위해 기존 Saga용 Bean에 `@Primary` + action.log 전용 Bean에 `@Qualifier("actionLogKafkaTemplate")` 조합 사용 (상세: [actionLog.md](actionLog.md) §2 #13)
+- **Producer 측 스키마 검증**: 숫자·필수 필드는 Jakarta Bean Validation(`@NotNull`·`@Positive` 등)으로 **Controller 진입 시점에 선 차단** (예: `DwellRequest.dwellTimeSeconds`). `acks=0` + Consumer dedup 미적용 정책상 Producer validation이 DB 오염 방지의 **최종 방어선** — Consumer(Log Fastify)는 의미 검증 전담, Producer는 스키마 검증 전담으로 레이어 분리 (상세: [actionLog.md](actionLog.md) §2 #2)
 
 ---
 
@@ -1099,7 +1124,8 @@ topic: event.force-cancelled  → DLT: event.force-cancelled.DLT
 ### Commerce (신규 적용)
 
 **구현 완료 (주문생성 ~ 결제완료 Phase)**
-- [x] ✅ `JacksonConfig` (`common/config/JacksonConfig.java`)
+- [x] ✅ **config 패키지 이전 (2026-04-21)** — `common/config/*` 8파일(`JacksonConfig`·`AsyncConfig`·`KafkaProducerConfig`·`KafkaConsumerConfig`·`ShedLockConfig`·`ActionLogKafkaProducerConfig`·`OpenApiConfig`·`TransactionConfig`) → **`infrastructure/config/*`** 로 이전 (AGENTS.md §2.1 규정 정합). Event·Payment 모듈은 여전히 `common/config/` 유지 (scope 외, 추후 리팩터링 트랙)
+- [x] ✅ `JacksonConfig` (`infrastructure/config/JacksonConfig.java`)
 - [x] ✅ `KafkaTopics` 상수 클래스 — Saga 6개 + 환불 1개 + 이벤트 관리 2개 + Orchestration 12개 (`common/messaging/KafkaTopics.java`)
 - [x] ✅ Outbox 패턴 구현 (`Outbox`, `OutboxService`, `OutboxEventProducer`, `OutboxScheduler` + ShedLock)
 - [x] ✅ `MessageDeduplicationService` + `processed_message` 테이블 (제약명: `uk_processed_message_message_id_topic`, 실제 `message_id` 단독 UNIQUE)
@@ -1128,7 +1154,7 @@ topic: event.force-cancelled  → DLT: event.force-cancelled.DLT
 - [x] ✅ `ShedLockConfig` — `JdbcTemplateLockProvider` + `.usingDbTime()`, `lockAtMostFor=30s`
 - [x] ✅ `KafkaConsumerConfig` — `ExponentialBackOff(2→4→8초, 3회)` + `AckMode.MANUAL`
 - [x] ✅ `MessageDeduplicationService` 구현 + `processed_message` 테이블 (`topic` 컬럼 포함, schema=`event`)
-- [x] ✅ Outbox 패키지 전체 (`common/outbox/`) — `Outbox` 엔티티, `OutboxStatus`, `OutboxEventMessage`, `OutboxRepository`(nextRetryAt 조건 포함), `OutboxService`(save MANDATORY 트랜잭션), `OutboxScheduler`(`@SchedulerLock`, fixedDelay=3s, 선형 백오프 5회), `OutboxEventProducer`(X-Message-Id 헤더 + partition key)
+- [x] ✅ Outbox 패키지 전체 (`common/outbox/`) — `Outbox` 엔티티, `OutboxStatus`, `OutboxEventMessage`, `OutboxRepository`(nextRetryAt 조건 포함), `OutboxService`(save MANDATORY 트랜잭션), `OutboxScheduler`(`@SchedulerLock`, fixedDelay=3s, 지수 백오프 6회: 1/2/4/8/16s, 7번째 FAILED), `OutboxEventProducer`(X-Message-Id 헤더 + partition key)
 - [x] ✅ `Event` 엔티티 낙관적 락 (`@Version`) 적용
 - [x] ✅ 이벤트 DTO record 신규 (`common/messaging/event/`): `OrderCreatedEvent(List<OrderItem>)`, `StockDeductedEvent`, `StockFailedEvent`, `PaymentFailedEvent(List<OrderItem>)` — 모두 UUID/Instant/enum 타입 준수
   > ⚠️ `infrastructure/messaging/event/PaymentFailedEvent.java` 사본이 로컬 untracked로 존재 — 사용처 없음, 후속 정리 필요
