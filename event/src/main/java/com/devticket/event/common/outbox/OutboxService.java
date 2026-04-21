@@ -50,9 +50,20 @@ public class OutboxService {
     /**
      * Outbox 한 건을 Kafka에 발행하고 상태를 반영한다.
      * Kafka 발행은 트랜잭션 밖, 상태 저장은 {@code save()} 자체 트랜잭션에서 수행.
+     *
+     * <p>publish() 가 예상 외 RuntimeException 을 던져도 markFailed/save 를 보장해야
+     * Scheduler 루프가 중단되지 않고 동일 레코드의 무한 고착을 막을 수 있다.
      */
     public void processOne(Outbox outbox) {
-        boolean success = outboxEventProducer.publish(OutboxEventMessage.from(outbox));
+        boolean success;
+        try {
+            success = outboxEventProducer.publish(OutboxEventMessage.from(outbox));
+        } catch (RuntimeException e) {
+            log.error("Outbox 발행 중 예외 전파 — outboxId={}, topic={}, messageId={}, error={}",
+                    outbox.getId(), outbox.getTopic(), outbox.getMessageId(), e.getMessage(), e);
+            success = false;
+        }
+
         if (success) {
             outbox.markSent();
         } else {
