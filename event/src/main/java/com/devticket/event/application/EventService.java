@@ -4,8 +4,10 @@ import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch._types.FieldValue;
 import co.elastic.clients.elasticsearch._types.query_dsl.BoolQuery;
 import co.elastic.clients.elasticsearch._types.query_dsl.Query;
+import com.devticket.event.application.event.ActionLogDomainEvent;
 import com.devticket.event.common.exception.BusinessException;
 import com.devticket.event.common.messaging.KafkaTopics;
+import com.devticket.event.common.messaging.event.ActionType;
 import com.devticket.event.common.messaging.event.OrderCreatedEvent;
 import com.devticket.event.common.messaging.event.StockDeductedEvent;
 import com.devticket.event.common.messaging.event.StockFailedEvent;
@@ -47,6 +49,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.elasticsearch.client.elc.NativeQuery;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
@@ -67,6 +70,7 @@ public class EventService {
     private final OutboxService outboxService;
     private final MessageDeduplicationService deduplicationService;
     private final ObjectMapper objectMapper;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public SellerEventCreateResponse createEvent(UUID sellerId, SellerEventCreateRequest request) {
@@ -134,6 +138,30 @@ public class EventService {
         String nickname = memberClient.getNickname(event.getSellerId());
 
         return EventDetailResponse.from(event, nickname);
+    }
+
+    public void logDetailView(UUID userId, UUID eventId) {
+        if (userId == null) {
+            return;
+        }
+        eventPublisher.publishEvent(new ActionLogDomainEvent(
+            userId, eventId, ActionType.DETAIL_VIEW,
+            null, null, null, null, null, Instant.now()));
+    }
+
+    public void logEventListView(UUID userId, EventListRequest request) {
+        if (userId == null) {
+            return;
+        }
+        String stackFilter = (request.techStacks() == null || request.techStacks().isEmpty())
+            ? null
+            : request.techStacks().stream()
+                .map(String::valueOf)
+                .collect(Collectors.joining(","));
+        eventPublisher.publishEvent(new ActionLogDomainEvent(
+            userId, null, ActionType.VIEW,
+            request.keyword(), stackFilter,
+            null, null, null, Instant.now()));
     }
 
     @Transactional(readOnly = true)
