@@ -13,7 +13,6 @@ import com.devticket.member.presentation.dto.internal.response.InternalMemberSta
 import com.devticket.member.presentation.dto.internal.response.InternalPagedMemberResponse;
 import com.devticket.member.presentation.dto.internal.response.InternalSellerApplicationResponse;
 import com.devticket.member.presentation.dto.internal.response.InternalSellerInfoResponse;
-import com.devticket.member.presentation.dto.internal.response.InternalTechStackListResponse;
 import com.devticket.member.presentation.dto.internal.response.InternalUpdateRoleResponse;
 import com.devticket.member.presentation.dto.internal.response.InternalUpdateStatusResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -74,16 +73,6 @@ public class InternalMemberController {
     @GetMapping("/sellers")
     public ResponseEntity<List<UUID>> getSellerId(){
         List<UUID> response = internalMemberService.getSellerIds();
-        return ResponseEntity.ok(response);
-    }
-
-    @Operation(summary = "기술 스택 목록 조회", description = "내부 서비스용 — 전체 기술 스택 목록 조회")
-    @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "조회 성공")
-    })
-    @GetMapping("/tech-stacks")
-    public ResponseEntity<InternalTechStackListResponse> getTechStacks() {
-        InternalTechStackListResponse response = internalMemberService.getAllTechStacks();
         return ResponseEntity.ok(response);
     }
 

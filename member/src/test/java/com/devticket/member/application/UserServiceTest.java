@@ -18,7 +18,6 @@ import com.devticket.member.presentation.domain.model.UserProfile;
 import com.devticket.member.presentation.domain.model.UserTechStack;
 import com.devticket.member.infrastructure.jwt.JwtTokenProvider;
 import com.devticket.member.presentation.domain.repository.RefreshTokenRepository;
-import com.devticket.member.presentation.domain.repository.TechStackRepository;
 import com.devticket.member.presentation.domain.repository.UserProfileRepository;
 import com.devticket.member.presentation.domain.repository.UserRepository;
 import com.devticket.member.presentation.domain.repository.UserTechStackRepository;

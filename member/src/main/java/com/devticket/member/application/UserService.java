@@ -1,17 +1,17 @@
 package com.devticket.member.application;
 
 import com.devticket.member.common.exception.BusinessException;
+import com.devticket.member.infrastructure.external.client.AdminInternalClient;
+import com.devticket.member.infrastructure.external.dto.res.InternalAdminTechStackResponse;
 import com.devticket.member.infrastructure.jwt.JwtTokenProvider;
 import com.devticket.member.presentation.domain.MemberErrorCode;
 import com.devticket.member.presentation.domain.Position;
 import com.devticket.member.presentation.domain.ProviderType;
 import com.devticket.member.presentation.domain.model.RefreshToken;
-import com.devticket.member.presentation.domain.model.TechStack;
 import com.devticket.member.presentation.domain.model.User;
 import com.devticket.member.presentation.domain.model.UserProfile;
 import com.devticket.member.presentation.domain.model.UserTechStack;
 import com.devticket.member.presentation.domain.repository.RefreshTokenRepository;
-import com.devticket.member.presentation.domain.repository.TechStackRepository;
 import com.devticket.member.presentation.domain.repository.UserProfileRepository;
 import com.devticket.member.presentation.domain.repository.UserRepository;
 import com.devticket.member.presentation.domain.repository.UserTechStackRepository;
@@ -41,10 +41,11 @@ public class UserService {
     private final UserRepository userRepository;
     private final UserProfileRepository userProfileRepository;
     private final UserTechStackRepository userTechStackRepository;
-    private final TechStackRepository techStackRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
+    private final AdminInternalClient adminInternalClient;
+
 
     @Transactional
     public SignUpProfileResponse createProfile(UUID userId, SignUpProfileRequest request) {
@@ -77,7 +78,12 @@ public class UserService {
         List<Long> techStackIds = userTechStacks.stream()
             .map(UserTechStack::getTechStackId)
             .toList();
-        List<TechStack> techStacks = techStackRepository.findByIdIn(techStackIds);
+
+        InternalAdminTechStackResponse response = adminInternalClient.getTechStacks();
+        List<InternalAdminTechStackResponse.TechStackInfo> techStacks = response.techStacks()
+            .stream()
+            .filter(ts -> techStackIds.contains(ts.id()))
+            .toList();
 
         return GetProfileResponse.from(user, profile, techStacks);
     }
@@ -171,8 +177,8 @@ public class UserService {
             .orElseThrow(() -> new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND));
     }
 
-    public List<TechStack> getAllTechStacks() {
-        return techStackRepository.findAll();
+    public InternalAdminTechStackResponse getAllTechStacks() {
+        return adminInternalClient.getTechStacks();
     }
 
     // ========== 토큰 ==========

@@ -1,6 +1,6 @@
 package com.devticket.member.presentation.dto.response;
 
-import com.devticket.member.presentation.domain.model.TechStack;
+import com.devticket.member.infrastructure.external.dto.res.InternalAdminTechStackResponse.TechStackInfo;
 import com.devticket.member.presentation.domain.model.User;
 import com.devticket.member.presentation.domain.model.UserProfile;
 import java.util.List;
@@ -18,22 +18,17 @@ public record GetProfileResponse(
     String providerType
 ) {
 
-    public record TechStackInfo(Long techStackId, String name) {
 
-    }
 
     public static GetProfileResponse from(User user, UserProfile profile,
-        List<TechStack> techStacks) {
-        List<TechStackInfo> techStackInfos = techStacks.stream()
-            .map(ts -> new TechStackInfo(ts.getId(), ts.getName()))
-            .toList();
+        List<TechStackInfo> techStacks) {
 
         return new GetProfileResponse(
             user.getUserId(),
             user.getEmail(),
             profile.getNickname(),
             profile.getPosition() != null ? profile.getPosition().name() : null,
-            techStackInfos,
+            techStacks,
             profile.getProfileImgUrl(),
             profile.getBio(),
             user.getRole().name(),
