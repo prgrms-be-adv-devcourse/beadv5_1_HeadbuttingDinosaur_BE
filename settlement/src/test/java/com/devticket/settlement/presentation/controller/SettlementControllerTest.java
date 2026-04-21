@@ -1,16 +1,11 @@
 package com.devticket.settlement.presentation.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 
 import com.devticket.settlement.application.service.SettlementServiceImpl;
-import com.devticket.settlement.common.exception.BusinessException;
-import com.devticket.settlement.common.exception.CommonErrorCode;
-import com.devticket.settlement.domain.exception.SettlementErrorCode;
-import com.devticket.settlement.domain.model.SettlementStatus;
-import com.devticket.settlement.presentation.dto.SellerSettlementDetailResponse;
-import com.devticket.settlement.presentation.dto.SettlementResponse;
+import com.devticket.settlement.presentation.dto.EventItemResponse;
+import com.devticket.settlement.presentation.dto.SettlementPeriodResponse;
 import com.devticket.settlement.presentation.dto.SettlementTargetPreviewResponse;
 import java.time.LocalDate;
 import java.util.List;
@@ -33,7 +28,6 @@ class SettlementControllerTest {
     private SettlementController settlementController;
 
     private final UUID sellerId = UUID.randomUUID();
-    private final UUID settlementId = UUID.randomUUID();
 
     // ────────────────────────────────────────────────
     // previewSettlementTarget
@@ -82,82 +76,97 @@ class SettlementControllerTest {
     }
 
     // ────────────────────────────────────────────────
-    // getSellerSettlements
+    // getSettlementByPeriod
     // ────────────────────────────────────────────────
 
     @Test
-    void getSellerSettlements_성공() {
-        List<SettlementResponse> settlements = List.of(
-            new SettlementResponse(settlementId, "2024-01-01", "2024-01-31",
-                100000, 0, 3000, 97000, SettlementStatus.COMPLETED, "2024-02-01T10:00:00"),
-            new SettlementResponse(UUID.randomUUID(), "2024-02-01", "2024-02-28",
-                50000, 5000, 1500, 43500, SettlementStatus.PENDING, null)
-        );
-        given(settlementServiceImpl.getSellerSettlements(sellerId)).willReturn(settlements);
+    void getSettlementByPeriod_정상조회_성공() {
+        String yearMonth = "202603";
+        EventItemResponse item = new EventItemResponse("eventId", "이벤트", 100000L, 0L, 3000L, 97000L);
+        SettlementPeriodResponse response = new SettlementPeriodResponse(97000, 3000, 100000, 0, List.of(item));
+        given(settlementServiceImpl.getSettlementByPeriod(sellerId, yearMonth)).willReturn(response);
 
-        ResponseEntity<List<SettlementResponse>> result =
-            settlementController.getSellerSettlements(sellerId);
+        ResponseEntity<SettlementPeriodResponse> result =
+            settlementController.getSettlementByPeriod(sellerId, yearMonth);
 
         assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(result.getBody()).hasSize(2);
-        assertThat(result.getBody().get(0).totalSalesAmount()).isEqualTo(100000);
-        assertThat(result.getBody().get(0).status()).isEqualTo(SettlementStatus.COMPLETED);
-        assertThat(result.getBody().get(1).status()).isEqualTo(SettlementStatus.PENDING);
-    }
-
-    @Test
-    void getSellerSettlements_빈목록_빈배열반환() {
-        given(settlementServiceImpl.getSellerSettlements(sellerId)).willReturn(List.of());
-
-        ResponseEntity<List<SettlementResponse>> result =
-            settlementController.getSellerSettlements(sellerId);
-
-        assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(result.getBody()).isEmpty();
-    }
-
-    // ────────────────────────────────────────────────
-    // getSellerSettlement (detail)
-    // ────────────────────────────────────────────────
-
-    @Test
-    void getSellerSettlement_상세조회_성공() {
-        SellerSettlementDetailResponse detail = new SellerSettlementDetailResponse(
-            settlementId.toString(), "2024-01-01T00:00:00", "2024-01-31T23:59:59",
-            100000, 0, 3000, 97000, "COMPLETED", "2024-02-01T10:00:00", List.of()
-        );
-        given(settlementServiceImpl.getSellerSettlementDetail(sellerId, settlementId)).willReturn(detail);
-
-        ResponseEntity<SellerSettlementDetailResponse> result =
-            settlementController.getSellerSettlement(sellerId, settlementId);
-
-        assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(result.getBody().settlementId()).isEqualTo(settlementId.toString());
+        assertThat(result.getBody().finalSettlementAmount()).isEqualTo(97000);
         assertThat(result.getBody().totalSalesAmount()).isEqualTo(100000);
-        assertThat(result.getBody().status()).isEqualTo("COMPLETED");
+        assertThat(result.getBody().totalFeeAmount()).isEqualTo(3000);
+        assertThat(result.getBody().carriedInAmount()).isEqualTo(0);
+        assertThat(result.getBody().settlementItems()).hasSize(1);
     }
 
     @Test
-    void getSellerSettlement_정산없음_BusinessException발생() {
-        given(settlementServiceImpl.getSellerSettlementDetail(sellerId, settlementId))
-            .willThrow(new BusinessException(SettlementErrorCode.SETTLEMENT_BAD_REQUEST));
+    void getSettlementByPeriod_이월금액포함_성공() {
+        String yearMonth = "202603";
+        SettlementPeriodResponse response = new SettlementPeriodResponse(25000, 1500, 50000, 20000, List.of());
+        given(settlementServiceImpl.getSettlementByPeriod(sellerId, yearMonth)).willReturn(response);
 
-        assertThatThrownBy(() -> settlementController.getSellerSettlement(sellerId, settlementId))
-            .isInstanceOf(BusinessException.class)
-            .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
-                .isEqualTo(SettlementErrorCode.SETTLEMENT_BAD_REQUEST));
+        ResponseEntity<SettlementPeriodResponse> result =
+            settlementController.getSettlementByPeriod(sellerId, yearMonth);
+
+        assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(result.getBody().carriedInAmount()).isEqualTo(20000);
+        assertThat(result.getBody().finalSettlementAmount()).isEqualTo(25000);
     }
 
     @Test
-    void getSellerSettlement_다른판매자접근_BusinessException발생() {
-        UUID anotherSellerId = UUID.randomUUID();
-        given(settlementServiceImpl.getSellerSettlementDetail(anotherSellerId, settlementId))
-            .willThrow(new BusinessException(CommonErrorCode.ACCESS_DENIED));
+    void getSettlementByPeriod_정산내역없음_빈응답반환() {
+        String yearMonth = "202601";
+        SettlementPeriodResponse emptyResponse = new SettlementPeriodResponse(0, 0, 0, 0, List.of());
+        given(settlementServiceImpl.getSettlementByPeriod(sellerId, yearMonth)).willReturn(emptyResponse);
 
-        assertThatThrownBy(() -> settlementController.getSellerSettlement(anotherSellerId, settlementId))
-            .isInstanceOf(BusinessException.class)
-            .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
-                .isEqualTo(CommonErrorCode.ACCESS_DENIED));
+        ResponseEntity<SettlementPeriodResponse> result =
+            settlementController.getSettlementByPeriod(sellerId, yearMonth);
+
+        assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(result.getBody().finalSettlementAmount()).isEqualTo(0);
+        assertThat(result.getBody().settlementItems()).isEmpty();
+    }
+
+    // ────────────────────────────────────────────────
+    // getSettlementPreview
+    // ────────────────────────────────────────────────
+
+    @Test
+    void getSettlementPreview_READY항목있음_집계응답() {
+        EventItemResponse item = new EventItemResponse("eventId", "이벤트", 50000L, 0L, 1500L, 48500L);
+        SettlementPeriodResponse response = new SettlementPeriodResponse(48500, 1500, 50000, 0, List.of(item));
+        given(settlementServiceImpl.getSettlementPreview(sellerId)).willReturn(response);
+
+        ResponseEntity<SettlementPeriodResponse> result =
+            settlementController.getSettlementPreview(sellerId);
+
+        assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(result.getBody().finalSettlementAmount()).isEqualTo(48500);
+        assertThat(result.getBody().settlementItems()).hasSize(1);
+    }
+
+    @Test
+    void getSettlementPreview_이월금액포함_합산응답() {
+        SettlementPeriodResponse response = new SettlementPeriodResponse(18000, 600, 20000, 10000, List.of());
+        given(settlementServiceImpl.getSettlementPreview(sellerId)).willReturn(response);
+
+        ResponseEntity<SettlementPeriodResponse> result =
+            settlementController.getSettlementPreview(sellerId);
+
+        assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(result.getBody().carriedInAmount()).isEqualTo(10000);
+        assertThat(result.getBody().finalSettlementAmount()).isEqualTo(18000);
+    }
+
+    @Test
+    void getSettlementPreview_데이터없음_빈응답() {
+        SettlementPeriodResponse emptyResponse = new SettlementPeriodResponse(0, 0, 0, 0, List.of());
+        given(settlementServiceImpl.getSettlementPreview(sellerId)).willReturn(emptyResponse);
+
+        ResponseEntity<SettlementPeriodResponse> result =
+            settlementController.getSettlementPreview(sellerId);
+
+        assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(result.getBody().finalSettlementAmount()).isEqualTo(0);
+        assertThat(result.getBody().settlementItems()).isEmpty();
     }
 
     // ────────────────────────────────────────────────
