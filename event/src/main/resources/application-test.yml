@@ -28,3 +28,10 @@ spring:
     # ES 계열 @SpringBootTest 컨텍스트 로드 시 KafkaProducerConfig @Value 실패 방지.
     # @EmbeddedKafka 통합 테스트는 spring.embedded.kafka.brokers 로 override 됨.
     bootstrap-servers: localhost:9092
+
+service:
+  # placeholder resolution 전용 dummy — AiClient/MemberClient @Value 실패 방지
+  member:
+    url: http://localhost:8081
+  ai:
+    url: http://localhost:8000
