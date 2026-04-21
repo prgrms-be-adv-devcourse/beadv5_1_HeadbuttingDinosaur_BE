@@ -36,7 +36,7 @@ public class AdminActionHistory {
     @Column(name = "target_type", nullable = false)
     private AdminTargetType targetType;
 
-    @Column(name = "target_id", nullable = false)
+    @Column(name = "target_id", nullable = true)
     private UUID targetId;
 
     @Enumerated(EnumType.STRING)
