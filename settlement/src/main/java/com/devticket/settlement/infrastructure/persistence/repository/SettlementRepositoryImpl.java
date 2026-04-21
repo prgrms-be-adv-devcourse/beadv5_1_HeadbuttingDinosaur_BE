@@ -55,8 +55,8 @@ public class SettlementRepositoryImpl implements SettlementRepository {
     }
 
     @Override
-    public Optional<Settlement> findBySellerIdAndPeriodStartAt(UUID sellerId, LocalDateTime periodStartAt) {
-        return settlementJpaRepository.findBySellerIdAndPeriodStartAt(sellerId, periodStartAt);
+    public Optional<Settlement> findBySellerIdAndPeriodStartAtBetween(UUID sellerId, LocalDateTime from, LocalDateTime to) {
+        return settlementJpaRepository.findBySellerIdAndPeriodStartAtBetween(sellerId, from, to);
     }
 
     @Override

@@ -191,25 +191,27 @@ public class SettlementServiceImpl implements SettlementService {
     public SettlementPeriodResponse getSettlementByPeriod(UUID sellerId, String yearMonth) {
         int year = Integer.parseInt(yearMonth.substring(0, 4));
         int month = Integer.parseInt(yearMonth.substring(4, 6));
-        LocalDateTime periodStartAt = YearMonth.of(year, month).minusMonths(1).atDay(26).atStartOfDay();
+        // 202604 → periodStartAt = 3/26, periodEndAt = 4/25
+        // periodStartAt이 전월 26일 하루(00:00~23:59) 범위로 조회
+        LocalDate periodStartDate = YearMonth.of(year, month).minusMonths(1).atDay(26);
+        LocalDateTime periodStartFrom = periodStartDate.atStartOfDay();
+        LocalDateTime periodStartTo = periodStartDate.atTime(23, 59, 59);
 
-        Settlement settlement = settlementRepository.findBySellerIdAndPeriodStartAt(sellerId, periodStartAt)
-            .orElseThrow(() -> new BusinessException(SettlementErrorCode.SETTLEMENT_NOT_FOUND));
-
-        validateSellerAccess(sellerId, settlement);
-
-        List<EventItemResponse> items = settlementItemRepository.findBySettlementId(settlement.getSettlementId())
-            .stream()
-            .map(this::toResponse)
-            .toList();
-
-        return new SettlementPeriodResponse(
-            settlement.getFinalSettlementAmount(),
-            settlement.getTotalFeeAmount(),
-            settlement.getTotalSalesAmount(),
-            settlement.getCarriedInAmount(),
-            items
-        );
+        return settlementRepository.findBySellerIdAndPeriodStartAtBetween(sellerId, periodStartFrom, periodStartTo)
+            .map(settlement -> {
+                List<EventItemResponse> items = settlementItemRepository.findBySettlementId(settlement.getSettlementId())
+                    .stream()
+                    .map(this::toResponse)
+                    .toList();
+                return new SettlementPeriodResponse(
+                    settlement.getFinalSettlementAmount(),
+                    settlement.getTotalFeeAmount(),
+                    settlement.getTotalSalesAmount(),
+                    settlement.getCarriedInAmount(),
+                    items
+                );
+            })
+            .orElse(new SettlementPeriodResponse(0, 0, 0, 0, List.of()));
     }
 
     @Override

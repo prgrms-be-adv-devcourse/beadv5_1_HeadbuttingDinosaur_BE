@@ -22,7 +22,7 @@ public interface SettlementJpaRepository extends JpaRepository<Settlement, Long>
 
     List<Settlement> findByStatus(SettlementStatus status);
 
-    Optional<Settlement> findBySellerIdAndPeriodStartAt(UUID sellerId, LocalDateTime periodStartAt);
+    Optional<Settlement> findBySellerIdAndPeriodStartAtBetween(UUID sellerId, LocalDateTime from, LocalDateTime to);
 
     @Query("""
     SELECT s FROM Settlement s

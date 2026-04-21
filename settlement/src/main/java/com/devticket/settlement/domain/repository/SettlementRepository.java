@@ -19,7 +19,7 @@ public interface SettlementRepository {
 
     List<Settlement> findByStatus(SettlementStatus status);
 
-    Optional<Settlement> findBySellerIdAndPeriodStartAt(UUID sellerId, LocalDateTime periodStartAt);
+    Optional<Settlement> findBySellerIdAndPeriodStartAtBetween(UUID sellerId, LocalDateTime from, LocalDateTime to);
 
     List<Settlement> saveAll(List<? extends Settlement> settlements);
 
