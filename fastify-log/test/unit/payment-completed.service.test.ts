@@ -178,6 +178,80 @@ describe('PaymentCompletedService', () => {
     });
   });
 
+  describe('Outbox wrapper unwrap', () => {
+    function buildOutboxEnvelope(innerEvent: Record<string, unknown>): Record<string, unknown> {
+      return {
+        messageId: '8b3e5a1c-4d2f-41a7-9c8e-6f1b2a3d4e5f',
+        eventType: 'PaymentCompletedEvent',
+        payload: JSON.stringify(innerEvent),
+        timestamp: '2024-04-19T14:30:00.123456789Z',
+      };
+    }
+
+    it('Outbox wrapper → payload 추출 후 INSERT', async () => {
+      const inner = baseEvent();
+      await paymentCompletedService.save(buildOutboxEnvelope(inner));
+
+      expect(mockInsert).toHaveBeenCalledOnce();
+      expect(mockInsert).toHaveBeenCalledWith([
+        expect.objectContaining({
+          userId: USER_UUID,
+          eventId: EVENT_UUID_1,
+          actionType: 'PURCHASE',
+          quantity: 2,
+          totalAmount: 100000,
+          timestamp: TIMESTAMP,
+        }),
+      ]);
+    });
+
+    it('Outbox wrapper 다건 주문 → orderItems 수만큼 fan-out', async () => {
+      const inner = baseEvent({
+        orderItems: [
+          { eventId: EVENT_UUID_1, quantity: 2 },
+          { eventId: EVENT_UUID_2, quantity: 3 },
+        ],
+        totalAmount: 250000,
+      });
+
+      await paymentCompletedService.save(buildOutboxEnvelope(inner));
+
+      expect(mockInsert).toHaveBeenCalledOnce();
+      expect(mockInsert).toHaveBeenCalledWith([
+        expect.objectContaining({ eventId: EVENT_UUID_1, quantity: 2, totalAmount: null }),
+        expect.objectContaining({ eventId: EVENT_UUID_2, quantity: 3, totalAmount: null }),
+      ]);
+    });
+
+    it('wrapper 없는 raw 이벤트는 그대로 처리된다 (backward compat)', async () => {
+      await paymentCompletedService.save(baseEvent());
+
+      expect(mockInsert).toHaveBeenCalledOnce();
+    });
+
+    it('payload 필드가 문자열 아니면 unwrap 스킵 → outer를 validate → 검증 실패', async () => {
+      const malformed = {
+        messageId: '8b3e5a1c-4d2f-41a7-9c8e-6f1b2a3d4e5f',
+        payload: { not: 'a string' },
+      };
+
+      await expect(paymentCompletedService.save(malformed)).rejects.toThrow();
+      expect(mockInsert).not.toHaveBeenCalled();
+    });
+
+    it('payload 문자열이 JSON 아님 → throw', async () => {
+      const malformed = {
+        messageId: '8b3e5a1c-4d2f-41a7-9c8e-6f1b2a3d4e5f',
+        eventType: 'PaymentCompletedEvent',
+        payload: 'not-a-json{{{',
+        timestamp: '2024-04-19T14:30:00Z',
+      };
+
+      await expect(paymentCompletedService.save(malformed)).rejects.toThrow('Outbox payload');
+      expect(mockInsert).not.toHaveBeenCalled();
+    });
+  });
+
   describe('repository 에러 전파', () => {
     it('DB INSERT 실패 시 에러가 전파된다', async () => {
       mockInsert.mockRejectedValueOnce(new Error('DB connection failed'));

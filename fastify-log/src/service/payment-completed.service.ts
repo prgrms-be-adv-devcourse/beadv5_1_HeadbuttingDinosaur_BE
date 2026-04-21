@@ -9,9 +9,30 @@ import { actionLogRepository } from '../repository/action-log.repository';
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function save(raw: unknown): Promise<void> {
-  const event = validateAndParse(raw);
+  const inner = unwrapOutboxPayload(raw);
+  const event = validateAndParse(inner);
   const logs = toActionLogs(event);
   await actionLogRepository.insertActionLogs(logs);
+}
+
+/**
+ * Payment OutboxEventProducer는 {messageId, eventType, payload(JSON string), timestamp} 래퍼로 발행한다.
+ * wrapper면 payload를 한번 더 JSON.parse 해서 실제 PaymentCompletedEvent로 복원한다.
+ * wrapper가 아니면 (예: 테스트 raw 발행) 원본 그대로 반환한다.
+ */
+function unwrapOutboxPayload(outer: unknown): unknown {
+  if (!outer || typeof outer !== 'object') return outer;
+  const obj = outer as Record<string, unknown>;
+
+  if (typeof obj.payload !== 'string') {
+    return outer;
+  }
+
+  try {
+    return JSON.parse(obj.payload);
+  } catch {
+    throw new Error('Outbox payload JSON 파싱 실패');
+  }
 }
 
 function validateAndParse(raw: unknown): PaymentCompletedEvent {
