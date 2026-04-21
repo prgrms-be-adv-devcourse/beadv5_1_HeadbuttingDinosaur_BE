@@ -352,7 +352,7 @@ public class ActionLogKafkaPublisher {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void publish(ActionLogDomainEvent domain) {
         try {
-            String payload = objectMapper.writeValueAsString(ActionLogEvent.from(domain));
+            String payload = objectMapper.writeValueAsString(toKafkaEvent(domain));
             actionLogKafkaTemplate.send(
                 "action.log",
                 domain.userId().toString(),     // Partition Key = userId
@@ -368,8 +368,33 @@ public class ActionLogKafkaPublisher {
                 domain.actionType(), domain.userId(), e);
         }
     }
+
+    // Kafka DTO 매핑 — Publisher(application 계층) 내부 유지로 AGENTS.md §2.2 의존 방향 준수.
+    // Kafka DTO record(ActionLogEvent)가 도메인 이벤트(ActionLogDomainEvent)를 역방향 import하지 않도록 분리.
+    private static ActionLogEvent toKafkaEvent(ActionLogDomainEvent domain) {
+        return new ActionLogEvent(
+            domain.userId(),
+            domain.eventId(),
+            domain.actionType(),
+            domain.searchKeyword(),
+            domain.stackFilter(),
+            domain.dwellTimeSeconds(),
+            domain.quantity(),
+            domain.totalAmount(),
+            domain.timestamp()
+        );
+    }
 }
 ```
+
+> **매퍼 위치 원칙 — 각 모듈 `AGENTS.md` 컨벤션 우선**
+>
+> 위 Publisher 샘플은 **Event 모듈 기준** (AGENTS.md §2.1 "Kafka DTO 전용" 규정 + §2.2 의존 방향 준수)으로 **Publisher 내부 `private static toKafkaEvent()`** 방식을 사용. 모듈별 기존 컨벤션에 따라 다르게 구현 가능:
+>
+> - **`from()` 정적 팩토리가 모듈 전수 표준인 경우** (예: Commerce — `from()` 12+건 사용): Kafka DTO record에 **`from(ActionLogDomainEvent)` 정적 팩토리 유지** + `ActionLogDomainEvent`를 동일 `common/messaging/event/` 하위에 배치하여 역참조 회피 가능 (Commerce `OutboxEventMessage`-`Outbox` 동일 패키지 참조 선례와 동일 구조). `ActionLogDomainEvent` 상단에 "Spring 내부 이벤트, Kafka 직렬화 대상 아님" 주석 명시 권장.
+> - **Kafka DTO 전용 패키지가 명시된 모듈** (예: Event AGENTS.md §2.1 — `infrastructure.messaging.event`는 "토픽별 이벤트 record DTO"): Kafka DTO record는 순수 계약만 유지, 매퍼는 **Publisher(application 계층) 내부 `private static`** 으로 두어 의존 방향 준수.
+>
+> 어느 방식이든 **Kafka DTO record의 계약 순수성(필드·`@JsonIgnoreProperties`)은 동일**.
 
 > `@EnableAsync` 어노테이션이 `@Configuration` 클래스 중 한 곳에 이미 선언돼 있어야 `@Async` 동작.
 
