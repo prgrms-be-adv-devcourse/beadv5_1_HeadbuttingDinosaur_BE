@@ -99,7 +99,7 @@ export interface ActionLogMessage {
 | # | 항목 | 결정 | 결정 주체 | 결정 이유 |
 |---|---|---|---|---|
 | 1 | **actionType 7종** (VIEW/DETAIL_VIEW/CART_ADD/CART_REMOVE/PURCHASE/DWELL_TIME/REFUND) 유지 | 현재 구현 유지 | 구현 반영 | 이미 enum·DB 마이그레이션 완료. REFUND는 향후 환불 스코프 사전 반영 — 제거 시 재작업 발생 |
-| 2 | **DTO 필드 9개** (userId/eventId/actionType/searchKeyword/stackFilter/dwellTimeSeconds/quantity/totalAmount/timestamp) 유지 | 현재 구현 유지 | 구현 반영 | 분석 가치 있는 필드(`searchKeyword`·`stackFilter` = 검색/필터 이탈 분석, `quantity`·`totalAmount` = 매출·장바구니 분석). 단일 DTO + nullable 방식, **검증은 Consumer에서 수행** |
+| 2 | **DTO 필드 9개** (userId/eventId/actionType/searchKeyword/stackFilter/dwellTimeSeconds/quantity/totalAmount/timestamp) 유지 | 현재 구현 유지 | 구현 반영 | 분석 가치 있는 필드(`searchKeyword`·`stackFilter` = 검색/필터 이탈 분석, `quantity`·`totalAmount` = 매출·장바구니 분석). 단일 DTO + nullable 방식. **검증 레이어 분리** — Producer 측은 `@NotNull`·`@Positive` 등 **스키마 레벨 Bean Validation**(예: `DwellRequest.dwellTimeSeconds`)으로 명백한 오염 요청 선 차단, Consumer(Log Fastify)는 **의미 검증** 수행. `acks=0`/Consumer dedup 미적용 정책상 Producer validation이 사실상 최종 방어선 |
 | 3 | **예외 처리: 스킵 + offset commit** (at-most-once) | 현재 구현 유지 | 구현 반영 | 로그는 손실 허용 가능한 성격. 재시도·DLT 운영 오버헤드 불필요. `acks=0`과 정책 일관성 |
 | 4 | **Partition Key = `userId`** | 확정 | 사용자 지시 | AI 행동분석 시 **동일 사용자 이벤트 순서 보장** 필수 (시퀀스 학습·이탈 예측의 핵심 전제) |
 | 5 | **Producer `acks=0`** | 확정 | 사용자 지시 | 최고 처리량. 로그 손실 허용. Outbox 패턴 오버헤드 없이 fire-and-forget |
@@ -182,7 +182,7 @@ export interface ActionLogMessage {
 
 - **작업**: `payment.completed` 토픽 **추가 구독** → Consumer 내부에서 PURCHASE 레코드 `log.action_log` **직접 INSERT** (Kafka 재발행 없음 — §2 #12)
 - **완료 반영**: kafka-impl-plan.md §3-4 체크리스트 5항 전부 `[x] ✅` (#455)
-- **구현 위치**: `fastify-log/src/consumer/payment-completed.consumer.ts`, `src/service/payment-completed.service.ts`, `src/repository/action-log.repository.ts`
+- **구현 위치**: `fastify-log/src/consumer/action-log.consumer.ts` (`dispatchMessage` topic 분기), `src/service/payment-completed.service.ts` (outbox unwrap + PURCHASE 매핑), `src/repository/action-log.repository.ts` (원자적 다중 INSERT)
 - **Consumer 선 구축 이유**: Producer 구현 시 즉시 E2E 검증 가능 + 매출 KPI 직결(§2 #12) — 파이프라인 먼저 안정화
 
 ---
@@ -348,8 +348,13 @@ public class ActionLogKafkaPublisher {
 
     // DB 미접근 리스너 — @Transactional 불요 (at-most-once 발행 전용).
     // 기존 도메인 리스너(예: StockStatusChangedListener의 @Transactional(REQUIRES_NEW)) 패턴과 의도적 차이.
+    //
+    // fallbackExecution=true 필수 이유:
+    //   @TransactionalEventListener 기본값(false)에서는 트랜잭션 밖 publishEvent 호출 시 리스너가 조용히 무시됨.
+    //   DWELL_TIME Controller처럼 @Transactional 없이 publishEvent 호출하는 경우(DB 접근 없음)에도 발행을 보장하기 위해 true.
+    //   트랜잭션 있으면 AFTER_COMMIT, 없으면 즉시 실행 — 양쪽 케이스 모두 커버.
     @Async
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void publish(ActionLogDomainEvent domain) {
         try {
             String payload = objectMapper.writeValueAsString(toKafkaEvent(domain));
@@ -408,8 +413,11 @@ public class ActionLogKafkaPublisher {
 
 - **경로 예시**: `POST /api/events/{eventId}/dwell` (프론트 스펙 합의 결과 우선)
 - **Request Body**: `{ dwellTimeSeconds: Integer }` (eventId는 Path Variable, userId는 인증 추출)
+  - **Bean Validation 필수**: `DwellRequest` record의 `dwellTimeSeconds` 필드에 `@NotNull @Positive` 적용, Controller 파라미터에 `@Valid` 부여
+  - 근거: `acks=0` + Consumer dedup 미적용 정책상 Producer validation이 `log.action_log.dwell_time_seconds` 오염 방지의 **최종 방어선** (null·음수 요청 선 차단)
 - **응답**: `204 No Content` (로그성 — body 불필요)
 - **Controller 구조**: 얇은 Controller → `ApplicationEventPublisher.publishEvent(ActionLogDomainEvent)` 호출만. **트랜잭션 불요, 기존 Publisher 재사용**
+- **비로그인 처리**: `X-User-Id` 미전달 시 → **발행 skip + `204 No Content` 반환** (`getEventList` / `getEvent` 등 `get*` 비로그인 정책과 일관. `userId` 필수 필드 누락 방지 + AI팀 수집 정책 일관성)
 - **프론트 트리거 규약** (참고): `visibilitychange` → hidden 전환 시 `navigator.sendBeacon()` 전송 권장 — 백엔드 구현과 독립, 프론트 합의 영역
 - **선결 합의 사항** (프론트 한정, PO·AI팀 의도는 확정): 경로 / body / 트리거 이벤트 / 최소 체류 시간 필터 / 수집 대상 페이지 범위
 - **스펙 합의 지연 대응**: 스펙만 먼저 확정되면 백엔드 구현·배포는 선행 가능 (호출자 없어도 무해)
@@ -418,14 +426,20 @@ public class ActionLogKafkaPublisher {
 
 ### ④ Commerce Producer 구현 (Event와 병렬 가능)
 
-| actionType | 발행 시점 | 필수 필드 |
-|---|---|---|
-| `CART_ADD` | 장바구니 담기 API 핸들러 | `userId`, `eventId`, `actionType`, `timestamp` (+ `quantity` 권장) |
-| `CART_REMOVE` | 장바구니 삭제 API 핸들러 | `userId`, `eventId`, `actionType`, `timestamp` |
+| actionType | 발행 시점 | 필수 필드 | 권장 필드 |
+|---|---|---|---|
+| `CART_ADD` | 장바구니 담기 (`save`), 수량 증가 (`updateTicket` 양수) | `userId`, `eventId`, `actionType`, `timestamp` | `quantity`, `totalAmount` |
+| `CART_REMOVE` | 단건 삭제 (`deleteTicket`), 수량 감소 (`updateTicket` 음수), 전체 삭제 (`clearCart` — **N회**) | `userId`, `eventId`, `actionType`, `timestamp` | `quantity`, `totalAmount` |
 
 **공통 발행 규약**: ③ 동일 (Partition Key `userId`, `acks=0`, 트랜잭션 경계 밖, 실패 허용)
 
 **권장 구현 패턴**: ③ 동일 (`ApplicationEventPublisher` + `@TransactionalEventListener(AFTER_COMMIT)` + `@Async`)
+
+**Commerce 발행 정책 (PO 결정)**
+- `totalAmount = event.price() × quantity` — Event 서비스 조회로 산출 (save/updateTicket 경로는 기존 조회 재사용, `deleteTicket`·`clearCart`는 신규 조회 비용 감수)
+- **`clearCart` 전체 삭제는 N회 발행** — 장바구니 아이템별 eventId 단위 `CART_REMOVE` 1건씩 (AI 이탈 패턴 분석 보존)
+- `CART_ADD` 신규 생성/수량 증가 구분 안 함 — 단일 `CART_ADD`로 통일 (enum 7종 고정)
+- `updateTicket` 양수/음수 → `CART_ADD`/`CART_REMOVE` 분기, `quantity=절댓값`
 
 **병렬성**: Event와 서비스 경계 완전 분리 — 팀 리소스 여건에 따라 ③과 동시 진행 가능
 
@@ -500,7 +514,7 @@ public class ActionLogKafkaPublisher {
 
 | 항목 | Commerce | Event |
 |---|---|---|
-| actionType | `CART_ADD` (필수: userId/eventId/actionType/timestamp, 권장: quantity) / `CART_REMOVE` | `VIEW` (eventId nullable, searchKeyword/stackFilter 선택) / `DETAIL_VIEW` (eventId 필수) / `DWELL_TIME` (dwellTimeSeconds 필수) |
+| actionType | `CART_ADD` / `CART_REMOVE` (필수: userId/eventId/actionType/timestamp, 권장: quantity + totalAmount) — `clearCart` 전체 삭제는 N회 발행 | `VIEW` (eventId nullable, searchKeyword/stackFilter 선택) / `DETAIL_VIEW` (eventId 필수) / `DWELL_TIME` (dwellTimeSeconds 필수) |
 | 발행 주체 | `CartService` 또는 장바구니 API 핸들러 | `EventQueryService` 또는 조회/이탈 API 핸들러 |
 | Publisher 클래스명 | **`ActionLogKafkaPublisher` (Commerce·Event 공통)** — `@TransactionalEventListener`는 트리거 수단이며 주 책임은 Kafka 발행. 기존 도메인 리스너(`StockStatusChangedListener` 등)의 "Listener" 명명은 별개 책임(내부 상태 동기화)이라 재사용하지 말 것 | 동일 |
 | 작업 순서 팁 | 2종 동시 진행 가능 | VIEW → DETAIL_VIEW → DWELL_TIME (트래픽 큰 순) |
