@@ -9,6 +9,7 @@ import com.devticket.admin.presentation.dto.res.GetTechStackResponse;
 import com.devticket.admin.presentation.dto.res.UpdateTechStackResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -34,7 +35,7 @@ public class TechStackController {
     @PostMapping
     @Operation(summary = "TechStack 생성")
     public ResponseEntity<CreateTechStackResponse> createTechStack(
-        @RequestBody CreateTechStackRequest request
+        @RequestBody @Valid CreateTechStackRequest request
     ) {
         return ResponseEntity.ok(techStackService.createTechStack(request));
     }
@@ -43,7 +44,7 @@ public class TechStackController {
     @Operation(summary = "TechStack 수정")
     public ResponseEntity<UpdateTechStackResponse> updateTechStack(
         @PathVariable Long id,
-        @RequestBody UpdateTechStackRequest request
+        @RequestBody @Valid UpdateTechStackRequest request
     ) {
         return ResponseEntity.ok(techStackService.updateTechStack(id, request));
     }

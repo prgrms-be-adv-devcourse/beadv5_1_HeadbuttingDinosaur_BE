@@ -32,7 +32,7 @@ public class OpenAiEmbeddingClient {
             EmbeddingResponse response = webClient.post()
                 .uri(embeddingUrl)
                 .header("Authorization", "Bearer " + apiKey)
-                .bodyValue(new EmbeddingRequest(text, model))
+                .bodyValue(new EmbeddingRequest(model, text))
                 .retrieve()
                 .bodyToMono(EmbeddingResponse.class)
                 .block();
