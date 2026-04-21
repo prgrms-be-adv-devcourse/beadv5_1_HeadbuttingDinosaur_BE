@@ -23,3 +23,8 @@ spring:
     uris: http://localhost:9200
     connection-timeout: 1s
     socket-timeout: 1s
+  kafka:
+    # placeholder resolution 전용 dummy — EventSearch*/EventSyncElasticsearchTest 등
+    # ES 계열 @SpringBootTest 컨텍스트 로드 시 KafkaProducerConfig @Value 실패 방지.
+    # @EmbeddedKafka 통합 테스트는 spring.embedded.kafka.brokers 로 override 됨.
+    bootstrap-servers: localhost:9092
