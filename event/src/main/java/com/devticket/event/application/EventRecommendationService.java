@@ -12,6 +12,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -39,9 +40,21 @@ public class EventRecommendationService {
             return InternalRecommendationResponse.empty();
         }
 
+        // AI 응답 ID 파싱 실패 항목 필터링 (graceful degradation)
         List<UUID> rankedIds = rankedIdStrings.stream()
-            .map(UUID::fromString)
+            .flatMap(id -> {
+                try {
+                    return Stream.of(UUID.fromString(id));
+                } catch (IllegalArgumentException | NullPointerException e) {
+                    log.warn("[AI 추천 ID 파싱 실패] id: {}", id);
+                    return Stream.empty();
+                }
+            })
             .toList();
+
+        if (rankedIds.isEmpty()) {
+            return InternalRecommendationResponse.empty();
+        }
 
         // N+1 방지: techStacks, images 각각 배치 로드
         Map<UUID, Event> hydratedById = eventRepository.findAllWithDetailsByEventIdIn(rankedIds).stream()
