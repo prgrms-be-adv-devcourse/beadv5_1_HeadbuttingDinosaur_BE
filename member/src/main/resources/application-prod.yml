@@ -26,6 +26,10 @@ logging:
   level:
     com.devticket: INFO
 
+internal:
+  admin-service:
+    url: http://admin:8087
+
 management:
   endpoints:
     web:
