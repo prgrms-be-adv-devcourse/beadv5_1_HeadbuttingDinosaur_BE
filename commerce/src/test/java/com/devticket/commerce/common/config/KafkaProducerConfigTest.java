@@ -3,74 +3,90 @@ package com.devticket.commerce.common.config;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.devticket.commerce.common.outbox.OutboxEventProducer;
-import java.lang.reflect.Field;
 import java.util.Map;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.junit.jupiter.api.Test;
 import org.springframework.kafka.core.DefaultKafkaProducerFactory;
-import org.springframework.kafka.core.ProducerFactory;
 import org.springframework.test.util.ReflectionTestUtils;
 
 /**
  * Outbox 이중 발행 완화(Issue #481, commit 5e2c3d5) — Producer 타임아웃과
- * OutboxEventProducer.SEND_TIMEOUT_SECONDS 간 정합성 회귀 방지.
+ * OutboxEventProducer.sendTimeoutMs 간 정합성 회귀 방지.
  *
  * 불변식:
- *   max.block.ms  <  request.timeout.ms  <=  delivery.timeout.ms  <  SEND_TIMEOUT_SECONDS * 1000
+ *   max.block.ms < request.timeout.ms ≤ delivery.timeout.ms < sendTimeoutMs
  * 하나라도 깨지면 앱 타임아웃 이전에 Producer 재시도가 종료되지 않아 이중 발행 위험 재발.
+ *
+ * 운영값(@Value default)은 500/1000/1500 + sendTimeoutMs 2000.
+ * 테스트 프로파일(application-test.yml)은 3000/5000/8000 + sendTimeoutMs 10000.
+ * 두 세트 모두 불변식을 만족해야 한다.
  */
 class KafkaProducerConfigTest {
 
     @Test
-    void producerFactory_타임아웃_설정이_커밋된_기준값과_일치한다() {
-        // given
-        KafkaProducerConfig config = new KafkaProducerConfig();
-        ReflectionTestUtils.setField(config, "bootstrapServers", "localhost:9092");
+    void OutboxEventProducer_sendTimeoutMs_기본값이_운영값_2000ms이다() {
+        OutboxEventProducer producer = new OutboxEventProducer(null);
 
-        // when
-        ProducerFactory<String, String> factory = config.producerFactory();
-        Map<String, Object> props =
-                ((DefaultKafkaProducerFactory<String, String>) factory).getConfigurationProperties();
+        long sendTimeoutMs = (long) ReflectionTestUtils.getField(producer, "sendTimeoutMs");
 
-        // then
+        assertThat(sendTimeoutMs)
+                .as("Spring 주입 실패 시 폴백 초기값 — @Value default 와도 일치해야 함")
+                .isEqualTo(2000L);
+    }
+
+    @Test
+    void producerFactory_운영_기본값이_적용되고_ACKS_idempotence가_고정된다() {
+        Map<String, Object> props = buildProps(500, 1000, 1500);
+
         assertThat(props)
-                .containsEntry(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, 1500)
-                .containsEntry(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, 1000)
                 .containsEntry(ProducerConfig.MAX_BLOCK_MS_CONFIG, 500)
+                .containsEntry(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, 1000)
+                .containsEntry(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, 1500)
                 .containsEntry(ProducerConfig.ACKS_CONFIG, "all")
                 .containsEntry(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
     }
 
     @Test
-    void delivery_timeout_ms는_OutboxEventProducer_SEND_TIMEOUT_SECONDS_미만으로_설정된다() throws Exception {
-        // given
+    void 운영_기본값은_불변식을_만족한다() {
+        Map<String, Object> props = buildProps(500, 1000, 1500);
+
+        assertInvariant(props, 2000L);
+    }
+
+    @Test
+    void 테스트_프로파일_완화값도_불변식을_만족한다() {
+        Map<String, Object> props = buildProps(3000, 5000, 8000);
+
+        assertInvariant(props, 10000L);
+    }
+
+    private Map<String, Object> buildProps(int maxBlockMs, int requestTimeoutMs, int deliveryTimeoutMs) {
         KafkaProducerConfig config = new KafkaProducerConfig();
         ReflectionTestUtils.setField(config, "bootstrapServers", "localhost:9092");
-        Map<String, Object> props = ((DefaultKafkaProducerFactory<String, String>) config.producerFactory())
+        ReflectionTestUtils.setField(config, "maxBlockMs", maxBlockMs);
+        ReflectionTestUtils.setField(config, "requestTimeoutMs", requestTimeoutMs);
+        ReflectionTestUtils.setField(config, "deliveryTimeoutMs", deliveryTimeoutMs);
+
+        return ((DefaultKafkaProducerFactory<String, String>) config.producerFactory())
                 .getConfigurationProperties();
+    }
 
-        Field sendTimeoutField = OutboxEventProducer.class.getDeclaredField("SEND_TIMEOUT_SECONDS");
-        sendTimeoutField.setAccessible(true);
-        long sendTimeoutMs = (long) sendTimeoutField.get(null) * 1000L;
+    private void assertInvariant(Map<String, Object> props, long sendTimeoutMs) {
+        int maxBlock = (int) props.get(ProducerConfig.MAX_BLOCK_MS_CONFIG);
+        int request = (int) props.get(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG);
+        int delivery = (int) props.get(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG);
 
-        int deliveryTimeoutMs = (int) props.get(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG);
-        int requestTimeoutMs = (int) props.get(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG);
-        int maxBlockMs = (int) props.get(ProducerConfig.MAX_BLOCK_MS_CONFIG);
-
-        // then — 앱 .get(SEND_TIMEOUT_SECONDS) 이전에 Producer 재시도가 확정 종료되어야 함
-        assertThat((long) deliveryTimeoutMs)
-                .as("delivery.timeout.ms(%d) < SEND_TIMEOUT_SECONDS*1000(%d) — 앱 타임아웃 이전 종료 보장",
-                        deliveryTimeoutMs, sendTimeoutMs)
-                .isLessThan(sendTimeoutMs);
-
-        assertThat(requestTimeoutMs)
-                .as("request.timeout.ms(%d) <= delivery.timeout.ms(%d) — Kafka 클라이언트 필수 제약",
-                        requestTimeoutMs, deliveryTimeoutMs)
-                .isLessThanOrEqualTo(deliveryTimeoutMs);
-
-        assertThat(maxBlockMs)
+        assertThat(maxBlock)
                 .as("max.block.ms(%d) < request.timeout.ms(%d) — 메타데이터 블로킹 조기 이탈",
-                        maxBlockMs, requestTimeoutMs)
-                .isLessThan(requestTimeoutMs);
+                        maxBlock, request)
+                .isLessThan(request);
+        assertThat(request)
+                .as("request.timeout.ms(%d) ≤ delivery.timeout.ms(%d) — Kafka 클라이언트 필수 제약",
+                        request, delivery)
+                .isLessThanOrEqualTo(delivery);
+        assertThat((long) delivery)
+                .as("delivery.timeout.ms(%d) < sendTimeoutMs(%d) — 앱 타임아웃 이전 Producer 재시도 확정 종료",
+                        delivery, sendTimeoutMs)
+                .isLessThan(sendTimeoutMs);
     }
 }
