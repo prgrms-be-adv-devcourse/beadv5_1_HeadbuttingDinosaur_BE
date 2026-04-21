@@ -1,15 +1,22 @@
 package com.devticket.commerce.common.messaging.event;
 
+import com.devticket.commerce.common.messaging.KafkaTopics;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
- * action.log 토픽 전용 Kafka Publisher (뼈대 — 본체 구현은 커밋 3).
- * 커밋 3에서 {@code @TransactionalEventListener(AFTER_COMMIT) + @Async} 적용,
- * {@code JsonProcessingException} 포함 전 예외 로깅 후 스킵 (at-most-once).
+ * action.log 토픽 전용 Kafka Publisher — fire-and-forget (at-most-once).
+ * 비즈니스 {@code @Transactional} 커밋 후 비동기 발행 → API 응답 지연 제로.
+ * 예외는 로깅 후 스킵 (재시도·DLT·throw 금지).
  */
+@Slf4j
 @Component
 public class ActionLogKafkaPublisher {
 
@@ -23,7 +30,22 @@ public class ActionLogKafkaPublisher {
         this.objectMapper = objectMapper;
     }
 
+    @Async("actionLogTaskExecutor")
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void publish(ActionLogDomainEvent domain) {
-        // 본체 구현: 커밋 3
+        try {
+            String payload = objectMapper.writeValueAsString(ActionLogEvent.from(domain));
+            actionLogKafkaTemplate.send(
+                    KafkaTopics.ACTION_LOG,
+                    domain.userId().toString(),
+                    payload
+            );
+        } catch (JsonProcessingException e) {
+            log.warn("action.log 직렬화 실패 — skip: actionType={}, userId={}",
+                    domain.actionType(), domain.userId(), e);
+        } catch (Exception e) {
+            log.warn("action.log 발행 실패 — skip: actionType={}, userId={}",
+                    domain.actionType(), domain.userId(), e);
+        }
     }
 }
