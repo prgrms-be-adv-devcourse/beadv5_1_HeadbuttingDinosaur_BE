@@ -25,6 +25,17 @@ spring:
     listener:
       ack-mode: manual
 
+# EmbeddedKafka 첫 발행 메타데이터 워밍 수용 — 운영 기본(500/1000/1500/2000)보다 완화
+# 불변식 유지: max.block(3000) < request(5000) ≤ delivery(8000) < send-timeout-ms(10000)
+devticket:
+  outbox:
+    send-timeout-ms: 10000
+  kafka:
+    producer:
+      delivery-timeout-ms: 8000
+      request-timeout-ms: 5000
+      max-block-ms: 3000
+
 external:
   event-base-url: http://localhost:8082
   payment-base-url: http://localhost:8084
