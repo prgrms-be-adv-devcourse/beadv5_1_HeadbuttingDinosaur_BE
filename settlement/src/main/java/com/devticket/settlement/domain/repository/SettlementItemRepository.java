@@ -16,6 +16,9 @@ public interface SettlementItemRepository {
     List<SettlementItem> findByStatusAndEventDateTimeBetween(
         SettlementItemStatus status, LocalDate from, LocalDate to);
 
+    List<SettlementItem> findBySellerIdAndStatusAndEventDateTimeBetween(
+        UUID sellerId, SettlementItemStatus status, LocalDate from, LocalDate to);
+
     List<SettlementItem> saveAll(List<SettlementItem> items);
 
 }

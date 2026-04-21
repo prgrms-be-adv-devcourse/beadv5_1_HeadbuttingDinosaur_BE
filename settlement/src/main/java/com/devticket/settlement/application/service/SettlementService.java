@@ -22,4 +22,6 @@ public interface SettlementService {
     SettlementTargetPreviewResponse collectSettlementTargets(LocalDate targetDate);
 
     SettlementPeriodResponse getSettlementByPeriod(UUID sellerId, String yearMonth);
+
+    SettlementPeriodResponse getSettlementPreview(UUID sellerId);
 }

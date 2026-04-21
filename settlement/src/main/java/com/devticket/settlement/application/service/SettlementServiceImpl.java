@@ -7,6 +7,7 @@ import com.devticket.settlement.domain.model.FeePolicy;
 import com.devticket.settlement.domain.model.Settlement;
 import com.devticket.settlement.domain.model.SettlementItem;
 import com.devticket.settlement.domain.model.SettlementItemStatus;
+import com.devticket.settlement.domain.model.SettlementStatus;
 import com.devticket.settlement.domain.repository.FeePolicyRepository;
 import com.devticket.settlement.domain.repository.SettlementItemRepository;
 import com.devticket.settlement.domain.repository.SettlementRepository;
@@ -23,9 +24,10 @@ import com.devticket.settlement.presentation.dto.SettlementResponse;
 import com.devticket.settlement.presentation.dto.SettlementTargetPreviewResponse;
 import com.devticket.settlement.presentation.dto.SettlementTargetPreviewResponse.EventSettlementPreview;
 import java.time.LocalDate;
-import java.time.YearMonth;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -206,6 +208,40 @@ public class SettlementServiceImpl implements SettlementService {
             settlement.getTotalFeeAmount(),
             settlement.getTotalSalesAmount(),
             settlement.getCarriedInAmount(),
+            items
+        );
+    }
+
+    @Override
+    public SettlementPeriodResponse getSettlementPreview(UUID sellerId) {
+        LocalDate periodFrom = YearMonth.now().minusMonths(1).atDay(26);
+        LocalDate periodTo = YearMonth.now().atDay(25);
+
+        List<SettlementItem> readyItems = settlementItemRepository
+            .findBySellerIdAndStatusAndEventDateTimeBetween(sellerId, SettlementItemStatus.READY, periodFrom, periodTo);
+
+        long totalSales = readyItems.stream().mapToLong(SettlementItem::getSalesAmount).sum();
+        long totalFee = readyItems.stream().mapToLong(SettlementItem::getFeeAmount).sum();
+        long newSettlementAmount = readyItems.stream().mapToLong(SettlementItem::getSettlementAmount).sum();
+
+        int carriedInAmount = settlementRepository
+            .findBySellerIdAndStatus(sellerId, SettlementStatus.PENDING_MIN_AMOUNT)
+            .stream()
+            .max(Comparator.comparing(Settlement::getCreatedAt))
+            .map(Settlement::getFinalSettlementAmount)
+            .orElse(0);
+
+        long finalSettlementAmount = newSettlementAmount + carriedInAmount;
+
+        List<EventItemResponse> items = readyItems.stream()
+            .map(this::toResponse)
+            .toList();
+
+        return new SettlementPeriodResponse(
+            (int) finalSettlementAmount,
+            (int) totalFee,
+            (int) totalSales,
+            carriedInAmount,
             items
         );
     }

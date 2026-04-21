@@ -37,6 +37,12 @@ public class SettlementItemRepositoryImpl implements SettlementItemRepository {
     }
 
     @Override
+    public List<SettlementItem> findBySellerIdAndStatusAndEventDateTimeBetween(
+        UUID sellerId, SettlementItemStatus status, LocalDate from, LocalDate to) {
+        return settlementItemJpaRepository.findBySellerIdAndStatusAndEventDateTimeBetween(sellerId, status, from, to);
+    }
+
+    @Override
     public List<SettlementItem> saveAll(List<SettlementItem> items) {
         return settlementItemJpaRepository.saveAll(items);
     }
