@@ -13,6 +13,8 @@ import org.springframework.data.domain.Pageable;
 
 public interface RefundService {
     RefundInfoResponse getRefundInfo(UUID userId, String ticketId);
+    void cancelSellerEvent(UUID sellerId, UUID eventId, String reason);
+    void cancelAdminEvent(UUID adminId, UUID eventId, String reason);
     PgRefundResponse refundPgTicket(UUID userId, String ticketId, PgRefundRequest request);
     OrderRefundResponse refundOrder(UUID userId, UUID orderId, String reason);
     Page<RefundListItemResponse> getRefundList(UUID userId, Pageable pageable);

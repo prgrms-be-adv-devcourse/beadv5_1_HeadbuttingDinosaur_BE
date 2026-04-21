@@ -164,25 +164,28 @@ public class RefundSagaOrchestrator {
             return;
         }
 
-        // wholeOrder 케이스 — Commerce 가 실제 취소한 ticketIds 를 RefundTicket 으로 채움
+        // (1) cancelledTicketIds → ticketIds 로 필드명 변경
         List<RefundTicket> existing = refundTicketRepository.findByRefundId(event.refundId());
-        if (existing.isEmpty() && event.cancelledTicketIds() != null && !event.cancelledTicketIds().isEmpty()) {
-            List<RefundTicket> rts = event.cancelledTicketIds().stream()
+        if (existing.isEmpty() && event.ticketIds() != null && !event.ticketIds().isEmpty()) {
+            List<RefundTicket> rts = event.ticketIds().stream()
                 .map(tid -> RefundTicket.of(event.refundId(), tid))
                 .toList();
             refundTicketRepository.saveAll(rts);
         }
 
-        int quantity = event.cancelledTicketIds() != null ? event.cancelledTicketIds().size() : existing.size();
+        // (2) quantity 계산도 ticketIds 로 변경
+        int quantity = event.quantity() > 0
+            ? event.quantity()
+            : (event.ticketIds() != null ? event.ticketIds().size() : existing.size());
 
         state.advance(SagaStep.STOCK_RESTORING);
         sagaStateRepository.save(state);
 
+        // (3) RefundStockRestoreEvent 를 items 리스트 구조로 발행
         RefundStockRestoreEvent next = new RefundStockRestoreEvent(
             event.refundId(),
             event.orderId(),
-            event.eventId(),
-            quantity,
+            List.of(new RefundStockRestoreEvent.Item(event.eventId(), quantity)),
             Instant.now()
         );
         outboxService.save(
@@ -193,8 +196,8 @@ public class RefundSagaOrchestrator {
             next
         );
 
-        log.info("[Saga] ticket.done → stock.restore 발행 — refundId={}, quantity={}",
-            event.refundId(), quantity);
+        log.info("[Saga] ticket.done → stock.restore 발행 — refundId={}, eventId={}, quantity={}",
+            event.refundId(), event.eventId(), quantity);
     }
 
     @Transactional
@@ -215,6 +218,7 @@ public class RefundSagaOrchestrator {
         RefundOrderCompensateEvent comp = new RefundOrderCompensateEvent(
             event.refundId(),
             event.orderId(),
+            event.reason(),
             Instant.now()
         );
         outboxService.save(
@@ -266,6 +270,7 @@ public class RefundSagaOrchestrator {
             event.refundId(),
             event.orderId(),
             ticketIds,
+            event.reason(),
             Instant.now()
         );
         outboxService.save(
@@ -279,6 +284,7 @@ public class RefundSagaOrchestrator {
         RefundOrderCompensateEvent orderComp = new RefundOrderCompensateEvent(
             event.refundId(),
             event.orderId(),
+            event.reason(),
             Instant.now()
         );
         outboxService.save(
@@ -322,15 +328,33 @@ public class RefundSagaOrchestrator {
                 );
             }
             case WALLET_PG -> {
-                state.advance(SagaStep.PG_CANCELLING);
-                sagaStateRepository.save(state);
-                completedAt = executePgCancel(payment, refund.getRefundAmount(), completedAt);
-                state.advance(SagaStep.WALLET_RESTORING);
-                sagaStateRepository.save(state);
-                int walletAmount = payment.getWalletAmount() != null ? payment.getWalletAmount() : 0;
-                if (walletAmount > 0) {
+                // 원 결제 비율대로 환불액 분배
+                int totalPaid = payment.getAmount();
+                int walletOriginal = payment.getWalletAmount() != null ? payment.getWalletAmount() : 0;
+
+                int walletPortion = totalPaid > 0
+                    ? (int) ((long) refund.getRefundAmount() * walletOriginal / totalPaid)
+                    : 0;
+                int pgPortion = refund.getRefundAmount() - walletPortion;
+
+                log.info("[Saga] WALLET_PG 분배 — refundId={}, total={}, walletPortion={}, pgPortion={} (원결제 wallet={}/pg={}/total={})",
+                    refund.getRefundId(), refund.getRefundAmount(),
+                    walletPortion, pgPortion,
+                    walletOriginal, payment.getPgAmount(), totalPaid);
+
+                // PG 취소 — pgPortion 만
+                if (pgPortion > 0) {
+                    state.advance(SagaStep.PG_CANCELLING);
+                    sagaStateRepository.save(state);
+                    completedAt = executePgCancel(payment, pgPortion, completedAt);
+                }
+
+                // Wallet 복구 — walletPortion 만
+                if (walletPortion > 0) {
+                    state.advance(SagaStep.WALLET_RESTORING);
+                    sagaStateRepository.save(state);
                     walletService.restoreBalance(
-                        refund.getUserId(), walletAmount, refund.getRefundId(), refund.getOrderId()
+                        refund.getUserId(), walletPortion, refund.getRefundId(), refund.getOrderId()
                     );
                 }
             }
@@ -341,8 +365,7 @@ public class RefundSagaOrchestrator {
 
         int ticketCount = refundTicketRepository.findByRefundId(refund.getRefundId()).size();
         if (ticketCount == 0) {
-            // wholeOrder 환불인데 Commerce 쪽에서 cancelledTicketIds 를 안 넘긴 경우 —
-            // ledger.remainingTickets 로 간주
+            // wholeOrder 환불인데 Commerce 쪽에서 cancelledTicketIds 를 안 넘긴 경우
             ticketCount = ledger.getRemainingTickets();
         }
         ledger.applyRefund(refund.getRefundAmount(), ticketCount);

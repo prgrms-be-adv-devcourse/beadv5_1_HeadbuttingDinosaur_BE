@@ -110,6 +110,7 @@ public class TicketIssueFailedConsumer {
 
         RefundRequestedEvent requested = new RefundRequestedEvent(
             refund.getRefundId(),
+            ledger.getOrderRefundId(),
             event.orderId(),
             event.userId(),
             payment.getPaymentId(),
@@ -118,6 +119,7 @@ public class TicketIssueFailedConsumer {
             refundAmount,
             RefundRateConstants.FULL,
             issuedTicketIds.isEmpty(),
+            event.reason(),
             Instant.now()
         );
 

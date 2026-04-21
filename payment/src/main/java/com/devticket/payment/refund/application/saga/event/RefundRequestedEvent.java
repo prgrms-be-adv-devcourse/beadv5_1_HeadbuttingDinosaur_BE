@@ -7,6 +7,7 @@ import java.util.UUID;
 
 public record RefundRequestedEvent(
     UUID refundId,
+    UUID orderRefundId,
     UUID orderId,
     UUID userId,
     UUID paymentId,
@@ -15,6 +16,6 @@ public record RefundRequestedEvent(
     int refundAmount,
     int refundRate,
     boolean wholeOrder,
+    String reason,
     Instant timestamp
-) {
-}
+) {}

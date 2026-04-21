@@ -8,6 +8,7 @@ public record RefundTicketCompensateEvent(
     UUID refundId,
     UUID orderId,
     List<UUID> ticketIds,
+    String reason,
     Instant timestamp
-) {
-}
+) {}
+

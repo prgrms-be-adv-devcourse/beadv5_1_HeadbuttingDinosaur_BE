@@ -96,6 +96,11 @@ public class RefundServiceImpl implements RefundService {
 
     // =========================================================
     // 티켓 단건 환불 — Saga 진입점 B (사용자 요청)
+    // TODO: /api/refunds/pg/{ticketId} 라는 URL 이 "PG 전용" 처럼 보이지만
+    //       실제로는 모든 결제수단의 티켓 단건 환불 진입점.
+    //      추후 /api/refunds/tickets/{ticketId} 로 리네임하는 게 맞겠지만,
+    //      프론트 호환성 때문에 지금 할 필요는 없음.
+    //      TODO 로 남기고 현재 환불 기능 안정화에 집중.
     // =========================================================
 
     @Override
@@ -109,7 +114,6 @@ public class RefundServiceImpl implements RefundService {
         Payment payment = paymentRepository.findByOrderId(orderItem.orderId())
             .orElseThrow(() -> new RefundException(RefundErrorCode.PAYMENT_NOT_FOUND));
 
-        validatePgPayment(payment);
         validateRefundablePaymentStatus(payment);
 
         int refundRate = calculateRefundRate(eventDateTime);
@@ -141,6 +145,7 @@ public class RefundServiceImpl implements RefundService {
 
         RefundRequestedEvent requested = new RefundRequestedEvent(
             refund.getRefundId(),
+            ledger.getOrderRefundId(),
             orderItem.orderId(),
             userId,
             payment.getPaymentId(),
@@ -149,6 +154,7 @@ public class RefundServiceImpl implements RefundService {
             refundAmount,
             refundRate,
             false,
+            request.reason(),
             Instant.now()
         );
         outboxService.save(
@@ -228,6 +234,7 @@ public class RefundServiceImpl implements RefundService {
 
         RefundRequestedEvent requested = new RefundRequestedEvent(
             refund.getRefundId(),
+            ledger.getOrderRefundId(),
             orderId,
             userId,
             payment.getPaymentId(),
@@ -236,6 +243,7 @@ public class RefundServiceImpl implements RefundService {
             refundAmount,
             refundRate,
             true,
+            reason,                          // ← 추가: 메서드 인자의 reason 전달
             Instant.now()
         );
         outboxService.save(
@@ -286,6 +294,43 @@ public class RefundServiceImpl implements RefundService {
             log.warn("[Refund] order info 조회 실패, totalTickets=1 로 보정 — orderId={}", orderId);
         }
         return 1;
+    }
+
+    /**
+     * 판매자 이벤트 강제 취소.
+     *
+     * <p>흐름:
+     *   1) Event 서비스에서 이벤트 조회 → seller 소유권 검증
+     *   2) Event 서비스의 internal force-cancel 호출 → Event 상태 전이 + event.force-cancelled Outbox 발행
+     *   3) Commerce 가 event.force-cancelled 수신 → PAID 주문별 refund.requested fan-out
+     *   4) Payment 가 각 refund.requested 수신 → 주문별 Saga 진행
+     *
+     * <p>이 메서드는 1-2 까지만 책임지고 3-4 는 비동기 Kafka 플로우에 위임한다.
+     */
+    @Override
+    public void cancelSellerEvent(UUID sellerId, UUID eventId, String reason) {
+        // 1) 소유권 검증 — seller 가 이 event 의 소유자인지 확인
+        InternalEventInfoResponse event = getEventInfo(eventId);
+        if (!event.sellerId().equals(sellerId)) {
+            log.warn("[Seller Cancel] 소유권 불일치 — sellerId={}, eventSellerId={}, eventId={}",
+                sellerId, event.sellerId(), eventId);
+            throw new RefundException(RefundErrorCode.REFUND_INVALID_REQUEST);
+        }
+
+        // 2) Event 서비스에 force-cancel 호출 — 내부적으로 상태 전이 + Kafka event.force-cancelled 발행
+        eventInternalClient.forceCancel(eventId, reason);
+
+        log.info("[Seller Cancel] 이벤트 강제 취소 요청 완료 — eventId={}, sellerId={}, reason={}",
+            eventId, sellerId, reason);
+    }
+
+    @Override
+    public void cancelAdminEvent(UUID adminId, UUID eventId, String reason) {
+        // 소유권 검증 없음 — admin 권한은 게이트웨이/admin-service 에서 사전 검증됐다고 가정
+        eventInternalClient.forceCancel(eventId, reason);
+
+        log.info("[Admin Cancel] 이벤트 강제 취소 요청 완료 — eventId={}, adminId={}, reason={}",
+            eventId, adminId, reason);
     }
 
     private InternalOrderItemInfoResponse getOrderItemInfo(String ticketId) {

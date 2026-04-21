@@ -7,8 +7,8 @@ import java.util.UUID;
 public record RefundTicketDoneEvent(
     UUID refundId,
     UUID orderId,
+    List<UUID> ticketIds,
     UUID eventId,
-    List<UUID> cancelledTicketIds,
+    int quantity,
     Instant timestamp
-) {
-}
+) {}
