@@ -1,10 +1,9 @@
 package com.devticket.member.presentation.controller;
 
 import com.devticket.member.application.UserService;
-import com.devticket.member.infrastructure.external.dto.res.InternalAdminTechStackResponse;
+import com.devticket.member.presentation.dto.internal.response.InternalAdminTechStackResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;

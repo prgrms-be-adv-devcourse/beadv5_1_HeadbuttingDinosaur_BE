@@ -2,7 +2,7 @@ package com.devticket.member.application;
 
 import com.devticket.member.common.exception.BusinessException;
 import com.devticket.member.infrastructure.external.client.AdminInternalClient;
-import com.devticket.member.infrastructure.external.dto.res.InternalAdminTechStackResponse;
+import com.devticket.member.presentation.dto.internal.response.InternalAdminTechStackResponse;
 import com.devticket.member.infrastructure.jwt.JwtTokenProvider;
 import com.devticket.member.presentation.domain.MemberErrorCode;
 import com.devticket.member.presentation.domain.Position;

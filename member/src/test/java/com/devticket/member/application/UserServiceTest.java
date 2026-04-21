@@ -9,7 +9,10 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import com.devticket.member.infrastructure.external.client.AdminInternalClient;
+
 import com.devticket.member.common.exception.BusinessException;
+
 import com.devticket.member.presentation.domain.MemberErrorCode;
 import com.devticket.member.presentation.domain.Position;
 import com.devticket.member.presentation.domain.ProviderType;
@@ -21,6 +24,7 @@ import com.devticket.member.presentation.domain.repository.RefreshTokenRepositor
 import com.devticket.member.presentation.domain.repository.UserProfileRepository;
 import com.devticket.member.presentation.domain.repository.UserRepository;
 import com.devticket.member.presentation.domain.repository.UserTechStackRepository;
+import com.devticket.member.presentation.dto.internal.response.InternalAdminTechStackResponse;
 import com.devticket.member.presentation.dto.request.ChangePasswordRequest;
 import com.devticket.member.presentation.dto.request.SignUpProfileRequest;
 import com.devticket.member.presentation.dto.request.UpdateProfileRequest;
@@ -57,8 +61,7 @@ class UserServiceTest {
     private UserTechStackRepository userTechStackRepository;
 
     @Mock
-    private TechStackRepository techStackRepository;
-
+    private AdminInternalClient adminInternalClient;
     @Mock
     private RefreshTokenRepository refreshTokenRepository;
 
@@ -161,7 +164,14 @@ class UserServiceTest {
             given(userRepository.findByUserId(any(UUID.class))).willReturn(Optional.of(user));
             given(userProfileRepository.findByUserId(any())).willReturn(Optional.of(profile));
             given(userTechStackRepository.findByUserId(any())).willReturn(userTechStacks);
-            given(techStackRepository.findByIdIn(anyList())).willReturn(List.of());
+            given(adminInternalClient.getTechStacks()).willReturn(
+                new InternalAdminTechStackResponse(
+                    List.of(
+                        new InternalAdminTechStackResponse.TechStackInfo(10L, "Java"),
+                        new InternalAdminTechStackResponse.TechStackInfo(20L, "Spring")
+                    )
+                )
+            );
 
             // when
             GetProfileResponse response = userService.getProfile(TEST_USER_UUID);

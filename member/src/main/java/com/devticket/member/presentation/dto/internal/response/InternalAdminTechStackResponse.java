@@ -1,4 +1,4 @@
-package com.devticket.member.infrastructure.external.dto.res;
+package com.devticket.member.presentation.dto.internal.response;
 
 import java.util.List;
 
