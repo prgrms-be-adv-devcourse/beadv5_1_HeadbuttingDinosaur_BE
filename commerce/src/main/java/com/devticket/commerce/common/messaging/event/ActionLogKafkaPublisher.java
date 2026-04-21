@@ -30,8 +30,9 @@ public class ActionLogKafkaPublisher {
         this.objectMapper = objectMapper;
     }
 
+    // fallbackExecution=true: 트랜잭션 없는 호출자도 지원 (이중 안전장치 — 원자성은 호출 측 @Transactional로 해결)
     @Async("actionLogTaskExecutor")
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void publish(ActionLogDomainEvent domain) {
         try {
             String payload = objectMapper.writeValueAsString(ActionLogEvent.from(domain));
