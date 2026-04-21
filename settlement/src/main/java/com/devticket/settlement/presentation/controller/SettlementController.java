@@ -2,6 +2,7 @@ package com.devticket.settlement.presentation.controller;
 
 import com.devticket.settlement.application.service.SettlementServiceImpl;
 import com.devticket.settlement.presentation.dto.SellerSettlementDetailResponse;
+import com.devticket.settlement.presentation.dto.SettlementPeriodResponse;
 import com.devticket.settlement.presentation.dto.SettlementResponse;
 import com.devticket.settlement.presentation.dto.SettlementTargetPreviewResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -59,11 +60,23 @@ public class SettlementController {
         description = "판매자 정산 내용을 상세 조회합니다."
     )
     @ApiResponse(responseCode = "200", description = "정산 내역 조회 성공")
-    @GetMapping("/seller/settlements/{settlementId}")
+    @GetMapping("/seller/settlements/{settlementId:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}")
     public ResponseEntity<SellerSettlementDetailResponse> getSellerSettlement(
         @RequestHeader("X-User-Id") UUID sellerId,
         @PathVariable UUID settlementId) {
         return ResponseEntity.ok(settlementServiceImpl.getSellerSettlementDetail(sellerId, settlementId));
+    }
+
+    @Operation(
+        summary = "판매자 월별 정산 조회",
+        description = "YYYYMM 형식으로 해당 월의 정산 데이터를 조회합니다. 예: 202603"
+    )
+    @ApiResponse(responseCode = "200", description = "월별 정산 조회 성공")
+    @GetMapping("/seller/settlements/{yearMonth:[0-9]{6}}")
+    public ResponseEntity<SettlementPeriodResponse> getSettlementByPeriod(
+        @RequestHeader("X-User-Id") UUID sellerId,
+        @PathVariable String yearMonth) {
+        return ResponseEntity.ok(settlementServiceImpl.getSettlementByPeriod(sellerId, yearMonth));
     }
 
 }

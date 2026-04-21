@@ -7,6 +7,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -51,6 +52,11 @@ public class SettlementRepositoryImpl implements SettlementRepository {
     @Override
     public List<Settlement> findByStatus(SettlementStatus status) {
         return settlementJpaRepository.findByStatus(status);
+    }
+
+    @Override
+    public Optional<Settlement> findBySellerIdAndPeriodStartAt(UUID sellerId, LocalDateTime periodStartAt) {
+        return settlementJpaRepository.findBySellerIdAndPeriodStartAt(sellerId, periodStartAt);
     }
 
     @Override

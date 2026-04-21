@@ -19,6 +19,8 @@ public interface SettlementRepository {
 
     List<Settlement> findByStatus(SettlementStatus status);
 
+    Optional<Settlement> findBySellerIdAndPeriodStartAt(UUID sellerId, LocalDateTime periodStartAt);
+
     List<Settlement> saveAll(List<? extends Settlement> settlements);
 
     Settlement save(Settlement settlement);

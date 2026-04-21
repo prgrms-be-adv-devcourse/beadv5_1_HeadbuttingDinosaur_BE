@@ -18,10 +18,13 @@ import com.devticket.settlement.infrastructure.client.dto.res.EventTicketSettlem
 import com.devticket.settlement.infrastructure.client.dto.res.InternalSettlementDataResponse;
 import com.devticket.settlement.presentation.dto.EventItemResponse;
 import com.devticket.settlement.presentation.dto.SellerSettlementDetailResponse;
+import com.devticket.settlement.presentation.dto.SettlementPeriodResponse;
 import com.devticket.settlement.presentation.dto.SettlementResponse;
 import com.devticket.settlement.presentation.dto.SettlementTargetPreviewResponse;
 import com.devticket.settlement.presentation.dto.SettlementTargetPreviewResponse.EventSettlementPreview;
 import java.time.LocalDate;
+import java.time.YearMonth;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -181,6 +184,31 @@ public class SettlementServiceImpl implements SettlementService {
         );
     }
 
+
+    @Override
+    public SettlementPeriodResponse getSettlementByPeriod(UUID sellerId, String yearMonth) {
+        int year = Integer.parseInt(yearMonth.substring(0, 4));
+        int month = Integer.parseInt(yearMonth.substring(4, 6));
+        LocalDateTime periodStartAt = YearMonth.of(year, month).minusMonths(1).atDay(26).atStartOfDay();
+
+        Settlement settlement = settlementRepository.findBySellerIdAndPeriodStartAt(sellerId, periodStartAt)
+            .orElseThrow(() -> new BusinessException(SettlementErrorCode.SETTLEMENT_NOT_FOUND));
+
+        validateSellerAccess(sellerId, settlement);
+
+        List<EventItemResponse> items = settlementItemRepository.findBySettlementId(settlement.getSettlementId())
+            .stream()
+            .map(this::toResponse)
+            .toList();
+
+        return new SettlementPeriodResponse(
+            settlement.getFinalSettlementAmount(),
+            settlement.getTotalFeeAmount(),
+            settlement.getTotalSalesAmount(),
+            settlement.getCarriedInAmount(),
+            items
+        );
+    }
 
     private void validateSellerAccess(UUID sellerId, Settlement settlement) {
         if (!sellerId.equals(settlement.getSellerId())) {

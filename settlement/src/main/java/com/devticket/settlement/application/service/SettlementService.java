@@ -2,6 +2,7 @@ package com.devticket.settlement.application.service;
 
 import com.devticket.settlement.infrastructure.client.dto.res.InternalSettlementDataResponse;
 import com.devticket.settlement.presentation.dto.SellerSettlementDetailResponse;
+import com.devticket.settlement.presentation.dto.SettlementPeriodResponse;
 import com.devticket.settlement.presentation.dto.SettlementResponse;
 import com.devticket.settlement.presentation.dto.SettlementTargetPreviewResponse;
 import java.time.LocalDate;
@@ -19,4 +20,6 @@ public interface SettlementService {
     SettlementTargetPreviewResponse previewSettlementTarget(LocalDate targetDate);
 
     SettlementTargetPreviewResponse collectSettlementTargets(LocalDate targetDate);
+
+    SettlementPeriodResponse getSettlementByPeriod(UUID sellerId, String yearMonth);
 }
