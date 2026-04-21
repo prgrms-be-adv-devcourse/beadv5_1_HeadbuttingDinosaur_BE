@@ -2,6 +2,8 @@
 
 > 대상: PO
 > 배경: 기존 서비스(Commerce/Event/Payment)에서 발생하는 사용자 행동을 Kafka `action.log` 토픽으로 발행 → Log 서비스(Fastify)에서 수집하여 AI 행동분석에 활용
+>
+> **상위 원칙:** 본 문서가 규정하는 `action.log` 토픽의 Producer 설정(`acks=0` / Outbox 미사용 / 트랜잭션 경계 밖)은 통신 경계 3분류 중 **1-C Kafka fire-and-forget** 에 해당. 다른 1-B 비즈니스 이벤트와의 설정 차이 및 선택 기준은 `kafka-sync-async-policy.md` §1-C, §2 참조.
 
 ---
 

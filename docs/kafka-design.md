@@ -40,6 +40,10 @@ Kafka 관련 코드의 **계층 배치·네이밍·Lombok·테스트·보안·PR
 
 > **충돌 시 우선순위:** 이벤트 계약·토픽·Saga·멱등성 = 본 문서 / 코드 컨벤션 = `AGENTS.md`
 
+### 상위 원칙 — Sync vs Async 경계
+
+본 문서가 규정하는 Producer/Consumer 설정(§6), Outbox 패턴(§4), `action.log` 예외(§6)는 **통신 경계 3분류**(1-A Sync HTTP / 1-B Kafka + Outbox / 1-C Kafka fire-and-forget)의 구체 구현이다. 신규 기능 설계 시 어느 분류로 갈지에 대한 **의사결정 기준**과 분류별 설정 요약은 `kafka-sync-async-policy.md` 참조.
+
 ---
 
 ## 목차

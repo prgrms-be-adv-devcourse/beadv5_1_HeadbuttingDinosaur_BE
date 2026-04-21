@@ -3,6 +3,7 @@
 > 최종 업데이트: 2026-04-16
 > 목적: PO 기준 문서 — 이 파일을 기준으로 /docs 내 다른 문서를 수정할 것
 > 원본 참조: kafka-design.md / kafka-idempotency-guide.md
+> 상위 원칙: `kafka-sync-async-policy.md` (Sync HTTP vs Async Kafka 통신 경계 및 1-B Outbox / 1-C fire-and-forget 분류 기준)
 
 ---
 

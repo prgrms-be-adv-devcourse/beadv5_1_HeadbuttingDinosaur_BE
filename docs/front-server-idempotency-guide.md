@@ -3,6 +3,8 @@
 > 이 문서는 팀원이 각 API의 멱등성을 **어디서, 어떤 순서로, 무엇으로** 막아야 하는지를
 > 바로 구현할 수 있도록 정리한 가이드입니다.
 > 코드는 포함하지 않지만, 각 레이어의 책임과 처리 순서를 고정합니다.
+>
+> **상위 원칙:** 본 가이드가 다루는 멱등성은 **1-A Sync HTTP** 경로(사용자 트리거 요청)의 `Idempotency-Key` 기반 전략. 1-B Async Kafka + Outbox 경로의 멱등성(`processed_message` + `canTransitionTo()` + `@Version`)은 `kafka-idempotency-guide.md` 참조. 통신 경계 분류 자체는 `kafka-sync-async-policy.md` §1-A 참조.
 
 ---
 
