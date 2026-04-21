@@ -21,26 +21,43 @@ spring:
               uri: http://localhost:8081
               predicates:
                 - Path=/api/auth/**, /api/users/**, /api/seller-applications, /api/seller-applications/**, /api/mypage/**, /api/tech-stacks
+
             - id: commerce-service
               uri: http://localhost:8083
               predicates:
                 - Path=/api/cart, /api/cart/**, /api/orders, /api/orders/**, /api/tickets, /api/tickets/**, /api/seller/events/{eventId}/participants
+
+            # ↓ 추가 — seller 이벤트 취소는 Payment 로 (event-service 보다 반드시 위)
+            - id: payment-seller-event-cancel
+              uri: http://localhost:8084
+              predicates:
+                - Path=/api/seller/events/{eventId}/cancel
+
+            - id: payment-admin-event-cancel
+              uri: http://localhost:8084
+              predicates:
+                - Path=/api/admin/events/{eventId}/cancel
+
             - id: event-service
               uri: http://localhost:8082
               predicates:
                 - Path=/api/events, /api/events/**, /api/seller/events, /api/seller/events/**
+
             - id: payment-service
               uri: http://localhost:8084
               predicates:
                 - Path=/api/payments/**, /api/wallet, /api/wallet/**, /api/wallets/**, /api/refunds, /api/refunds/**
+
             - id: settlement-service
               uri: http://localhost:8085
               predicates:
                 - Path=/api/settlements/**, /api/seller/settlements, /api/seller/settlements/**
+
             - id: log-service
               uri: http://localhost:8086
               predicates:
                 - Path=/api/logs/**
+
             - id: admin-service
               uri: http://localhost:8087
               predicates:
