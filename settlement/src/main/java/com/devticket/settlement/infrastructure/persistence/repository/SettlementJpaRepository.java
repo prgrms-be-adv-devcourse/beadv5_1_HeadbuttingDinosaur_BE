@@ -18,6 +18,12 @@ public interface SettlementJpaRepository extends JpaRepository<Settlement, Long>
 
     Optional<Settlement> findBySettlementId(UUID settlementId);
 
+    List<Settlement> findBySellerIdAndStatus(UUID sellerId, SettlementStatus status);
+
+    List<Settlement> findByStatus(SettlementStatus status);
+
+    List<Settlement> findBySellerIdAndPeriodStartAt(UUID sellerId, LocalDateTime periodStartAt);
+
     @Query("""
     SELECT s FROM Settlement s
     WHERE (CAST(:status AS string) IS NULL OR s.status = :status)

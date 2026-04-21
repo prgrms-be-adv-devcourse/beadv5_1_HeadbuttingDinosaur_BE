@@ -8,15 +8,16 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
 
 public interface SettlementRepository {
 
     List<Settlement> findBySellerId(UUID sellerId);
 
     Optional<Settlement> findBySettlementId(UUID settlementId);
+
+    List<Settlement> findBySellerIdAndStatus(UUID sellerId, SettlementStatus status);
+
+    List<Settlement> findByStatus(SettlementStatus status);
 
     List<Settlement> saveAll(List<? extends Settlement> settlements);
 

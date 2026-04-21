@@ -140,6 +140,8 @@ public class SettlementServiceImpl implements SettlementService {
                 continue;
             }
 
+            log.info(event.toString());
+
             SettlementItem item = SettlementItem.builder()
                 .orderItemId(ticketItem.orderItemId())
                 .eventId(event.id())
@@ -150,6 +152,7 @@ public class SettlementServiceImpl implements SettlementService {
                 .feeAmount(feeAmount)
                 .settlementAmount(settlementAmount)
                 .status(SettlementItemStatus.READY)
+                .eventDateTime(event.eventDateTime())
                 .build();
 
             settlementItemRepository.save(item);
