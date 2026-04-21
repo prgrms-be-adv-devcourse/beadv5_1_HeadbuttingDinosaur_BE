@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import java.util.UUID;
+import org.apache.kafka.common.KafkaException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -91,6 +92,23 @@ class OutboxServiceTest {
         assertThat(outbox.getRetryCount()).isEqualTo(1);
         assertThat(outbox.getNextRetryAt()).isNotNull();
         assertThat(outbox.getSentAt()).isNull();
+        then(outboxRepository).should().save(outbox);
+    }
+
+    @Test
+    void processOne_publish가_KafkaException을_던져도_markFailed후_저장한다() {
+        // given — publish() 가 send() 시점 KafkaException (max.block.ms 초과 등) 을 전파
+        Outbox outbox = pendingOutbox();
+        given(outboxEventProducer.publish(any(OutboxEventMessage.class)))
+                .willThrow(new KafkaException("max.block.ms expired while fetching metadata"));
+
+        // when — processOne 은 예외를 최후 방어선에서 흡수해야 함
+        outboxService.processOne(outbox);
+
+        // then — 루프 중단 방지 위해 markFailed + save 보장
+        assertThat(outbox.getStatus()).isEqualTo(OutboxStatus.PENDING);
+        assertThat(outbox.getRetryCount()).isEqualTo(1);
+        assertThat(outbox.getNextRetryAt()).isNotNull();
         then(outboxRepository).should().save(outbox);
     }
 
