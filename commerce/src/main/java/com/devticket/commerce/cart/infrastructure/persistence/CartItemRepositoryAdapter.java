@@ -53,9 +53,4 @@ public class CartItemRepositoryAdapter implements CartItemRepository {
     public Optional<CartItem> findById(Long cartItemId) {
         return cartItemJpaRepository.findById(cartItemId);
     }
-
-    @Override
-    public void upsertCartItem(Long cartId, UUID eventId, int quantity) {
-        cartItemJpaRepository.upsertCartItem(cartId, eventId, quantity);
-    }
 }
