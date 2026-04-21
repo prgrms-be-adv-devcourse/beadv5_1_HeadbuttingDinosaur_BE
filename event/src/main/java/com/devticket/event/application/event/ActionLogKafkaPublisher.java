@@ -27,7 +27,7 @@ public class ActionLogKafkaPublisher {
     // 기존 도메인 리스너(StockStatusChangedListener 의 @Transactional(REQUIRES_NEW, readOnly))
     // 패턴과 의도적 차이: 이 리스너의 주 책임은 내부 상태 동기화가 아닌 외부 Kafka 발행.
     @Async("actionLogTaskExecutor")
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void publish(ActionLogDomainEvent domain) {
         try {
             String payload = objectMapper.writeValueAsString(toKafkaEvent(domain));
