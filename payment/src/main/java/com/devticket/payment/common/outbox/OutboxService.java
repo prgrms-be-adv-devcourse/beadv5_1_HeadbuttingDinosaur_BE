@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 public class OutboxService {
 
     private final OutboxRepository outboxRepository;
+    private final OutboxEventProducer outboxEventProducer;
     private final ObjectMapper objectMapper;
 
     /**
@@ -36,5 +37,22 @@ public class OutboxService {
                 aggregateId, eventType, topic, e);
             throw new IllegalStateException("Outbox 페이로드 직렬화 실패", e);
         }
+    }
+
+    // @Transactional 없음 — 스케줄러 루프 전체를 트랜잭션으로 묶지 않고 건별 save()로 개별 커밋
+    public void processOne(Outbox outbox) {
+        try {
+            OutboxEventMessage message = OutboxEventMessage.from(outbox);
+            String key = outbox.getPartitionKey() != null
+                ? outbox.getPartitionKey()
+                : outbox.getAggregateId();
+            outboxEventProducer.send(outbox.getTopic(), key, message);
+            outbox.markSent();
+        } catch (OutboxPublishException e) {
+            log.warn("[Outbox] 이벤트 발행 실패 — outboxId={}, eventType={}, retry={}, error={}",
+                outbox.getId(), outbox.getEventType(), outbox.getRetryCount() + 1, e.getMessage());
+            outbox.increaseRetryCount();
+        }
+        outboxRepository.save(outbox);
     }
 }

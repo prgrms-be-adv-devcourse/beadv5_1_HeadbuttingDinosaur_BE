@@ -2,6 +2,8 @@ package com.devticket.payment.common.outbox;
 
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,7 +36,7 @@ public class OutboxEventProducer {
             record.headers().add("X-Message-Id",
                 message.messageId().toString().getBytes(StandardCharsets.UTF_8));
 
-            var result = kafkaTemplate.send(record).get();
+            var result = kafkaTemplate.send(record).get(2, TimeUnit.SECONDS);
 
             log.info("[Outbox] Kafka 발행 성공 — topic={}, messageId={}, offset={}",
                 topic, message.messageId(),
@@ -45,7 +47,7 @@ public class OutboxEventProducer {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new OutboxPublishException("Kafka 발행 중 인터럽트 발생", e);
-        } catch (ExecutionException | KafkaException e) {
+        } catch (TimeoutException | ExecutionException | KafkaException e) {
             throw new OutboxPublishException("Kafka 발행 실패", e);
         }
     }
