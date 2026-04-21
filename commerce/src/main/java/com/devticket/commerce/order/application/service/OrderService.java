@@ -36,6 +36,7 @@ import com.devticket.commerce.order.presentation.dto.res.OrderCancelResponse;
 import com.devticket.commerce.order.presentation.dto.res.OrderDetailResponse;
 import com.devticket.commerce.order.presentation.dto.res.OrderListResponse;
 import com.devticket.commerce.order.presentation.dto.res.OrderResponse;
+import com.devticket.commerce.order.presentation.dto.res.OrderStatusResponse;
 import com.devticket.commerce.ticket.application.usecase.TicketUsecase;
 import com.devticket.commerce.ticket.domain.exception.TicketErrorCode;
 import com.devticket.commerce.ticket.domain.model.Ticket;
@@ -45,6 +46,7 @@ import com.devticket.commerce.ticket.presentation.dto.req.TicketRequest;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -161,6 +163,19 @@ public class OrderService implements OrderUsecase {
             .collect(Collectors.toMap(InternalEventInfoResponse::eventId, InternalEventInfoResponse::title));
 
         return OrderResponse.of(order, savedOrderItems, eventTitles);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public OrderStatusResponse getOrderStatus(UUID userId, UUID orderId) {
+        Order order = orderRepository.findByOrderId(orderId)
+            .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
+
+        if (!order.getUserId().equals(userId)) {
+            throw new BusinessException(OrderErrorCode.ORDER_FORBIDDEN);
+        }
+
+        return OrderStatusResponse.of(order);
     }
 
     @Override
@@ -475,12 +490,41 @@ public class OrderService implements OrderUsecase {
             return;
         }
 
-        // 장바구니 비우기 (카트가 없으면 무시)
-        Optional<Cart> cart = cartRepository.findByUserId(event.userId());
-        cart.ifPresent(c -> {
-            List<CartItem> cartItems = cartItemRepository.findAllByCartId(c.getId());
-            if (!cartItems.isEmpty()) {
-                cartItemRepository.deleteAllInBatch(cartItems);
+        // 장바구니 분기 삭제 (A안, #427) — 결제된 OrderItem eventId별 총 qty를 카트에서 차감
+        //   - 차감 후 orderedByEvent 잔여 수량을 갱신/제거 → 동일 eventId 행이 복수일 때 과차감 방지
+        //     (UNIQUE 제약은 신규 데이터에 대해서만 보장 — 레거시 중복 행 가능성 방어)
+        //   - remaining == 0 이면 row 삭제, 그 외 quantity 갱신
+        //   - 결제 대상이 아닌 CartItem 은 카트에 보존 (부분 결제 UX 대응)
+        Map<UUID, Integer> orderedByEvent = orderItems.stream()
+                .collect(Collectors.toMap(
+                        OrderItem::getEventId,
+                        OrderItem::getQuantity,
+                        Integer::sum
+                ));
+        cartRepository.findByUserId(event.userId()).ifPresent(cart -> {
+            List<CartItem> cartItems = cartItemRepository.findAllByCartId(cart.getId());
+            List<CartItem> toDelete = new ArrayList<>();
+            for (CartItem cartItem : cartItems) {
+                Integer orderedQty = orderedByEvent.get(cartItem.getEventId());
+                if (orderedQty == null || orderedQty == 0) {
+                    continue;
+                }
+                int deduct = Math.min(orderedQty, cartItem.getQuantity());
+                int remaining = cartItem.getQuantity() - deduct;
+                if (remaining == 0) {
+                    toDelete.add(cartItem);
+                } else {
+                    cartItem.updateQuantity(remaining);
+                }
+                int remainingOrder = orderedQty - deduct;
+                if (remainingOrder == 0) {
+                    orderedByEvent.remove(cartItem.getEventId());
+                } else {
+                    orderedByEvent.put(cartItem.getEventId(), remainingOrder);
+                }
+            }
+            if (!toDelete.isEmpty()) {
+                cartItemRepository.deleteAllInBatch(toDelete);
             }
         });
 

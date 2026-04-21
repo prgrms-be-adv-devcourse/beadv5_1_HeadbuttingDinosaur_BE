@@ -65,15 +65,16 @@ public class CartService implements CartUseCase, CartItemUseCase {
         return CartItemResponse.of(cart, cartItem, event.title(), event.price());
     }
 
-    // 장바구니 전체 조회
+    // 장바구니 전체 조회 — Cart row가 없으면 빈 응답 반환 (#416: 신규 사용자 400 → 200)
     @Override
     public CartResponse getCart(UUID userId) {
-        // 장바구니 비어 있음 예외
-        Cart cart = getCartByUserId(userId);
-        // 장바구니 내 아이템 조회
+        Cart cart = cartRepository.findByUserId(userId).orElse(null);
+        if (cart == null) {
+            return CartResponse.empty();
+        }
+
         List<CartItem> cartItems = cartItemRepository.findAllByCartId(cart.getId());
 
-        // 아이템 -> 아이템 상세
         List<CartItemDetail> itemDetails = cartItems.stream()
             .map(cartItem -> {
                 InternalPurchaseValidationResponse event =
@@ -84,20 +85,25 @@ public class CartService implements CartUseCase, CartItemUseCase {
         return CartResponse.of(cart, itemDetails);
     }
 
-    // 장바구니 비우기
+    // 장바구니 비우기 — Cart row가 없으면 멱등 성공 반환 (#416: 이미 비어있음도 성공으로 취급)
     @Override
     public CartClearResponse clearCart(UUID userId) {
-        Cart cart = getCartByUserId(userId);
+        Cart cart = cartRepository.findByUserId(userId).orElse(null);
+        if (cart == null) {
+            return CartClearResponse.of();
+        }
         List<CartItem> cartItems = cartItemRepository.findAllByCartId(cart.getId());
-        cartItemRepository.deleteAllInBatch(cartItems);
+        if (!cartItems.isEmpty()) {
+            cartItemRepository.deleteAllInBatch(cartItems);
+        }
         return CartClearResponse.of();
     }
 
     // 장바구니 아이템 갯수 증감
     @Override
     public CartItemQuantityResponse updateTicket(UUID userId, Long cartItemId, CartItemQuantityRequest request) {
-        // 장바구니 가져오기
-        Cart cart = getCartByUserId(userId);
+        // 장바구니 가져오기 — Cart 없으면 ITEM_NOT_FOUND (#416)
+        Cart cart = getCartOrThrowItemNotFound(userId);
         // 장바구니 아이템 가져오기
         CartItem cartItem = getCartItemById(cartItemId);
 
@@ -125,8 +131,8 @@ public class CartService implements CartUseCase, CartItemUseCase {
     // 장바구니 아이템 삭제
     @Override
     public CartItemDeleteResponse deleteTicket(UUID userId, Long cartItemId) {
-        // 장바구니 가져오기
-        Cart cart = getCartByUserId(userId);
+        // 장바구니 가져오기 — Cart 없으면 ITEM_NOT_FOUND (#416)
+        Cart cart = getCartOrThrowItemNotFound(userId);
         // 장바구니 아이템 가져오기
         CartItem cartItem = getCartItemById(cartItemId);
 
@@ -159,17 +165,28 @@ public class CartService implements CartUseCase, CartItemUseCase {
     }
 
     private CartItem addOrUpdateCartItem(Long cartId, CartItemRequest request) {
-        return cartItemRepository.findByCartIdAndEventId(cartId, request.eventId())
-            .map(existingItem -> {
-                log.info("[CartService] 기존 아이템 수량 추가: cartId={}, eventId={}", cartId, request.eventId());
-                existingItem.addQuantity(request.quantity());
-                return cartItemRepository.save(existingItem);
-            })
-            .orElseGet(() -> {
-                log.info("[CartService] 신규 아이템 생성: cartId={}, eventId={}", cartId, request.eventId());
-                CartItem newItem = CartItem.create(cartId, request.eventId(), request.quantity());
-                return cartItemRepository.save(newItem);
-            });
+        try {
+            return cartItemRepository.findByCartIdAndEventId(cartId, request.eventId())
+                .map(existingItem -> {
+                    log.info("[CartService] 기존 아이템 수량 추가: cartId={}, eventId={}", cartId, request.eventId());
+                    existingItem.addQuantity(request.quantity());
+                    return cartItemRepository.save(existingItem);
+                })
+                .orElseGet(() -> {
+                    log.info("[CartService] 신규 아이템 생성: cartId={}, eventId={}", cartId, request.eventId());
+                    CartItem newItem = CartItem.create(cartId, request.eventId(), request.quantity());
+                    return cartItemRepository.save(newItem);
+                });
+        } catch (DataIntegrityViolationException e) {
+            // 광클 race: 동시 INSERT 중 다른 트랜잭션이 먼저 커밋 → (cart_id, event_id) UNIQUE 위반
+            // findOrCreateCart 와 동일한 복구 패턴 — 재조회 후 수량 합산
+            log.warn("[CartService] addOrUpdateCartItem UNIQUE 충돌 감지 — race 복구 재조회. cartId={}, eventId={}",
+                cartId, request.eventId());
+            CartItem existing = cartItemRepository.findByCartIdAndEventId(cartId, request.eventId())
+                .orElseThrow(() -> new RuntimeException("장바구니 아이템 확보 실패", e));
+            existing.addQuantity(request.quantity());
+            return cartItemRepository.save(existing);
+        }
     }
 
     // Event에서 반환된 reason값 기준 에러 처리
@@ -198,10 +215,10 @@ public class CartService implements CartUseCase, CartItemUseCase {
     }
 
 
-    // 장바구니 존재 유무 확인
-    private Cart getCartByUserId(UUID userId) {
+    // Cart row 없음도 단건 ITEM_NOT_FOUND 로 통일 (#416: CART_EMPTY 400 대신 404 매핑)
+    private Cart getCartOrThrowItemNotFound(UUID userId) {
         return cartRepository.findByUserId(userId)
-            .orElseThrow(() -> new BusinessException(CartErrorCode.CART_EMPTY));
+            .orElseThrow(() -> new BusinessException(CartErrorCode.ITEM_NOT_FOUND));
     }
 
     // 장바구니 아이템 존재 유무 확인
