@@ -38,4 +38,12 @@ public class TechStack {
         ts.createdAt = LocalDateTime.now();
         return ts;
     }
+
+    // =========== 비즈니스 로직 =========== //
+    // 1. tech_Stack 수정
+    public void updateName(String name) {
+        this.name = name;
+        this.updatedAt = LocalDateTime.now();
+    }
+
 }
