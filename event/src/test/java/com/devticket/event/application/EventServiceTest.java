@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -20,8 +21,10 @@ import com.devticket.event.domain.enums.EventStatus;
 import com.devticket.event.domain.exception.EventErrorCode;
 import com.devticket.event.domain.model.Event;
 import com.devticket.event.fixture.EventTestFixture;
+import com.devticket.event.infrastructure.client.AdminClient;
 import com.devticket.event.infrastructure.client.MemberClient;
 import com.devticket.event.infrastructure.client.OpenAiEmbeddingClient;
+import com.devticket.event.infrastructure.client.dto.TechStackItem;
 import com.devticket.event.infrastructure.persistence.EventRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.devticket.event.infrastructure.search.EventDocument;
@@ -39,6 +42,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Stream;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -63,6 +67,9 @@ class EventServiceTest {
     private MemberClient memberClient;
 
     @Mock
+    private AdminClient adminClient;
+
+    @Mock
     private ElasticsearchOperations elasticsearchOperations;
 
     @Mock
@@ -82,6 +89,15 @@ class EventServiceTest {
 
     @InjectMocks
     private EventService eventService;
+
+    @BeforeEach
+    void setUp() {
+        lenient().when(adminClient.getTechStacks()).thenReturn(List.of(
+            new TechStackItem(1L, "Java"),
+            new TechStackItem(2L, "Spring"),
+            new TechStackItem(3L, "Kotlin")
+        ));
+    }
 
     // ── 검색 히트 목 헬퍼 ──────────────────────────────────────────────────
 

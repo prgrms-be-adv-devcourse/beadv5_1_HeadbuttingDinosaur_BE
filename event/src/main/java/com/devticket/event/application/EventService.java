@@ -18,6 +18,7 @@ import com.devticket.event.domain.exception.StockDeductionException;
 import com.devticket.event.domain.model.Event;
 import com.devticket.event.domain.model.EventImage;
 import com.devticket.event.domain.model.EventTechStack;
+import com.devticket.event.infrastructure.client.AdminClient;
 import com.devticket.event.infrastructure.client.MemberClient;
 import com.devticket.event.infrastructure.client.OpenAiEmbeddingClient;
 import com.devticket.event.infrastructure.client.dto.TechStackItem;
@@ -63,6 +64,7 @@ public class EventService {
 
     private final EventRepository eventRepository;
     private final MemberClient memberClient;
+    private final AdminClient adminClient;
     private final ElasticsearchOperations elasticsearchOperations;
     private final ElasticsearchClient esClient;
     private final OpenAiEmbeddingClient openAiEmbeddingClient;
@@ -124,7 +126,7 @@ public class EventService {
     }
 
     private Map<Long, String> buildTechStackMap() {
-        return memberClient.getTechStacks().stream()
+        return adminClient.getTechStacks().stream()
             .collect(Collectors.toMap(TechStackItem::techStackId, TechStackItem::name));
     }
 

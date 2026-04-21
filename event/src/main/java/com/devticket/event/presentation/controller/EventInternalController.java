@@ -1,10 +1,12 @@
 package com.devticket.event.presentation.controller;
 
 import com.devticket.event.application.EventInternalService;
+import com.devticket.event.application.EventRecommendationService;
 import com.devticket.event.common.response.SuccessResponse;
 import com.devticket.event.domain.enums.EventStatus;
 import com.devticket.event.application.EventService;
 import com.devticket.event.presentation.dto.internal.InternalBulkEventInfoRequest;
+import com.devticket.event.presentation.dto.internal.InternalRecommendationResponse;
 import com.devticket.event.presentation.dto.internal.InternalBulkEventInfoResponse;
 import com.devticket.event.presentation.dto.internal.InternalBulkStockAdjustmentRequest;
 import com.devticket.event.presentation.dto.internal.InternalEventForceCancelRequest;
@@ -30,6 +32,7 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -42,6 +45,7 @@ public class EventInternalController {
 
     private final EventInternalService eventInternalService;
     private final EventService eventService;
+    private final EventRecommendationService eventRecommendationService;
 
     @GetMapping
     public ResponseEntity<SuccessResponse<InternalPagedEventResponse>> getEvents(
@@ -178,5 +182,12 @@ public class EventInternalController {
         @RequestBody @Valid InternalEventForceCancelRequest request) {
         eventService.forceCancel(eventId, request.reason());
         return ResponseEntity.noContent().build();
+ 
+    @GetMapping("/recommendations")
+    public ResponseEntity<SuccessResponse<InternalRecommendationResponse>> getRecommendations(
+        @RequestHeader("X-User-Id") UUID userId) {
+        return ResponseEntity.ok(SuccessResponse.success(
+            eventRecommendationService.getRecommendations(userId)
+        ));
     }
 }
