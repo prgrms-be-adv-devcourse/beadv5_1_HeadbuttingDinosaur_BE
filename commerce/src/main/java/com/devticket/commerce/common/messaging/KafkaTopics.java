@@ -19,6 +19,9 @@ public final class KafkaTopics {
     public static final String EVENT_FORCE_CANCELLED = "event.force-cancelled";
     public static final String EVENT_SALE_STOPPED    = "event.sale-stopped";
 
+    // action.log (analytics — fire-and-forget, Bean 격리)
+    public static final String ACTION_LOG = "action.log";
+
     // Refund Saga Orchestration
     public static final String REFUND_REQUESTED         = "refund.requested";
     public static final String REFUND_ORDER_CANCEL      = "refund.order.cancel";
