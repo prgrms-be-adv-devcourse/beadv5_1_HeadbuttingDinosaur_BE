@@ -18,7 +18,7 @@ public class ElasticsearchIndexInitializer {
 
     @PostConstruct
     public void init(){
-        createIndexIfNotExists("techstack-index", "elasticsearch/techstack-index-mapping.json");
+        createIndexIfNotExists("techstack", "elasticsearch/techstack-index-mapping.json");
     }
 
     private void createIndexIfNotExists(String indexName, String mappingFilePath){

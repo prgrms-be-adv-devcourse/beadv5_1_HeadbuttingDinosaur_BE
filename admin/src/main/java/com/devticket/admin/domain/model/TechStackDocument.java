@@ -11,7 +11,7 @@ import org.springframework.data.elasticsearch.annotations.Document;
 @AllArgsConstructor
 @Builder
 @Getter
-@Document(indexName = "techstack-index", createIndex = false)
+@Document(indexName = "techstack", createIndex = false)
 public class TechStackDocument {
 
     @Id
