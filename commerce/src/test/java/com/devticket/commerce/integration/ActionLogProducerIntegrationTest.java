@@ -13,13 +13,16 @@ import com.devticket.commerce.cart.domain.repository.CartItemRepository;
 import com.devticket.commerce.cart.domain.repository.CartRepository;
 import com.devticket.commerce.cart.infrastructure.external.client.EventClient;
 import com.devticket.commerce.cart.infrastructure.external.client.dto.InternalPurchaseValidationResponse;
+import com.devticket.commerce.cart.presentation.dto.req.CartItemQuantityRequest;
 import com.devticket.commerce.cart.presentation.dto.req.CartItemRequest;
 import com.devticket.commerce.common.messaging.KafkaTopics;
+import com.devticket.commerce.common.messaging.event.ActionLogDomainEvent;
 import com.devticket.commerce.common.messaging.event.ActionLogEvent;
 import com.devticket.commerce.common.messaging.event.ActionType;
 import com.devticket.commerce.common.outbox.OutboxRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -37,6 +40,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.core.ProducerFactory;
@@ -45,6 +49,7 @@ import org.springframework.kafka.test.context.EmbeddedKafka;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * action.log Producer 통합 테스트.
@@ -77,6 +82,8 @@ class ActionLogProducerIntegrationTest {
     @Autowired private OutboxRepository outboxRepository;
     @Autowired private EmbeddedKafkaBroker embeddedKafka;
     @Autowired private ObjectMapper objectMapper;
+    @Autowired private ApplicationEventPublisher eventPublisher;
+    @Autowired private TransactionTemplate transactionTemplate;
 
     @Autowired
     @Qualifier("actionLogKafkaTemplate")
@@ -194,6 +201,110 @@ class ActionLogProducerIntegrationTest {
         assertThat(outboxRepository.count()).isEqualTo(outboxCountBefore);
     }
 
+    @Test
+    @DisplayName("롤백 시 미발행 — @TransactionalEventListener(AFTER_COMMIT) 정책 증명")
+    void rollback_시_action_log_미발행() {
+        UUID userId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+
+        transactionTemplate.execute(status -> {
+            eventPublisher.publishEvent(new ActionLogDomainEvent(
+                    userId, eventId, ActionType.CART_ADD,
+                    null, null, null, 1, 1_000L, Instant.now()));
+            status.setRollbackOnly();
+            return null;
+        });
+
+        assertNoActionLogFor(userId, Duration.ofSeconds(3));
+    }
+
+    @Test
+    @DisplayName("updateTicket delta 양수 → CART_ADD 발행 (quantity=|delta|)")
+    void updateTicket_delta_양수_CART_ADD() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+        Cart cart = cartRepository.save(Cart.create(userId));
+        CartItem item = cartItemRepository.save(CartItem.create(cart.getId(), eventId, 1));
+        stubEventPrice(eventId, 3_000);
+
+        cartItemUseCase.updateTicket(userId, item.getId(), new CartItemQuantityRequest(2));
+
+        ActionLogEvent event = awaitSingleActionLog(userId);
+        assertThat(event.actionType()).isEqualTo(ActionType.CART_ADD);
+        assertThat(event.eventId()).isEqualTo(eventId);
+        assertThat(event.quantity()).isEqualTo(2);
+        assertThat(event.totalAmount()).isEqualTo(6_000L); // 3,000 × 2
+    }
+
+    @Test
+    @DisplayName("updateTicket delta 음수 → CART_REMOVE 발행 (quantity=|delta|)")
+    void updateTicket_delta_음수_CART_REMOVE() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+        Cart cart = cartRepository.save(Cart.create(userId));
+        CartItem item = cartItemRepository.save(CartItem.create(cart.getId(), eventId, 5));
+        stubEventPrice(eventId, 4_000);
+
+        cartItemUseCase.updateTicket(userId, item.getId(), new CartItemQuantityRequest(-2));
+
+        ActionLogEvent event = awaitSingleActionLog(userId);
+        assertThat(event.actionType()).isEqualTo(ActionType.CART_REMOVE);
+        assertThat(event.eventId()).isEqualTo(eventId);
+        assertThat(event.quantity()).isEqualTo(2);
+        assertThat(event.totalAmount()).isEqualTo(8_000L); // 4,000 × 2
+    }
+
+    @Test
+    @DisplayName("updateTicket delta 0 → 미발행")
+    void updateTicket_delta_0_미발행() {
+        UUID userId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+        Cart cart = cartRepository.save(Cart.create(userId));
+        CartItem item = cartItemRepository.save(CartItem.create(cart.getId(), eventId, 1));
+        stubEventPrice(eventId, 5_000);
+
+        cartItemUseCase.updateTicket(userId, item.getId(), new CartItemQuantityRequest(0));
+
+        assertNoActionLogFor(userId, Duration.ofSeconds(3));
+    }
+
+    @Test
+    @DisplayName("fallbackExecution=true — 트랜잭션 없이 publishEvent해도 발행 도달")
+    void fallbackExecution_트랜잭션_없이도_발행() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+
+        // 트랜잭션 경계 없이 직접 publishEvent — fallbackExecution=true 덕에 즉시 발행
+        eventPublisher.publishEvent(new ActionLogDomainEvent(
+                userId, eventId, ActionType.VIEW,
+                null, null, null, null, null, Instant.now()));
+
+        ActionLogEvent event = awaitSingleActionLog(userId);
+        assertThat(event.actionType()).isEqualTo(ActionType.VIEW);
+        assertThat(event.eventId()).isEqualTo(eventId);
+    }
+
+    @Test
+    @DisplayName("deleteTicket — eventClient 예외 시 totalAmount=null로 CART_REMOVE 발행 (fetchEventPriceSafely 복원력)")
+    void deleteTicket_eventClient_예외_시_totalAmount_null_CART_REMOVE() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+        Cart cart = cartRepository.save(Cart.create(userId));
+        CartItem item = cartItemRepository.save(CartItem.create(cart.getId(), eventId, 2));
+
+        // eventClient 전 호출 실패 — price 조회 실패하지만 action.log는 발행되어야 함
+        given(eventClient.getValidateEventStatus(any(), any(), anyInt()))
+                .willThrow(new RuntimeException("event-service down"));
+
+        cartItemUseCase.deleteTicket(userId, item.getId());
+
+        ActionLogEvent event = awaitSingleActionLog(userId);
+        assertThat(event.actionType()).isEqualTo(ActionType.CART_REMOVE);
+        assertThat(event.eventId()).isEqualTo(eventId);
+        assertThat(event.quantity()).isEqualTo(2);
+        assertThat(event.totalAmount()).isNull(); // price 실패 → totalAmount=null
+    }
+
     // ── 헬퍼 ──────────────────────────────────────────────────────────
 
     private void stubEventPrice(UUID eventId, int price) {
@@ -222,6 +333,20 @@ class ActionLogProducerIntegrationTest {
 
         assertThat(collected).hasSize(expectedCount);
         return collected;
+    }
+
+    // 지정 userId 키의 메시지가 timeout 내에 도착하지 않음을 검증 (미발행 시나리오)
+    private void assertNoActionLogFor(UUID expectedUserId, Duration timeout) {
+        long deadline = System.currentTimeMillis() + timeout.toMillis();
+        while (System.currentTimeMillis() < deadline) {
+            ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(300));
+            for (ConsumerRecord<String, String> record : records) {
+                if (expectedUserId.toString().equals(record.key())) {
+                    throw new AssertionError(
+                            "예상과 달리 action.log 수신 — key=" + record.key() + ", value=" + record.value());
+                }
+            }
+        }
     }
 
     private Consumer<String, String> createTestConsumer(String topic) {
