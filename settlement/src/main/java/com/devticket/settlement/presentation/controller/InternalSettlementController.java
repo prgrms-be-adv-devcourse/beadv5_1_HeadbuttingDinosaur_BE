@@ -1,4 +1,4 @@
-package com.devticket.settlement.presentation.controller;
+ package com.devticket.settlement.presentation.controller;
 
 import com.devticket.settlement.application.service.SettlementInternalService;
 import com.devticket.settlement.infrastructure.external.dto.InternalSettlementPageResponse;
@@ -36,6 +36,13 @@ public class InternalSettlementController {
     @PostMapping("/run")
     public ResponseEntity<Void> runSettlement() {
         settlementInternalService.runSettlement();
+        return ResponseEntity.ok().build();
+    }
+
+    // 정산기능 수동테스트용 API : SettlementItem데이터를 기반으로 Settelemnt생성
+    @PostMapping("/create-from-items")
+    public ResponseEntity<Void> createSettlementFromItems() {
+        settlementInternalService.createSettlementFromItems();
         return ResponseEntity.ok().build();
     }
 }

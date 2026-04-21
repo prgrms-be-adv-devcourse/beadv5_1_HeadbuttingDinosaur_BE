@@ -10,6 +10,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.time.LocalDate;
 import java.util.UUID;
 import lombok.Builder;
 import lombok.Getter;
@@ -57,11 +58,15 @@ public class SettlementItem extends BaseEntity {
     @Column(name = "settlement_amount", nullable = false)
     private Long settlementAmount;
 
+    @Column(name = "event_date_time", nullable = false)
+    private LocalDate eventDateTime;
+
 
     @Builder
     public SettlementItem(UUID settlementId, UUID orderItemId, Long eventId, UUID eventUUID,
         UUID sellerId, SettlementItemStatus status,
-        Long salesAmount, Long refundAmount, Long feeAmount, Long settlementAmount) {
+        Long salesAmount, Long refundAmount, Long feeAmount, Long settlementAmount,
+        LocalDate eventDateTime) {
         this.settlementId = settlementId;
         this.orderItemId = orderItemId;
         this.eventId = eventId;
@@ -72,6 +77,12 @@ public class SettlementItem extends BaseEntity {
         this.refundAmount = refundAmount;
         this.feeAmount = feeAmount;
         this.settlementAmount = settlementAmount;
+        this.eventDateTime = eventDateTime;
+    }
+
+    public void finalize(UUID settlementId) {
+        this.settlementId = settlementId;
+        this.status = SettlementItemStatus.FINALIZED;
     }
 
 }

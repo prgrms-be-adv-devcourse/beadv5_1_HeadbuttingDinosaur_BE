@@ -3,9 +3,11 @@ package com.devticket.settlement.presentation.scheduler;
 import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.never;
+import static org.mockito.BDDMockito.willDoNothing;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verify;
 
+import com.devticket.settlement.application.service.SettlementInternalService;
 import com.devticket.settlement.application.service.SettlementService;
 import com.devticket.settlement.common.exception.BusinessException;
 import com.devticket.settlement.common.exception.CommonErrorCode;
@@ -24,8 +26,15 @@ class SettlementSchedulerTest {
     @Mock
     private SettlementService settlementService;
 
+    @Mock
+    private SettlementInternalService settlementInternalService;
+
     @InjectMocks
     private SettlementScheduler settlementScheduler;
+
+    // ────────────────────────────────────────────────
+    // collectDailySettlementTargets
+    // ────────────────────────────────────────────────
 
     @Test
     void collectDailySettlementTargets_성공_어제날짜로_서비스호출() {
@@ -58,7 +67,6 @@ class SettlementSchedulerTest {
         given(settlementService.collectSettlementTargets(any(LocalDate.class)))
             .willThrow(new BusinessException(CommonErrorCode.EXTERNAL_SERVICE_ERROR));
 
-        // 예외가 스케줄러 밖으로 전파되지 않아야 함
         assertThatNoException().isThrownBy(
             () -> settlementScheduler.collectDailySettlementTargets()
         );
@@ -75,5 +83,38 @@ class SettlementSchedulerTest {
         settlementScheduler.collectDailySettlementTargets();
 
         verify(settlementService).collectSettlementTargets(yesterday);
+    }
+
+    // ────────────────────────────────────────────────
+    // createMonthlySettlement
+    // ────────────────────────────────────────────────
+
+    @Test
+    void createMonthlySettlement_성공_서비스호출() {
+        willDoNothing().given(settlementInternalService).createSettlementFromItems();
+
+        settlementScheduler.createMonthlySettlement();
+
+        verify(settlementInternalService).createSettlementFromItems();
+    }
+
+    @Test
+    void createMonthlySettlement_예외발생_밖으로_전파하지않음() {
+        willThrow(new RuntimeException("정산 생성 실패"))
+            .given(settlementInternalService).createSettlementFromItems();
+
+        assertThatNoException().isThrownBy(
+            () -> settlementScheduler.createMonthlySettlement()
+        );
+    }
+
+    @Test
+    void createMonthlySettlement_비즈니스예외발생_밖으로_전파하지않음() {
+        willThrow(new BusinessException(CommonErrorCode.EXTERNAL_SERVICE_ERROR))
+            .given(settlementInternalService).createSettlementFromItems();
+
+        assertThatNoException().isThrownBy(
+            () -> settlementScheduler.createMonthlySettlement()
+        );
     }
 }

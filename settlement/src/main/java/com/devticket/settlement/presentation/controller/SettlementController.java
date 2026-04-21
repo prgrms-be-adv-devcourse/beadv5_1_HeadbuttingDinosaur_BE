@@ -2,6 +2,7 @@ package com.devticket.settlement.presentation.controller;
 
 import com.devticket.settlement.application.service.SettlementServiceImpl;
 import com.devticket.settlement.presentation.dto.SellerSettlementDetailResponse;
+import com.devticket.settlement.presentation.dto.SettlementPeriodResponse;
 import com.devticket.settlement.presentation.dto.SettlementResponse;
 import com.devticket.settlement.presentation.dto.SettlementTargetPreviewResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -43,27 +44,51 @@ public class SettlementController {
         return ResponseEntity.ok(settlementServiceImpl.previewSettlementTarget(targetDate));
     }
 
+//    @Operation(
+//        summary = "판매자 정산 내용 조회",
+//        description = "판매자 정산 내용을 조회합니다."
+//    )
+//    @ApiResponse(responseCode = "200", description = "정산 내역 조회 성공")
+//    @GetMapping("/seller/settlements")
+//    public ResponseEntity<List<SettlementResponse>> getSellerSettlements(
+//        @RequestHeader("X-User-Id") UUID sellerId) {
+//        return ResponseEntity.ok(settlementServiceImpl.getSellerSettlements(sellerId));
+//    }
+//
+//    @Operation(
+//        summary = "판매자 정산 내용 상세 조회",
+//        description = "판매자 정산 내용을 상세 조회합니다."
+//    )
+//    @ApiResponse(responseCode = "200", description = "정산 내역 조회 성공")
+//    @GetMapping("/seller/settlements/{settlementId:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}")
+//    public ResponseEntity<SellerSettlementDetailResponse> getSellerSettlement(
+//        @RequestHeader("X-User-Id") UUID sellerId,
+//        @PathVariable UUID settlementId) {
+//        return ResponseEntity.ok(settlementServiceImpl.getSellerSettlementDetail(sellerId, settlementId));
+//    }
+
     @Operation(
-        summary = "판매자 정산 내용 조회",
-        description = "판매자 정산 내용을 조회합니다."
+        summary = "판매자 월별 정산 조회",
+        description = "YYYYMM 형식으로 해당 월의 정산 데이터를 조회합니다. 예: 202603"
     )
-    @ApiResponse(responseCode = "200", description = "정산 내역 조회 성공")
-    @GetMapping("/seller/settlements")
-    public ResponseEntity<List<SettlementResponse>> getSellerSettlements(
-        @RequestHeader("X-User-Id") UUID sellerId) {
-        return ResponseEntity.ok(settlementServiceImpl.getSellerSettlements(sellerId));
+    @ApiResponse(responseCode = "200", description = "월별 정산 조회 성공")
+    @GetMapping("/seller/settlements/{yearMonth:[0-9]{6}}")
+    public ResponseEntity<SettlementPeriodResponse> getSettlementByPeriod(
+        @RequestHeader("X-User-Id") UUID sellerId,
+        @PathVariable String yearMonth) {
+        return ResponseEntity.ok(settlementServiceImpl.getSettlementByPeriod(sellerId, yearMonth));
     }
 
     @Operation(
-        summary = "판매자 정산 내용 상세 조회",
-        description = "판매자 정산 내용을 상세 조회합니다."
+        summary = "판매자 당월 예상 정산 미리보기",
+        description = "아직 정산일이 경과하지 않은 당월의 예상 정산 데이터를 조회합니다. " +
+            "집계 대상 기간: 전월 26일 ~ 당월 25일"
     )
-    @ApiResponse(responseCode = "200", description = "정산 내역 조회 성공")
-    @GetMapping("/seller/settlements/{settlementId}")
-    public ResponseEntity<SellerSettlementDetailResponse> getSellerSettlement(
-        @RequestHeader("X-User-Id") UUID sellerId,
-        @PathVariable UUID settlementId) {
-        return ResponseEntity.ok(settlementServiceImpl.getSellerSettlementDetail(sellerId, settlementId));
+    @ApiResponse(responseCode = "200", description = "예상 정산 조회 성공")
+    @GetMapping("/seller/settlements/preview")
+    public ResponseEntity<SettlementPeriodResponse> getSettlementPreview(
+        @RequestHeader("X-User-Id") UUID sellerId) {
+        return ResponseEntity.ok(settlementServiceImpl.getSettlementPreview(sellerId));
     }
 
 }

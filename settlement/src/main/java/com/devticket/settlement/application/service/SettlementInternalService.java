@@ -17,4 +17,6 @@ public interface SettlementInternalService {
     );
 
     void runSettlement();
+
+    void createSettlementFromItems();
 }
