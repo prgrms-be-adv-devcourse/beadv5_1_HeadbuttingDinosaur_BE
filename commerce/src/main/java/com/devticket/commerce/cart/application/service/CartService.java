@@ -58,7 +58,7 @@ public class CartService implements CartUseCase, CartItemUseCase {
         Cart cart = findOrCreateCart(userId);
 
         //기존에 존재하는 cartItem의 경우 수량증가, 없는 경우 추가
-        CartItem cartItem = upsertCartItemWithRace(cart.getId(), request);
+        CartItem cartItem = addOrUpdateCartItem(cart.getId(), request);
 
         //응답데이터 구성
         return CartItemResponse.of(cart, cartItem, event.title(), event.price());
@@ -165,14 +165,19 @@ public class CartService implements CartUseCase, CartItemUseCase {
 
     // DataIntegrityViolationException을 transactionTemplate 바깥에서 잡아 세션 오염 방지.
     // 충돌 시 트랜잭션이 깨끗하게 롤백된 뒤 새 트랜잭션으로 재시도.
-    private CartItem upsertCartItemWithRace(Long cartId, CartItemRequest request) {
-        //장바구니에 아이템추가
+    private CartItem addOrUpdateCartItem(Long cartId, CartItemRequest request) {
         try {
             return transactionTemplate.execute(status ->
-                addOrUpdateCartItem(cartId, request)
+                cartItemRepository.findByCartIdAndEventId(cartId, request.eventId())
+                    .map(existingItem -> {
+                        existingItem.addQuantity(request.quantity());
+                        return cartItemRepository.save(existingItem);
+                    })
+                    .orElseGet(() -> cartItemRepository.save(
+                        CartItem.create(cartId, request.eventId(), request.quantity())
+                    ))
             );
         } catch (DataIntegrityViolationException e) {
-            //중복된 아이템인 경우 조회 후 수량증가 시킴
             log.warn("[CartService] UNIQUE 충돌 — race 복구 재시도. cartId={}, eventId={}", cartId, request.eventId());
             return transactionTemplate.execute(status -> {
                 CartItem existing = cartItemRepository.findByCartIdAndEventId(cartId, request.eventId())
@@ -181,17 +186,6 @@ public class CartService implements CartUseCase, CartItemUseCase {
                 return cartItemRepository.save(existing);
             });
         }
-    }
-
-    private CartItem addOrUpdateCartItem(Long cartId, CartItemRequest request) {
-        return cartItemRepository.findByCartIdAndEventId(cartId, request.eventId())
-            .map(existingItem -> {
-                existingItem.addQuantity(request.quantity());
-                return cartItemRepository.save(existingItem);
-            })
-            .orElseGet(() -> cartItemRepository.save(
-                CartItem.create(cartId, request.eventId(), request.quantity())
-            ));
     }
 
     // Event에서 반환된 reason값 기준 에러 처리
