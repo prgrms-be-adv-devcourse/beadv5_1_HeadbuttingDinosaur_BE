@@ -6,11 +6,9 @@ import com.devticket.member.presentation.domain.SellerApplicationDecision;
 import com.devticket.member.presentation.domain.UserRole;
 import com.devticket.member.presentation.domain.UserStatus;
 import com.devticket.member.presentation.domain.model.SellerApplication;
-import com.devticket.member.presentation.domain.model.TechStack;
 import com.devticket.member.presentation.domain.model.User;
 import com.devticket.member.presentation.domain.model.UserProfile;
 import com.devticket.member.presentation.domain.repository.SellerApplicationRepository;
-import com.devticket.member.presentation.domain.repository.TechStackRepository;
 import com.devticket.member.presentation.domain.repository.UserProfileRepository;
 import com.devticket.member.presentation.domain.repository.UserRepository;
 import com.devticket.member.presentation.dto.internal.request.InternalDecideSellerApplicationRequest;
@@ -23,7 +21,6 @@ import com.devticket.member.presentation.dto.internal.response.InternalMemberSta
 import com.devticket.member.presentation.dto.internal.response.InternalPagedMemberResponse;
 import com.devticket.member.presentation.dto.internal.response.InternalSellerApplicationResponse;
 import com.devticket.member.presentation.dto.internal.response.InternalSellerInfoResponse;
-import com.devticket.member.presentation.dto.internal.response.InternalTechStackListResponse;
 import com.devticket.member.presentation.dto.internal.response.InternalUpdateRoleResponse;
 import com.devticket.member.presentation.dto.internal.response.InternalUpdateStatusResponse;
 import java.util.List;
@@ -43,7 +40,7 @@ public class InternalMemberService {
     private final UserRepository userRepository;
     private final UserProfileRepository userProfileRepository;
     private final SellerApplicationRepository sellerApplicationRepository;
-    private final TechStackRepository techStackRepository;
+
 
     public InternalMemberInfoResponse getMemberInfo(UUID userId) {
         User user = findUserByUuidOrThrow(userId);
@@ -159,8 +156,4 @@ public class InternalMemberService {
             .toList();
     }
 
-    public InternalTechStackListResponse getAllTechStacks() {
-        List<TechStack> stacks = techStackRepository.findAll();
-        return InternalTechStackListResponse.from(stacks);
-    }
 }

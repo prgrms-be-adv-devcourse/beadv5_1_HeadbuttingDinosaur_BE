@@ -30,3 +30,7 @@ logging:
   level:
     org.hibernate.SQL: DEBUG
     com.devticket: DEBUG
+
+internal:
+  admin-service:
+    url: http://localhost:8087
