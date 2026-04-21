@@ -6,6 +6,7 @@ spring:
     password:
     hikari:
       maximum-pool-size: 30
+      connection-init-sql: "SET SCHEMA payment"
   jpa:
     database-platform: org.hibernate.dialect.H2Dialect
     hibernate:
