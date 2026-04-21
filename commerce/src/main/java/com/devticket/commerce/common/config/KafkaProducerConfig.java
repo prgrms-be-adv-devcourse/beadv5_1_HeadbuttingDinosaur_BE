@@ -29,6 +29,11 @@ public class KafkaProducerConfig {
         config.put(ProducerConfig.ACKS_CONFIG, "all");
         // Producer 멱등성 — 재전송 시 중복 발행 방지 (acks=all 필수)
         config.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
+        // OutboxEventProducer.get(2s)와 정합 — 앱 타임아웃 이전에 Producer 재시도 확정 종료
+        // 일시 실패는 Outbox markFailed() 지수 백오프가 단일 재시도 메커니즘으로 수행
+        config.put(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, 1500);
+        config.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, 1000);
+        config.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, 500);
         return new DefaultKafkaProducerFactory<>(config);
     }
 

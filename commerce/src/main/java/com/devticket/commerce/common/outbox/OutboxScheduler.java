@@ -19,7 +19,7 @@ public class OutboxScheduler {
     // @Transactional 없음 — Kafka 발행은 트랜잭션 밖에서 처리
     // 건당 독립 처리: OutboxService.processOne()에 위임
     @Scheduled(fixedDelay = 3_000)
-    @SchedulerLock(name = "outbox-scheduler", lockAtMostFor = "30s", lockAtLeastFor = "5s")
+    @SchedulerLock(name = "outbox-scheduler", lockAtMostFor = "5m", lockAtLeastFor = "5s")
     public void publishPendingEvents() {
         List<Outbox> pendingList = outboxRepository
                 .findPendingToPublish(OutboxStatus.PENDING, Instant.now());
