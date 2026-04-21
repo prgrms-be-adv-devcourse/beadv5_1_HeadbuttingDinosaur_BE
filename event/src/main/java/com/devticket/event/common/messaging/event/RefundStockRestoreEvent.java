@@ -1,5 +1,6 @@
 package com.devticket.event.common.messaging.event;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -9,12 +10,12 @@ import java.util.UUID;
  * 결과로 refund.stock.done / refund.stock.failed 를 발행한다.
  */
 public record RefundStockRestoreEvent(
-        UUID refundId,
-        UUID orderId,
-        List<Item> items
+    UUID refundId,
+    UUID orderId,
+    List<Item> items,
+    Instant timestamp
 ) {
-    public record Item(
-            UUID eventId,
-            int quantity
-    ) {}
+    public record Item(UUID eventId, int quantity) {}
 }
+
+

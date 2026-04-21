@@ -10,5 +10,5 @@ import java.util.UUID;
 public record RefundStockDoneEvent(
         UUID refundId,
         UUID orderId,
-        Instant occurredAt
+        Instant timestamp
 ) {}

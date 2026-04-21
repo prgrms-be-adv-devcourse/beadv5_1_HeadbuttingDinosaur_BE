@@ -5,8 +5,8 @@ import com.devticket.event.application.RefundStockRestoreService;
 import com.devticket.event.application.RefundStockRestoreService.EventNotFoundForRefundException;
 import com.devticket.event.common.exception.BusinessException;
 import com.devticket.event.common.messaging.KafkaTopics;
+import com.devticket.event.common.messaging.PayloadExtractor;
 import com.devticket.event.common.messaging.event.RefundStockRestoreEvent;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +19,7 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.ObjectMapper;
 
 @Slf4j
 @Component
@@ -41,7 +42,6 @@ public class RefundStockRestoreConsumer {
             refundStockRestoreService.handleRefundStockRestore(
                 messageId, record.topic(), record.value());
         } catch (EventNotFoundForRefundException | BusinessException e) {
-            // 비즈니스 실패 — 본 트랜잭션 롤백 후 별도 트랜잭션으로 failed 발행
             log.warn("[refund.stock.restore 비즈니스 실패 → failed 발행] messageId={}, reason={}",
                 messageId, e.getMessage());
             RefundStockRestoreEvent payload = parsePayloadForFailure(record.value());
@@ -49,7 +49,6 @@ public class RefundStockRestoreConsumer {
                 messageId, record.topic(),
                 payload.refundId(), payload.orderId(), e.getMessage());
         } catch (ObjectOptimisticLockingFailureException e) {
-            // @Version 충돌: 트랜잭션 롤백됨 → dedup 재확인
             if (deduplicationService.isDuplicate(messageId)) {
                 log.info("[refund.stock.restore @Version 충돌 → 이미 처리됨, 스킵] messageId={}", messageId);
             } else {
@@ -57,7 +56,6 @@ public class RefundStockRestoreConsumer {
                 throw e;
             }
         } catch (DataIntegrityViolationException e) {
-            // dedup UNIQUE 충돌: 다른 요청이 이미 처리 완료 → 스킵
             log.warn("[refund.stock.restore dedup] UNIQUE 충돌로 스킵 — messageId={}", messageId);
         } catch (Exception e) {
             log.error("[refund.stock.restore 처리 실패] messageId={}", messageId, e);
@@ -69,9 +67,10 @@ public class RefundStockRestoreConsumer {
 
     private RefundStockRestoreEvent parsePayloadForFailure(String payload) {
         try {
-            return objectMapper.readValue(payload, RefundStockRestoreEvent.class);
+            // wrapper JSON 이 오면 payload 필드만 추출해서 역직렬화
+            String actualPayload = PayloadExtractor.extract(objectMapper, payload);
+            return objectMapper.readValue(actualPayload, RefundStockRestoreEvent.class);
         } catch (Exception e) {
-            // 페이로드 자체가 손상 — failed 발행 불가, 재시도/DLT 로 위임
             throw new IllegalStateException("RefundStockRestoreEvent 역직렬화 실패", e);
         }
     }

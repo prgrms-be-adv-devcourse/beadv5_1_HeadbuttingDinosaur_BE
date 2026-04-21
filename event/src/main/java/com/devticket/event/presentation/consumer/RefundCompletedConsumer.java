@@ -2,8 +2,8 @@ package com.devticket.event.presentation.consumer;
 
 import com.devticket.event.application.MessageDeduplicationService;
 import com.devticket.event.common.messaging.KafkaTopics;
+import com.devticket.event.common.messaging.PayloadExtractor;
 import com.devticket.event.common.messaging.event.RefundCompletedEvent;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +16,7 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * refund.completed 수신자.
@@ -42,8 +43,9 @@ public class RefundCompletedConsumer {
         try {
             if (!deduplicationService.isDuplicate(messageId)) {
                 RefundCompletedEvent event = deserialize(record.value());
-                log.info("[refund.completed 처리] refundId={}, orderId={}, occurredAt={}",
-                    event.refundId(), event.orderId(), event.occurredAt());
+                log.info("[refund.completed 처리] refundId={}, orderId={}, paymentMethod={}, amount={}, rate={}, ts={}",
+                    event.refundId(), event.orderId(), event.paymentMethod(),
+                    event.refundAmount(), event.refundRate(), event.timestamp());
                 deduplicationService.markProcessed(messageId, record.topic());
             }
         } catch (DataIntegrityViolationException e) {
@@ -58,7 +60,8 @@ public class RefundCompletedConsumer {
 
     private RefundCompletedEvent deserialize(String payload) {
         try {
-            return objectMapper.readValue(payload, RefundCompletedEvent.class);
+            String actualPayload = PayloadExtractor.extract(objectMapper, payload);
+            return objectMapper.readValue(actualPayload, RefundCompletedEvent.class);
         } catch (Exception e) {
             throw new IllegalArgumentException("RefundCompletedEvent 역직렬화 실패", e);
         }
