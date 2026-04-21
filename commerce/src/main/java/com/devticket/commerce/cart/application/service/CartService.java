@@ -220,28 +220,28 @@ public class CartService implements CartUseCase, CartItemUseCase {
 
     }
 
+    // DataIntegrityViolationException을 transactionTemplate 바깥에서 잡아 세션 오염 방지.
+    // 충돌 시 트랜잭션이 깨끗하게 롤백된 뒤 새 트랜잭션으로 재시도.
     private CartItem addOrUpdateCartItem(Long cartId, CartItemRequest request) {
         try {
-            return cartItemRepository.findByCartIdAndEventId(cartId, request.eventId())
-                .map(existingItem -> {
-                    log.info("[CartService] 기존 아이템 수량 추가: cartId={}, eventId={}", cartId, request.eventId());
-                    existingItem.addQuantity(request.quantity());
-                    return cartItemRepository.save(existingItem);
-                })
-                .orElseGet(() -> {
-                    log.info("[CartService] 신규 아이템 생성: cartId={}, eventId={}", cartId, request.eventId());
-                    CartItem newItem = CartItem.create(cartId, request.eventId(), request.quantity());
-                    return cartItemRepository.save(newItem);
-                });
+            return transactionTemplate.execute(status ->
+                cartItemRepository.findByCartIdAndEventId(cartId, request.eventId())
+                    .map(existingItem -> {
+                        existingItem.addQuantity(request.quantity());
+                        return cartItemRepository.save(existingItem);
+                    })
+                    .orElseGet(() -> cartItemRepository.save(
+                        CartItem.create(cartId, request.eventId(), request.quantity())
+                    ))
+            );
         } catch (DataIntegrityViolationException e) {
-            // 광클 race: 동시 INSERT 중 다른 트랜잭션이 먼저 커밋 → (cart_id, event_id) UNIQUE 위반
-            // findOrCreateCart 와 동일한 복구 패턴 — 재조회 후 수량 합산
-            log.warn("[CartService] addOrUpdateCartItem UNIQUE 충돌 감지 — race 복구 재조회. cartId={}, eventId={}",
-                cartId, request.eventId());
-            CartItem existing = cartItemRepository.findByCartIdAndEventId(cartId, request.eventId())
-                .orElseThrow(() -> new RuntimeException("장바구니 아이템 확보 실패", e));
-            existing.addQuantity(request.quantity());
-            return cartItemRepository.save(existing);
+            log.warn("[CartService] UNIQUE 충돌 — race 복구 재시도. cartId={}, eventId={}", cartId, request.eventId());
+            return transactionTemplate.execute(status -> {
+                CartItem existing = cartItemRepository.findByCartIdAndEventId(cartId, request.eventId())
+                    .orElseThrow(() -> new RuntimeException("장바구니 아이템 확보 실패"));
+                existing.addQuantity(request.quantity());
+                return cartItemRepository.save(existing);
+            });
         }
     }
 
