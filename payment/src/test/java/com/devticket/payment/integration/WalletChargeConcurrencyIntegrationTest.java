@@ -213,7 +213,6 @@ class WalletChargeConcurrencyIntegrationTest {
     // 검증: Wallet 1개만 생성 + 에러 없이 N건 모두 성공 + WalletCharge N건 생성
     // =========================================================================
     @Test
-    @Disabled("TODO: 신규 사용자 동시 다기기 요청 시 Wallet 중복 생성 방어 미구현 — getWallet() 개선 후 활성화")
     @DisplayName("신규 유저: 지갑 없는 상태에서 다기기 동시 충전(다른 멱등성 키) — Wallet 1개, WalletCharge N건 생성")
     void 신규유저_지갑미생성_다기기_동시충전_각기다른멱등성키() throws InterruptedException {
         // given — 지갑이 없는 신규 유저 (setUp의 walletRepository.save 적용 안 됨)
