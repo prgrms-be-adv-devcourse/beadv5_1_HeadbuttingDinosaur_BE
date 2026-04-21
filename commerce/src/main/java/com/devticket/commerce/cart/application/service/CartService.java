@@ -57,6 +57,7 @@ public class CartService implements CartUseCase, CartItemUseCase {
         //Cart와 CartItem -> 객체참조x, 연관관계 매핑 없이 식별자참조.
         Cart cart = findOrCreateCart(userId);
 
+        //기존에 존재하는 cartItem의 경우 수량증가, 없는 경우 추가
         CartItem cartItem = upsertCartItemWithRace(cart.getId(), request);
 
         //응답데이터 구성
@@ -165,11 +166,13 @@ public class CartService implements CartUseCase, CartItemUseCase {
     // DataIntegrityViolationException을 transactionTemplate 바깥에서 잡아 세션 오염 방지.
     // 충돌 시 트랜잭션이 깨끗하게 롤백된 뒤 새 트랜잭션으로 재시도.
     private CartItem upsertCartItemWithRace(Long cartId, CartItemRequest request) {
+        //장바구니에 아이템추가
         try {
             return transactionTemplate.execute(status ->
                 addOrUpdateCartItem(cartId, request)
             );
         } catch (DataIntegrityViolationException e) {
+            //중복된 아이템인 경우 조회 후 수량증가 시킴
             log.warn("[CartService] UNIQUE 충돌 — race 복구 재시도. cartId={}, eventId={}", cartId, request.eventId());
             return transactionTemplate.execute(status -> {
                 CartItem existing = cartItemRepository.findByCartIdAndEventId(cartId, request.eventId())
