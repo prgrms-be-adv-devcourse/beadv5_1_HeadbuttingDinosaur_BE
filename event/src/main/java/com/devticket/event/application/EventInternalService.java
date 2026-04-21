@@ -302,7 +302,7 @@ public class EventInternalService {
             eventRepository.findAllByEventDate(startOfDay, startOfNextDay)
                 .stream()
                 .map(e -> new InternalEndedEventsResponse.EndedEventItem(
-                    e.getId(), e.getEventId(), e.getSellerId()
+                    e.getId(), e.getEventId(), e.getSellerId(), e.getEventDateTime()
                 ))
                 .toList();
 
