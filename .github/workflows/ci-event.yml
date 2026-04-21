@@ -14,22 +14,21 @@ jobs:
     runs-on: ubuntu-latest
 
     services:
-      # ElasticsearchIntegrationTestBase 가 localhost:9200 참조 (docs/~~, EventSearch*Test)
-      # xpack.security.enabled=false 로 HTTP 통신 사용 (인증 없이 테스트)
       elasticsearch:
-        image: docker.elastic.co/elasticsearch/elasticsearch:9.2.5
+        image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
         env:
           discovery.type: single-node
-          xpack.security.enabled: false
-          ES_JAVA_OPTS: -Xms512m -Xmx512m
+          xpack.security.enabled: "false"
+          xpack.security.http.ssl.enabled: "false"
+          xpack.security.transport.ssl.enabled: "false"
         ports:
           - 9200:9200
         options: >-
-          --health-cmd "curl -sf http://localhost:9200/_cluster/health || exit 1"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 20
-
+          --health-cmd="curl -fsS http://localhost:9200/_cluster/health || exit 1"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=30
+          
     steps:
       - name: 1. Checkout Repository
         uses: actions/checkout@v4
@@ -48,6 +47,7 @@ jobs:
         run: cd event && ./gradlew test
         env:
           SPRING_PROFILES_ACTIVE: test
+          SPRING_ELASTICSEARCH_URIS: http://localhost:9200
 
       - name: 5. Gradle Build
         run: cd event && ./gradlew build -x test

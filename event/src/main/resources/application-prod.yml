@@ -33,6 +33,8 @@ openai:
 service:
   member:
     url: http://member:8081
+  admin:
+    url: http://admin:8087
   ai:
     url: http://ai:8088
 
