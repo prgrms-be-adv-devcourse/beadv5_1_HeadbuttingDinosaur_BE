@@ -441,7 +441,7 @@ sequenceDiagram
 - [x] ✅ Outbox 스케줄러와 Consumer 동시 처리 충돌 방지 — payment.* Consumer 경로 `@Version` + `canTransitionTo()` 양쪽 가드 적용 (`OrderExpirationScheduler`도 동일)
 
 **`action.log` Producer (analytics — 신규 적용)** *(상세: [actionLog.md](actionLog.md))*
-- [ ] 전용 `ActionLogKafkaProducerConfig` Bean 분리 — `acks=0`, `retries=0`, `enable.idempotence=false` (기존 Producer Bean과 공유 금지)
+- [ ] 전용 `ActionLogKafkaProducerConfig` Bean 분리 — `acks=0`, `retries=0`, `enable.idempotence=false`, `linger.ms=10`, `batch.size=기본`, `compression.type=none`, `max.in.flight=5` (기존 Producer Bean과 공유 금지 — 기존 `kafkaTemplate` `@Primary` 부여 + 신규 `actionLogKafkaTemplate` `@Qualifier` 매칭)
 - [ ] `CART_ADD` 발행 — 장바구니 담기 API 핸들러 내 트랜잭션 경계 **밖**에서 비동기 발행 (Partition Key: `userId`)
 - [ ] `CART_REMOVE` 발행 — 장바구니 삭제 API 핸들러 내 트랜잭션 경계 **밖**에서 비동기 발행
 - [ ] Outbox 미사용 확인 (비즈니스 트랜잭션에 INSERT 포함 금지)
@@ -524,7 +524,7 @@ sequenceDiagram
 - [x] ✅ `StockRestoreServiceTest` 업데이트 — `JacksonConfig` import, @DataJpaTest 기반
 
 **`action.log` Producer (analytics — 신규 적용)** *(상세: [actionLog.md](actionLog.md))*
-- [ ] 전용 `ActionLogKafkaProducerConfig` Bean 분리 — `acks=0`, `retries=0`, `enable.idempotence=false` (기존 Producer Bean과 공유 금지)
+- [ ] 전용 `ActionLogKafkaProducerConfig` Bean 분리 — `acks=0`, `retries=0`, `enable.idempotence=false`, `linger.ms=10`, `batch.size=기본`, `compression.type=none`, `max.in.flight=5` (기존 Producer Bean과 공유 금지 — 기존 `kafkaTemplate` `@Primary` 부여 + 신규 `actionLogKafkaTemplate` `@Qualifier` 매칭)
 - [ ] `VIEW` 발행 — 이벤트 목록 조회 API 핸들러 내 트랜잭션 경계 **밖**에서 비동기 발행 (Partition Key: `userId`, `searchKeyword` / `stackFilter`가 있으면 포함)
 - [ ] `DETAIL_VIEW` 발행 — 이벤트 상세 조회 API 핸들러 내 트랜잭션 경계 **밖**에서 비동기 발행
 - [ ] `DWELL_TIME` 발행 — 프론트 이탈 시 호출 API 핸들러 내 트랜잭션 경계 **밖**에서 비동기 발행 (`dwellTimeSeconds` 필수)

@@ -110,6 +110,8 @@ export interface ActionLogMessage {
 | 10 | **`actorType` 필드 미추가** (Q1 → A) | 확정 | **PO 결정** | 현 스코프 6종 actionType은 전부 USER 행동. Seller/Admin/SYSTEM 로그 수집이 현 로드맵에 없음 → YAGNI. 미래 확장 확정 시 V3 마이그레이션으로 추가 |
 | 11 | **`sessionId` 필드 제외** (Q2 → C) | 확정 | **PO 결정** | 현 스코프 단순화 우선. 프론트 `X-Session-Id` 헤더 신규 작업 필요 + 도입 시점 불확실성. AI 분석 품질은 `userId + timestamp` 근사로 대응. AI 팀이 "sessionId 없이도 분석 가능" 판단 전제. 필요 시 V3 마이그레이션으로 재도입 |
 | 12 | **PURCHASE 처리 = Kafka 재발행 없이 Consumer 직접 DB INSERT** | 확정 | 아키텍트 결정 | ① 셀프 루프 오버헤드 제거 ② "DB 저장은 Log 서비스 Consumer 단계에서만" 정책 일관성 ③ 매출 KPI 직결 → `acks=0` 중간 손실 리스크 회피 (상류 `payment.completed`는 Outbox + dedup 보장됨). Log 서비스가 `payment.completed` 토픽 추가 구독 |
+| 13 | **action.log 전용 `KafkaTemplate` Bean 분리 전략: 기존 `kafkaTemplate` Bean `@Primary` 부여 + 신규 `actionLogKafkaTemplate` 추가** | 확정 | 아키텍트 결정 | 동일 타입 Bean 2개 공존 시 `NoUniqueBeanDefinitionException` 방지. 기존 Saga Producer 주입부 **무수정** (회귀 위험 최소화) + action.log Producer만 `@Qualifier("actionLogKafkaTemplate")` 명시. `@Primary` + `@Qualifier` 조합은 Spring 공식 패턴 |
+| 14 | **action.log Producer 튜닝 초기값**: `max.in.flight.requests.per.connection=5`, `linger.ms=10`, `batch.size=기본(16KB)`, `compression.type=none` | 확정 | 아키텍트 결정 | ① `linger.ms=10`: 비동기 발행 전제 → UX 영향 없이 batch 효율 ↑ ② `compression=none`: 1차 기능 검증 우선 — `lz4` 전환은 성능 테스트 후 별도 Task로 분리 ③ `max.in.flight=5`: 기본값 유지 (순서 보장 불요하나 idempotence 옵션 여지 확보) ④ `batch.size` 기본 유지 — `linger.ms=10`이 먼저 flush 트리거하므로 증설 효과 제한적 |
 
 ---
 

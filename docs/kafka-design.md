@@ -701,12 +701,17 @@ kafkaTemplate.send("order.created", orderId.toString(), payload);
 | `enable.idempotence` | `false` | `true` |
 | Outbox 패턴 | **미사용** (트랜잭션 경계 밖 비동기 발행) | 필수 (원자성) |
 | `X-Message-Id` 헤더 | 미사용 | 필수 (Consumer dedup용) |
-| KafkaTemplate / Producer Bean | **전용 Bean 분리 필요** | 공유 |
+| KafkaTemplate / Producer Bean | **전용 Bean 분리 필요** — 기존 `kafkaTemplate` Bean `@Primary` 부여 + 신규 `actionLogKafkaTemplate` 등록 (`@Qualifier("actionLogKafkaTemplate")` 매칭) | 공유 |
+| `max.in.flight.requests.per.connection` | `5` (기본값 유지) | `5` |
+| `linger.ms` | `10` (batch 효율 ↑, 비동기 발행 전제라 UX 무영향) | `0` (지연 최소화) |
+| `batch.size` | 기본(`16KB`) — `linger.ms=10`이 먼저 flush 트리거하므로 증설 효과 제한적 | 기본 |
+| `compression.type` | `none` (1차 기능 검증 우선 — `lz4` 전환은 성능 테스트 후 별도 Task로 분리) | `none` |
 
 **핵심 원칙**
 - **손실 허용**: 로그 데이터 성격상 네트워크/브로커 장애 시 일부 메시지 손실 허용 → 재시도·DLT 운영 오버헤드 제거
 - **비즈니스 API 응답 지연 제로**: 트랜잭션 경계 밖에서 비동기 발행 → API 응답 시간에 영향 없음
 - **구현 주의**: 기존 Producer Bean과 설정이 완전히 다르므로 **반드시 전용 `KafkaProducerConfig` Bean을 별도로 등록**해 공유하지 말 것
+- **Bean 분리 방식**: 동일 타입 `KafkaTemplate<String, Object>` 2개 공존 시 `NoUniqueBeanDefinitionException` 방지를 위해 기존 Saga용 Bean에 `@Primary` + action.log 전용 Bean에 `@Qualifier("actionLogKafkaTemplate")` 조합 사용 (상세: [actionLog.md](actionLog.md) §2 #13)
 
 ---
 
