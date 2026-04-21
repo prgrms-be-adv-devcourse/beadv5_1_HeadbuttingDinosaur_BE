@@ -19,13 +19,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.test.EmbeddedKafkaBroker;
 import org.springframework.kafka.test.context.EmbeddedKafka;
 import org.springframework.kafka.test.utils.KafkaTestUtils;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -37,72 +37,72 @@ import org.springframework.test.context.ActiveProfiles;
 )
 class OutboxSchedulerIntegrationTest {
 
-//    @MockitoBean
-//    private LockProvider lockProvider;
-//
-//    @Autowired
-//    private OutboxRepository outboxRepository;
-//
-//    @Autowired
-//    private EmbeddedKafkaBroker embeddedKafkaBroker;
-//
-//    private Consumer<String, String> consumer;
-//
-//    @BeforeEach
-//    void setUp() {
-//        given(lockProvider.lock(any())).willReturn(Optional.of(() -> {}));
-//
-//        Map<String, Object> consumerProperties =
-//                KafkaTestUtils.consumerProps("outbox-scheduler-test", "true", embeddedKafkaBroker);
-//        consumerProperties.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-//        consumer = new DefaultKafkaConsumerFactory<>(
-//                consumerProperties,
-//                new StringDeserializer(),
-//                new StringDeserializer()
-//        ).createConsumer();
-//        embeddedKafkaBroker.consumeFromAnEmbeddedTopic(consumer, "payment.completed");
-//    }
-//
-//    @AfterEach
-//    void tearDown() {
-//        if (consumer != null) {
-//            consumer.close();
-//        }
-//    }
-//
-//    @Test
-//    void publishPendingEvents_대기중인_레코드를_발행하고_SENT로_변경한다() {
-//        // given
-//        Outbox saved = outboxRepository.save(
-//                Outbox.create(
-//                        "aggregate-1",
-//                        "partition-1",
-//                        "PaymentCompleted",
-//                        "payment.completed",
-//                        "{\"orderId\":1}"
-//                )
-//        );
-//
-//        // when & then
-//        await()
-//                .atMost(Duration.ofSeconds(10))
-//                .pollInterval(Duration.ofMillis(500))
-//                .untilAsserted(() -> {
-//                    ConsumerRecords<String, String> records = KafkaTestUtils.getRecords(
-//                            consumer,
-//                            Duration.ofSeconds(1)
-//                    );
-//
-//                    assertThat(records.count()).isGreaterThan(0);
-//
-//                    ConsumerRecord<String, String> record = records.iterator().next();
-//                    assertThat(record.key()).isEqualTo("partition-1");
-//                    assertThat(record.value()).isEqualTo("{\"orderId\":1}");
-//                    assertThat(record.headers().lastHeader("X-Message-Id")).isNotNull();
-//
-//                    Outbox outbox = outboxRepository.findById(saved.getId()).orElseThrow();
-//                    assertThat(outbox.getStatus()).isEqualTo(OutboxStatus.SENT);
-//                    assertThat(outbox.getSentAt()).isNotNull();
-//                });
-//    }
+    @MockitoBean
+    private LockProvider lockProvider;
+
+    @Autowired
+    private OutboxRepository outboxRepository;
+
+    @Autowired
+    private EmbeddedKafkaBroker embeddedKafkaBroker;
+
+    private Consumer<String, String> consumer;
+
+    @BeforeEach
+    void setUp() {
+        given(lockProvider.lock(any())).willReturn(Optional.of(() -> {}));
+
+        Map<String, Object> consumerProperties =
+                KafkaTestUtils.consumerProps("outbox-scheduler-test", "true", embeddedKafkaBroker);
+        consumerProperties.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        consumer = new DefaultKafkaConsumerFactory<>(
+                consumerProperties,
+                new StringDeserializer(),
+                new StringDeserializer()
+        ).createConsumer();
+        embeddedKafkaBroker.consumeFromAnEmbeddedTopic(consumer, "payment.completed");
+    }
+
+    @AfterEach
+    void tearDown() {
+        if (consumer != null) {
+            consumer.close();
+        }
+    }
+
+    @Test
+    void publishPendingEvents_대기중인_레코드를_발행하고_SENT로_변경한다() {
+        // given
+        Outbox saved = outboxRepository.save(
+                Outbox.create(
+                        "aggregate-1",
+                        "partition-1",
+                        "PaymentCompleted",
+                        "payment.completed",
+                        "{\"orderId\":1}"
+                )
+        );
+
+        // when & then
+        await()
+                .atMost(Duration.ofSeconds(10))
+                .pollInterval(Duration.ofMillis(500))
+                .untilAsserted(() -> {
+                    ConsumerRecords<String, String> records = KafkaTestUtils.getRecords(
+                            consumer,
+                            Duration.ofSeconds(1)
+                    );
+
+                    assertThat(records.count()).isGreaterThan(0);
+
+                    ConsumerRecord<String, String> record = records.iterator().next();
+                    assertThat(record.key()).isEqualTo("partition-1");
+                    assertThat(record.value()).isEqualTo("{\"orderId\":1}");
+                    assertThat(record.headers().lastHeader("X-Message-Id")).isNotNull();
+
+                    Outbox outbox = outboxRepository.findById(saved.getId()).orElseThrow();
+                    assertThat(outbox.getStatus()).isEqualTo(OutboxStatus.SENT);
+                    assertThat(outbox.getSentAt()).isNotNull();
+                });
+    }
 }
