@@ -27,7 +27,7 @@ import org.springframework.stereotype.Component;
 public class OutboxEventProducer {
 
     private static final String MESSAGE_ID_HEADER = "X-Message-Id";
-    private static final long SEND_TIMEOUT_SECONDS = 5L;
+    private static final long SEND_TIMEOUT_SECONDS = 2L;
 
     private final KafkaTemplate<String, String> kafkaTemplate;
 
