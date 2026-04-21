@@ -4,6 +4,7 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
+import com.devticket.event.common.config.ElasticsearchIndexInitializer;
 import com.devticket.event.common.messaging.KafkaTopics;
 import com.devticket.event.common.messaging.event.PaymentFailedEvent;
 import com.devticket.event.common.outbox.OutboxScheduler;
@@ -65,6 +66,7 @@ class PaymentFailedKafkaIntegrationTest {
     @MockitoBean private MemberClient memberClient;
     @MockitoBean private OpenAiEmbeddingClient openAiEmbeddingClient;
     @MockitoBean private OutboxScheduler outboxScheduler;
+    @MockitoBean private ElasticsearchIndexInitializer elasticsearchIndexInitializer;
 
     @BeforeEach
     void setUp() {

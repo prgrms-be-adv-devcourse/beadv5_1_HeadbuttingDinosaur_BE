@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
 import com.devticket.event.application.EventService;
+import com.devticket.event.common.config.ElasticsearchIndexInitializer;
 import com.devticket.event.common.messaging.KafkaTopics;
 import com.devticket.event.common.messaging.event.OrderCreatedEvent;
 import com.devticket.event.common.outbox.OutboxRepository;
@@ -77,6 +78,7 @@ class OrderCreatedKafkaIntegrationTest {
     @MockitoBean private MemberClient memberClient;
     @MockitoBean private OpenAiEmbeddingClient openAiEmbeddingClient;
     @MockitoBean private OutboxScheduler outboxScheduler; // H2에 shedlock 테이블 없음
+    @MockitoBean private ElasticsearchIndexInitializer elasticsearchIndexInitializer;
 
     @BeforeEach
     void setUp() {
