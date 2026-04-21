@@ -125,6 +125,7 @@ class ConsumerDltIntegrationTest {
                 UUID.randomUUID(),
                 PaymentMethod.PG,
                 10_000,
+                List.of(),
                 Instant.now()
         );
 
