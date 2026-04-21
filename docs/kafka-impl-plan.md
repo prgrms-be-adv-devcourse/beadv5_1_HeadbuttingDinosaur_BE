@@ -440,13 +440,16 @@ sequenceDiagram
 - [x] ✅ Consumer 순서 역전 3분류 처리 구현 (payment.completed / payment.failed) — ①이미 목표 상태(멱등 스킵+ACK) ②정책적 스킵(PAID 후 CANCELLED/FAILED 도착 등) ③이상 상태(throw→재시도→DLT)
 - [x] ✅ Outbox 스케줄러와 Consumer 동시 처리 충돌 방지 — payment.* Consumer 경로 `@Version` + `canTransitionTo()` 양쪽 가드 적용 (`OrderExpirationScheduler`도 동일)
 
-**`action.log` Producer (analytics — 신규 적용)** *(상세: [actionLog.md](actionLog.md))*
+**`action.log` Producer (analytics — 신규 적용)** *(상세: [actionLog.md](actionLog.md) §4 — 구현 지시서)*
 - [ ] 전용 `ActionLogKafkaProducerConfig` Bean 분리 — `acks=0`, `retries=0`, `enable.idempotence=false`, `linger.ms=10`, `batch.size=기본`, `compression.type=none`, `max.in.flight=5` (기존 Producer Bean과 공유 금지 — 기존 `kafkaTemplate` `@Primary` 부여 + 신규 `actionLogKafkaTemplate` `@Qualifier` 매칭)
-- [ ] `CART_ADD` 발행 — 장바구니 담기 API 핸들러 내 트랜잭션 경계 **밖**에서 비동기 발행 (Partition Key: `userId`)
-- [ ] `CART_REMOVE` 발행 — 장바구니 삭제 API 핸들러 내 트랜잭션 경계 **밖**에서 비동기 발행
+- [ ] `CART_ADD` 발행 — 장바구니 담기 API 핸들러 내 트랜잭션 경계 **밖**에서 비동기 발행 (Partition Key: `userId`, 필수: `userId`/`eventId`/`actionType`/`timestamp`, 권장: `quantity`)
+- [ ] `CART_REMOVE` 발행 — 장바구니 삭제 API 핸들러 내 트랜잭션 경계 **밖**에서 비동기 발행 (필수: `userId`/`eventId`/`actionType`/`timestamp`)
 - [ ] Outbox 미사용 확인 (비즈니스 트랜잭션에 INSERT 포함 금지)
+- [ ] 권장 구현 패턴: `ApplicationEventPublisher.publishEvent(ActionLogEvent)` → `@TransactionalEventListener(phase = AFTER_COMMIT)` + `@Async` → `actionLogKafkaTemplate.send(...)` (commit 후 발행 보장 + API 응답 지연 제로)
+- [ ] 실패 허용 정책 — 발행 예외 시 로깅만, 장바구니 API 응답에 영향 주지 말 것 (at-most-once)
+- [ ] 테스트: Bean 격리 단위 테스트 (`actionLogKafkaTemplate` 주입 검증), 트랜잭션 롤백 시 action.log 미발행 통합 테스트
 
-> 설계 기준: kafka-design.md §12 참조 (이 문서가 상세 구현 체크리스트)
+> 설계 기준: kafka-design.md §12 참조, 통합 검증 항목 상세: [actionLog.md](actionLog.md) §4 ⑤
 
 ### 3-3. Event (신규 적용)
 
@@ -523,26 +526,31 @@ sequenceDiagram
 - [x] ✅ `EventServiceKafkaTest` 신규 (+370라인) — `processOrderCreated` 시나리오 10종(중복 메시지 / 단건·다건 성공 / 재고 부족 / 이벤트 미존재 / 매진 / 판매 기간 외 / All-or-Nothing / `saveStockFailed`)
 - [x] ✅ `StockRestoreServiceTest` 업데이트 — `JacksonConfig` import, @DataJpaTest 기반
 
-**`action.log` Producer (analytics — 신규 적용)** *(상세: [actionLog.md](actionLog.md))*
+**`action.log` Producer (analytics — 신규 적용)** *(상세: [actionLog.md](actionLog.md) §4 — 구현 지시서)*
 - [ ] 전용 `ActionLogKafkaProducerConfig` Bean 분리 — `acks=0`, `retries=0`, `enable.idempotence=false`, `linger.ms=10`, `batch.size=기본`, `compression.type=none`, `max.in.flight=5` (기존 Producer Bean과 공유 금지 — 기존 `kafkaTemplate` `@Primary` 부여 + 신규 `actionLogKafkaTemplate` `@Qualifier` 매칭)
-- [ ] `VIEW` 발행 — 이벤트 목록 조회 API 핸들러 내 트랜잭션 경계 **밖**에서 비동기 발행 (Partition Key: `userId`, `searchKeyword` / `stackFilter`가 있으면 포함)
-- [ ] `DETAIL_VIEW` 발행 — 이벤트 상세 조회 API 핸들러 내 트랜잭션 경계 **밖**에서 비동기 발행
+- [ ] `VIEW` 발행 — 이벤트 목록 조회 API 핸들러 내 트랜잭션 경계 **밖**에서 비동기 발행 (Partition Key: `userId`, `searchKeyword` / `stackFilter`가 있으면 포함, `eventId`는 nullable)
+- [ ] `DETAIL_VIEW` 발행 — 이벤트 상세 조회 API 핸들러 내 트랜잭션 경계 **밖**에서 비동기 발행 (필수: `userId`/`eventId`/`actionType`/`timestamp`)
 - [ ] `DWELL_TIME` 발행 — 프론트 이탈 시 호출 API 핸들러 내 트랜잭션 경계 **밖**에서 비동기 발행 (`dwellTimeSeconds` 필수)
+- [ ] **DWELL_TIME 전용 신규 API 엔드포인트 구현** — Event 모듈에 현재 부재 상태 확인됨 (grep 0건). 얇은 Controller(Path Variable `eventId` + Body `{ dwellTimeSeconds: Integer }`) + `ApplicationEventPublisher.publishEvent(ActionLogDomainEvent)` 호출 — 기존 Publisher 재사용. 응답 `204 No Content`. **프론트 스펙(경로/body/트리거 이벤트) 합의 선결**
 - [ ] Outbox 미사용 확인 (비즈니스 트랜잭션에 INSERT 포함 금지)
+- [ ] 권장 구현 패턴: `ApplicationEventPublisher.publishEvent(ActionLogEvent)` → `@TransactionalEventListener(phase = AFTER_COMMIT)` + `@Async` → `actionLogKafkaTemplate.send(...)` (commit 후 발행 보장 + API 응답 지연 제로)
+- [ ] 실패 허용 정책 — 발행 예외 시 로깅만, 조회 API 응답에 영향 주지 말 것 (at-most-once)
+- [ ] 작업 순서 팁: VIEW → DETAIL_VIEW → DWELL_TIME (트래픽 큰 순)
+- [ ] 테스트: Bean 격리 단위 테스트 (`actionLogKafkaTemplate` 주입 검증), 대량 VIEW 발행 시 목록 API p99 응답 지연 영향 없음 부하 테스트
 
-> 설계 기준: kafka-design.md §12 / §5 Stock 상태 전이 표 참조 (이 문서가 상세 구현 체크리스트)
+> 설계 기준: kafka-design.md §12 / §5 Stock 상태 전이 표 참조, 통합 검증 항목 상세: [actionLog.md](actionLog.md) §4 ⑤
 
 ### 3-4. Log 서비스 확장 (Fastify/TS — 별도 스택)
 
-> **기반 이미 존재**: `fastify-log/` 브랜치(`develop/log`)에 `action.log` Consumer 파이프라인(kafkajs, DB 스키마 `log.action_log`, enum 7종) 구현 완료. 본 항목은 **PURCHASE 처리를 위한 `payment.completed` 추가 구독 확장**.
+> **기반 이미 존재**: `fastify-log/` 브랜치(`develop/log`)에 `action.log` Consumer 파이프라인(kafkajs, DB 스키마 `log.action_log`, enum 7종) 구현 완료. 본 항목은 **PURCHASE 처리를 위한 `payment.completed` 추가 구독 확장** — ✅ 구현 완료 (2026-04-21).
 > 상세: [actionLog.md](actionLog.md) §1, §4
 
-**확장 작업**
-- [ ] `payment.completed` 토픽 **추가 구독** (`fastify-log/src/consumer/`에 전용 핸들러 추가)
-- [ ] `payment.completed` payload → PURCHASE 레코드 매핑 (`userId`, `eventId`, `actionType=PURCHASE`, `quantity`, `totalAmount`, `timestamp`)
-- [ ] `log.action_log`에 **직접 INSERT** (Kafka 재발행 없이)
-- [ ] 예외 처리는 기존 `action.log` Consumer와 동일 정책(스킵 + offset commit, at-most-once) 적용
-- [ ] `env.ts` 토픽 설정에 `KAFKA_PAYMENT_COMPLETED_TOPIC` 추가 (또는 `subscribe` 시 토픽 배열 확장)
+**확장 작업 ✅ 구현 완료**
+- [x] ✅ `payment.completed` 토픽 **추가 구독** — `fastify-log/src/consumer/payment-completed.consumer.ts` 전용 핸들러 추가
+- [x] ✅ `payment.completed` payload → PURCHASE 레코드 매핑 (`userId`, `eventId`, `actionType=PURCHASE`, `quantity`, `totalAmount`, `timestamp`) — `service/payment-completed.service.ts` (`toActionLogs()`, 단건/다건 `totalAmount` 분배 정책은 [actionLog.md](actionLog.md) §3.2 참조)
+- [x] ✅ `log.action_log`에 **직접 INSERT** (Kafka 재발행 없이) — `repository/action-log.repository.ts` (`insertActionLogs` 원자적 다중 INSERT)
+- [x] ✅ 예외 처리: 스킵 + offset commit (at-most-once) — `consumer/action-log.consumer.ts` (`dispatchMessage`)
+- [x] ✅ `env.ts` 토픽 설정: `KAFKA_TOPIC_PAYMENT_COMPLETED` 추가 + `subscribe` 토픽 배열 확장 (`action-log.consumer.ts:15`)
 
 **유지 (변경 없음)**
 - groupId `log-group`

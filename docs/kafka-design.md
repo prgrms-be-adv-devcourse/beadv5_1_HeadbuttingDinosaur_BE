@@ -160,8 +160,10 @@ public final class KafkaTopics {
 - 모든 ID 필드: `UUID` 타입 통일 (String/Long 사용 금지)
 - 모든 timestamp 필드: `Instant` 타입 통일 (LocalDateTime 사용 금지)
 - enum 필드: String 대신 Java enum 타입 사용
-- 직렬화: `JacksonConfig` — `JavaTimeModule` + `WRITE_DATES_AS_TIMESTAMPS=false` 적용
+- 직렬화: `JacksonConfig` — `JavaTimeModule` + `WRITE_DATES_AS_TIMESTAMPS=false` + `FAIL_ON_UNKNOWN_PROPERTIES=false` 적용
   - **모든 서비스(Commerce, Event, Payment, Member, Admin, Settlement)에 JacksonConfig 추가 필요**
+  - **`objectMapper` Bean에 `@Primary` 부여 의무** — 향후 Kafka Producer Bean 복수 등록(예: `actionLogKafkaTemplate`) 등으로 `ObjectMapper` 추가 Bean이 등장할 경우 `NoUniqueBeanDefinitionException` 예방. 현재 Event만 `@Primary` 부여 상태(Commerce·Payment 미부착) → **전 서비스 통일 대상**. 별도 리팩터링 트랙을 신설하지 말고, 각 서비스에서 **`ObjectMapper`를 주입받는 신규 Bean이 추가되는 PR에 동반 부여** 권장 (예: Commerce·Payment의 action.log Producer PR 내 1줄 수정)
+- **`@JsonIgnoreProperties(ignoreUnknown = true)` 모든 이벤트 DTO record에 명시 의무** — 상류 Producer가 필드 확장할 경우 Consumer 배포 지연 시 DLT 적재를 막기 위한 **이중 방어**. 전역 `JacksonConfig` 단일 의존은 설정 변경·리팩토링 실수에 취약하므로, 개별 record(부모 + nested record 모두)에도 어노테이션을 붙여 forward-compatible 계약을 코드 자체에 선언한다. 발행 측(Producer)·수신 측(Consumer) DTO 복사본 양쪽 동일 원칙.
 
 ### OrderCreatedEvent
 
@@ -415,6 +417,43 @@ public enum ActionType {
 > `event_type` 컬럼은 멱등성 자체에는 필수가 아니지만,
 > 운영 중 "이 aggregate에서 어떤 이벤트가 몇 번 발행됐는지" 추적하는 데 유용합니다.
 > 단, **현 구현은 이 컬럼에 토픽명 문자열을 그대로 저장**하므로 `topic` 컬럼과 값이 동일하여 추적 기능은 제한적입니다 (`OutboxService.save(...)` 호출부 전수: `PaymentServiceImpl.java:152, 237`, `WalletServiceImpl.java:375`, `WalletPgTimeoutHandler.java:58`).
+
+### Kafka 발행 본문 구조 (`OutboxEventMessage`)
+
+> **모든 Outbox 기반 이벤트는 아래 래퍼로 이중 JSON 인코딩되어 발행된다.** Consumer는 본문을 **2단계**로 파싱해야 실제 이벤트 DTO를 복원할 수 있다.
+> `action.log`는 Outbox 미사용이므로 래퍼 없이 `ActionLogEvent` JSON을 직접 발행 — 본 구조 적용 대상 아님.
+
+```java
+// common/outbox/OutboxEventMessage.java
+public record OutboxEventMessage(
+    UUID messageId,         // Kafka 헤더 X-Message-Id와 동일값, Consumer dedup 키
+    String eventType,       // 토픽명과 동일 문자열 (예: "payment.completed")
+    String payload,         // JSON 직렬화된 실제 이벤트 DTO (이중 인코딩)
+    Instant timestamp
+) {}
+```
+
+**발행 포맷 예시** (`payment.completed` 토픽 본문)
+
+```json
+{
+  "messageId": "0c6a...-...",
+  "eventType": "payment.completed",
+  "payload": "{\"orderId\":\"...\",\"userId\":\"...\",\"paymentId\":\"...\",\"paymentMethod\":\"PG\",\"totalAmount\":50000,\"orderItems\":[...],\"timestamp\":\"...\"}",
+  "timestamp": "2026-04-21T..."
+}
+```
+
+`payload` 필드는 문자열 — 내부의 `\"...\"` 이스케이프된 JSON이 실제 이벤트 DTO.
+
+**Consumer 측 언래핑 의무**
+
+- outer JSON 파싱 → `payload` 필드 문자열 추출 → **다시 `JSON.parse` / Jackson `readValue`** 로 실제 이벤트 DTO 복원
+- Java Consumer 예: `commerce/order/application/service/OrderService.java:405` `deserialize(payload, PaymentCompletedEvent.class)`
+- Node.js Consumer 예: `fastify-log/src/consumer/payment-completed.consumer.ts` `unwrapOutboxPayload()`
+- **신규 Consumer 구현 시 이 2단계 파싱을 반드시 적용**해야 함 — 누락 시 역직렬화 실패로 DLT 적재 위험
+
+---
 
 ### Outbox 엔티티 변경사항 (기존 배포 마이그레이션)
 
