@@ -1,4 +1,9 @@
 package com.devticket.event.presentation.dto;
 
-public record DwellRequest(Integer dwellTimeSeconds) {
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+
+public record DwellRequest(
+        @NotNull @Positive Integer dwellTimeSeconds
+) {
 }

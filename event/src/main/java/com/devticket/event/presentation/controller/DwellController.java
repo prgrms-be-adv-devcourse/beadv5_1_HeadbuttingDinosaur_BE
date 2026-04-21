@@ -3,6 +3,7 @@ package com.devticket.event.presentation.controller;
 import com.devticket.event.application.event.ActionLogDomainEvent;
 import com.devticket.event.common.messaging.event.ActionType;
 import com.devticket.event.presentation.dto.DwellRequest;
+import jakarta.validation.Valid;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -26,7 +27,7 @@ public class DwellController {
     public ResponseEntity<Void> reportDwell(
             @RequestHeader(value = "X-User-Id", required = false) UUID userId,
             @PathVariable("eventId") UUID eventId,
-            @RequestBody DwellRequest request) {
+            @Valid @RequestBody DwellRequest request) {
         if (userId != null) {
             eventPublisher.publishEvent(new ActionLogDomainEvent(
                     userId, eventId, ActionType.DWELL_TIME,
