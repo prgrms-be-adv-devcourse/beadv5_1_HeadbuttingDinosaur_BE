@@ -1,8 +1,6 @@
 package com.devticket.event.infrastructure.client;
 
 import com.devticket.event.infrastructure.client.dto.InternalMemberInfoResponse;
-import com.devticket.event.infrastructure.client.dto.TechStackItem;
-import com.devticket.event.infrastructure.client.dto.TechStackListResponse;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -61,17 +59,4 @@ public class MemberClient {
         }
     }
 
-    public List<TechStackItem> getTechStacks() {
-        try {
-            String url = memberServiceUrl + "/internal/members/tech-stacks";
-            TechStackListResponse response = restTemplate.getForObject(url, TechStackListResponse.class);
-            if (response == null) {
-                return List.of();
-            }
-            return response.techStacks() != null ? response.techStacks() : List.of();
-        } catch (Exception e) {
-            log.warn("[기술스택 조회 실패] Member 서비스 호출 오류", e);
-            return List.of();
-        }
-    }
 }

@@ -23,3 +23,19 @@ spring:
     uris: http://localhost:9200
     connection-timeout: 1s
     socket-timeout: 1s
+  kafka:
+    bootstrap-servers: localhost:9093
+    consumer:
+      group-id: devticket-event
+      auto-offset-reset: earliest
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+service:
+  member:
+    url: http://member:8081
+  admin:
+    url: http://admin:8087
+  ai:
+    url: http://ai:8088
