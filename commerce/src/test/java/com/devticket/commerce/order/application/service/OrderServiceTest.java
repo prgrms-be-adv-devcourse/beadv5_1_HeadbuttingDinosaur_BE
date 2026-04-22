@@ -17,17 +17,15 @@ import com.devticket.commerce.cart.domain.repository.CartItemRepository;
 import com.devticket.commerce.cart.domain.repository.CartRepository;
 import com.devticket.commerce.common.enums.OrderStatus;
 import com.devticket.commerce.common.exception.BusinessException;
-import com.devticket.commerce.common.messaging.KafkaTopics;
 import com.devticket.commerce.common.messaging.MessageDeduplicationService;
-import com.devticket.commerce.common.messaging.event.StockDeductedEvent;
-import com.devticket.commerce.common.messaging.event.StockFailedEvent;
 import com.devticket.commerce.common.outbox.OutboxService;
+import com.devticket.commerce.order.domain.exception.OrderErrorCode;
 import com.devticket.commerce.order.domain.model.Order;
 import com.devticket.commerce.order.domain.model.OrderItem;
 import com.devticket.commerce.order.domain.repository.OrderItemRepository;
 import com.devticket.commerce.order.domain.repository.OrderRepository;
 import com.devticket.commerce.order.infrastructure.external.client.OrderToEventClient;
-import com.devticket.commerce.order.domain.exception.OrderErrorCode;
+import com.devticket.commerce.order.infrastructure.external.client.dto.InternalStockAdjustmentResponse;
 import com.devticket.commerce.order.presentation.dto.req.CartOrderRequest;
 import com.devticket.commerce.order.presentation.dto.res.OrderResponse;
 import com.devticket.commerce.order.presentation.dto.res.OrderStatusResponse;
@@ -38,11 +36,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.support.SimpleTransactionStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -74,10 +75,17 @@ class OrderServiceTest {
 
     @BeforeEach
     void setUp() {
+        // 단위 테스트용 no-op 트랜잭션 매니저 — Spring 컨텍스트 없이 TransactionTemplate 동작 허용
+        PlatformTransactionManager noopTxManager = new PlatformTransactionManager() {
+            @Override public TransactionStatus getTransaction(TransactionDefinition def) { return new SimpleTransactionStatus(); }
+            @Override public void commit(TransactionStatus status) {}
+            @Override public void rollback(TransactionStatus status) {}
+        };
+
         orderService = new OrderService(
                 orderToEventClient, cartRepository, cartItemRepository,
                 orderRepository, orderItemRepository, ticketUsecase,
-                ticketRepository, outboxService, deduplicationService, objectMapper
+                ticketRepository, outboxService, deduplicationService, objectMapper, noopTxManager
         );
     }
 
@@ -122,78 +130,36 @@ class OrderServiceTest {
         return order;
     }
 
-    private Order failedOrder() {
-        Order order = createdOrder();
-        order.failByStock();
-        return order;
-    }
-
-    private Order cancelledOrder() {
-        Order order = paymentPendingOrder();
-        order.cancel();
-        return order;
-    }
-
-    private Order paidOrder() {
-        Order order = paymentPendingOrder();
-        order.completePayment();
-        return order;
-    }
-
-    private String toJson(Object event) {
-        try {
-            return objectMapper.writeValueAsString(event);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    private String stockDeductedPayload(UUID orderId) {
-        return toJson(new StockDeductedEvent(orderId, UUID.randomUUID(), 2, Instant.now()));
-    }
-
-    private String stockFailedPayload(UUID orderId) {
-        return toJson(new StockFailedEvent(orderId, UUID.randomUUID(), "재고 부족", Instant.now()));
-    }
-
     // ── 신규_주문_생성 ────────────────────────────────────────────────
 
     @Nested
     class 신규_주문_생성 {
 
         @Test
-        void 정상_흐름_신규_주문을_생성하고_Outbox에_저장한다() {
+        void 정상_흐름_재고_차감_성공_시_PAYMENT_PENDING_상태로_응답한다() {
             UUID userId = UUID.randomUUID();
             UUID eventId = UUID.randomUUID();
-            UUID cartItemId = UUID.randomUUID();
 
             CartItem item = cartItem(1L, eventId, 2);
             InternalEventInfoResponse info = eventInfo(eventId, 5_000, 10);
-            Order order = savedOrder(userId, 10_000, "hash");
-            OrderItem savedItem = orderItem(order.getId(), userId, eventId, 5_000, 2);
+            OrderItem savedItem = orderItem(null, userId, eventId, 5_000, 2);
 
             given(cartRepository.findByUserId(userId)).willReturn(Optional.of(cart(userId)));
             given(cartItemRepository.findAllByCartItemIdWithLock(anyList())).willReturn(List.of(item));
             given(orderRepository.findActiveOrder(eq(userId), anyString(), anyList()))
                     .willReturn(Optional.empty());
             given(orderToEventClient.getBulkEventInfo(anyList())).willReturn(List.of(info));
-            given(orderRepository.save(any(Order.class))).willReturn(order);
+            given(orderToEventClient.adjustStocks(any()))
+                    .willReturn(List.of(new InternalStockAdjustmentResponse(eventId, true, 98, "이벤트", 5_000, 10)));
+            given(orderRepository.save(any(Order.class))).willAnswer(inv -> inv.getArgument(0));
             given(orderItemRepository.saveAll(anyList())).willReturn(List.of(savedItem));
 
-            CartOrderRequest request = new CartOrderRequest(List.of(cartItemId));
-
-            OrderResponse response = orderService.createOrderByCart(userId, request);
+            OrderResponse response = orderService.createOrderByCart(userId, new CartOrderRequest(List.of(UUID.randomUUID())));
 
             assertThat(response).isNotNull();
-            assertThat(response.orderStatus()).isEqualTo(OrderStatus.CREATED);
-            then(orderRepository).should().save(any(Order.class));
-            then(orderItemRepository).should().saveAll(anyList());
-            then(outboxService).should().save(
-                    anyString(), anyString(),
-                    eq("OrderCreated"),
-                    eq(KafkaTopics.ORDER_CREATED),
-                    any()
-            );
+            assertThat(response.orderStatus()).isEqualTo(OrderStatus.PAYMENT_PENDING);
+            then(orderToEventClient).should().adjustStocks(any());
+            then(outboxService).shouldHaveNoInteractions();
         }
 
         @Test
@@ -215,39 +181,66 @@ class OrderServiceTest {
             given(orderRepository.findActiveOrder(eq(userId), anyString(), anyList()))
                     .willReturn(Optional.empty());
             given(orderToEventClient.getBulkEventInfo(anyList())).willReturn(infos);
+            given(orderToEventClient.adjustStocks(any()))
+                    .willReturn(List.of(
+                        new InternalStockAdjustmentResponse(eventId1, true, 8, "이벤트1", 3_000, 10),
+                        new InternalStockAdjustmentResponse(eventId2, true, 7, "이벤트2", 4_000, 10)
+                    ));
             given(orderRepository.save(any(Order.class))).willAnswer(inv -> inv.getArgument(0));
             given(orderItemRepository.saveAll(anyList())).willAnswer(inv -> inv.getArgument(0));
 
-            CartOrderRequest request = new CartOrderRequest(List.of(UUID.randomUUID(), UUID.randomUUID()));
-
-            OrderResponse response = orderService.createOrderByCart(userId, request);
+            OrderResponse response = orderService.createOrderByCart(
+                    userId, new CartOrderRequest(List.of(UUID.randomUUID(), UUID.randomUUID())));
 
             assertThat(response.totalAmount()).isEqualTo(18_000L);
         }
 
         @Test
-        void order_created_토픽으로_Outbox를_저장한다() {
+        void 재고_부족_시_OUT_OF_STOCK_예외를_던진다() {
             UUID userId = UUID.randomUUID();
             UUID eventId = UUID.randomUUID();
 
-            CartItem item = cartItem(1L, eventId, 1);
-            InternalEventInfoResponse info = eventInfo(eventId, 10_000, 5);
-            Order order = savedOrder(userId, 10_000, "hash");
-            OrderItem savedItem = orderItem(order.getId(), userId, eventId, 10_000, 1);
+            CartItem item = cartItem(1L, eventId, 2);
+            InternalEventInfoResponse info = eventInfo(eventId, 5_000, 10);
 
             given(cartRepository.findByUserId(userId)).willReturn(Optional.of(cart(userId)));
             given(cartItemRepository.findAllByCartItemIdWithLock(anyList())).willReturn(List.of(item));
             given(orderRepository.findActiveOrder(eq(userId), anyString(), anyList()))
                     .willReturn(Optional.empty());
             given(orderToEventClient.getBulkEventInfo(anyList())).willReturn(List.of(info));
-            given(orderRepository.save(any(Order.class))).willReturn(order);
-            given(orderItemRepository.saveAll(anyList())).willReturn(List.of(savedItem));
+            given(orderToEventClient.adjustStocks(any()))
+                    .willReturn(List.of(new InternalStockAdjustmentResponse(eventId, false, 0, "이벤트", 5_000, 10)));
 
-            orderService.createOrderByCart(userId, new CartOrderRequest(List.of(UUID.randomUUID())));
+            assertThatThrownBy(() -> orderService.createOrderByCart(userId, new CartOrderRequest(List.of(UUID.randomUUID()))))
+                    .isInstanceOf(BusinessException.class)
+                    .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
+                            .isEqualTo(OrderErrorCode.OUT_OF_STOCK));
 
-            ArgumentCaptor<String> topicCaptor = ArgumentCaptor.forClass(String.class);
-            then(outboxService).should().save(anyString(), anyString(), anyString(), topicCaptor.capture(), any());
-            assertThat(topicCaptor.getValue()).isEqualTo(KafkaTopics.ORDER_CREATED);
+            then(orderRepository).should(never()).save(any());
+        }
+
+        @Test
+        void Order_저장_실패_시_재고_보상_adjustStocks를_호출한다() {
+            UUID userId = UUID.randomUUID();
+            UUID eventId = UUID.randomUUID();
+
+            CartItem item = cartItem(1L, eventId, 2);
+            InternalEventInfoResponse info = eventInfo(eventId, 5_000, 10);
+
+            given(cartRepository.findByUserId(userId)).willReturn(Optional.of(cart(userId)));
+            given(cartItemRepository.findAllByCartItemIdWithLock(anyList())).willReturn(List.of(item));
+            given(orderRepository.findActiveOrder(eq(userId), anyString(), anyList()))
+                    .willReturn(Optional.empty());
+            given(orderToEventClient.getBulkEventInfo(anyList())).willReturn(List.of(info));
+            given(orderToEventClient.adjustStocks(any()))
+                    .willReturn(List.of(new InternalStockAdjustmentResponse(eventId, true, 98, "이벤트", 5_000, 10)));
+            given(orderRepository.save(any())).willThrow(new RuntimeException("DB 오류"));
+
+            assertThatThrownBy(() -> orderService.createOrderByCart(userId, new CartOrderRequest(List.of(UUID.randomUUID()))))
+                    .isInstanceOf(RuntimeException.class);
+
+            // 차감 1회 + 보상 1회 = 총 2회
+            then(orderToEventClient).should(org.mockito.Mockito.times(2)).adjustStocks(any());
         }
     }
 
@@ -385,108 +378,7 @@ class OrderServiceTest {
         }
     }
 
-    // ── ProcessStockDeducted ──────────────────────────────────────────
-
-    @Nested
-    class ProcessStockDeducted {
-
-        @Test
-        void CREATED_상태_주문을_PAYMENT_PENDING으로_전이한다() {
-            Order order = createdOrder();
-            UUID messageId = UUID.randomUUID();
-            given(deduplicationService.isDuplicate(messageId)).willReturn(false);
-            given(orderRepository.findByOrderId(order.getOrderId())).willReturn(Optional.of(order));
-
-            orderService.processStockDeducted(
-                    messageId, KafkaTopics.STOCK_DEDUCTED, stockDeductedPayload(order.getOrderId()));
-
-            assertThat(order.getStatus()).isEqualTo(OrderStatus.PAYMENT_PENDING);
-            then(deduplicationService).should().markProcessed(messageId, KafkaTopics.STOCK_DEDUCTED);
-        }
-
-        @Test
-        void 중복_메시지면_주문_조회_없이_스킵한다() {
-            UUID messageId = UUID.randomUUID();
-            given(deduplicationService.isDuplicate(messageId)).willReturn(true);
-
-            orderService.processStockDeducted(
-                    messageId, KafkaTopics.STOCK_DEDUCTED, stockDeductedPayload(UUID.randomUUID()));
-
-            then(orderRepository).shouldHaveNoInteractions();
-            then(deduplicationService).should(never()).markProcessed(messageId, KafkaTopics.STOCK_DEDUCTED);
-        }
-
-        @Test
-        void 이미_PAYMENT_PENDING이면_멱등_스킵하고_markProcessed를_호출한다() {
-            Order order = paymentPendingOrder();
-            UUID messageId = UUID.randomUUID();
-            given(deduplicationService.isDuplicate(messageId)).willReturn(false);
-            given(orderRepository.findByOrderId(order.getOrderId())).willReturn(Optional.of(order));
-
-            orderService.processStockDeducted(
-                    messageId, KafkaTopics.STOCK_DEDUCTED, stockDeductedPayload(order.getOrderId()));
-
-            assertThat(order.getStatus()).isEqualTo(OrderStatus.PAYMENT_PENDING);
-            then(deduplicationService).should().markProcessed(messageId, KafkaTopics.STOCK_DEDUCTED);
-        }
-
-        @Test
-        void CANCELLED_상태면_정책적_스킵하고_markProcessed를_호출한다() {
-            Order order = cancelledOrder();
-            UUID messageId = UUID.randomUUID();
-            given(deduplicationService.isDuplicate(messageId)).willReturn(false);
-            given(orderRepository.findByOrderId(order.getOrderId())).willReturn(Optional.of(order));
-
-            orderService.processStockDeducted(
-                    messageId, KafkaTopics.STOCK_DEDUCTED, stockDeductedPayload(order.getOrderId()));
-
-            assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
-            then(deduplicationService).should().markProcessed(messageId, KafkaTopics.STOCK_DEDUCTED);
-        }
-
-        @Test
-        void FAILED_상태면_정책적_스킵하고_markProcessed를_호출한다() {
-            Order order = failedOrder();
-            UUID messageId = UUID.randomUUID();
-            given(deduplicationService.isDuplicate(messageId)).willReturn(false);
-            given(orderRepository.findByOrderId(order.getOrderId())).willReturn(Optional.of(order));
-
-            orderService.processStockDeducted(
-                    messageId, KafkaTopics.STOCK_DEDUCTED, stockDeductedPayload(order.getOrderId()));
-
-            assertThat(order.getStatus()).isEqualTo(OrderStatus.FAILED);
-            then(deduplicationService).should().markProcessed(messageId, KafkaTopics.STOCK_DEDUCTED);
-        }
-
-        @Test
-        void PAID_상태면_이상_상태_예외를_던진다() {
-            Order order = paidOrder();
-            UUID messageId = UUID.randomUUID();
-            given(deduplicationService.isDuplicate(messageId)).willReturn(false);
-            given(orderRepository.findByOrderId(order.getOrderId())).willReturn(Optional.of(order));
-
-            assertThatThrownBy(() -> orderService.processStockDeducted(
-                    messageId, KafkaTopics.STOCK_DEDUCTED, stockDeductedPayload(order.getOrderId())))
-                    .isInstanceOf(IllegalStateException.class)
-                    .hasMessageContaining("PAID");
-
-            then(deduplicationService).should(never()).markProcessed(messageId, KafkaTopics.STOCK_DEDUCTED);
-        }
-
-        @Test
-        void 주문이_없으면_BusinessException을_던진다() {
-            UUID orderId = UUID.randomUUID();
-            UUID messageId = UUID.randomUUID();
-            given(deduplicationService.isDuplicate(messageId)).willReturn(false);
-            given(orderRepository.findByOrderId(orderId)).willReturn(Optional.empty());
-
-            assertThatThrownBy(() -> orderService.processStockDeducted(
-                    messageId, KafkaTopics.STOCK_DEDUCTED, stockDeductedPayload(orderId)))
-                    .isInstanceOf(BusinessException.class);
-        }
-    }
-
-    // ── ProcessStockFailed ────────────────────────────────────────────
+    // ── 주문_상태_폴링 ────────────────────────────────────────────────
 
     @Nested
     class 주문_상태_폴링 {
@@ -551,103 +443,4 @@ class OrderServiceTest {
         }
     }
 
-    @Nested
-    class ProcessStockFailed {
-
-        @Test
-        void CREATED_상태_주문을_FAILED로_전이한다() {
-            Order order = createdOrder();
-            UUID messageId = UUID.randomUUID();
-            given(deduplicationService.isDuplicate(messageId)).willReturn(false);
-            given(orderRepository.findByOrderId(order.getOrderId())).willReturn(Optional.of(order));
-
-            orderService.processStockFailed(
-                    messageId, KafkaTopics.STOCK_FAILED, stockFailedPayload(order.getOrderId()));
-
-            assertThat(order.getStatus()).isEqualTo(OrderStatus.FAILED);
-            then(deduplicationService).should().markProcessed(messageId, KafkaTopics.STOCK_FAILED);
-        }
-
-        @Test
-        void 중복_메시지면_주문_조회_없이_스킵한다() {
-            UUID messageId = UUID.randomUUID();
-            given(deduplicationService.isDuplicate(messageId)).willReturn(true);
-
-            orderService.processStockFailed(
-                    messageId, KafkaTopics.STOCK_FAILED, stockFailedPayload(UUID.randomUUID()));
-
-            then(orderRepository).shouldHaveNoInteractions();
-            then(deduplicationService).should(never()).markProcessed(messageId, KafkaTopics.STOCK_FAILED);
-        }
-
-        @Test
-        void 이미_FAILED면_멱등_스킵하고_markProcessed를_호출한다() {
-            Order order = failedOrder();
-            UUID messageId = UUID.randomUUID();
-            given(deduplicationService.isDuplicate(messageId)).willReturn(false);
-            given(orderRepository.findByOrderId(order.getOrderId())).willReturn(Optional.of(order));
-
-            orderService.processStockFailed(
-                    messageId, KafkaTopics.STOCK_FAILED, stockFailedPayload(order.getOrderId()));
-
-            assertThat(order.getStatus()).isEqualTo(OrderStatus.FAILED);
-            then(deduplicationService).should().markProcessed(messageId, KafkaTopics.STOCK_FAILED);
-        }
-
-        @Test
-        void CANCELLED_상태면_정책적_스킵하고_markProcessed를_호출한다() {
-            Order order = cancelledOrder();
-            UUID messageId = UUID.randomUUID();
-            given(deduplicationService.isDuplicate(messageId)).willReturn(false);
-            given(orderRepository.findByOrderId(order.getOrderId())).willReturn(Optional.of(order));
-
-            orderService.processStockFailed(
-                    messageId, KafkaTopics.STOCK_FAILED, stockFailedPayload(order.getOrderId()));
-
-            assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
-            then(deduplicationService).should().markProcessed(messageId, KafkaTopics.STOCK_FAILED);
-        }
-
-        @Test
-        void PAYMENT_PENDING_상태면_이상_상태_예외를_던진다() {
-            Order order = paymentPendingOrder();
-            UUID messageId = UUID.randomUUID();
-            given(deduplicationService.isDuplicate(messageId)).willReturn(false);
-            given(orderRepository.findByOrderId(order.getOrderId())).willReturn(Optional.of(order));
-
-            assertThatThrownBy(() -> orderService.processStockFailed(
-                    messageId, KafkaTopics.STOCK_FAILED, stockFailedPayload(order.getOrderId())))
-                    .isInstanceOf(IllegalStateException.class)
-                    .hasMessageContaining("PAYMENT_PENDING");
-
-            assertThat(order.getStatus()).isEqualTo(OrderStatus.PAYMENT_PENDING);
-            then(deduplicationService).should(never()).markProcessed(messageId, KafkaTopics.STOCK_FAILED);
-        }
-
-        @Test
-        void PAID_상태면_이상_상태_예외를_던진다() {
-            Order order = paidOrder();
-            UUID messageId = UUID.randomUUID();
-            given(deduplicationService.isDuplicate(messageId)).willReturn(false);
-            given(orderRepository.findByOrderId(order.getOrderId())).willReturn(Optional.of(order));
-
-            assertThatThrownBy(() -> orderService.processStockFailed(
-                    messageId, KafkaTopics.STOCK_FAILED, stockFailedPayload(order.getOrderId())))
-                    .isInstanceOf(IllegalStateException.class);
-
-            then(deduplicationService).should(never()).markProcessed(messageId, KafkaTopics.STOCK_FAILED);
-        }
-
-        @Test
-        void 주문이_없으면_BusinessException을_던진다() {
-            UUID orderId = UUID.randomUUID();
-            UUID messageId = UUID.randomUUID();
-            given(deduplicationService.isDuplicate(messageId)).willReturn(false);
-            given(orderRepository.findByOrderId(orderId)).willReturn(Optional.empty());
-
-            assertThatThrownBy(() -> orderService.processStockFailed(
-                    messageId, KafkaTopics.STOCK_FAILED, stockFailedPayload(orderId)))
-                    .isInstanceOf(BusinessException.class);
-        }
-    }
 }
