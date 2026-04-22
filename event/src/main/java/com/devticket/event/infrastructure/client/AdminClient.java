@@ -1,7 +1,6 @@
 package com.devticket.event.infrastructure.client;
 
 import com.devticket.event.infrastructure.client.dto.TechStackItem;
-import com.devticket.event.infrastructure.client.dto.TechStackListResponse;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,11 +21,11 @@ public class AdminClient {
     public List<TechStackItem> getTechStacks() {
         try {
             String url = adminServiceUrl + "/internal/admin/tech-stacks";
-            TechStackListResponse response = restTemplate.getForObject(url, TechStackListResponse.class);
-            if (response == null) {
+            TechStackItem[] items = restTemplate.getForObject(url, TechStackItem[].class);
+            if (items == null) {
                 return List.of();
             }
-            return response.techStacks() != null ? response.techStacks() : List.of();
+            return items != null ? List.of(items) : List.of();
         } catch (Exception e) {
             log.warn("[기술스택 조회 실패] Admin 서비스 호출 오류", e);
             return List.of();
