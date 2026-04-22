@@ -30,16 +30,16 @@ class OutboxSchedulerTest {
     private Outbox createOutbox(String topic, String partitionKey) {
         return Outbox.create(
             "agg-id-001",
+            partitionKey,
             "payment.completed",
             topic,
-            partitionKey,
             "{\"orderId\":\"order-uuid-001\"}"
         );
     }
 
     @Test
     void PENDING_없으면_processOne_미호출() {
-        given(outboxRepository.findPendingForRetry(any(), any())).willReturn(List.of());
+        given(outboxRepository.findPendingToPublish(any(), any())).willReturn(List.of());
 
         scheduler.publishPendingEvents();
 
@@ -49,7 +49,7 @@ class OutboxSchedulerTest {
     @Test
     void PENDING_단건이면_processOne_1회_호출() {
         Outbox outbox = createOutbox("payment.completed", "order-uuid-001");
-        given(outboxRepository.findPendingForRetry(any(), any())).willReturn(List.of(outbox));
+        given(outboxRepository.findPendingToPublish(any(), any())).willReturn(List.of(outbox));
 
         scheduler.publishPendingEvents();
 
@@ -61,7 +61,7 @@ class OutboxSchedulerTest {
         Outbox o1 = createOutbox("payment.completed", "order-001");
         Outbox o2 = createOutbox("payment.completed", "order-002");
         Outbox o3 = createOutbox("payment.completed", "order-003");
-        given(outboxRepository.findPendingForRetry(any(), any())).willReturn(List.of(o1, o2, o3));
+        given(outboxRepository.findPendingToPublish(any(), any())).willReturn(List.of(o1, o2, o3));
 
         scheduler.publishPendingEvents();
 

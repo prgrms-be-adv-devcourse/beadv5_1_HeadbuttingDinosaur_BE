@@ -19,10 +19,12 @@ import lombok.NoArgsConstructor;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(name = "outbox", indexes = {
+@Table(name = "outbox", schema = "payment", indexes = {
     @Index(name = "idx_outbox_status_created", columnList = "status, created_at")
 })
 public class Outbox extends BaseEntity {
+
+    private static final int MAX_RETRY = 6;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -47,8 +49,8 @@ public class Outbox extends BaseEntity {
     @Column(nullable = false, length = 20)
     private OutboxStatus status;
 
-    @Column(name = "message_id", nullable = false, unique = true)
-    private UUID messageId;
+    @Column(name = "message_id", nullable = false, unique = true, length = 36)
+    private String messageId;
 
     @Column(name = "retry_count", nullable = false)
     private int retryCount;
@@ -59,18 +61,16 @@ public class Outbox extends BaseEntity {
     @Column(name = "sent_at")
     private Instant sentAt;
 
-    private static final int MAX_RETRY = 5;
-
-    public static Outbox create(String aggregateId, String eventType,
-                                String topic, String partitionKey, String payload) {
+    public static Outbox create(String aggregateId, String partitionKey,
+                                String eventType, String topic, String payload) {
         Outbox outbox = new Outbox();
         outbox.aggregateId = aggregateId;
+        outbox.partitionKey = partitionKey;
         outbox.eventType = eventType;
         outbox.topic = topic;
-        outbox.partitionKey = partitionKey;
         outbox.payload = payload;
         outbox.status = OutboxStatus.PENDING;
-        outbox.messageId = UUID.randomUUID();
+        outbox.messageId = UUID.randomUUID().toString();
         outbox.retryCount = 0;
         return outbox;
     }
@@ -80,12 +80,13 @@ public class Outbox extends BaseEntity {
         this.sentAt = Instant.now();
     }
 
-    public void increaseRetryCount() {
+    public void markFailed() {
         this.retryCount++;
         if (this.retryCount >= MAX_RETRY) {
             this.status = OutboxStatus.FAILED;
         } else {
-            this.nextRetryAt = Instant.now().plusSeconds(this.retryCount * 60L);
+            long backoffSeconds = 1L << (this.retryCount - 1);
+            this.nextRetryAt = Instant.now().plusSeconds(backoffSeconds);
         }
     }
 
