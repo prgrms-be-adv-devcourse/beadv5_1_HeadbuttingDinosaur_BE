@@ -19,8 +19,8 @@ import com.devticket.settlement.infrastructure.external.dto.InternalSettlementRe
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
-import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -43,6 +43,10 @@ public class SettlementInternalServiceImpl implements SettlementInternalService 
     private final FeePolicyRepository feePolicyRepository;
     private final SettlementRepository settlementRepository;
     private final SettlementItemRepository settlementItemRepository;
+
+    // ────────────────────────────────────────────────
+    // Public API
+    // ────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
     public InternalSettlementPageResponse getSettlements(
@@ -134,82 +138,99 @@ public class SettlementInternalServiceImpl implements SettlementInternalService 
     public void createSettlementFromItems() {
         LocalDate periodFrom = YearMonth.now().minusMonths(2).atDay(26);
         LocalDate periodTo = YearMonth.now().minusMonths(1).atDay(25);
-        LocalDateTime settlementPeriodStart = periodFrom.atStartOfDay();
-        LocalDateTime settlementPeriodEnd = periodTo.atTime(23, 59, 59);
+        LocalDateTime periodStart = periodFrom.atStartOfDay();
+        LocalDateTime periodEnd = periodTo.atTime(23, 59, 59);
 
-        List<SettlementItem> targetItems = settlementItemRepository
-            .findByStatusAndEventDateTimeBetween(SettlementItemStatus.READY, periodFrom, periodTo);
+        Map<UUID, List<SettlementItem>> itemsBySeller = collectItemsBySeller(periodFrom, periodTo);
+        includeCarryOverSellers(itemsBySeller);
 
-        log.info("[정산 생성] 대상 기간: {} ~ {}, 항목: {}건", periodFrom, periodTo, targetItems.size());
+        log.info("[정산 생성] 대상 기간: {} ~ {}, 판매자: {}명", periodFrom, periodTo, itemsBySeller.size());
 
-        Map<UUID, List<SettlementItem>> itemsBySeller = targetItems.stream()
-            .collect(Collectors.groupingBy(SettlementItem::getSellerId));
+        for (Map.Entry<UUID, List<SettlementItem>> entry : itemsBySeller.entrySet()) {
+            processSellerSettlement(entry.getKey(), entry.getValue(), periodStart, periodEnd);
+        }
+    }
 
-        // 이번 달 신규 아이템이 없어도 이월 건이 있는 판매자도 처리해야 하므로
-        // PENDING_MIN_AMOUNT 판매자 목록도 포함
-        List<Settlement> allPendingSettlements = settlementRepository
-            .findByStatus(SettlementStatus.PENDING_MIN_AMOUNT);
-        allPendingSettlements.stream()
+    // ────────────────────────────────────────────────
+    // Private helpers
+    // ────────────────────────────────────────────────
+
+    private Map<UUID, List<SettlementItem>> collectItemsBySeller(LocalDate from, LocalDate to) {
+        List<SettlementItem> items = settlementItemRepository
+            .findByStatusAndEventDateTimeBetween(SettlementItemStatus.READY, from, to);
+        log.info("[정산 생성] READY 항목: {}건", items.size());
+        return new HashMap<>(items.stream()
+            .collect(Collectors.groupingBy(SettlementItem::getSellerId)));
+    }
+
+    private void includeCarryOverSellers(Map<UUID, List<SettlementItem>> itemsBySeller) {
+        settlementRepository.findByStatus(SettlementStatus.PENDING_MIN_AMOUNT).stream()
             .map(Settlement::getSellerId)
             .distinct()
             .filter(sellerId -> !itemsBySeller.containsKey(sellerId))
             .forEach(sellerId -> itemsBySeller.put(sellerId, List.of()));
-
-        for (Map.Entry<UUID, List<SettlementItem>> entry : itemsBySeller.entrySet()) {
-            UUID sellerId = entry.getKey();
-            List<SettlementItem> sellerItems = entry.getValue();
-
-            // 이번 달 신규 집계 금액
-            long totalSales = sellerItems.stream().mapToLong(SettlementItem::getSalesAmount).sum();
-            long totalRefund = sellerItems.stream().mapToLong(SettlementItem::getRefundAmount).sum();
-            long totalFee = sellerItems.stream().mapToLong(SettlementItem::getFeeAmount).sum();
-            long newSettlementAmount = sellerItems.stream().mapToLong(SettlementItem::getSettlementAmount).sum();
-
-            // 직전 이월 건 조회 (체인의 최신 노드)
-            List<Settlement> pendingSettlements = settlementRepository
-                .findBySellerIdAndStatus(sellerId, SettlementStatus.PENDING_MIN_AMOUNT);
-            Settlement latestPending = pendingSettlements.stream()
-                .max(Comparator.comparing(Settlement::getCreatedAt))
-                .orElse(null);
-
-            int carriedInAmount = (latestPending != null) ? latestPending.getFinalSettlementAmount() : 0;
-            UUID carriedInSettlementId = (latestPending != null) ? latestPending.getSettlementId() : null;
-            long totalFinalAmount = newSettlementAmount + carriedInAmount;
-
-            SettlementStatus newStatus = (totalFinalAmount >= MIN_SETTLEMENT_AMOUNT)
-                ? SettlementStatus.COMPLETED
-                : SettlementStatus.PENDING_MIN_AMOUNT;
-
-            Settlement settlement = Settlement.builder()
-                .sellerId(sellerId)
-                .periodStartAt(settlementPeriodStart)
-                .periodEndAt(settlementPeriodEnd)
-                .totalSalesAmount((int) totalSales)
-                .totalRefundAmount((int) totalRefund)
-                .totalFeeAmount((int) totalFee)
-                .finalSettlementAmount((int) totalFinalAmount)
-                .carriedInAmount(carriedInAmount)
-                .carriedInSettlementId(carriedInSettlementId)
-                .status(newStatus)
-                .settledAt(LocalDateTime.now())
-                .build();
-
-            settlementRepository.save(settlement);
-
-            // 이월 건 해소 시 체인 전체를 COMPLETED로 변경
-            if (newStatus == SettlementStatus.COMPLETED && latestPending != null) {
-                markChainAsPaidByCarryForward(latestPending);
-            }
-
-            if (!sellerItems.isEmpty()) {
-                sellerItems.forEach(item -> item.finalize(settlement.getSettlementId()));
-                settlementItemRepository.saveAll(sellerItems);
-            }
-
-            log.info("[정산 생성] sellerId={}, items={}건, carriedIn={}, finalAmount={}, status={}",
-                sellerId, sellerItems.size(), carriedInAmount, totalFinalAmount, newStatus);
-        }
     }
+
+    private void processSellerSettlement(UUID sellerId, List<SettlementItem> items,
+        LocalDateTime periodStart, LocalDateTime periodEnd) {
+
+        SellerAmounts amounts = aggregateAmounts(items);
+        Settlement latestPending = resolveLatestPending(sellerId);
+
+        int carriedInAmount = latestPending != null ? latestPending.getFinalSettlementAmount() : 0;
+        UUID carriedInSettlementId = latestPending != null ? latestPending.getSettlementId() : null;
+        long totalFinalAmount = amounts.settlementAmount() + carriedInAmount;
+        SettlementStatus status = totalFinalAmount >= MIN_SETTLEMENT_AMOUNT
+            ? SettlementStatus.COMPLETED
+            : SettlementStatus.PENDING_MIN_AMOUNT;
+
+        Settlement settlement = Settlement.builder()
+            .sellerId(sellerId)
+            .periodStartAt(periodStart)
+            .periodEndAt(periodEnd)
+            .totalSalesAmount((int) amounts.totalSales())
+            .totalRefundAmount((int) amounts.totalRefund())
+            .totalFeeAmount((int) amounts.totalFee())
+            .finalSettlementAmount((int) totalFinalAmount)
+            .carriedInAmount(carriedInAmount)
+            .carriedInSettlementId(carriedInSettlementId)
+            .status(status)
+            .settledAt(LocalDateTime.now())
+            .build();
+
+        settlementRepository.save(settlement);
+
+        if (status == SettlementStatus.COMPLETED && latestPending != null) {
+            markChainAsPaidByCarryForward(latestPending);
+        }
+
+        if (!items.isEmpty()) {
+            items.forEach(item -> item.finalize(settlement.getSettlementId()));
+            settlementItemRepository.saveAll(items);
+        }
+
+        log.info("[정산 생성] sellerId={}, items={}건, carriedIn={}, finalAmount={}, status={}",
+            sellerId, items.size(), carriedInAmount, totalFinalAmount, status);
+    }
+
+    private SellerAmounts aggregateAmounts(List<SettlementItem> items) {
+        return new SellerAmounts(
+            items.stream().mapToLong(SettlementItem::getSalesAmount).sum(),
+            items.stream().mapToLong(SettlementItem::getRefundAmount).sum(),
+            items.stream().mapToLong(SettlementItem::getFeeAmount).sum(),
+            items.stream().mapToLong(SettlementItem::getSettlementAmount).sum()
+        );
+    }
+
+    private Settlement resolveLatestPending(UUID sellerId) {
+        return settlementRepository
+            .findBySellerIdAndStatus(sellerId, SettlementStatus.PENDING_MIN_AMOUNT)
+            .stream()
+            .max(Comparator.comparing(Settlement::getCreatedAt))
+            .orElse(null);
+    }
+
+    private record SellerAmounts(long totalSales, long totalRefund, long totalFee, long settlementAmount) {}
 
     private void markChainAsPaidByCarryForward(Settlement settlement) {
         Settlement cursor = settlement;
