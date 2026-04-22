@@ -4,6 +4,7 @@ import com.devticket.admin.application.event.TechStackCreatedEvent;
 import com.devticket.admin.application.event.TechStackDeletedEvent;
 import com.devticket.admin.application.event.TechStackUpdatedEvent;
 import com.devticket.admin.domain.model.TechStack;
+import com.devticket.admin.domain.model.TechStackDocument;
 import com.devticket.admin.domain.repository.TechStackRepository;
 import com.devticket.admin.infrastructure.external.client.OpenAiEmbeddingClient;
 import com.devticket.admin.infrastructure.persistence.repository.TechStackEsRepository;
@@ -29,6 +30,7 @@ public class TechStackServiceImpl implements TechStackService{
     private final TechStackRepository  techStackRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final OpenAiEmbeddingClient openAiEmbeddingClient;
+    private final TechStackEsRepository  techStackEsRepository;
 
     // =============== 1. TechStack 조회 =============== //
     @Transactional(readOnly = true)
@@ -90,6 +92,30 @@ public class TechStackServiceImpl implements TechStackService{
         eventPublisher.publishEvent(new TechStackDeletedEvent(id));
 
         return DeleteTechStackResponse.of(id);
+    }
+
+    // =============== 5. TechStack 재색인 =============== //
+    public void reindexEmptyEmbeddings(){
+        List<TechStackDocument> emptyEmbeddings = techStackEsRepository.findAllWithoutEmbedding();
+
+        if(emptyEmbeddings.isEmpty()){
+            log.info("[Reindex] 임베딩 없는 TechStack 없음");
+            return;
+        }
+
+        log.info("[Reindex] 임베딩 없는 TechStack {} 개 재색인 시작", emptyEmbeddings.size());
+
+        for (TechStackDocument doc : emptyEmbeddings) {
+            try {
+                float[] embedding = openAiEmbeddingClient.embed(doc.getName());
+                techStackEsRepository.update(Long.valueOf(doc.getId()), doc.getName(), embedding);
+                log.info("[Reindex] 완료 - id: {}, name: {}", doc.getId(), doc.getName());
+            } catch (Exception e) {
+                log.error("[Reindex] 실패 - id: {}, name: {}", doc.getId(), doc.getName(), e);
+            }
+        }
+
+        log.info("[Reindex] 전체 재색인 완료");
     }
 
 }
