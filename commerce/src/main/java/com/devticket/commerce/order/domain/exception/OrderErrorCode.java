@@ -28,7 +28,6 @@ public enum OrderErrorCode implements ErrorCode {
     REFUND_ROLLBACK_INVALID(400, "ORDER_017", "환불 보상 롤백이 불가능한 주문 상태입니다."),
     REFUND_COMPLETE_INVALID(400, "ORDER_018", "환불 확정이 불가능한 주문 상태입니다.");
 
-
     private final int status;
     private final String code;
     private final String message;

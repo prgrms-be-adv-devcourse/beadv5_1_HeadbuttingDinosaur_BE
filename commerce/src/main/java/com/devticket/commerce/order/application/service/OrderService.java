@@ -204,9 +204,14 @@ public class OrderService implements OrderUsecase {
     @Override
     @Transactional(readOnly = true)
     public OrderListResponse getOrderList(UUID userId, OrderListRequest request) {
-        OrderStatus status = (request.status() != null && !request.status().isBlank())
-            ? OrderStatus.valueOf(request.status())
-            : null;
+        OrderStatus status = null;
+        if (request.status() != null && !request.status().isBlank()) {
+            try {
+                status = OrderStatus.valueOf(request.status());
+            } catch (IllegalArgumentException e) {
+                throw new BusinessException(OrderErrorCode.INVALID_ORDER_STATUS_FILTER);
+            }
+        }
 
         PageRequest pageable = PageRequest.of(request.page() - 1, request.size(), Sort.by("id").descending());
         Page<Order> orderPage = orderRepository.findAllByUserId(userId, status, pageable);
@@ -218,7 +223,8 @@ public class OrderService implements OrderUsecase {
     public InternalOrderInfoResponse getOrderInfo(UUID orderId) {
         Order order = orderRepository.findByOrderId(orderId)
             .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
-        return InternalOrderInfoResponse.from(order);
+        List<OrderItem> orderItems = orderItemRepository.findAllByOrderId(order.getId());
+        return InternalOrderInfoResponse.from(order, orderItems);
     }
 
     @Override
@@ -360,6 +366,7 @@ public class OrderService implements OrderUsecase {
 
     // 결제 전 주문 취소
     @Override
+    @Transactional
     public OrderCancelResponse cancelOrder(UUID userId, UUID orderId) {
         // 1. 주문 정보 확인
         Order order = orderRepository.findByOrderId(orderId)
@@ -368,16 +375,16 @@ public class OrderService implements OrderUsecase {
         if (!order.getUserId().equals(userId)) {
             throw new BusinessException(OrderErrorCode.ORDER_FORBIDDEN);
         }
-        // 3. 결제 상태 체크
+        // 3. 결제 상태 체크 (환불 흐름은 별도 경로 — API로는 PAID 취소 차단)
         if (order.getStatus().equals(OrderStatus.PAID)) {
             throw new BusinessException(OrderErrorCode.ALREADY_PAID_ORDER);
         }
-        // 4. 주문 아이템 조회
-        List<OrderItem> orderItems = orderItemRepository.findAllByOrderId(order.getId());
-        // 5. 재고 복구
-        orderToEventClient.adjustStocks(InternalBulkStockAdjustmentRequest.createForCancelByOrderItems(orderItems));
-        // 6. 주문 취소
+        // 4. 상태 전이 선수행 — canTransitionTo(CANCELLED) 위반 시 외부 호출 전에 throw
         order.cancel();
+
+        // 5. 전이 성공 후에만 재고 복구 — 종단 상태(FAILED/CANCELLED 등) 재진입으로 인한 over-restore 차단
+        List<OrderItem> orderItems = orderItemRepository.findAllByOrderId(order.getId());
+        orderToEventClient.adjustStocks(InternalBulkStockAdjustmentRequest.createForCancelByOrderItems(orderItems));
 
         orderRepository.save(order);
 

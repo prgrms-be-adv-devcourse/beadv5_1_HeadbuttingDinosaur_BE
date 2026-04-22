@@ -6,6 +6,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -14,7 +15,14 @@ import lombok.NoArgsConstructor;
 
 @Entity
 @Getter
-@Table(name = "processed_message", schema = "commerce")
+@Table(
+    name = "processed_message",
+    schema = "commerce",
+    uniqueConstraints = @UniqueConstraint(
+        name = "uk_processed_message_message_id_topic",
+        columnNames = "message_id"
+    )
+)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ProcessedMessage {
 
@@ -23,8 +31,8 @@ public class ProcessedMessage {
     private Long id;
 
     // Outbox message_id (Kafka 헤더 X-Message-Id에서 추출)
-    // UNIQUE 제약 — 레이스 컨디션 최종 방어선
-    @Column(name = "message_id", nullable = false, unique = true, length = 36)
+    // UNIQUE 제약명 고정 — Consumer의 isProcessedMessageUniqueConflict()가 제약명으로 판별
+    @Column(name = "message_id", nullable = false, length = 36)
     private String messageId;
 
     // 운영 디버깅용
