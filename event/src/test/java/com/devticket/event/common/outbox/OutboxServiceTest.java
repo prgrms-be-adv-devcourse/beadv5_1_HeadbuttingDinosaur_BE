@@ -62,9 +62,12 @@ class OutboxServiceTest {
         assertThat(saved.getMessageId()).isNotBlank();
     }
 
+    // 엔티티 상태 전이 세부(retryCount / sentAt / nextRetryAt 백오프)는 OutboxEntityTest 로 위임.
+    // 여기서는 processOne 의 Service 계층 협력(publish 호출 · markSent/markFailed 경유 save) 만 단언.
+
     @Test
-    void processOne_성공시_SENT로_변경하고_저장한다() throws OutboxPublishException {
-        // given — publish()는 void이므로 기본 no-op 동작 사용
+    void processOne_성공시_publish_호출_후_SENT로_전이하고_save를_호출한다() throws OutboxPublishException {
+        // given — publish()는 void 이므로 기본 no-op 동작 사용
         Outbox outbox = pendingOutbox();
 
         // when
@@ -72,15 +75,13 @@ class OutboxServiceTest {
 
         // then
         assertThat(outbox.getStatus()).isEqualTo(OutboxStatus.SENT);
-        assertThat(outbox.getSentAt()).isNotNull();
-        assertThat(outbox.getRetryCount()).isZero();
         then(outboxEventProducer).should().publish(any(OutboxEventMessage.class));
         then(outboxRepository).should().save(outbox);
     }
 
     @Test
-    void processOne_발행_실패시_markFailed후_저장한다() throws OutboxPublishException {
-        // given — Producer가 OutboxPublishException으로 감싼 발행 실패
+    void processOne_OutboxPublishException_발생시_PENDING_유지하고_save를_호출한다() throws OutboxPublishException {
+        // given — Producer 가 OutboxPublishException 으로 감싼 발행 실패
         Outbox outbox = pendingOutbox();
         willThrow(new OutboxPublishException("broker ack 실패", null))
                 .given(outboxEventProducer).publish(any(OutboxEventMessage.class));
@@ -88,34 +89,30 @@ class OutboxServiceTest {
         // when
         outboxService.processOne(outbox);
 
-        // then
+        // then — 재시도 가능 상태 유지 + 저장
         assertThat(outbox.getStatus()).isEqualTo(OutboxStatus.PENDING);
-        assertThat(outbox.getRetryCount()).isEqualTo(1);
-        assertThat(outbox.getNextRetryAt()).isNotNull();
-        assertThat(outbox.getSentAt()).isNull();
         then(outboxRepository).should().save(outbox);
     }
 
     @Test
-    void processOne_publish가_KafkaException을_던져도_markFailed후_저장한다() throws OutboxPublishException {
-        // given — Producer가 감싸지 못한 예상 외 RuntimeException 전파 (최후 방어선 검증)
+    void processOne_publish가_RuntimeException을_전파해도_최후_방어선에서_흡수하고_save를_호출한다() throws OutboxPublishException {
+        // given — Producer 가 감싸지 못한 예상 외 RuntimeException 전파 시나리오
+        // (Producer 계약 위반이더라도 Scheduler 루프 중단 방지 — processOne 최후 방어선 가드)
         Outbox outbox = pendingOutbox();
         willThrow(new KafkaException("max.block.ms expired while fetching metadata"))
                 .given(outboxEventProducer).publish(any(OutboxEventMessage.class));
 
-        // when — processOne 은 예외를 최후 방어선에서 흡수해야 함
+        // when
         outboxService.processOne(outbox);
 
-        // then — 루프 중단 방지 위해 markFailed + save 보장
+        // then
         assertThat(outbox.getStatus()).isEqualTo(OutboxStatus.PENDING);
-        assertThat(outbox.getRetryCount()).isEqualTo(1);
-        assertThat(outbox.getNextRetryAt()).isNotNull();
         then(outboxRepository).should().save(outbox);
     }
 
     @Test
-    void processOne_여섯번째_실패시_FAILED로_저장한다() throws OutboxPublishException {
-        // given
+    void processOne_최대_재시도_도달시_FAILED로_전이하고_save를_호출한다() throws OutboxPublishException {
+        // given — retryCount 5 에서 실패 1회 추가 → 6회 도달
         Outbox outbox = pendingOutbox();
         ReflectionTestUtils.setField(outbox, "retryCount", 5);
         willThrow(new OutboxPublishException("broker ack 실패", null))
@@ -126,7 +123,6 @@ class OutboxServiceTest {
 
         // then
         assertThat(outbox.getStatus()).isEqualTo(OutboxStatus.FAILED);
-        assertThat(outbox.getRetryCount()).isEqualTo(6);
         then(outboxRepository).should().save(outbox);
     }
 
