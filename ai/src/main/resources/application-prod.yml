@@ -1,0 +1,45 @@
+spring:
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
+    consumer:
+      group-id: devticket-ai
+      auto-offset-reset: latest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+  batch:
+    job:
+      enabled: false
+    jdbc:
+      initialize-schema: always
+  elasticsearch:
+    uris: ${ELASTICSEARCH_URI}
+    connection-timeout: 5s
+    socket-timeout: 30s
+
+openai:
+  api-key: ${OPENAI_API_KEY}
+  embedding:
+    url: https://api.openai.com/v1/embeddings
+    model: text-embedding-3-small
+
+internal:
+  log-service:
+    url: http://log:8086
+
+logging:
+  level:
+    com.devticket: INFO

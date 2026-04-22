@@ -1,0 +1,53 @@
+package org.example.ai.domain.model;
+
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.elasticsearch.annotations.Document;
+import org.springframework.data.elasticsearch.annotations.Field;
+import org.springframework.data.elasticsearch.annotations.FieldType;
+
+@NoArgsConstructor
+@AllArgsConstructor
+@Getter
+@Builder
+@Document(indexName = "user-index", createIndex = false)
+public class UserVector {
+
+    @Id
+    private String userId;
+
+    // ============ 장기 취향 벡터 ============ //
+    private float[] preferenceVector;
+
+    private float preferenceWeightSum;
+    // ===================================== //
+
+    // ============ 구매 의도 벡터 ============ //
+    private float[] cartVector;
+
+    private float cartWeightSum;
+    // ===================================== //
+
+    // ============ 최근 관심 벡터 ============ //
+    private float[] recentVector;
+
+    private float recentWeightSum;
+    // ===================================== //
+
+    // ============ 부정 신호 vector ============ //
+    private float[] negativeVector;
+
+    private float negativeWeightSum;
+    // ===================================== //
+
+    // vector 갱신 시각
+    private String updatedAt;
+
+
+
+}
+

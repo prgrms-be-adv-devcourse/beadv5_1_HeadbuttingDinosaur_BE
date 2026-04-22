@@ -1,34 +1,136 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:16
     container_name: devticket-postgres
+    ports:
+      - "5433:5432"
+    restart: always
     environment:
       POSTGRES_USER: devticket
       POSTGRES_PASSWORD: devticket
       POSTGRES_DB: devticket
-    ports:
-      - "5433:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
+      - ./init-schemas.sql:/docker-entrypoint-initdb.d/init-schemas.sql
 
   kafka:
     image: confluentinc/cp-kafka:7.5.0
     container_name: devticket-kafka
     ports:
       - "9093:9092"
+    restart: always
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9094
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9093
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9094
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      CLUSTER_ID: "devticket-local-cluster"
+      CLUSTER_ID: _gHNc3ZVSOuPFP_DLXBTLQ
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: devticket-kafka-ui
+    ports:
+      - "8989:8080"
+    restart: always
+    depends_on:
+      - kafka
+    environment:
+      KAFKA_CLUSTERS_0_NAME: devticket
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: localhost:9093
+
+  kafka-init:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: devticket-kafka-init
+    depends_on:
+      - kafka
+    entrypoint: [ "/bin/sh", "-c" ]
+    command: |
+      "
+      echo 'Waiting for Kafka...'
+      sleep 15
+      kafka-topics --create --if-not-exists --bootstrap-server localhost:9093 --topic payment.completed --partitions 3 --replication-factor 1
+      kafka-topics --create --if-not-exists --bootstrap-server localhost:9093 --topic refund.completed --partitions 3 --replication-factor 1
+      kafka-topics --create --if-not-exists --bootstrap-server localhost:9093 --topic event.force-cancelled --partitions 1 --replication-factor 1
+      kafka-topics --create --if-not-exists --bootstrap-server localhost:9093 --topic event.sale-stopped --partitions 1 --replication-factor 1
+      kafka-topics --create --if-not-exists --bootstrap-server localhost:9093 --topic member.suspended --partitions 1 --replication-factor 1
+      kafka-topics --create --if-not-exists --bootstrap-server localhost:9093 --topic action.log --partitions 3 --replication-factor 1
+      kafka-topics --create --if-not-exists --bootstrap-server localhost:9093 --topic order.created --partitions 3 --replication-factor 1
+      kafka-topics --create --if-not-exists --bootstrap-server localhost:9093 --topic stock.deducted --partitions 3 --replication-factor 1
+      kafka-topics --create --if-not-exists --bootstrap-server localhost:9093 --topic stock.failed --partitions 1 --replication-factor 1
+      kafka-topics --create --if-not-exists --bootstrap-server localhost:9093 --topic payment.failed --partitions 3 --replication-factor 1
+      echo 'Topics created successfully.'
+      "
+    restart: on-failure
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.2.5
+    container_name: devticket-elasticsearch
+    ports:
+      - "9200:9200"
+    restart: always
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+    volumes:
+      - es-data:/usr/share/elasticsearch/data
+
+  loki:
+    image: grafana/loki:2.9.0
+    container_name: devticket-loki
+    ports:
+      - "3100:3100"
+    restart: always
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - loki-data:/loki
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: devticket-grafana
+    ports:
+      - "3001:3000"
+    restart: always
+    depends_on:
+      - loki
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: devticket-prometheus
+    ports:
+      - "19090:9090"
+    restart: always
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+
+  promtail:
+    image: grafana/promtail:2.9.0
+    container_name: devticket-promtail
+    volumes:
+      - ./promtail-config.yml:/etc/promtail/config.yml
+      - ./spring-logs:/spring-logs
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      - loki
 
 volumes:
   postgres-data:
+  kafka-data:
+  es-data:
+  loki-data:
+  grafana-data:
+  prometheus-data:
