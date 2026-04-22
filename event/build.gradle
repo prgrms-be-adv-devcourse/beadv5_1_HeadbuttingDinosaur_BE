@@ -38,6 +38,7 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
     runtimeOnly 'com.h2database:h2'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testImplementation 'org.awaitility:awaitility'
     // 테스트 환경을 위한 H2 인메모리 DB
     testImplementation 'com.h2database:h2'
 
