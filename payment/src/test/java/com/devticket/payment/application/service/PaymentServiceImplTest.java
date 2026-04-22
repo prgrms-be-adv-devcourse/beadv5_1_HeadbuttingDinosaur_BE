@@ -3,6 +3,7 @@ package com.devticket.payment.application.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
@@ -27,6 +28,7 @@ import com.devticket.payment.payment.presentation.dto.PaymentFailRequest;
 import com.devticket.payment.payment.presentation.dto.PaymentFailResponse;
 import com.devticket.payment.payment.presentation.dto.PaymentReadyRequest;
 import com.devticket.payment.payment.presentation.dto.PaymentReadyResponse;
+import com.devticket.payment.wallet.application.event.PaymentCompletedEvent;
 import com.devticket.payment.wallet.application.service.WalletService;
 import java.util.List;
 import java.time.LocalDateTime;
@@ -37,6 +39,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -176,7 +179,7 @@ public class PaymentServiceImplTest {
             PaymentReadyResponse response = paymentService.readyPayment(USER_ID, request);
 
             // then
-            verify(walletService).processWalletPayment(USER_ID, EXTERNAL_ORDER_ID, orderInfo.totalAmount());
+            verify(walletService).processWalletPayment(eq(USER_ID), eq(EXTERNAL_ORDER_ID), eq(orderInfo.totalAmount()), any());
             assertThat(response.paymentStatus()).isEqualTo(PaymentStatus.SUCCESS);
         }
 
@@ -339,6 +342,121 @@ public class PaymentServiceImplTest {
             // then
             assertThat(payment.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
             verify(outboxService).save(any(), any(), any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("confirmPgPayment → PaymentCompletedEvent 에 orderItems가 포함된다")
+        void confirmPgPayment_orderItems_Outbox_전달() {
+            // given
+            Payment payment = createReadyPayment();
+            UUID eventId1 = UUID.randomUUID();
+            UUID eventId2 = UUID.randomUUID();
+            InternalOrderInfoResponse orderWithItems = new InternalOrderInfoResponse(
+                ORDER_ID, USER_ID, "ORD-001", orderInfo.totalAmount(), "PAYMENT_PENDING",
+                LocalDateTime.of(2025, 8, 15, 14, 30).toString(),
+                List.of(
+                    new InternalOrderInfoResponse.OrderItem(eventId1, 2),
+                    new InternalOrderInfoResponse.OrderItem(eventId2, 1)
+                )
+            );
+            PaymentConfirmRequest request = new PaymentConfirmRequest(
+                PAYMENT_KEY, PAYMENT_ID, EXTERNAL_ORDER_ID, orderInfo.totalAmount());
+
+            given(commerceInternalClient.getOrderInfo(EXTERNAL_ORDER_ID)).willReturn(orderWithItems);
+            given(paymentRepository.findByOrderId(orderWithItems.id())).willReturn(Optional.of(payment));
+            given(pgPaymentClient.confirm(any())).willReturn(createPgConfirmResult());
+            given(paymentRepository.save(any(Payment.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
+
+            // when
+            paymentService.confirmPgPayment(USER_ID, request);
+
+            // then: outboxService.save에 전달된 PaymentCompletedEvent 페이로드 검증
+            ArgumentCaptor<Object> payloadCaptor = ArgumentCaptor.forClass(Object.class);
+            verify(outboxService).save(any(), any(), any(), any(), payloadCaptor.capture());
+
+            Object captured = payloadCaptor.getValue();
+            assertThat(captured).isInstanceOf(PaymentCompletedEvent.class);
+            PaymentCompletedEvent event = (PaymentCompletedEvent) captured;
+            assertThat(event.orderItems()).hasSize(2);
+            assertThat(event.orderItems().get(0).eventId()).isEqualTo(eventId1);
+            assertThat(event.orderItems().get(0).quantity()).isEqualTo(2);
+            assertThat(event.orderItems().get(1).eventId()).isEqualTo(eventId2);
+            assertThat(event.orderItems().get(1).quantity()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("WALLET_PG 결제 승인 시에도 orderItems가 PaymentCompletedEvent에 포함된다")
+        void WALLET_PG_confirmPgPayment_orderItems_포함() {
+            // given: WALLET_PG 결제 — totalAmount=100,000, walletAmount=30,000, pgAmount=70,000
+            int totalAmount = 100_000;
+            int walletAmount = 30_000;
+            int pgAmount = 70_000;
+            Payment walletPgPayment = Payment.create(
+                ORDER_ID, USER_ID, PaymentMethod.WALLET_PG, totalAmount, walletAmount, pgAmount
+            );
+
+            UUID eventId = UUID.randomUUID();
+            InternalOrderInfoResponse orderWithItems = new InternalOrderInfoResponse(
+                ORDER_ID, USER_ID, "ORD-WPG-001", totalAmount, "PAYMENT_PENDING",
+                LocalDateTime.of(2025, 8, 15, 14, 30).toString(),
+                List.of(new InternalOrderInfoResponse.OrderItem(eventId, 5))
+            );
+            // WALLET_PG: request.amount()는 pgAmount와 비교됨
+            PaymentConfirmRequest request = new PaymentConfirmRequest(
+                PAYMENT_KEY, PAYMENT_ID, EXTERNAL_ORDER_ID, pgAmount);
+
+            given(commerceInternalClient.getOrderInfo(EXTERNAL_ORDER_ID)).willReturn(orderWithItems);
+            given(paymentRepository.findByOrderId(orderWithItems.id())).willReturn(Optional.of(walletPgPayment));
+            given(pgPaymentClient.confirm(any())).willReturn(new PgPaymentConfirmResult(
+                PAYMENT_KEY, EXTERNAL_ORDER_ID.toString(), "카드", "DONE", pgAmount, APPROVED_AT
+            ));
+            given(paymentRepository.save(any(Payment.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
+
+            // when
+            paymentService.confirmPgPayment(USER_ID, request);
+
+            // then: totalAmount는 payment.getAmount()(총액), orderItems는 그대로 전달
+            ArgumentCaptor<Object> payloadCaptor = ArgumentCaptor.forClass(Object.class);
+            verify(outboxService).save(any(), any(), any(), any(), payloadCaptor.capture());
+
+            PaymentCompletedEvent event = (PaymentCompletedEvent) payloadCaptor.getValue();
+            assertThat(event.paymentMethod()).isEqualTo(PaymentMethod.WALLET_PG);
+            assertThat(event.totalAmount()).isEqualTo(totalAmount);
+            assertThat(event.orderItems()).hasSize(1);
+            assertThat(event.orderItems().get(0).eventId()).isEqualTo(eventId);
+            assertThat(event.orderItems().get(0).quantity()).isEqualTo(5);
+        }
+
+        @Test
+        @DisplayName("order.orderItems가 null이면 빈 리스트로 매핑된다")
+        void confirmPgPayment_orderItems_null_빈_리스트() {
+            // given
+            Payment payment = createReadyPayment();
+            InternalOrderInfoResponse orderWithNullItems = new InternalOrderInfoResponse(
+                ORDER_ID, USER_ID, "ORD-001", orderInfo.totalAmount(), "PAYMENT_PENDING",
+                LocalDateTime.of(2025, 8, 15, 14, 30).toString(),
+                null
+            );
+            PaymentConfirmRequest request = new PaymentConfirmRequest(
+                PAYMENT_KEY, PAYMENT_ID, EXTERNAL_ORDER_ID, orderInfo.totalAmount());
+
+            given(commerceInternalClient.getOrderInfo(EXTERNAL_ORDER_ID)).willReturn(orderWithNullItems);
+            given(paymentRepository.findByOrderId(orderWithNullItems.id())).willReturn(Optional.of(payment));
+            given(pgPaymentClient.confirm(any())).willReturn(createPgConfirmResult());
+            given(paymentRepository.save(any(Payment.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
+
+            // when
+            paymentService.confirmPgPayment(USER_ID, request);
+
+            // then
+            ArgumentCaptor<Object> payloadCaptor = ArgumentCaptor.forClass(Object.class);
+            verify(outboxService).save(any(), any(), any(), any(), payloadCaptor.capture());
+
+            PaymentCompletedEvent event = (PaymentCompletedEvent) payloadCaptor.getValue();
+            assertThat(event.orderItems()).isNotNull().isEmpty();
         }
     }
 

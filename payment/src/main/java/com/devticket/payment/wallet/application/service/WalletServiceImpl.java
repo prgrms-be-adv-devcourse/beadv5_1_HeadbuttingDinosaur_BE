@@ -214,7 +214,8 @@ public class WalletServiceImpl implements WalletService {
 
     @Override
     @Transactional
-    public void processWalletPayment(UUID userId, UUID orderId, int amount) {
+    public void processWalletPayment(UUID userId, UUID orderId, int amount,
+        List<PaymentCompletedEvent.OrderItem> orderItems) {
         String transactionKey = "USE_" + orderId;
 
         //토스 paymentKey = WalletTransaction의 transactionKey
@@ -252,6 +253,7 @@ public class WalletServiceImpl implements WalletService {
             .paymentId(payment.getPaymentId())
             .paymentMethod(PaymentMethod.WALLET)
             .totalAmount(amount)
+            .orderItems(orderItems == null ? List.of() : orderItems)
             .timestamp(Instant.now())
             .build();
         outboxService.save(

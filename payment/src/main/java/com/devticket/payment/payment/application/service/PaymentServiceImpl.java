@@ -90,7 +90,12 @@ public class PaymentServiceImpl implements PaymentService {
         // WALLET 결제
         Payment payment = Payment.create(order.id(), userId, PaymentMethod.WALLET, order.totalAmount());
         paymentRepository.save(payment);
-        walletService.processWalletPayment(userId, request.orderId(), order.totalAmount());
+        List<PaymentCompletedEvent.OrderItem> walletOrderItems = order.orderItems() == null
+            ? List.of()
+            : order.orderItems().stream()
+                .map(item -> new PaymentCompletedEvent.OrderItem(item.eventId(), item.quantity()))
+                .toList();
+        walletService.processWalletPayment(userId, request.orderId(), order.totalAmount(), walletOrderItems);
         Payment updated = paymentRepository.findByOrderId(order.id())
             .orElseThrow(() -> new PaymentException(PaymentErrorCode.INVALID_PAYMENT_REQUEST));
         return PaymentReadyResponse.from(updated, request.orderId(), order.orderNumber(), order.status());
@@ -141,12 +146,19 @@ public class PaymentServiceImpl implements PaymentService {
         paymentRepository.save(payment);
 
         // payment.completed Outbox 발행 (트랜잭션 내)
+        List<PaymentCompletedEvent.OrderItem> orderItems = order.orderItems() == null
+            ? List.of()
+            : order.orderItems().stream()
+                .map(item -> new PaymentCompletedEvent.OrderItem(item.eventId(), item.quantity()))
+                .toList();
+
         PaymentCompletedEvent event = PaymentCompletedEvent.builder()
             .orderId(payment.getOrderId())
             .userId(payment.getUserId())
             .paymentId(payment.getPaymentId())
             .paymentMethod(payment.getPaymentMethod())
             .totalAmount(payment.getAmount())
+            .orderItems(orderItems)
             .timestamp(Instant.now())
             .build();
         outboxService.save(

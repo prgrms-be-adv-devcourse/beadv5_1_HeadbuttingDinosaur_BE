@@ -20,6 +20,7 @@ import com.devticket.payment.payment.domain.model.Payment;
 import com.devticket.payment.payment.domain.repository.PaymentRepository;
 import com.devticket.payment.payment.infrastructure.client.CommerceInternalClient;
 import com.devticket.payment.payment.infrastructure.external.PgPaymentClient;
+import com.devticket.payment.wallet.application.event.PaymentCompletedEvent;
 import com.devticket.payment.wallet.application.service.WalletServiceImpl;
 import com.devticket.payment.wallet.application.service.support.WalletChargeTransactionService;
 import com.devticket.payment.payment.infrastructure.external.dto.TossPaymentStatusResponse;
@@ -54,6 +55,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
@@ -632,7 +634,7 @@ class WalletServiceTest {
             given(paymentRepository.findByOrderId(ORDER_ID)).willReturn(Optional.of(payment));
 
             // when
-            walletService.processWalletPayment(USER_ID, ORDER_ID, 50_000);
+            walletService.processWalletPayment(USER_ID, ORDER_ID, 50_000, List.of());
 
             // then
             then(walletRepository).should(times(1)).useBalanceAtomic(USER_ID, 50_000);
@@ -645,7 +647,7 @@ class WalletServiceTest {
             given(walletTransactionRepository.existsByTransactionKey("USE_" + ORDER_ID)).willReturn(true);
 
             // when
-            walletService.processWalletPayment(USER_ID, ORDER_ID, 50_000);
+            walletService.processWalletPayment(USER_ID, ORDER_ID, 50_000, List.of());
 
             // then: atomic update 및 이벤트 발행 없음
             then(walletRepository).should(never()).useBalanceAtomic(any(), anyInt());
@@ -660,7 +662,7 @@ class WalletServiceTest {
             given(walletRepository.findByUserId(USER_ID)).willReturn(Optional.of(walletWithBalance(10_000)));
 
             // when & then
-            assertThatThrownBy(() -> walletService.processWalletPayment(USER_ID, ORDER_ID, 50_000))
+            assertThatThrownBy(() -> walletService.processWalletPayment(USER_ID, ORDER_ID, 50_000, List.of()))
                 .isInstanceOf(WalletException.class)
                 .extracting(e -> ((WalletException) e).getErrorCode())
                 .isEqualTo(WalletErrorCode.INSUFFICIENT_BALANCE);
@@ -676,10 +678,79 @@ class WalletServiceTest {
             given(walletRepository.findByUserId(USER_ID)).willReturn(Optional.empty());
 
             // when & then
-            assertThatThrownBy(() -> walletService.processWalletPayment(USER_ID, ORDER_ID, 50_000))
+            assertThatThrownBy(() -> walletService.processWalletPayment(USER_ID, ORDER_ID, 50_000, List.of()))
                 .isInstanceOf(WalletException.class)
                 .extracting(e -> ((WalletException) e).getErrorCode())
                 .isEqualTo(WalletErrorCode.WALLET_NOT_FOUND);
+        }
+
+        @Test
+        @DisplayName("orderItems가 PaymentCompletedEvent에 포함되어 Outbox에 저장된다")
+        void orderItems가_Outbox에_전달된다() {
+            // given
+            Wallet wallet = walletWithBalance(50_000);
+            Payment payment = paymentOf(ORDER_ID, 50_000, PaymentMethod.WALLET, PaymentStatus.READY);
+
+            UUID eventId1 = UUID.randomUUID();
+            UUID eventId2 = UUID.randomUUID();
+            List<PaymentCompletedEvent.OrderItem> items = List.of(
+                new PaymentCompletedEvent.OrderItem(eventId1, 2),
+                new PaymentCompletedEvent.OrderItem(eventId2, 1)
+            );
+
+            given(walletTransactionRepository.existsByTransactionKey("USE_" + ORDER_ID)).willReturn(false);
+            given(walletRepository.useBalanceAtomic(USER_ID, 50_000)).willReturn(1);
+            given(walletRepository.findByUserId(USER_ID)).willReturn(Optional.of(wallet));
+            given(walletTransactionRepository.save(any())).willReturn(
+                WalletTransaction.createUse(1L, USER_ID, "USE_" + ORDER_ID, 50_000, 50_000, ORDER_ID));
+            given(paymentRepository.findByOrderId(ORDER_ID)).willReturn(Optional.of(payment));
+
+            // when
+            walletService.processWalletPayment(USER_ID, ORDER_ID, 50_000, items);
+
+            // then: outboxService.save에 전달된 payload 검증
+            ArgumentCaptor<Object> payloadCaptor = ArgumentCaptor.forClass(Object.class);
+            then(outboxService).should(times(1)).save(
+                anyString(), eq(KafkaTopics.PAYMENT_COMPLETED),
+                eq(KafkaTopics.PAYMENT_COMPLETED), anyString(), payloadCaptor.capture()
+            );
+
+            Object captured = payloadCaptor.getValue();
+            assertThat(captured).isInstanceOf(PaymentCompletedEvent.class);
+            PaymentCompletedEvent event = (PaymentCompletedEvent) captured;
+            assertThat(event.orderItems()).hasSize(2);
+            assertThat(event.orderItems().get(0).eventId()).isEqualTo(eventId1);
+            assertThat(event.orderItems().get(0).quantity()).isEqualTo(2);
+            assertThat(event.orderItems().get(1).eventId()).isEqualTo(eventId2);
+            assertThat(event.orderItems().get(1).quantity()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("orderItems가 null이면 빈 리스트로 저장된다")
+        void null_orderItems는_빈_리스트로_저장() {
+            // given
+            Wallet wallet = walletWithBalance(50_000);
+            Payment payment = paymentOf(ORDER_ID, 50_000, PaymentMethod.WALLET, PaymentStatus.READY);
+
+            given(walletTransactionRepository.existsByTransactionKey("USE_" + ORDER_ID)).willReturn(false);
+            given(walletRepository.useBalanceAtomic(USER_ID, 50_000)).willReturn(1);
+            given(walletRepository.findByUserId(USER_ID)).willReturn(Optional.of(wallet));
+            given(walletTransactionRepository.save(any())).willReturn(
+                WalletTransaction.createUse(1L, USER_ID, "USE_" + ORDER_ID, 50_000, 50_000, ORDER_ID));
+            given(paymentRepository.findByOrderId(ORDER_ID)).willReturn(Optional.of(payment));
+
+            // when
+            walletService.processWalletPayment(USER_ID, ORDER_ID, 50_000, null);
+
+            // then
+            ArgumentCaptor<Object> payloadCaptor = ArgumentCaptor.forClass(Object.class);
+            then(outboxService).should(times(1)).save(
+                anyString(), eq(KafkaTopics.PAYMENT_COMPLETED),
+                eq(KafkaTopics.PAYMENT_COMPLETED), anyString(), payloadCaptor.capture()
+            );
+
+            PaymentCompletedEvent event = (PaymentCompletedEvent) payloadCaptor.getValue();
+            assertThat(event.orderItems()).isNotNull().isEmpty();
         }
     }
 
