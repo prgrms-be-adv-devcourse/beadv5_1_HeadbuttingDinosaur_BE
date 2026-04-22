@@ -258,9 +258,9 @@ public class WalletServiceImpl implements WalletService {
             .build();
         outboxService.save(
             payment.getPaymentId().toString(),
-            KafkaTopics.PAYMENT_COMPLETED,
-            KafkaTopics.PAYMENT_COMPLETED,
             orderId.toString(),
+            KafkaTopics.PAYMENT_COMPLETED,
+            KafkaTopics.PAYMENT_COMPLETED,
             event
         );
 

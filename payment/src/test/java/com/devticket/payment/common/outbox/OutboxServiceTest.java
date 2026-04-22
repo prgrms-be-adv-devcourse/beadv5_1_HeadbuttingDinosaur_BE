@@ -3,7 +3,6 @@ package com.devticket.payment.common.outbox;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.times;
@@ -13,6 +12,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -36,9 +36,9 @@ class OutboxServiceTest {
     private Outbox createOutbox(String topic, String partitionKey) {
         return Outbox.create(
             "agg-id-001",
+            partitionKey,
             "payment.completed",
             topic,
-            partitionKey,
             "{\"orderId\":\"order-uuid-001\"}"
         );
     }
@@ -53,8 +53,10 @@ class OutboxServiceTest {
 
             outboxService.processOne(outbox);
 
-            then(outboxEventProducer).should(times(1))
-                .send(eq("payment.completed"), eq("order-uuid-001"), any());
+            ArgumentCaptor<OutboxEventMessage> captor = ArgumentCaptor.forClass(OutboxEventMessage.class);
+            then(outboxEventProducer).should(times(1)).publish(captor.capture());
+            assertThat(captor.getValue().topic()).isEqualTo("payment.completed");
+            assertThat(captor.getValue().partitionKey()).isEqualTo("order-uuid-001");
         }
 
         @Test
@@ -81,8 +83,9 @@ class OutboxServiceTest {
 
             outboxService.processOne(outbox);
 
-            then(outboxEventProducer).should(times(1))
-                .send(eq("payment.completed"), eq("agg-id-001"), any());
+            ArgumentCaptor<OutboxEventMessage> captor = ArgumentCaptor.forClass(OutboxEventMessage.class);
+            then(outboxEventProducer).should(times(1)).publish(captor.capture());
+            assertThat(captor.getValue().partitionKey()).isEqualTo("agg-id-001");
         }
 
         @Test
@@ -103,7 +106,7 @@ class OutboxServiceTest {
         void 발행_실패_시_retryCount_증가() {
             Outbox outbox = createOutbox("payment.completed", "order-uuid-001");
             willThrow(new OutboxPublishException("Kafka 연결 실패", new RuntimeException()))
-                .given(outboxEventProducer).send(any(), any(), any());
+                .given(outboxEventProducer).publish(any());
 
             outboxService.processOne(outbox);
 
@@ -114,7 +117,7 @@ class OutboxServiceTest {
         void 발행_실패_시_nextRetryAt_설정() {
             Outbox outbox = createOutbox("payment.completed", "order-uuid-001");
             willThrow(new OutboxPublishException("Kafka 연결 실패", new RuntimeException()))
-                .given(outboxEventProducer).send(any(), any(), any());
+                .given(outboxEventProducer).publish(any());
 
             outboxService.processOne(outbox);
 
@@ -125,7 +128,7 @@ class OutboxServiceTest {
         void 발행_실패_시_예외_미전파() {
             Outbox outbox = createOutbox("payment.completed", "order-uuid-001");
             willThrow(new OutboxPublishException("전체 오류", new RuntimeException()))
-                .given(outboxEventProducer).send(any(), any(), any());
+                .given(outboxEventProducer).publish(any());
 
             assertThatCode(() -> outboxService.processOne(outbox))
                 .doesNotThrowAnyException();
@@ -135,7 +138,7 @@ class OutboxServiceTest {
         void 발행_실패여도_save_호출() {
             Outbox outbox = createOutbox("payment.completed", "order-uuid-001");
             willThrow(new OutboxPublishException("Kafka 오류", new RuntimeException()))
-                .given(outboxEventProducer).send(any(), any(), any());
+                .given(outboxEventProducer).publish(any());
 
             outboxService.processOne(outbox);
 
