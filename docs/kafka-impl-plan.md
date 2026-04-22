@@ -630,6 +630,60 @@ sequenceDiagram
 
 ---
 
+### 4-5. 📋 Outbox 정합 후속 트랙 — A파트 머지 완료 후 B·B6 잔여
+
+> 상세: [outbox_fix.md](outbox_fix.md) — 3모듈 실코드 대조 기반 체크리스트
+> 관련 PR (A파트 머지 완료): #482 Commerce / #483 Payment / #484 Event
+> 관련 Issue: #481 (Parent) / #495 (F2 본문 정정 필요)
+
+#### A파트 (머지 완료 — 이중 발행 완화 3축)
+
+- [x] ✅ 3모듈 공통: ShedLock `lockAtMostFor=5m / lockAtLeastFor=5s`
+- [x] ✅ 3모듈 공통: ProducerConfig `delivery.timeout.ms=1500 / request.timeout.ms=1000 / max.block.ms=500`
+- [x] ✅ 3모듈 공통: `OutboxEventProducer.get(2s)` 타임아웃
+- [x] ✅ Payment/Event: Scheduler 트랜잭션 해소 + `processOne()` 별도 빈 분리 (Commerce는 선례)
+- [x] ✅ Commerce: 회귀 방지 테스트(`KafkaProducerConfigTest` + `OutboxSchedulerIntegrationTest`) — PR #482 `e1d53c8`
+
+#### Commerce — 선례 모듈, 후속 없음
+
+- 실코드 대조 결과 §2 통합 결정값 전 항목 이미 일치
+- F2 실사 대상 포함 (`infrastructure.messaging` 하위 `Outbox*` 존재 여부 주기 확인)
+
+#### Event 후속 (B3 / B5 / B6)
+
+- [ ] **B3** `OutboxEventProducer.publish()` 시그니처 전환 — `boolean → void throws OutboxPublishException`
+- [ ] **B5-1** Repository 메서드명 — `findPendingOutboxes → findPendingToPublish`
+- [ ] **B5-2** 쿼리 연산자 — `<= :now → < :now`
+- [ ] **B5-3** `markFailed(MAX_RETRIES)` 파라미터 주입 → `markFailed()` 상수 내부화
+- [ ] **B6** 회귀 방지 테스트 이식 (Commerce 선례 기반)
+  - `KafkaProducerConfigTest` — 타임아웃 3종·acks·idempotence 값 고정 + 불변식 가드 (`max.block < request.timeout ≤ delivery.timeout < SEND_TIMEOUT*1000`)
+  - `OutboxSchedulerIntegrationTest` — EmbeddedKafka + `@MockitoBean LockProvider` E2E 검증
+
+#### Payment 후속 (B1 / B2 / B3 / B4 / B5 / B6)
+
+- [ ] **B1** 재시도 전면 개편 — 선형 5회(`retryCount * 60s`) → 지수 6회(`2^(retryCount-1)s`, 누적 31초)
+- [ ] **B2** `OutboxService.save()` 시그니처 재정렬 + 전파 속성
+  - 현재: `(aggregateId, eventType, topic, partitionKey, payload)`
+  - 변경: `(aggregateId, partitionKey, eventType, topic, event)` + `@Transactional(propagation = MANDATORY)`
+- [ ] **B3** `OutboxEventProducer.send()` → `publish(OutboxEventMessage): void throws OutboxPublishException`
+- [ ] **B4-1** `@Table(schema="payment")` 적용 (현재 schema 미지정)
+- [ ] **B4-2** `messageId` `UUID → String(36)` 타입 전환
+  - 영향: 엔티티 필드 / DB 컬럼 / 호출부 / Kafka 헤더 / `processed_message` 정합
+  - ⚠️ **별건 이슈 분리 권고** — PostgreSQL `USING message_id::text` 명시 필요, `ddl-auto:update` 자동 처리 불가 가능성 / 운영 배포 타이밍 별도
+- [ ] **B5-1** `findPendingForRetry → findPendingToPublish`
+- [ ] **B5-2** `<= :now → < :now`
+- [ ] **B5-3** `increaseRetryCount() → markFailed()` (Commerce 기준 + 상수 내부화)
+- [ ] **B6** 회귀 방지 테스트 이식 (Commerce 선례 기반) — Event와 동일 2종
+
+#### F2 — 패키지 경로 `common.outbox` 현행 유지 확정
+
+- **2026-04-22 결정**: #495 본문의 `common.outbox → infrastructure.messaging` 이동 방향 **번복**
+- 표준 = `common.outbox` (3모듈 정착 완료, 실사 기준 `infrastructure.messaging` 이동분 0건)
+- **정책**: "발견 시 리팩토링" — 향후 `infrastructure.messaging` 하위 `Outbox*` 추가 발견 시 `common.outbox`로 되돌림
+- [ ] #495 이슈 본문 F2 항목 방향 정정 코멘트 (별건 후속)
+
+---
+
 ## 섹션 5 — /docs 싱크 포인트
 
 Kafka 설계 및 구현 내용이 다른 문서에 아직 반영되지 않은 항목을 정리합니다.
