@@ -1,0 +1,30 @@
+name: CD - Log (Dev)
+on:
+  push:
+    branches: ["develop/log"]
+    paths: ["fastify-log/**"]
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, local]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and Push
+        run: |
+          IMAGE=${{ secrets.DOCKERHUB_USERNAME }}/devticket-domain-log:dev
+          docker build -t $IMAGE ./fastify-log
+          docker push $IMAGE
+
+      - name: Deploy to k3s
+        run: |
+          sudo /usr/local/bin/k3s kubectl -n devticket set image deployment/log log=${{ secrets.DOCKERHUB_USERNAME }}/devticket-domain-log:dev
+          sudo /usr/local/bin/k3s kubectl -n devticket scale deployment/log --replicas=1
+          sudo /usr/local/bin/k3s kubectl -n devticket rollout restart deployment/log
+          sudo /usr/local/bin/k3s kubectl -n devticket rollout status deployment/log --timeout=120s

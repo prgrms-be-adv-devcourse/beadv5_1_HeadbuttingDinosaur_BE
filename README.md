@@ -81,19 +81,8 @@ src/
 
 | 역할 | 경로 |
 |------|------|
-| 비회원 | `/`, `/events/*`, `/login`, `/signup` |
-| USER | 위 + `/cart`, `/payment`, `/mypage`, `/seller-apply` |
-| SELLER | 위 + `/seller/*` |
-| ADMIN | 전체 + `/admin/*` |
-
-## API 관리 포인트
-
-- **base URL**: `.env.development` 한 곳
-- **토큰 주입 / 재발급**: `api/client.ts` 인터셉터만
-- **도메인별 API**: `api/*.api.ts` 해당 파일만
-- **타입 변경**: `api/types.ts` 한 곳만
-
-```ts
-// 컴포넌트에서 사용 예
-import { login, getEvents, createOrder } from '@/api'
-```
+| c| |
+| | |
+| | |
+| | |
+| | |
