@@ -5,6 +5,7 @@ import com.devticket.event.application.EventRecommendationService;
 import com.devticket.event.common.response.SuccessResponse;
 import com.devticket.event.domain.enums.EventStatus;
 import com.devticket.event.presentation.dto.internal.InternalBulkEventInfoRequest;
+import com.devticket.event.presentation.dto.internal.InternalPopularEventResponse;
 import com.devticket.event.presentation.dto.internal.InternalRecommendationResponse;
 import com.devticket.event.presentation.dto.internal.InternalBulkEventInfoResponse;
 import com.devticket.event.presentation.dto.internal.InternalBulkStockAdjustmentRequest;
@@ -174,5 +175,11 @@ public class EventInternalController {
         return ResponseEntity.ok(SuccessResponse.success(
             eventRecommendationService.getRecommendations(userId)
         ));
+    }
+
+    @GetMapping("/internal/events/popular")
+    public ResponseEntity<List<InternalPopularEventResponse>> getPopularEvents(
+        @RequestParam int count) {
+        return ResponseEntity.ok(eventInternalService.getPopularEventsByCount(count));
     }
 }

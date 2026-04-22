@@ -132,11 +132,15 @@ public class EventService {
             .collect(Collectors.toMap(TechStackItem::techStackId, TechStackItem::name));
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public EventDetailResponse getEvent(UUID eventId) {
 
         Event event = eventRepository.findWithDetailsByEventId(eventId)
             .orElseThrow(() -> new BusinessException(EventErrorCode.EVENT_NOT_FOUND));
+
+        // 조회수 증가
+        event.increaseViewCount();
+
         String nickname = memberClient.getNickname(event.getSellerId());
 
         return EventDetailResponse.from(event, nickname);

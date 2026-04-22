@@ -84,6 +84,9 @@ public class Event extends BaseEntity {
     @Column(nullable = false)
     private EventCategory category;
 
+    @Column(nullable = false)
+    private Long viewCount = 0L;
+
     @Version
     private Long version;
 
@@ -214,6 +217,10 @@ public class Event extends BaseEntity {
             && !now.isBefore(this.saleStartAt) && !now.isAfter(this.saleEndAt)
             && this.remainingQuantity >= requestedQuantity
             && requestedQuantity <= this.maxQuantity;
+    }
+
+    public void increaseViewCount() {
+        this.viewCount++;
     }
 
 }
