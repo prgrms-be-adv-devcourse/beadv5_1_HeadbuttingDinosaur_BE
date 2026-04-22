@@ -13,7 +13,6 @@ import com.devticket.commerce.cart.domain.repository.CartItemRepository;
 import com.devticket.commerce.cart.domain.repository.CartRepository;
 import com.devticket.commerce.common.enums.OrderStatus;
 import com.devticket.commerce.common.exception.BusinessException;
-import com.devticket.commerce.common.messaging.KafkaTopics;
 import com.devticket.commerce.order.application.usecase.OrderUsecase;
 import com.devticket.commerce.order.domain.exception.OrderErrorCode;
 import com.devticket.commerce.order.domain.model.Order;
@@ -51,7 +50,6 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 @ActiveProfiles("test")
 @EmbeddedKafka(
         partitions = 1,
-        topics = {KafkaTopics.PAYMENT_COMPLETED, KafkaTopics.PAYMENT_FAILED},
         bootstrapServersProperty = "spring.kafka.bootstrap-servers"
 )
 @DirtiesContext
