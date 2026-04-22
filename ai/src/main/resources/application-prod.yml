@@ -38,7 +38,11 @@ openai:
 
 internal:
   log-service:
-    url: http://log:8086
+    url: http://log:8085
+  member-service:
+    url: http://member:8081
+  event-service:
+    url: http://event:8082
 
 logging:
   level:
