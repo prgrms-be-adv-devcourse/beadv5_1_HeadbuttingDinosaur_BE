@@ -3,7 +3,6 @@ package com.devticket.payment.payment.presentation.dto;
 import com.devticket.payment.payment.domain.enums.PaymentStatus;
 import com.devticket.payment.payment.domain.model.Payment;
 import java.util.UUID;
-import lombok.Builder;
 
 public record PaymentReadyResponse(
     UUID orderId,
@@ -13,6 +12,8 @@ public record PaymentReadyResponse(
     String orderStatus,
     PaymentStatus paymentStatus,
     Integer amount,
+    Integer walletAmount,
+    Integer pgAmount,
     String approvedAt
 ) {
 
@@ -30,6 +31,8 @@ public record PaymentReadyResponse(
             orderStatus,
             payment.getStatus(),
             payment.getAmount(),
+            payment.getWalletAmount(),
+            payment.getPgAmount(),
             payment.getApprovedAt() != null ? payment.getApprovedAt().toString() : null
         );
     }

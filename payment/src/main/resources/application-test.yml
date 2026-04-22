@@ -1,20 +1,33 @@
 spring:
-  autoconfigure:
-    exclude:
-      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
-      - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
-
   datasource:
-    # H2 메모리 DB를 사용하되, PostgreSQL 모드로 동작하도록 설정
-    url: jdbc:h2:mem:testdb;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    url: jdbc:h2:mem:testdb;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;INIT=CREATE SCHEMA IF NOT EXISTS payment\;CREATE SCHEMA IF NOT EXISTS refund\;CREATE TABLE IF NOT EXISTS payment.shedlock(name VARCHAR(64) NOT NULL PRIMARY KEY, lock_until TIMESTAMP NOT NULL, locked_at TIMESTAMP NOT NULL, locked_by VARCHAR(255) NOT NULL)
     driver-class-name: org.h2.Driver
     username: sa
     password:
+    hikari:
+      maximum-pool-size: 30
+      connection-init-sql: "SET SCHEMA payment"
   jpa:
     database-platform: org.hibernate.dialect.H2Dialect
     hibernate:
-      ddl-auto: create-drop # 테스트 시작 시 테이블 생성, 종료 시 삭제
-    show-sql: true
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        default_schema: payment
+  kafka:
+    bootstrap-servers: localhost:9093
+    consumer:
+      group-id: devticket-payment
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+server:
+  port: 8085
 
 jwt:
   secret-key: test-jwt-secret-key
@@ -23,9 +36,9 @@ jwt:
 
 internal:
   commerce:
-    base-url: http://localhost:8083
+    base-url: http://localhost:8085
   event:
-    base-url: http://localhost:8082
+    base-url: http://localhost:8085
 
 pg:
   toss:

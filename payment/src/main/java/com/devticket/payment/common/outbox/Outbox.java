@@ -10,6 +10,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.Table;
+import java.time.Instant;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -27,14 +28,17 @@ public class Outbox extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "aggregate_type", nullable = false, length = 50)
-    private String aggregateType;
-
-    @Column(name = "aggregate_id", nullable = false)
-    private Long aggregateId;
+    @Column(name = "aggregate_id", nullable = false, length = 36)
+    private String aggregateId;
 
     @Column(name = "event_type", nullable = false, length = 100)
     private String eventType;
+
+    @Column(name = "topic", nullable = false, length = 128)
+    private String topic;
+
+    @Column(name = "partition_key", length = 36)
+    private String partitionKey;
 
     @Column(nullable = false, columnDefinition = "TEXT")
     private String payload;
@@ -49,14 +53,21 @@ public class Outbox extends BaseEntity {
     @Column(name = "retry_count", nullable = false)
     private int retryCount;
 
+    @Column(name = "next_retry_at")
+    private Instant nextRetryAt;
+
+    @Column(name = "sent_at")
+    private Instant sentAt;
+
     private static final int MAX_RETRY = 5;
 
-    public static Outbox create(String aggregateType, Long aggregateId,
-                                String eventType, String payload) {
+    public static Outbox create(String aggregateId, String eventType,
+                                String topic, String partitionKey, String payload) {
         Outbox outbox = new Outbox();
-        outbox.aggregateType = aggregateType;
         outbox.aggregateId = aggregateId;
         outbox.eventType = eventType;
+        outbox.topic = topic;
+        outbox.partitionKey = partitionKey;
         outbox.payload = payload;
         outbox.status = OutboxStatus.PENDING;
         outbox.messageId = UUID.randomUUID();
@@ -66,12 +77,15 @@ public class Outbox extends BaseEntity {
 
     public void markSent() {
         this.status = OutboxStatus.SENT;
+        this.sentAt = Instant.now();
     }
 
     public void increaseRetryCount() {
         this.retryCount++;
         if (this.retryCount >= MAX_RETRY) {
             this.status = OutboxStatus.FAILED;
+        } else {
+            this.nextRetryAt = Instant.now().plusSeconds(this.retryCount * 60L);
         }
     }
 

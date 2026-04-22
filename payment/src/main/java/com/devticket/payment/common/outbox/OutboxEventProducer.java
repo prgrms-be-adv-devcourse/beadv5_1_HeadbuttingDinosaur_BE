@@ -1,12 +1,20 @@
 package com.devticket.payment.common.outbox;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.KafkaException;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Slf4j
 @Component
@@ -24,7 +32,11 @@ public class OutboxEventProducer {
         try {
             String json = objectMapper.writeValueAsString(message);
 
-            var result = kafkaTemplate.send(topic, key, json).get();
+            ProducerRecord<String, String> record = new ProducerRecord<>(topic, key, json);
+            record.headers().add("X-Message-Id",
+                message.messageId().toString().getBytes(StandardCharsets.UTF_8));
+
+            var result = kafkaTemplate.send(record).get(2, TimeUnit.SECONDS);
 
             log.info("[Outbox] Kafka 발행 성공 — topic={}, messageId={}, offset={}",
                 topic, message.messageId(),
@@ -35,7 +47,7 @@ public class OutboxEventProducer {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new OutboxPublishException("Kafka 발행 중 인터럽트 발생", e);
-        } catch (ExecutionException e) {
+        } catch (TimeoutException | ExecutionException | KafkaException e) {
             throw new OutboxPublishException("Kafka 발행 실패", e);
         }
     }
