@@ -136,16 +136,19 @@ public class SettlementInternalServiceImpl implements SettlementInternalService 
 
     @Transactional
     public void createSettlementFromItems() {
+        //매월1일 정산시작시 정산대상기간 설정 : 전전월 26일 ~ 전월 25일
         LocalDate periodFrom = YearMonth.now().minusMonths(2).atDay(26);
         LocalDate periodTo = YearMonth.now().minusMonths(1).atDay(25);
         LocalDateTime periodStart = periodFrom.atStartOfDay();
         LocalDateTime periodEnd = periodTo.atTime(23, 59, 59);
 
+        //판매자별 settlementItem데이터 조회
         Map<UUID, List<SettlementItem>> itemsBySeller = collectItemsBySeller(periodFrom, periodTo);
         includeCarryOverSellers(itemsBySeller);
 
         log.info("[정산 생성] 대상 기간: {} ~ {}, 판매자: {}명", periodFrom, periodTo, itemsBySeller.size());
 
+        //Settlement생성
         for (Map.Entry<UUID, List<SettlementItem>> entry : itemsBySeller.entrySet()) {
             processSellerSettlement(entry.getKey(), entry.getValue(), periodStart, periodEnd);
         }
@@ -173,6 +176,12 @@ public class SettlementInternalServiceImpl implements SettlementInternalService 
 
     private void processSellerSettlement(UUID sellerId, List<SettlementItem> items,
         LocalDateTime periodStart, LocalDateTime periodEnd) {
+
+        // Settlement가 이미 생
+        if (alreadySettledForPeriod(sellerId, periodStart)) {
+            log.info("[정산 생성 스킵] 이미 처리된 기간 - sellerId={}, periodStart={}", sellerId, periodStart);
+            return;
+        }
 
         SellerAmounts amounts = aggregateAmounts(items);
         Settlement latestPending = resolveLatestPending(sellerId);
@@ -211,6 +220,14 @@ public class SettlementInternalServiceImpl implements SettlementInternalService 
 
         log.info("[정산 생성] sellerId={}, items={}건, carriedIn={}, finalAmount={}, status={}",
             sellerId, items.size(), carriedInAmount, totalFinalAmount, status);
+    }
+
+    private boolean alreadySettledForPeriod(UUID sellerId, LocalDateTime periodStart) {
+        return settlementRepository.findBySellerIdAndPeriodStartAtBetween(
+            sellerId,
+            periodStart,
+            periodStart.toLocalDate().atTime(23, 59, 59)
+        ).filter(s -> s.getStatus() != SettlementStatus.CANCELLED).isPresent();
     }
 
     private SellerAmounts aggregateAmounts(List<SettlementItem> items) {
