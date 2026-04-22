@@ -2,8 +2,8 @@ package com.devticket.event.common.outbox;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.BDDMockito.willThrow;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
@@ -63,10 +63,9 @@ class OutboxServiceTest {
     }
 
     @Test
-    void processOne_성공시_SENT로_변경하고_저장한다() {
-        // given
+    void processOne_성공시_SENT로_변경하고_저장한다() throws OutboxPublishException {
+        // given — publish()는 void이므로 기본 no-op 동작 사용
         Outbox outbox = pendingOutbox();
-        given(outboxEventProducer.publish(any(OutboxEventMessage.class))).willReturn(true);
 
         // when
         outboxService.processOne(outbox);
@@ -75,14 +74,16 @@ class OutboxServiceTest {
         assertThat(outbox.getStatus()).isEqualTo(OutboxStatus.SENT);
         assertThat(outbox.getSentAt()).isNotNull();
         assertThat(outbox.getRetryCount()).isZero();
+        then(outboxEventProducer).should().publish(any(OutboxEventMessage.class));
         then(outboxRepository).should().save(outbox);
     }
 
     @Test
-    void processOne_발행_실패시_markFailed후_저장한다() {
-        // given
+    void processOne_발행_실패시_markFailed후_저장한다() throws OutboxPublishException {
+        // given — Producer가 OutboxPublishException으로 감싼 발행 실패
         Outbox outbox = pendingOutbox();
-        given(outboxEventProducer.publish(any(OutboxEventMessage.class))).willReturn(false);
+        willThrow(new OutboxPublishException("broker ack 실패", null))
+                .given(outboxEventProducer).publish(any(OutboxEventMessage.class));
 
         // when
         outboxService.processOne(outbox);
@@ -96,11 +97,11 @@ class OutboxServiceTest {
     }
 
     @Test
-    void processOne_publish가_KafkaException을_던져도_markFailed후_저장한다() {
-        // given — publish() 가 send() 시점 KafkaException (max.block.ms 초과 등) 을 전파
+    void processOne_publish가_KafkaException을_던져도_markFailed후_저장한다() throws OutboxPublishException {
+        // given — Producer가 감싸지 못한 예상 외 RuntimeException 전파 (최후 방어선 검증)
         Outbox outbox = pendingOutbox();
-        given(outboxEventProducer.publish(any(OutboxEventMessage.class)))
-                .willThrow(new KafkaException("max.block.ms expired while fetching metadata"));
+        willThrow(new KafkaException("max.block.ms expired while fetching metadata"))
+                .given(outboxEventProducer).publish(any(OutboxEventMessage.class));
 
         // when — processOne 은 예외를 최후 방어선에서 흡수해야 함
         outboxService.processOne(outbox);
@@ -113,11 +114,12 @@ class OutboxServiceTest {
     }
 
     @Test
-    void processOne_여섯번째_실패시_FAILED로_저장한다() {
+    void processOne_여섯번째_실패시_FAILED로_저장한다() throws OutboxPublishException {
         // given
         Outbox outbox = pendingOutbox();
         ReflectionTestUtils.setField(outbox, "retryCount", 5);
-        given(outboxEventProducer.publish(any(OutboxEventMessage.class))).willReturn(false);
+        willThrow(new OutboxPublishException("broker ack 실패", null))
+                .given(outboxEventProducer).publish(any(OutboxEventMessage.class));
 
         // when
         outboxService.processOne(outbox);

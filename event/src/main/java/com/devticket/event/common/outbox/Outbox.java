@@ -30,6 +30,9 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Outbox {
 
+    /** 재시도 최대 횟수 — 지수 백오프 6회 (즉시/1/2/4/8/16초, 누적 31초) */
+    private static final int MAX_RETRIES = 6;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -103,9 +106,9 @@ public class Outbox {
      * 발행 실패 처리 — 지수 백오프 스케줄 계산
      * 시도 횟수: 6회 (즉시→1→2→4→8→16초), 초과 시 FAILED
      */
-    public void markFailed(int maxRetries) {
+    public void markFailed() {
         this.retryCount++;
-        if (this.retryCount >= maxRetries) {
+        if (this.retryCount >= MAX_RETRIES) {
             this.status = OutboxStatus.FAILED;
         } else {
             long delaySec = (long) Math.pow(2, this.retryCount - 1);
