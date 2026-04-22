@@ -132,7 +132,7 @@ public class EventService {
 
     private Map<Long, String> buildTechStackMap() {
         return adminClient.getTechStacks().stream()
-            .collect(Collectors.toMap(TechStackItem::techStackId, TechStackItem::name));
+            .collect(Collectors.toMap(TechStackItem::id, TechStackItem::name));
     }
 
     @Transactional
