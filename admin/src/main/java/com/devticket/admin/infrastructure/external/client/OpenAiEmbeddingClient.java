@@ -2,6 +2,7 @@ package com.devticket.admin.infrastructure.external.client;
 
 import com.devticket.admin.infrastructure.external.dto.req.EmbeddingRequest;
 import com.devticket.admin.infrastructure.external.dto.res.EmbeddingResponse;
+import jakarta.annotation.PostConstruct;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,6 +25,7 @@ public class OpenAiEmbeddingClient {
 
     @Value("${openai.embedding.model}")
     private String model;
+
 
     public float[] embed(String text){
         try{

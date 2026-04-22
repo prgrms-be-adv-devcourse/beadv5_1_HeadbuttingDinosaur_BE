@@ -45,7 +45,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'io.micrometer:micrometer-registry-prometheus'
     implementation 'com.github.loki4j:loki-logback-appender:1.5.2'
-
+    implementation 'me.paulschwarz:spring-dotenv:4.0.0'
     // WebFlux
     implementation 'org.springframework.boot:spring-boot-starter-webflux'
 
