@@ -15,7 +15,8 @@ public enum GatewayErrorCode {
     SERVICE_CONNECT_FAILED(502, "COMMON_007", "외부 서비스 연동에 실패했습니다."),
     SERVICE_UNAVAILABLE(503, "COMMON_008", "서비스를 일시적으로 이용할 수 없습니다."),
     RATE_LIMIT_EXCEEDED(429, "COMMON_009", "요청이 너무 많습니다. 잠시 후 다시 시도해주세요."),
-    PROFILE_INCOMPLETE(403, "COMMON_010", "프로필 설정을 완료해야 서비스를 이용할 수 있습니다.");
+    PROFILE_INCOMPLETE(403, "COMMON_010", "프로필 설정을 완료해야 서비스를 이용할 수 있습니다."),
+    OAUTH_LOGIN_FAILED(502, "AUTH_001", "소셜 로그인 처리 중 오류가 발생했습니다.");
 
     private final int status;
     private final String code;

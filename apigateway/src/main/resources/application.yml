@@ -3,6 +3,15 @@ spring:
     name: devticket-gateway
   profiles:
     active: local
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID:}
+            client-secret: ${GOOGLE_CLIENT_SECRET:}
+            scope: email, profile
+
   cloud:
     gateway:
       server:
@@ -12,26 +21,43 @@ spring:
               uri: http://localhost:8081
               predicates:
                 - Path=/api/auth/**, /api/users/**, /api/seller-applications, /api/seller-applications/**, /api/mypage/**, /api/tech-stacks
-            - id: event-service
-              uri: http://localhost:8082
-              predicates:
-                - Path=/api/events, /api/events/**, /api/seller/events, /api/seller/events/**, /api/seller/settlements, /api/seller/settlements/**
+
             - id: commerce-service
               uri: http://localhost:8083
               predicates:
-                - Path=/api/cart, /api/cart/**, /api/orders, /api/orders/**, /api/tickets, /api/tickets/**
+                - Path=/api/cart, /api/cart/**, /api/orders, /api/orders/**, /api/tickets, /api/tickets/**, /api/seller/events/{eventId}/participants
+
+            # ↓ 추가 — seller 이벤트 취소는 Payment 로 (event-service 보다 반드시 위)
+            - id: payment-seller-event-cancel
+              uri: http://localhost:8084
+              predicates:
+                - Path=/api/seller/events/{eventId}/cancel
+
+            - id: payment-admin-event-cancel
+              uri: http://localhost:8084
+              predicates:
+                - Path=/api/admin/events/{eventId}/cancel
+
+            - id: event-service
+              uri: http://localhost:8082
+              predicates:
+                - Path=/api/events, /api/events/**, /api/seller/events, /api/seller/events/**
+
             - id: payment-service
               uri: http://localhost:8084
               predicates:
                 - Path=/api/payments/**, /api/wallet, /api/wallet/**, /api/wallets/**, /api/refunds, /api/refunds/**
+
             - id: settlement-service
               uri: http://localhost:8085
               predicates:
-                - Path=/api/settlements/**
+                - Path=/api/settlements/**, /api/seller/settlements, /api/seller/settlements/**
+
             - id: log-service
               uri: http://localhost:8086
               predicates:
                 - Path=/api/logs/**
+
             - id: admin-service
               uri: http://localhost:8087
               predicates:
@@ -45,11 +71,15 @@ management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: health, prometheus
       base-path: /actuator
   endpoint:
     health:
       show-details: never
+  prometheus:
+    metrics:
+      export:
+        enabled: true
 
 # Swagger
 springdoc:
@@ -57,6 +87,15 @@ springdoc:
     path: /swagger-ui.html
   api-docs:
     path: /v1/api-docs
+
+# 내부 서비스 URL (OAuth 콜백 시 member-service 호출용)
+services:
+  member:
+    url: http://localhost:8081
+
+# OAuth2 소셜 로그인 성공 후 프론트엔드 리다이렉트 URI
+oauth2:
+  redirect-uri: http://localhost:13000/oauth/callback
 
 # Rate Limiting
 gateway:
@@ -74,4 +113,6 @@ gateway:
         refill-tokens: 10
         refill-duration: 1s
 
-
+logging:
+  file:
+    name: ./spring-logs/gateway/gateway.log
