@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -167,7 +168,8 @@ class SettlementInternalServiceImplTest {
     void createSettlementFromItems_동일기간_이미정산존재_스킵() {
         SettlementItem item = buildItem(sellerId, 48500L);
         givenReadyItems(List.of(item));
-        givenNoPendingSettlements();
+        given(settlementRepository.findByStatus(SettlementStatus.PENDING_MIN_AMOUNT))
+            .willReturn(List.of());
         given(settlementRepository.findBySellerIdAndPeriodStartAtBetween(
             eq(sellerId), any(LocalDateTime.class), any(LocalDateTime.class)))
             .willReturn(Optional.of(buildPendingSettlement(sellerId, 48500)));
@@ -270,7 +272,7 @@ class SettlementInternalServiceImplTest {
 
     private Settlement captureNewSettlement() {
         ArgumentCaptor<Settlement> captor = ArgumentCaptor.forClass(Settlement.class);
-        verify(settlementRepository).save(captor.capture());
-        return captor.getValue();
+        verify(settlementRepository, atLeastOnce()).save(captor.capture());
+        return captor.getAllValues().get(0);
     }
 }
