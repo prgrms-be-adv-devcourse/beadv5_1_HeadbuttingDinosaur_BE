@@ -11,7 +11,7 @@
 - **프로젝트명:** DevTicket — 개발자 이벤트 티켓 커머스 플랫폼
 - **아키텍처:** Saga 기반 마이크로서비스 아키텍처 (MSA)
 - **DB 전략:** Shared Database Pattern (단일 PostgreSQL, 논리적 스키마 격리)
-- **언어/프레임워크:** Java 21+, Spring Boot, Spring Cloud Gateway
+- **언어/프레임워크:** Java 17+, Spring Boot, Spring Cloud Gateway
 - **비동기 메시징:** Apache Kafka
 - **코드 스타일:** Google Java Style 기반 + 프로젝트 커스텀 규칙
 
