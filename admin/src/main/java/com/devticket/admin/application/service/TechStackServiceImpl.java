@@ -2,6 +2,8 @@ package com.devticket.admin.application.service;
 
 import com.devticket.admin.domain.model.TechStack;
 import com.devticket.admin.domain.repository.TechStackRepository;
+import com.devticket.admin.infrastructure.external.client.OpenAiEmbeddingClient;
+import com.devticket.admin.infrastructure.persistence.repository.TechStackEsRepository;
 import com.devticket.admin.presentation.dto.req.CreateTechStackRequest;
 import com.devticket.admin.presentation.dto.req.DeleteTechStackRequest;
 import com.devticket.admin.presentation.dto.req.UpdateTechStackRequest;
@@ -20,7 +22,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class TechStackServiceImpl implements TechStackService{
 
-    private final TechStackRepository techStackRepository;
+    private final TechStackEsRepository  techStackEsRepository;
+    private final TechStackRepository  techStackRepository;
+    private final OpenAiEmbeddingClient openAiEmbeddingClient;
 
     // =============== 1. TechStack 조회 =============== //
     @Transactional(readOnly = true)
@@ -39,7 +43,12 @@ public class TechStackServiceImpl implements TechStackService{
             throw new IllegalArgumentException("이미 존재하는 TechStack: " + name);
         }
 
+        // 1. RDB 저장
         TechStack saved = techStackRepository.save(TechStack.of(null, name));
+
+        // 2. ES 저장
+        float[] embedding = openAiEmbeddingClient.embed(name);
+        techStackEsRepository.save(saved.getId(),name, embedding);
 
         return CreateTechStackResponse.from(saved);
     }
@@ -50,7 +59,12 @@ public class TechStackServiceImpl implements TechStackService{
         TechStack techStack = techStackRepository.findById(id)
             .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 TechStack: " + id));
 
+        // 1. RDB 업데이트
         techStack.updateName(request.name());
+
+        // 2. ES  업데이트
+        float[] embedding = openAiEmbeddingClient.embed(request.name());
+        techStackEsRepository.update(id, request.name(), embedding);
 
         return UpdateTechStackResponse.from(techStack);
     }
@@ -61,7 +75,10 @@ public class TechStackServiceImpl implements TechStackService{
         techStackRepository.findById(id)
             .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 TechStack: " + id));
 
+        // 1. RDB 삭제
         techStackRepository.deleteById(id);
+        // 2. ES 삭제
+        techStackEsRepository.delete(id);
 
         return DeleteTechStackResponse.of(id);
     }
