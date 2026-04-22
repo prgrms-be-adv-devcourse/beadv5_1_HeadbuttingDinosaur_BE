@@ -1,11 +1,15 @@
 package com.devticket.event.presentation.controller;
 
 import com.devticket.event.application.EventInternalService;
+import com.devticket.event.application.EventRecommendationService;
 import com.devticket.event.common.response.SuccessResponse;
 import com.devticket.event.domain.enums.EventStatus;
 import com.devticket.event.presentation.dto.internal.InternalBulkEventInfoRequest;
+import com.devticket.event.presentation.dto.internal.InternalRecommendationResponse;
 import com.devticket.event.presentation.dto.internal.InternalBulkEventInfoResponse;
 import com.devticket.event.presentation.dto.internal.InternalBulkStockAdjustmentRequest;
+import com.devticket.event.presentation.dto.internal.InternalPagedEventResponse;
+import com.devticket.event.presentation.dto.internal.InternalEndedEventsResponse;
 import com.devticket.event.presentation.dto.internal.InternalStockAdjustmentResponse;
 import com.devticket.event.presentation.dto.internal.InternalEventInfoResponse;
 import com.devticket.event.presentation.dto.internal.InternalPurchaseValidationResponse;
@@ -15,14 +19,18 @@ import com.devticket.event.presentation.dto.internal.InternalStockOperationRespo
 import com.devticket.event.presentation.dto.internal.InternalStockRestoreRequest;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -34,6 +42,19 @@ import org.springframework.web.bind.annotation.RestController;
 public class EventInternalController {
 
     private final EventInternalService eventInternalService;
+    private final EventRecommendationService eventRecommendationService;
+
+    @GetMapping
+    public ResponseEntity<SuccessResponse<InternalPagedEventResponse>> getEvents(
+        @RequestParam(required = false) String keyword,
+        @RequestParam(required = false) EventStatus status,
+        @RequestParam(required = false) UUID sellerId,
+        Pageable pageable
+    ) {
+        return ResponseEntity.ok(SuccessResponse.success(
+            eventInternalService.searchEvents(keyword, status, sellerId, pageable)
+        ));
+    }
 
     /**
      * API 1: 단건 이벤트 정보 조회
@@ -121,6 +142,37 @@ public class EventInternalController {
         @RequestParam(required = false) EventStatus status) {
         return ResponseEntity.ok(SuccessResponse.success(
             eventInternalService.getEventsBySeller(sellerId, status)
+        ));
+    }
+
+    /**
+     * API 8: 특정 날짜에 개최된 이벤트 목록 조회
+     * eventDateTime의 날짜가 date와 일치하는 이벤트의 id, eventId, sellerId 반환
+     */
+    @GetMapping("/ended")
+    public ResponseEntity<SuccessResponse<InternalEndedEventsResponse>> getEndedEventsByDate(
+        @RequestParam LocalDate date) {
+        return ResponseEntity.ok(SuccessResponse.success(
+            eventInternalService.getEndedEventsByDate(date)
+        ));
+    }
+
+    // 기간 별 판매자 이벤트
+    @GetMapping("/by-seller/{sellerId}/settlement")
+    public ResponseEntity<SuccessResponse<List<InternalEventInfoResponse>>> getEventsBySellerForSettlement(
+        @PathVariable UUID sellerId,
+        @RequestParam String periodStart,
+        @RequestParam String periodEnd) {
+        return ResponseEntity.ok(SuccessResponse.success(
+            eventInternalService.getEventsBySellerForSettlement(sellerId, periodStart, periodEnd)
+        ));
+    }
+
+    @GetMapping("/recommendations")
+    public ResponseEntity<SuccessResponse<InternalRecommendationResponse>> getRecommendations(
+        @RequestHeader("X-User-Id") UUID userId) {
+        return ResponseEntity.ok(SuccessResponse.success(
+            eventRecommendationService.getRecommendations(userId)
         ));
     }
 }
