@@ -25,3 +25,18 @@ jwt:
 logging:
   level:
     com.devticket: INFO
+
+internal:
+  admin-service:
+    url: http://admin:8087
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, prometheus
+      base-path: /actuator
+  prometheus:
+    metrics:
+      export:
+        enabled: true

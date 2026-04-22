@@ -19,8 +19,10 @@ public enum MemberErrorCode implements ErrorCode {
     MEMBER_NOT_FOUND(404, "MEMBER_009", "존재하지 않는 회원입니다."),
     PASSWORD_MISMATCH(400, "MEMBER_010", "기존 비밀번호가 일치하지 않습니다."),
     SELLER_APPLICATION_DUPLICATED(409, "MEMBER_011", "이미 판매자 전환 신청이 진행 중입니다."),
-    SOCIAL_EMAIL_CONFLICT(409, "MEMBER_012", "동일 이메일의 계정이 이미 존재하여 소셜 가입이 불가합니다."),
-    REFRESH_TOKEN_INVALID(401, "MEMBER_013", "Refresh Token이 유효하지 않습니다.");
+    SOCIAL_EMAIL_CONFLICT(409, "MEMBER_012", "이미 이메일로 가입된 계정입니다. 이메일 로그인을 이용해주세요."),
+    REFRESH_TOKEN_INVALID(401, "MEMBER_013", "Refresh Token이 유효하지 않습니다."),
+    ADMIN_INTERNAL_API_FAILED(502, "MEMBER_014", "Admin Service 호출에 실패했습니다.");
+
 
     private final int status;
     private final String code;
