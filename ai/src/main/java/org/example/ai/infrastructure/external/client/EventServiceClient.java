@@ -24,12 +24,14 @@ public class EventServiceClient {
         log.info("[EventClient] 인기 이벤트 조회 - neededCount: {}", request.neededCount());
 
         try {
-            return webClient.post()
+            PopularEventListResponse response = webClient.post()
                 .uri(eventServiceUrl + "/internal/events/popular")
                 .bodyValue(request)
                 .retrieve()
                 .bodyToMono(PopularEventListResponse.class)
                 .block();
+
+            return response != null ? response : new PopularEventListResponse(List.of());
         } catch (Exception e) {
             log.error("[EventClient] 인기 이벤트 조회 실패", e);
             return new PopularEventListResponse(List.of());

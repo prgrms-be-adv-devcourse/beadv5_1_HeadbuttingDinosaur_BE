@@ -23,15 +23,18 @@ public class MemberServiceClient {
         log.info("[MemberClient] TechStack 조회 - userId: {}", userId);
 
         try {
-            return webClient.get()
+            UserTechStackResponse response = webClient.get()
                 .uri(memberServiceUrl + "/internal/members/" + userId + "/tech-stacks")
                 .retrieve()
                 .bodyToMono(UserTechStackResponse.class)
                 .block();
+
+            return response != null ? response : new UserTechStackResponse(userId, List.of());
         } catch (Exception e) {
             log.error("[MemberClient] TechStack 조회 실패 - userId: {}", userId, e);
             return new UserTechStackResponse(userId, List.of());
         }
+
     }
 
 }
