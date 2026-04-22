@@ -279,11 +279,12 @@ public class EventInternalService {
         if (status == EventStatus.SOLD_OUT) {
             return PurchaseUnavailableReason.SOLD_OUT;
         }
-        // InstantType으로 수정 필요 그래야 올바른 시간 비교 가능해짐
-        // LocalDateTime now = LocalDateTime.now();
-        // if (now.isBefore(event.getSaleStartAt()) || now.isAfter(event.getSaleEndAt())) {
-        //     return PurchaseUnavailableReason.SALE_ENDED;
-        // }
+        // 판매 기간 외 — ON_SALE 상태여도 사전판매 시작 전/종료 후이면 SALE_ENDED 로 분류
+        // (saleStartAt / saleEndAt 은 Event.isPurchasable() 와 동일하게 LocalDateTime 기준)
+        LocalDateTime now = LocalDateTime.now();
+        if (now.isBefore(event.getSaleStartAt()) || now.isAfter(event.getSaleEndAt())) {
+            return PurchaseUnavailableReason.SALE_ENDED;
+        }
         if (status == EventStatus.SALE_ENDED) {
             return PurchaseUnavailableReason.SALE_ENDED;
         }

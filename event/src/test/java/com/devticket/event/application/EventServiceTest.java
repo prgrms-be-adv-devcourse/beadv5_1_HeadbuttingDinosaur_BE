@@ -136,7 +136,8 @@ class EventServiceTest {
         assertThat(response.eventId()).isEqualTo(expectedUuid);
         assertThat(response.status()).isEqualTo(EventStatus.ON_SALE);
 
-        verify(eventRepository, times(2)).save(argThat(event -> event != null));
+        // save 3회 호출 — (1) 이벤트 본체 + (2) techStackIds + (3) imageUrls (fixture 에 "url1" 포함)
+        verify(eventRepository, times(3)).save(argThat(event -> event != null));
     }
 
     @Test

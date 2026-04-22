@@ -122,6 +122,15 @@ public class EventService {
             eventRepository.save(savedEvent);
         }
 
+        // 5. imageUrls 저장 로직 — updateEvent 와 대칭 보장 (생성 시 이미지 누락 방지)
+        if (request.imageUrls() != null && !request.imageUrls().isEmpty()) {
+            for (int i = 0; i < request.imageUrls().size(); i++) {
+                savedEvent.getEventImages().add(
+                    EventImage.of(savedEvent, request.imageUrls().get(i), i));
+            }
+            eventRepository.save(savedEvent);
+        }
+
         syncToElasticsearch(savedEvent);
 
         return SellerEventCreateResponse.from(savedEvent);
