@@ -10,7 +10,7 @@ import static org.mockito.Mockito.never;
 
 import com.devticket.commerce.common.enums.OrderStatus;
 import com.devticket.commerce.common.messaging.KafkaTopics;
-import com.devticket.commerce.common.messaging.event.PaymentFailedEvent;
+import com.devticket.commerce.common.messaging.event.OrderCancelledEvent;
 import com.devticket.commerce.common.outbox.OutboxService;
 import com.devticket.commerce.order.domain.model.Order;
 import com.devticket.commerce.order.domain.model.OrderItem;
@@ -67,11 +67,11 @@ class OrderExpirationCancelServiceTest {
     }
 
     @Nested
-    @DisplayName("정상 전이 — PAYMENT_PENDING → CANCELLED + 재고 복구 Outbox 발행")
+    @DisplayName("정상 전이 — PAYMENT_PENDING → CANCELLED + order.cancelled Outbox 발행")
     class HappyPath {
 
         @Test
-        @DisplayName("canTransitionTo 통과 → cancel() + save() + payment.failed Outbox 발행")
+        @DisplayName("canTransitionTo 통과 → cancel() + save() + order.cancelled Outbox 발행")
         void cancelsPaymentPendingOrderAndPublishesOutbox() {
             // given
             Order order = buildOrder(OrderStatus.PAYMENT_PENDING);
@@ -87,23 +87,23 @@ class OrderExpirationCancelServiceTest {
             assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
             then(orderRepository).should().save(order);
 
-            // then — Outbox 발행 검증 (reason=ORDER_EXPIRED, orderItems 매핑 확인)
-            ArgumentCaptor<PaymentFailedEvent> eventCaptor = ArgumentCaptor.forClass(PaymentFailedEvent.class);
+            // then — Outbox 발행 검증
+            ArgumentCaptor<OrderCancelledEvent> eventCaptor = ArgumentCaptor.forClass(OrderCancelledEvent.class);
             then(outboxService).should().save(
                     eq(order.getOrderId().toString()),
                     eq(order.getOrderId().toString()),
-                    eq("PaymentFailed"),
-                    eq(KafkaTopics.PAYMENT_FAILED),
+                    eq("OrderCancelled"),
+                    eq(KafkaTopics.ORDER_CANCELLED),
                     eventCaptor.capture()
             );
-            PaymentFailedEvent published = eventCaptor.getValue();
+            OrderCancelledEvent published = eventCaptor.getValue();
             assertThat(published.orderId()).isEqualTo(order.getOrderId());
             assertThat(published.userId()).isEqualTo(order.getUserId());
             assertThat(published.reason()).isEqualTo("ORDER_TIMEOUT");
             assertThat(published.orderItems()).hasSize(2);
-            assertThat(published.orderItems()).extracting(PaymentFailedEvent.OrderItem::eventId)
+            assertThat(published.orderItems()).extracting(OrderCancelledEvent.OrderItem::eventId)
                     .containsExactlyInAnyOrder(eventId1, eventId2);
-            assertThat(published.orderItems()).extracting(PaymentFailedEvent.OrderItem::quantity)
+            assertThat(published.orderItems()).extracting(OrderCancelledEvent.OrderItem::quantity)
                     .containsExactlyInAnyOrder(2, 1);
         }
 
@@ -122,7 +122,7 @@ class OrderExpirationCancelServiceTest {
             assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
             then(orderRepository).should().save(order);
 
-            ArgumentCaptor<PaymentFailedEvent> eventCaptor = ArgumentCaptor.forClass(PaymentFailedEvent.class);
+            ArgumentCaptor<OrderCancelledEvent> eventCaptor = ArgumentCaptor.forClass(OrderCancelledEvent.class);
             then(outboxService).should().save(any(), any(), any(), any(), eventCaptor.capture());
             assertThat(eventCaptor.getValue().orderItems()).isEmpty();
         }

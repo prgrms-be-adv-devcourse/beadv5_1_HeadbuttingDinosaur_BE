@@ -4,5 +4,6 @@ public enum WalletTransactionType {
     CHARGE,
     USE,
     REFUND,
-    WITHDRAW
+    WITHDRAW,
+    SETTLEMENT
 }

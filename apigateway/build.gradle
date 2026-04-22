@@ -2,6 +2,7 @@ plugins {
     id 'java'
     id 'org.springframework.boot' version '4.0.4'
     id 'io.spring.dependency-management' version '1.1.7'
+    id 'com.github.spotbugs' version '6.0.9'
 }
 
 group = 'com.devticket'
@@ -73,4 +74,17 @@ dependencyManagement {
 
 tasks.named('test') {
     useJUnitPlatform()
+}
+
+spotbugs {
+    ignoreFailures = true
+    effort = 'max'
+    reportLevel = 'medium'
+    excludeFilter = file('spotbugs-exclude.xml')
+}
+
+spotbugsMain {
+    reports {
+        html { required = true }
+    }
 }

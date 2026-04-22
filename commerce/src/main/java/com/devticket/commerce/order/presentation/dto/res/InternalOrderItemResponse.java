@@ -1,36 +1,29 @@
 package com.devticket.commerce.order.presentation.dto.res;
 
 import com.devticket.commerce.order.domain.model.OrderItem;
-import java.time.LocalDateTime;
 import java.util.UUID;
 import lombok.Builder;
 
+// Payment 의 /internal/order-items/by-ticket/{ticketId} 응답.
+// amount 필드는 "해당 티켓 1장의 단가" 를 의미 — Refund 단건 환불 계산 기준.
+// OrderItem.subtotalAmount(= price × quantity) 을 넘기면 단건 환불이 전량 환불로 잘못 계산되므로
+// 반드시 getPrice() 를 사용한다.
 @Builder
 public record InternalOrderItemResponse(
-    Long id,
     UUID orderItemId,
-    Long orderId,
+    UUID orderId,
     UUID userId,
     UUID eventId,
-    int price,
-    int quantity,
-    int subtotalAmount,
-    LocalDateTime createdAt,
-    LocalDateTime updatedAt
+    Integer amount
 ) {
 
-    public static InternalOrderItemResponse from(OrderItem orderItem) {
-        return InternalOrderItemResponse.builder()
-            .id(orderItem.getId())
-            .orderItemId(orderItem.getOrderItemId())
-            .orderId(orderItem.getOrderId())
-            .userId(orderItem.getUserId())
-            .eventId(orderItem.getEventId())
-            .price(orderItem.getPrice())
-            .quantity(orderItem.getQuantity())
-            .subtotalAmount(orderItem.getSubtotalAmount())
-            .createdAt(orderItem.getCreatedAt())
-            .updatedAt(orderItem.getUpdatedAt())
-            .build();
+    public static InternalOrderItemResponse from(OrderItem orderItem, UUID orderUuid) {
+        return new InternalOrderItemResponse(
+            orderItem.getOrderItemId(),
+            orderUuid,
+            orderItem.getUserId(),
+            orderItem.getEventId(),
+            orderItem.getPrice()
+        );
     }
 }

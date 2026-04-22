@@ -2,8 +2,6 @@ package com.devticket.commerce.order.presentation.consumer;
 
 import com.devticket.commerce.common.messaging.KafkaTopics;
 import com.devticket.commerce.order.application.usecase.OrderUsecase;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +12,8 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * payment.completed Consumer — Order PAYMENT_PENDING → PAID 전이 + 티켓 발급 + 장바구니 삭제.
@@ -36,8 +36,8 @@ public class PaymentCompletedConsumer {
     private final ObjectMapper objectMapper;
 
     @KafkaListener(
-            topics = KafkaTopics.PAYMENT_COMPLETED,
-            groupId = "commerce-payment.completed"
+        topics = KafkaTopics.PAYMENT_COMPLETED,
+        groupId = "commerce-payment.completed"
     )
     public void consume(ConsumerRecord<String, String> record, Acknowledgment ack) {
         // X-Message-Id 헤더 우선, 없으면 본문의 messageId 필드에서 추출
@@ -50,7 +50,7 @@ public class PaymentCompletedConsumer {
         } catch (DataIntegrityViolationException e) {
             if (isProcessedMessageUniqueConflict(e)) {
                 log.warn("[PaymentCompletedConsumer] processed_message UNIQUE 충돌 — 이미 처리 완료, 스킵. messageId={}",
-                        messageId);
+                    messageId);
                 ack.acknowledge();
                 return;
             }
@@ -78,7 +78,7 @@ public class PaymentCompletedConsumer {
                 return UUID.fromString(new String(header.value(), StandardCharsets.UTF_8));
             } catch (IllegalArgumentException e) {
                 log.warn("[PaymentCompletedConsumer] 헤더 UUID 파싱 실패, 본문 fallback. header={}",
-                        new String(header.value(), StandardCharsets.UTF_8));
+                    new String(header.value(), StandardCharsets.UTF_8));
             }
         }
         // 2. 본문 wrapper의 messageId 필드에서 추출 (Payment Outbox 구조 대응)

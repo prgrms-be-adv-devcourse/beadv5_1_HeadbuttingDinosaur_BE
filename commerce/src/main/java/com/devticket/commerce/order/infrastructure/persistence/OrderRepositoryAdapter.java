@@ -62,4 +62,9 @@ public class OrderRepositoryAdapter implements OrderRepository {
         return orderJpaRepository.findActiveOrder(userId, cartHash, activeStatuses);
     }
 
+    @Override
+    public List<Order> findAllByEventIdAndStatus(UUID eventId, OrderStatus status) {
+        return orderJpaRepository.findAllByEventIdAndStatus(eventId, status);
+    }
+
 }

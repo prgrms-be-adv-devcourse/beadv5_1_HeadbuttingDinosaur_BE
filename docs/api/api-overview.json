@@ -1,0 +1,48 @@
+{
+  "schema": "api-overview-v2",
+  "description": "9-module integrated API index. Module-level metadata + endpointCount. Detail per module: docs/api/summary/{module}-summary.json",
+  "moduleCount": 9,
+  "modules": {
+    "admin": {
+      "endpointCount": 17,
+      "summaryFile": "docs/api/summary/admin-summary.json"
+    },
+    "ai": {
+      "endpointCount": 1,
+      "summaryFile": "docs/api/summary/ai-summary.json"
+    },
+    "apigateway": {
+      "endpointCount": 1,
+      "summaryFile": "docs/api/summary/apigateway-summary.json"
+    },
+    "commerce": {
+      "endpointCount": 20,
+      "summaryFile": "docs/api/summary/commerce-summary.json"
+    },
+    "event": {
+      "endpointCount": 20,
+      "summaryFile": "docs/api/summary/event-summary.json"
+    },
+    "log": {
+      "endpointCount": 0,
+      "summaryFile": "docs/api/summary/log-summary.json"
+    },
+    "member": {
+      "endpointCount": 27,
+      "summaryFile": "docs/api/summary/member-summary.json"
+    },
+    "payment": {
+      "endpointCount": 19,
+      "summaryFile": "docs/api/summary/payment-summary.json"
+    },
+    "settlement": {
+      "endpointCount": 12,
+      "summaryFile": "docs/api/summary/settlement-summary.json"
+    }
+  },
+  "totalEndpointCount": 117,
+  "notes": [
+    "log 모듈은 Fastify/TS 별도 스택, Java endpointCount 0 정당.",
+    "apigateway 는 라우팅 전용, health check 1건만 보유."
+  ]
+}

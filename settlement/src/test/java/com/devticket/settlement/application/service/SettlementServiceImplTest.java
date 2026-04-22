@@ -1,20 +1,24 @@
 package com.devticket.settlement.application.service;
 
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 
 import com.devticket.settlement.common.exception.BusinessException;
 import com.devticket.settlement.common.exception.CommonErrorCode;
-import com.devticket.settlement.domain.exception.SettlementErrorCode;
 import com.devticket.settlement.domain.model.Settlement;
 import com.devticket.settlement.domain.model.SettlementItem;
+import com.devticket.settlement.domain.model.SettlementItemStatus;
 import com.devticket.settlement.domain.model.SettlementStatus;
+import com.devticket.settlement.domain.repository.FeePolicyRepository;
 import com.devticket.settlement.domain.repository.SettlementItemRepository;
 import com.devticket.settlement.domain.repository.SettlementRepository;
-import com.devticket.settlement.presentation.dto.SellerSettlementDetailResponse;
-import com.devticket.settlement.presentation.dto.SettlementResponse;
+import com.devticket.settlement.infrastructure.client.SettlementToCommerceClient;
+import com.devticket.settlement.infrastructure.client.SettlementToEventClient;
+import com.devticket.settlement.presentation.dto.SettlementPeriodResponse;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -25,136 +29,170 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-
 @ExtendWith(MockitoExtension.class)
-public class SettlementServiceImplTest {
+class SettlementServiceImplTest {
 
-    @Mock
-    private SettlementRepository settlementRepository;
-
-    @Mock
-    private SettlementItemRepository settlementItemRepository;
+    @Mock private SettlementRepository settlementRepository;
+    @Mock private SettlementItemRepository settlementItemRepository;
+    @Mock private FeePolicyRepository feePolicyRepository;
+    @Mock private SettlementToCommerceClient settlementToCommerceClient;
+    @Mock private SettlementToEventClient settlementToEventClient;
 
     @InjectMocks
     private SettlementServiceImpl settlementServiceImpl;
 
-    // 공용  Mock 데이터
-    UUID sellerId = UUID.randomUUID();
-    UUID settlementId = UUID.randomUUID();
+    private final UUID sellerId = UUID.randomUUID();
 
-    // Mock Settlement 생성 메서드
-    private Settlement makeSettlement(UUID sellerId) {
-        return Settlement.builder()
+    // ────────────────────────────────────────────────
+    // getSettlementByPeriod — 입력값 검증
+    // ────────────────────────────────────────────────
+
+    @Test
+    void getSettlementByPeriod_월값00_400예외() {
+        assertThatThrownBy(() -> settlementServiceImpl.getSettlementByPeriod(sellerId, "202600"))
+            .isInstanceOf(BusinessException.class)
+            .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
+                .isEqualTo(CommonErrorCode.INVALID_INPUT_VALUE));
+    }
+
+    @Test
+    void getSettlementByPeriod_월값13_400예외() {
+        assertThatThrownBy(() -> settlementServiceImpl.getSettlementByPeriod(sellerId, "202613"))
+            .isInstanceOf(BusinessException.class)
+            .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
+                .isEqualTo(CommonErrorCode.INVALID_INPUT_VALUE));
+    }
+
+    @Test
+    void getSettlementByPeriod_숫자아닌입력_400예외() {
+        assertThatThrownBy(() -> settlementServiceImpl.getSettlementByPeriod(sellerId, "20261a"))
+            .isInstanceOf(BusinessException.class)
+            .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
+                .isEqualTo(CommonErrorCode.INVALID_INPUT_VALUE));
+    }
+
+    // ────────────────────────────────────────────────
+    // getSettlementByPeriod — 정상 조회
+    // ────────────────────────────────────────────────
+
+    @Test
+    void getSettlementByPeriod_정산존재_응답반환() {
+        Settlement settlement = Settlement.builder()
             .sellerId(sellerId)
-            .settlementId(settlementId)
-            .periodStartAt(LocalDateTime.of(2025, 1, 1, 0, 0))
-            .periodEndAt(LocalDateTime.of(2025, 1, 2, 0, 0))
+            .periodStartAt(LocalDateTime.of(2026, 2, 26, 0, 0))
+            .periodEndAt(LocalDateTime.of(2026, 3, 25, 23, 59, 59))
             .totalSalesAmount(100000)
             .totalRefundAmount(0)
             .totalFeeAmount(3000)
-            .build();
-    }
-
-    // Mock SettlementItem 생성 메서드
-    private List<SettlementItem> makeSettlementItems(UUID settlementId) {
-        SettlementItem item = SettlementItem.builder()
-            .settlementId(settlementId)
-            .orderItemId(1L)
-            .eventId(100L)
-            .salesAmount(100000)
-            .refundAmount(0)
-            .feeAmount(3000)
-            .settlementAmount(97000)
+            .finalSettlementAmount(97000)
+            .carriedInAmount(0)
+            .status(SettlementStatus.CONFIRMED)
+            .settledAt(LocalDateTime.of(2026, 4, 1, 0, 10))
             .build();
 
-        return List.of(item);
-    }
-
-
-    // 1. 정산 목록 조회 성공 케이스
-    @Test
-    void getSettlementListSuccess() {
-        Settlement settlement1 = makeSettlement(sellerId);
-        Settlement settlement2 = makeSettlement(sellerId);
-
-        given(settlementRepository.findBySellerId(sellerId))
-            .willReturn(List.of(settlement1, settlement2));
-
-        List<SettlementResponse> result = settlementServiceImpl.getSellerSettlements(sellerId);
-
-        // 1. 반환 갯수 검증
-        assertThat(result).hasSize(2);
-        // 2. DTO 변환 검증
-        assertThat(result.get(0).totalSalesAmount()).isEqualTo(100000);
-        // 3. ENUM 변환 검증
-        assertThat(result.get(0).status()).isEqualTo(SettlementStatus.PENDING);
-    }
-
-    // 2. 정산 목록 조회 실패 케이스
-    @Test
-    void getSettlementListFail() {
-        given(settlementRepository.findBySellerId(sellerId))
+        given(settlementRepository.findFirstBySellerIdAndPeriodStartAtBetweenAndStatusNotOrderByCreatedAtDesc(
+            eq(sellerId), any(LocalDateTime.class), any(LocalDateTime.class), eq(SettlementStatus.CANCELLED)))
+            .willReturn(Optional.of(settlement));
+        given(settlementItemRepository.findBySettlementId(settlement.getSettlementId()))
             .willReturn(List.of());
 
-        // 예외 던지기 검증
-        assertThatThrownBy(() -> settlementServiceImpl.getSellerSettlements(sellerId))
-            .isInstanceOf(BusinessException.class)
-            .satisfies(e -> {
-                BusinessException be = (BusinessException) e;
-                assertThat(be.getErrorCode()).isEqualTo(SettlementErrorCode.SETTLEMENT_NOT_FOUND);
-            });
-    }
+        SettlementPeriodResponse result = settlementServiceImpl.getSettlementByPeriod(sellerId, "202603");
 
-    // 3. 정산 내역 상세 조회 성공 케이스
-    @Test
-    void getSellerSettlementDetailSuccess() {
-        Settlement settlement = makeSettlement(sellerId);
-        List<SettlementItem> items = makeSettlementItems(settlementId);
-
-        given(settlementRepository.findBySettlementId(settlementId))
-            .willReturn(Optional.of(settlement));
-        given(settlementItemRepository.findBySettlementId(settlementId))
-            .willReturn(items);
-
-        SellerSettlementDetailResponse result = settlementServiceImpl.getSellerSettlementDetail(sellerId, settlementId);
-
-        // 1. null 여부 체크
-        assertThat(result).isNotNull();
-
-        // 2. DTO 변환 체크
+        assertThat(result.finalSettlementAmount()).isEqualTo(97000);
         assertThat(result.totalSalesAmount()).isEqualTo(100000);
+        assertThat(result.totalFeeAmount()).isEqualTo(3000);
+        assertThat(result.carriedInAmount()).isEqualTo(0);
+        assertThat(result.settlementItems()).isEmpty();
     }
 
-    // 4. 정산 상세 조회 실패(1) - 정산 없음
     @Test
-    void getSellerSettlementDetailFail_NotFound() {
-        given(settlementRepository.findBySettlementId(settlementId))
+    void getSettlementByPeriod_정산없음_빈응답반환() {
+        given(settlementRepository.findFirstBySellerIdAndPeriodStartAtBetweenAndStatusNotOrderByCreatedAtDesc(
+            eq(sellerId), any(LocalDateTime.class), any(LocalDateTime.class), eq(SettlementStatus.CANCELLED)))
             .willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> settlementServiceImpl.getSellerSettlementDetail(sellerId, settlementId))
-            .isInstanceOf(BusinessException.class)
-            .satisfies(e -> {
-                BusinessException be = (BusinessException) e;
-                assertThat(be.getErrorCode()).isEqualTo(SettlementErrorCode.SETTLEMENT_BAD_REQUEST);
-            });
+        SettlementPeriodResponse result = settlementServiceImpl.getSettlementByPeriod(sellerId, "202603");
+
+        assertThat(result.finalSettlementAmount()).isEqualTo(0);
+        assertThat(result.totalSalesAmount()).isEqualTo(0);
+        assertThat(result.totalFeeAmount()).isEqualTo(0);
+        assertThat(result.settlementItems()).isEmpty();
     }
 
-    // 5. 정산 상세 조회 실패(2) - 다른 판매자 접근
+    // ────────────────────────────────────────────────
+    // getSettlementPreview — 집계 검증
+    // ────────────────────────────────────────────────
+
     @Test
-    void getSellerSettlementDetailFail_AccessDenied() {
-        UUID anotherSellerId = UUID.randomUUID();
+    void getSettlementPreview_READY항목집계() {
+        SettlementItem item = SettlementItem.builder()
+            .orderItemId(UUID.randomUUID())
+            .eventId(1L)
+            .eventUUID(UUID.randomUUID())
+            .sellerId(sellerId)
+            .salesAmount(50000L)
+            .refundAmount(0L)
+            .feeAmount(1500L)
+            .settlementAmount(48500L)
+            .status(SettlementItemStatus.READY)
+            .eventDateTime(LocalDate.now().minusDays(10))
+            .build();
 
-        Settlement settlement = makeSettlement(sellerId);
+        given(settlementItemRepository.findBySellerIdAndStatusAndEventDateTimeBetween(
+            eq(sellerId), eq(SettlementItemStatus.READY), any(LocalDate.class), any(LocalDate.class)))
+            .willReturn(List.of(item));
+        given(settlementRepository.findBySellerIdAndStatusAndCarriedToSettlementIdIsNull(sellerId, SettlementStatus.PENDING_MIN_AMOUNT))
+            .willReturn(List.of());
 
-        given(settlementRepository.findBySettlementId(settlementId))
-            .willReturn(Optional.of(settlement));
+        SettlementPeriodResponse result = settlementServiceImpl.getSettlementPreview(sellerId);
 
-        assertThatThrownBy(() -> settlementServiceImpl.getSellerSettlementDetail(anotherSellerId, settlementId))
-            .isInstanceOf(BusinessException.class)
-            .satisfies(e -> {
-                BusinessException be = (BusinessException) e;
-                assertThat(be.getErrorCode()).isEqualTo(CommonErrorCode.ACCESS_DENIED);
-            });
+        assertThat(result.totalSalesAmount()).isEqualTo(50000);
+        assertThat(result.totalFeeAmount()).isEqualTo(1500);
+        assertThat(result.finalSettlementAmount()).isEqualTo(48500);
+        assertThat(result.carriedInAmount()).isEqualTo(0);
+        assertThat(result.settlementItems()).hasSize(1);
     }
 
+    @Test
+    void getSettlementPreview_이월금액합산() {
+        Settlement pending = Settlement.builder()
+            .sellerId(sellerId)
+            .periodStartAt(LocalDateTime.of(2026, 1, 26, 0, 0))
+            .periodEndAt(LocalDateTime.of(2026, 2, 25, 23, 59, 59))
+            .totalSalesAmount(5000)
+            .totalRefundAmount(0)
+            .totalFeeAmount(150)
+            .finalSettlementAmount(4850)
+            .carriedInAmount(0)
+            .status(SettlementStatus.PENDING_MIN_AMOUNT)
+            .settledAt(LocalDateTime.of(2026, 3, 1, 0, 10))
+            .build();
+
+        given(settlementItemRepository.findBySellerIdAndStatusAndEventDateTimeBetween(
+            eq(sellerId), eq(SettlementItemStatus.READY), any(LocalDate.class), any(LocalDate.class)))
+            .willReturn(List.of());
+        given(settlementRepository.findBySellerIdAndStatusAndCarriedToSettlementIdIsNull(sellerId, SettlementStatus.PENDING_MIN_AMOUNT))
+            .willReturn(List.of(pending));
+
+        SettlementPeriodResponse result = settlementServiceImpl.getSettlementPreview(sellerId);
+
+        assertThat(result.carriedInAmount()).isEqualTo(4850);
+        assertThat(result.finalSettlementAmount()).isEqualTo(4850);
+    }
+
+    @Test
+    void getSettlementPreview_데이터없음_빈응답() {
+        given(settlementItemRepository.findBySellerIdAndStatusAndEventDateTimeBetween(
+            eq(sellerId), eq(SettlementItemStatus.READY), any(LocalDate.class), any(LocalDate.class)))
+            .willReturn(List.of());
+        given(settlementRepository.findBySellerIdAndStatusAndCarriedToSettlementIdIsNull(sellerId, SettlementStatus.PENDING_MIN_AMOUNT))
+            .willReturn(List.of());
+
+        SettlementPeriodResponse result = settlementServiceImpl.getSettlementPreview(sellerId);
+
+        assertThat(result.finalSettlementAmount()).isEqualTo(0);
+        assertThat(result.totalSalesAmount()).isEqualTo(0);
+        assertThat(result.carriedInAmount()).isEqualTo(0);
+        assertThat(result.settlementItems()).isEmpty();
+    }
 }

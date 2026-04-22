@@ -7,6 +7,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Slf4j
 @Service
@@ -15,15 +17,30 @@ public class OutboxService {
 
     private final OutboxRepository outboxRepository;
     private final OutboxEventProducer outboxEventProducer;
+    private final OutboxAfterCommitPublisher outboxAfterCommitPublisher;
     private final ObjectMapper objectMapper;
 
     // 비즈니스 서비스에서 호출 — 반드시 호출자의 @Transactional 안에서 실행
     // MANDATORY: 활성 트랜잭션 없으면 IllegalTransactionStateException 발생
+    //
+    // 저장 후 afterCommit 훅을 등록해 커밋 직후 별도 executor 스레드에서 직접 발행한다.
+    // 직접 발행 실패/누락 시에도 row 는 PENDING 으로 남아 OutboxScheduler 가 보완 발행한다.
     @Transactional(propagation = Propagation.MANDATORY)
     public void save(String aggregateId, String partitionKey,
             String eventType, String topic, Object event) {
         String payload = serialize(event);
-        outboxRepository.save(Outbox.create(aggregateId, partitionKey, eventType, topic, payload));
+        Outbox saved = outboxRepository.save(
+                Outbox.create(aggregateId, partitionKey, eventType, topic, payload));
+        registerAfterCommitPublish(saved.getId());
+    }
+
+    private void registerAfterCommitPublish(Long outboxId) {
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                outboxAfterCommitPublisher.schedulePublish(outboxId);
+            }
+        });
     }
 
     // OutboxScheduler에서 호출 — Kafka 발행 후 상태 갱신

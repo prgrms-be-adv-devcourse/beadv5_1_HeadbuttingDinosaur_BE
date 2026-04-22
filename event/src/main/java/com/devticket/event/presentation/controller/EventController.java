@@ -1,10 +1,12 @@
 package com.devticket.event.presentation.controller;
 
+import com.devticket.event.application.EventRecommendationService;
 import com.devticket.event.application.EventService;
 import com.devticket.event.common.response.SuccessResponse;
 import com.devticket.event.presentation.dto.EventDetailResponse;
 import com.devticket.event.presentation.dto.EventListRequest;
 import com.devticket.event.presentation.dto.EventListResponse;
+import com.devticket.event.presentation.dto.RecommendationResponse;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
@@ -18,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 public class EventController {
 
     private final EventService eventService;
+    private final EventRecommendationService eventRecommendationService;
 
     @GetMapping("/{eventId}")
     public ResponseEntity<SuccessResponse<EventDetailResponse>> getEvent(
@@ -38,5 +41,11 @@ public class EventController {
         return ResponseEntity.ok(SuccessResponse.success(response));
     }
 
-
+    @GetMapping("/user/recommendations")
+    public ResponseEntity<SuccessResponse<RecommendationResponse>> getRecommendations(
+        @RequestHeader("X-User-Id") UUID userId) {
+        return ResponseEntity.ok(SuccessResponse.success(
+            eventRecommendationService.getRecommendations(userId)
+        ));
+    }
 }

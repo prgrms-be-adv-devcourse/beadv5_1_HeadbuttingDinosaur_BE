@@ -1,3 +1,11 @@
+server:
+  forward-headers-strategy: framework
+  reactive:
+    session:
+      cookie:
+        name: DEV_TICKET_SESSION
+        same-site: lax
+        secure: true
 spring:
   cloud:
     gateway:
@@ -12,10 +20,18 @@ spring:
               uri: http://commerce:8083
               predicates:
                 - Path=/api/cart, /api/cart/**, /api/orders, /api/orders/**, /api/tickets, /api/tickets/**, /api/seller/events/{eventId}/participants
+            - id: payment-seller-event-cancel
+              uri: http://payment:8084
+              predicates:
+                - Path=/api/seller/events/{eventId}/cancel
+            - id: payment-admin-event-cancel
+              uri: http://payment:8084
+              predicates:
+                - Path=/api/admin/events/{eventId}/cancel
             - id: event-service
               uri: http://event:8082
               predicates:
-                - Path=/api/events, /api/events/**, /api/seller/events, /api/seller/events/**
+                - Path=/api/events, /api/events/**, /api/seller/events, /api/seller/events/**, /api/seller/images/**
             - id: payment-service
               uri: http://payment:8084
               predicates:
@@ -23,7 +39,7 @@ spring:
             - id: settlement-service
               uri: http://settlement:8085
               predicates:
-                - Path=/api/settlements/**, /api/seller/settlements, /api/seller/settlements/**
+                - Path=/api/settlements/**, /api/seller/settlements, /api/seller/settlements/**, /api/admin/settlements/**
             - id: log-service
               uri: http://log:8086
               predicates:
@@ -39,6 +55,8 @@ spring:
           google:
             client-id: ${GOOGLE_CLIENT_ID}
             client-secret: ${GOOGLE_CLIENT_SECRET}
+            redirect-uri: "https://devticket.kro.kr/login/oauth2/code/google"   # ← 추가
+            scope: email, profile
 
 jwt:
   secret-key: ${JWT_SECRET_KEY}

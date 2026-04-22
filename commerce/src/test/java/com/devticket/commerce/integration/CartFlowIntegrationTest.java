@@ -13,7 +13,6 @@ import com.devticket.commerce.cart.presentation.dto.req.CartItemQuantityRequest;
 import com.devticket.commerce.cart.presentation.dto.res.CartClearResponse;
 import com.devticket.commerce.cart.presentation.dto.res.CartResponse;
 import com.devticket.commerce.common.exception.BusinessException;
-import com.devticket.commerce.common.messaging.KafkaTopics;
 import java.util.Optional;
 import java.util.UUID;
 import net.javacrumbs.shedlock.core.LockProvider;
@@ -41,7 +40,6 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 @ActiveProfiles("test")
 @EmbeddedKafka(
         partitions = 1,
-        topics = {KafkaTopics.ORDER_CREATED},
         bootstrapServersProperty = "spring.kafka.bootstrap-servers"
 )
 @DirtiesContext
@@ -86,7 +84,7 @@ class CartFlowIntegrationTest {
         UUID userId = UUID.randomUUID();
         CartItemQuantityRequest request = new CartItemQuantityRequest(1);
 
-        assertThatThrownBy(() -> cartItemUseCase.updateTicket(userId, 1L, request))
+        assertThatThrownBy(() -> cartItemUseCase.updateTicket(userId, UUID.randomUUID(), request))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(CartErrorCode.ITEM_NOT_FOUND);
@@ -97,7 +95,7 @@ class CartFlowIntegrationTest {
     void deleteTicketThrowsItemNotFoundForNewUser() {
         UUID userId = UUID.randomUUID();
 
-        assertThatThrownBy(() -> cartItemUseCase.deleteTicket(userId, 1L))
+        assertThatThrownBy(() -> cartItemUseCase.deleteTicket(userId, UUID.randomUUID()))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(CartErrorCode.ITEM_NOT_FOUND);

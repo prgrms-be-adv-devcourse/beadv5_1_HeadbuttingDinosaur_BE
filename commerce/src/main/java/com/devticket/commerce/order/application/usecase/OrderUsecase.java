@@ -5,11 +5,13 @@ import com.devticket.commerce.order.presentation.dto.req.OrderListRequest;
 import com.devticket.commerce.order.presentation.dto.res.InternalOrderInfoResponse;
 import com.devticket.commerce.order.presentation.dto.res.InternalOrderItemResponse;
 import com.devticket.commerce.order.presentation.dto.res.InternalOrderItemsResponse;
+import com.devticket.commerce.order.presentation.dto.res.InternalOrderTicketsResponse;
 import com.devticket.commerce.order.presentation.dto.res.InternalSettlementDataResponse;
 import com.devticket.commerce.order.presentation.dto.res.OrderCancelResponse;
 import com.devticket.commerce.order.presentation.dto.res.OrderDetailResponse;
 import com.devticket.commerce.order.presentation.dto.res.OrderListResponse;
 import com.devticket.commerce.order.presentation.dto.res.OrderResponse;
+import com.devticket.commerce.ticket.domain.enums.TicketStatus;
 import com.devticket.commerce.order.presentation.dto.res.OrderStatusResponse;
 import java.util.UUID;
 
@@ -31,15 +33,12 @@ public interface OrderUsecase {
 
     InternalOrderItemsResponse getOrderListForSettlement(Long id);
 
-    void completeOrder(UUID orderId);
+    InternalSettlementDataResponse getSettlementData(UUID sellerId, String periodStart, String periodEnd);
 
-    void failOrder(UUID orderId);
+    InternalOrderItemResponse getOrderItemByTicketId(UUID ticketId);
 
-    InternalSettlementDataResponse getSettelmentData(UUID sellerId, String periodStart, String periodEnd);
-
-    InternalOrderItemResponse getOrderItemByTicketId(Long ticketId);
-
-    void completeRefund(Long ticketId);
+    // Payment -> Commerce : 환불 산정용 오더 티켓 목록 조회 (status 필터 옵션)
+    InternalOrderTicketsResponse getOrderTickets(UUID orderId, TicketStatus status);
 
     //InternalEventOrdersResponse getOrdersByEvent(Long eventId, String status);
 

@@ -1,5 +1,8 @@
 {
   "properties": {
+    "eventId": {
+      "type": "keyword"
+    },
     "title": {
       "type": "text"
     },
@@ -20,6 +23,9 @@
       "dims": 1536,
       "index": true,
       "similarity": "cosine"
+    },
+    "saleStartAt": {
+      "type": "date"
     },
     "indexedAt": {
       "type": "date"

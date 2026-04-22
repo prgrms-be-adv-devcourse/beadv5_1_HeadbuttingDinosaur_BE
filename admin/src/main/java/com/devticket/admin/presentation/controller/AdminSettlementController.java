@@ -2,7 +2,7 @@ package com.devticket.admin.presentation.controller;
 
 import com.devticket.admin.application.service.AdminSettlementService;
 import com.devticket.admin.presentation.dto.req.AdminSettlementSearchRequest;
-import com.devticket.admin.presentation.dto.res.AdminSettelmentListResponse;
+import com.devticket.admin.presentation.dto.res.AdminSettlementListResponse;
 import com.devticket.admin.presentation.dto.res.SettlementResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -30,7 +30,7 @@ public class AdminSettlementController {
     @ApiResponse(responseCode = "200", description = "정산 목록 조회 성공")
     @ApiResponse(responseCode = "403", description = "접근 권한 없음 (COMMON_005)")
     @GetMapping("/settlements")
-    public AdminSettelmentListResponse getAdminSettlementList(
+    public AdminSettlementListResponse getAdminSettlementList(
         @ModelAttribute @Valid AdminSettlementSearchRequest condition) {
         return adminSettlementService.getSettlementList(condition);
     }

@@ -21,14 +21,25 @@ public class EventServiceClient {
     private String eventServiceUrl;
 
     public PopularEventListResponse getPopularEvents(PopularEventListRequest request) {
-        log.info("[EventClient] 인기 이벤트 조회 (Mock) - neededCount: {}", request.neededCount());
+        log.info("[EventClient] 인기 이벤트 조회 - needed: {}", request.needed());
+        log.info("[EventClient] 요청 URL: {}", eventServiceUrl + "/internal/events/popular");
+        log.info("[EventClient] 요청 body: {}", request);
 
-        List<PopularEventListResponse.EventInfo> mockEvents = new ArrayList<>();
-        for (int i = 1; i <= request.neededCount(); i++) {
-            mockEvents.add(new PopularEventListResponse.EventInfo("popular-event-" + i));
+        try {
+            PopularEventListResponse response = webClient.post()
+                .uri(eventServiceUrl + "/internal/events/popular")
+                .bodyValue(request)
+                .retrieve()
+                .bodyToMono(PopularEventListResponse.class)
+                .doOnSuccess(r -> log.info("[EventClient] 응답 성공: {}", r))
+                .doOnError(e -> log.error("[EventClient] 응답 실패", e))
+                .block();
+
+            return response != null ? response : new PopularEventListResponse(List.of(),null, null);
+        } catch (Exception e) {
+            log.error("[EventClient] 인기 이벤트 조회 실패", e);
+            return new PopularEventListResponse(List.of(),null, null);
         }
-
-        return new PopularEventListResponse(mockEvents);
     }
 
 }

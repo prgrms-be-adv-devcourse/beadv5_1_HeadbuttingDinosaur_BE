@@ -2,6 +2,7 @@ plugins {
     id 'java'
     id 'org.springframework.boot' version '4.0.4'
     id 'io.spring.dependency-management' version '1.1.7'
+    id 'com.github.spotbugs' version '6.0.9'
 }
 
 group = 'com.devticket'
@@ -36,9 +37,10 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-starter-kafka-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-validation-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+    // OutboxSchedulerIntegrationTest — EmbeddedKafka 비동기 발행·DB 상태 전이 대기
+    testImplementation 'org.awaitility:awaitility:4.2.2'
     runtimeOnly 'com.h2database:h2'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-    testImplementation 'org.awaitility:awaitility'
     // 테스트 환경을 위한 H2 인메모리 DB
     testImplementation 'com.h2database:h2'
 
@@ -55,8 +57,34 @@ dependencies {
     // ShedLock — Outbox 스케줄러 분산 환경 중복 실행 방지
     implementation 'net.javacrumbs.shedlock:shedlock-spring:5.16.0'
     implementation 'net.javacrumbs.shedlock:shedlock-provider-jdbc-template:5.16.0'
+
+    // Spring Retry — ES 동기화 실패 시 재시도
+    implementation 'org.springframework.retry:spring-retry:2.0.11'
+
+    // AWS S3
+    implementation platform('software.amazon.awssdk:bom:2.26.12')
+    implementation 'software.amazon.awssdk:s3'
+    implementation 'software.amazon.awssdk:auth'
 }
 
-tasks.named('test') {
-    useJUnitPlatform()
+test {
+    useJUnitPlatform {
+        // CI 환경에서만 @Tag("elasticsearch") 스킵 — 로컬은 Docker ES 기동 상태 기준 전체 실행
+        if (System.getenv('CI') == 'true') {
+            excludeTags 'elasticsearch'
+        }
+    }
+}
+
+spotbugs {
+    ignoreFailures = true
+    effort = 'max'
+    reportLevel = 'medium'
+    excludeFilter = file('spotbugs-exclude.xml')
+}
+
+spotbugsMain {
+    reports {
+        html { required = true }
+    }
 }

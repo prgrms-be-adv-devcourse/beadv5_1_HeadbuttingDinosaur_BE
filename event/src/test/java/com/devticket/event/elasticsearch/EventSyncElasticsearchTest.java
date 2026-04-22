@@ -6,7 +6,7 @@ import static org.mockito.Mockito.when;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch.core.GetResponse;
-import com.devticket.event.application.EventService;
+import com.devticket.event.application.ElasticsearchSyncService;
 import com.devticket.event.domain.enums.EventCategory;
 import com.devticket.event.domain.enums.EventStatus;
 import com.devticket.event.domain.model.Event;
@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -36,6 +37,7 @@ import org.springframework.test.util.ReflectionTestUtils;
  * esClient.index() 직접 인덱싱 방식이 실제 ES에서 올바르게 동작하는지,
  * dense_vector(embedding) 포함·미포함 두 경우를 검증한다.
  */
+@Tag("elasticsearch")
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.NONE,
     properties = {"spring.kafka.listener.auto-startup=false"}
@@ -44,7 +46,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 class EventSyncElasticsearchTest extends ElasticsearchIntegrationTestBase {
 
     @Autowired
-    private EventService eventService;
+    private ElasticsearchSyncService elasticsearchSyncService;
 
     @Autowired
     private EventSearchRepository eventSearchRepository;
@@ -77,7 +79,7 @@ class EventSyncElasticsearchTest extends ElasticsearchIntegrationTestBase {
         Event event = createEvent(sellerId, "Spring Boot 심화 밋업", EventStatus.ON_SALE);
 
         // when
-        eventService.syncToElasticsearch(event);
+        elasticsearchSyncService.sync(event);
         elasticsearchOperations.indexOps(EventDocument.class).refresh();
 
         // then
@@ -97,7 +99,7 @@ class EventSyncElasticsearchTest extends ElasticsearchIntegrationTestBase {
         Event event = createEvent(UUID.randomUUID(), "임베딩 없는 이벤트", EventStatus.ON_SALE);
 
         // when
-        eventService.syncToElasticsearch(event);
+        elasticsearchSyncService.sync(event);
         elasticsearchOperations.indexOps(EventDocument.class).refresh();
 
         // then
@@ -116,11 +118,11 @@ class EventSyncElasticsearchTest extends ElasticsearchIntegrationTestBase {
         when(openAiEmbeddingClient.embed(anyString())).thenReturn(null);
         Event event = createEvent(UUID.randomUUID(), "원본 제목", EventStatus.ON_SALE);
 
-        eventService.syncToElasticsearch(event);
+        elasticsearchSyncService.sync(event);
         elasticsearchOperations.indexOps(EventDocument.class).refresh();
 
         ReflectionTestUtils.setField(event, "title", "수정된 제목");
-        eventService.syncToElasticsearch(event);
+        elasticsearchSyncService.sync(event);
         elasticsearchOperations.indexOps(EventDocument.class).refresh();
 
         // then
@@ -137,11 +139,11 @@ class EventSyncElasticsearchTest extends ElasticsearchIntegrationTestBase {
         when(openAiEmbeddingClient.embed(anyString())).thenReturn(null);
         Event event = createEvent(UUID.randomUUID(), "취소 예정 이벤트", EventStatus.ON_SALE);
 
-        eventService.syncToElasticsearch(event);
+        elasticsearchSyncService.sync(event);
         elasticsearchOperations.indexOps(EventDocument.class).refresh();
 
         ReflectionTestUtils.setField(event, "status", EventStatus.CANCELLED);
-        eventService.syncToElasticsearch(event);
+        elasticsearchSyncService.sync(event);
         elasticsearchOperations.indexOps(EventDocument.class).refresh();
 
         // then
@@ -161,7 +163,7 @@ class EventSyncElasticsearchTest extends ElasticsearchIntegrationTestBase {
         event.getEventTechStacks().add(EventTechStack.of(event, 3L, "Redis"));
 
         // when
-        eventService.syncToElasticsearch(event);
+        elasticsearchSyncService.sync(event);
         elasticsearchOperations.indexOps(EventDocument.class).refresh();
 
         // then
@@ -180,7 +182,7 @@ class EventSyncElasticsearchTest extends ElasticsearchIntegrationTestBase {
         Event event = createEvent(UUID.randomUUID(), "기술 스택 없음", EventStatus.ON_SALE);
 
         // when
-        eventService.syncToElasticsearch(event);
+        elasticsearchSyncService.sync(event);
         elasticsearchOperations.indexOps(EventDocument.class).refresh();
 
         // then
@@ -189,6 +191,31 @@ class EventSyncElasticsearchTest extends ElasticsearchIntegrationTestBase {
         @SuppressWarnings("unchecked")
         List<String> techStacks = (List<String>) response.source().get("techStacks");
         assertThat(techStacks).isEmpty();
+    }
+
+    // ── AI 계약 (eventId 필드) ────────────────────────────────────────────
+
+    /**
+     * AI 추천 서비스는 _source.eventId 로 필드를 추출 (PR #540 계약).
+     * ES _id 는 hit._source 에 포함되지 않으므로 body 에 eventId 키가 존재해야 함.
+     * 회귀 시 AI reRank 루프에서 NPE 발생.
+     */
+    @Test
+    void sync하면_body_source에_eventId_필드가_저장된다() throws Exception {
+        // given
+        when(openAiEmbeddingClient.embed(anyString())).thenReturn(null);
+        Event event = createEvent(UUID.randomUUID(), "AI 계약 확인 이벤트", EventStatus.ON_SALE);
+
+        // when
+        elasticsearchSyncService.sync(event);
+        elasticsearchOperations.indexOps(EventDocument.class).refresh();
+
+        // then
+        GetResponse<Map> response = esClient.get(g -> g
+            .index("event").id(event.getEventId().toString()), Map.class);
+        assertThat(response.found()).isTrue();
+        assertThat(response.source()).containsKey("eventId");
+        assertThat(response.source().get("eventId")).isEqualTo(event.getEventId().toString());
     }
 
     // ── indexedAt 형식 ────────────────────────────────────────────────────
@@ -200,7 +227,7 @@ class EventSyncElasticsearchTest extends ElasticsearchIntegrationTestBase {
         Event event = createEvent(UUID.randomUUID(), "날짜 형식 테스트", EventStatus.ON_SALE);
 
         // when
-        eventService.syncToElasticsearch(event);
+        elasticsearchSyncService.sync(event);
         elasticsearchOperations.indexOps(EventDocument.class).refresh();
 
         // then

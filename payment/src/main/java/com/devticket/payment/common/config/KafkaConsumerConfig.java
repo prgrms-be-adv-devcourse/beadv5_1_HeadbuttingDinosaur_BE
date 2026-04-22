@@ -1,5 +1,6 @@
 package com.devticket.payment.common.config;
 
+import com.devticket.payment.refund.domain.exception.RefundInconsistencyException;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -15,7 +16,7 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.listener.ContainerProperties;
 import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
-import org.springframework.util.backoff.FixedBackOff;
+import org.springframework.util.backoff.ExponentialBackOff;
 
 @Configuration
 public class KafkaConsumerConfig {
@@ -54,8 +55,12 @@ public class KafkaConsumerConfig {
             }
         );
 
-        FixedBackOff backOff = new FixedBackOff(2000L, 3L); // 2초 간격, 최대 3회
-        return new DefaultErrorHandler(recoverer, backOff);
+        ExponentialBackOff backOff = new ExponentialBackOff(2000L, 2.0); // 2→4→8초
+        backOff.setMaxAttempts(3); // 최대 3회 재시도
+        DefaultErrorHandler handler = new DefaultErrorHandler(recoverer, backOff);
+        // 부정합(REFUND_NOT_FOUND 등)은 재시도해도 결과가 바뀌지 않으므로 즉시 DLT 이동
+        handler.addNotRetryableExceptions(RefundInconsistencyException.class);
+        return handler;
     }
 
     @Bean

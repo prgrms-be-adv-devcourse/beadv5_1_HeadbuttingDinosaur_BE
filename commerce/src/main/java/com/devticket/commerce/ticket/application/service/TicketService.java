@@ -54,62 +54,56 @@ public class TicketService implements TicketUsecase {
     @Override
     public TicketListResponse getTicketList(UUID userId, TicketListRequest request) {
         log.debug("[getTicketList] 시작 - userId={}, request={}", userId, request);
-        try {
-            //티켓조회
-            Page<Ticket> ticketPage = ticketRepository.findAllByUserId(userId, request);
-            log.debug("[getTicketList] 티켓 조회 완료 - totalElements={}, page={}", ticketPage.getTotalElements(),
-                ticketPage.getNumber());
+        //티켓조회
+        Page<Ticket> ticketPage = ticketRepository.findAllByUserId(userId, request);
+        log.debug("[getTicketList] 티켓 조회 완료 - totalElements={}, page={}", ticketPage.getTotalElements(),
+            ticketPage.getNumber());
 
-            //각 티켓의 eventId 가져오기
-            List<Ticket> ticketList = ticketPage.getContent();
-            List<UUID> eventIds = ticketList.stream()
-                .map(Ticket::getEventId)
-                .distinct()
-                .toList();
-            log.debug("[getTicketList] eventIds 추출 완료 - count={}, eventIds={}", eventIds.size(), eventIds);
+        //각 티켓의 eventId 가져오기
+        List<Ticket> ticketList = ticketPage.getContent();
+        List<UUID> eventIds = ticketList.stream()
+            .map(Ticket::getEventId)
+            .distinct()
+            .toList();
+        log.debug("[getTicketList] eventIds 추출 완료 - count={}, eventIds={}", eventIds.size(), eventIds);
 
-            // eventIds가 비어있으면 외부 호출 스킵
-            if (eventIds.isEmpty()) {
-                return TicketListResponse.of(ticketPage, List.of());
-            }
-
-            //외부 API호출 : Event정보 조회
-            InternalBulkEventInfoRequest bulkRequest = new InternalBulkEventInfoRequest(eventIds);
-            log.debug("[getTicketList] Event 외부 API 호출 시작 - bulkRequest={}", bulkRequest);
-            List<InternalEventInfoResponse> eventInfos = ticketToEventClient.getBulkEventInfo(bulkRequest);
-            log.debug("[getTicketList] Event 외부 API 호출 완료 - eventInfos count={}",
-                eventInfos != null ? eventInfos.size() : "null");
-
-            Map<UUID, InternalEventInfoResponse> eventMap = (eventInfos != null ? eventInfos
-                : List.<InternalEventInfoResponse>of()).stream()
-                .collect(Collectors.toMap(InternalEventInfoResponse::eventId, info -> info));
-
-            // Ticket, Event정보 조합
-            List<TicketDetailResponse> tickets = ticketList.stream()
-                .map(ticket -> {
-                    InternalEventInfoResponse event = eventMap.get(ticket.getEventId());
-                    if (event == null) {
-                        log.warn("[getTicketList] eventMap에서 이벤트 정보 없음 - ticketId={}, eventId={}", ticket.getId(),
-                            ticket.getEventId());
-                    }
-                    return new TicketDetailResponse(
-                        ticket.getTicketId(),
-                        ticket.getEventId(),
-                        event != null ? event.title() : "정보 없음",
-                        event != null ? String.valueOf(event.eventDateTime()) : null,
-                        ticket.getStatus().name(),
-                        ticket.getIssuedAt().toString()
-                    );
-                })
-                .toList();
-
-            log.debug("[getTicketList] 완료 - 응답 티켓 count={}", tickets.size());
-            return TicketListResponse.of(ticketPage, tickets);
-        } catch (Exception e) {
-            log.error("[getTicketList] 예외 발생 - userId={}, errorType={}, message={}", userId,
-                e.getClass().getSimpleName(), e.getMessage(), e);
-            throw e;
+        // eventIds가 비어있으면 외부 호출 스킵
+        if (eventIds.isEmpty()) {
+            return TicketListResponse.of(ticketPage, List.of());
         }
+
+        //외부 API호출 : Event정보 조회
+        InternalBulkEventInfoRequest bulkRequest = new InternalBulkEventInfoRequest(eventIds);
+        log.debug("[getTicketList] Event 외부 API 호출 시작 - bulkRequest={}", bulkRequest);
+        List<InternalEventInfoResponse> eventInfos = ticketToEventClient.getBulkEventInfo(bulkRequest);
+        log.debug("[getTicketList] Event 외부 API 호출 완료 - eventInfos count={}",
+            eventInfos != null ? eventInfos.size() : "null");
+
+        Map<UUID, InternalEventInfoResponse> eventMap = (eventInfos != null ? eventInfos
+            : List.<InternalEventInfoResponse>of()).stream()
+            .collect(Collectors.toMap(InternalEventInfoResponse::eventId, info -> info));
+
+        // Ticket, Event정보 조합
+        List<TicketDetailResponse> tickets = ticketList.stream()
+            .map(ticket -> {
+                InternalEventInfoResponse event = eventMap.get(ticket.getEventId());
+                if (event == null) {
+                    log.warn("[getTicketList] eventMap에서 이벤트 정보 없음 - ticketId={}, eventId={}", ticket.getId(),
+                        ticket.getEventId());
+                }
+                return new TicketDetailResponse(
+                    ticket.getTicketId(),
+                    ticket.getEventId(),
+                    event != null ? event.title() : "정보 없음",
+                    event != null ? String.valueOf(event.eventDateTime()) : null,
+                    ticket.getStatus().name(),
+                    ticket.getIssuedAt().toString()
+                );
+            })
+            .toList();
+
+        log.debug("[getTicketList] 완료 - 응답 티켓 count={}", tickets.size());
+        return TicketListResponse.of(ticketPage, tickets);
     }
 
     @Override
@@ -204,7 +198,7 @@ public class TicketService implements TicketUsecase {
             throw new BusinessException(TicketErrorCode.UNAUTHORIZED_EVENT_ACCESS);
         }
 
-        Page<Ticket> ticketPage = ticketRepository.findAllByEventId(eventId, request);
+        Page<Ticket> ticketPage = ticketRepository.findAllByEventIdAndStatus(eventId, TicketStatus.ISSUED, request);
 
         // 유저별 티켓 그룹핑
         Map<UUID, List<Ticket>> ticketsByUser = ticketPage.getContent().stream()

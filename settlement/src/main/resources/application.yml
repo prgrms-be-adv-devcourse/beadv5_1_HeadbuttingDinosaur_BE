@@ -3,6 +3,12 @@ spring:
     name: devticket-settlement
   profiles:
     active: local
+  batch:
+    job:
+      enabled: false # 앱 시작 시 모든 Job 자동 실행 방지
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.batch.autoconfigure.BatchJobLauncherAutoConfiguration
 
 server:
   port: 8085
@@ -12,3 +18,21 @@ springdoc:
     path: /swagger-ui.html
   api-docs:
     path: /v3/api-docs
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, prometheus
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: never
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+
+logging:
+  file:
+    name: ./spring-logs/settlement/settlement.log

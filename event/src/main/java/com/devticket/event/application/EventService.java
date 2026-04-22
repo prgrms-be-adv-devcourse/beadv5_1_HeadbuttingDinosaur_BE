@@ -1,28 +1,27 @@
 package com.devticket.event.application;
 
-import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch._types.FieldValue;
 import co.elastic.clients.elasticsearch._types.query_dsl.BoolQuery;
 import co.elastic.clients.elasticsearch._types.query_dsl.Query;
 import com.devticket.event.application.event.ActionLogDomainEvent;
 import com.devticket.event.common.exception.BusinessException;
 import com.devticket.event.common.messaging.KafkaTopics;
+import com.devticket.event.common.messaging.event.EventForceCancelledEvent;
+import com.devticket.event.common.messaging.event.EventSaleStoppedEvent;
 import com.devticket.event.common.messaging.event.ActionType;
-import com.devticket.event.common.messaging.event.OrderCreatedEvent;
-import com.devticket.event.common.messaging.event.StockDeductedEvent;
-import com.devticket.event.common.messaging.event.StockFailedEvent;
 import com.devticket.event.common.outbox.OutboxService;
 import com.devticket.event.domain.enums.EventStatus;
 import com.devticket.event.domain.exception.EventErrorCode;
-import com.devticket.event.domain.exception.StockDeductionException;
 import com.devticket.event.domain.model.Event;
 import com.devticket.event.domain.model.EventImage;
 import com.devticket.event.domain.model.EventTechStack;
+import com.devticket.event.domain.model.EventView;
 import com.devticket.event.infrastructure.client.AdminClient;
 import com.devticket.event.infrastructure.client.MemberClient;
 import com.devticket.event.infrastructure.client.OpenAiEmbeddingClient;
 import com.devticket.event.infrastructure.client.dto.TechStackItem;
 import com.devticket.event.infrastructure.persistence.EventRepository;
+import com.devticket.event.infrastructure.persistence.EventViewRepository;
 import com.devticket.event.infrastructure.search.EventDocument;
 import com.devticket.event.presentation.dto.EventDetailResponse;
 import com.devticket.event.presentation.dto.EventListContentResponse;
@@ -34,14 +33,9 @@ import com.devticket.event.presentation.dto.SellerEventDetailResponse;
 import com.devticket.event.presentation.dto.SellerEventSummaryResponse;
 import com.devticket.event.presentation.dto.SellerEventUpdateRequest;
 import com.devticket.event.presentation.dto.SellerEventUpdateResponse;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import java.io.StringReader;
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -52,9 +46,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.elasticsearch.client.elc.NativeQuery;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.SearchHits;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -67,12 +63,12 @@ public class EventService {
     private final MemberClient memberClient;
     private final AdminClient adminClient;
     private final ElasticsearchOperations elasticsearchOperations;
-    private final ElasticsearchClient esClient;
+    private final ElasticsearchSyncService elasticsearchSyncService;
     private final OpenAiEmbeddingClient openAiEmbeddingClient;
     private final OutboxService outboxService;
     private final MessageDeduplicationService deduplicationService;
-    private final ObjectMapper objectMapper;
     private final ApplicationEventPublisher eventPublisher;
+    private final EventViewRepository eventViewRepository;
 
     @Transactional
     public SellerEventCreateResponse createEvent(UUID sellerId, SellerEventCreateRequest request) {
@@ -122,21 +118,37 @@ public class EventService {
             eventRepository.save(savedEvent);
         }
 
-        syncToElasticsearch(savedEvent);
+        // 5. imageUrls 저장 로직 — updateEvent 와 대칭 보장 (생성 시 이미지 누락 방지)
+        if (request.imageUrls() != null && !request.imageUrls().isEmpty()) {
+            for (int i = 0; i < request.imageUrls().size(); i++) {
+                savedEvent.getEventImages().add(
+                    EventImage.of(savedEvent, request.imageUrls().get(i), i));
+            }
+            eventRepository.save(savedEvent);
+        }
+
+        elasticsearchSyncService.sync(savedEvent);
 
         return SellerEventCreateResponse.from(savedEvent);
     }
 
     private Map<Long, String> buildTechStackMap() {
         return adminClient.getTechStacks().stream()
-            .collect(Collectors.toMap(TechStackItem::techStackId, TechStackItem::name));
+            .collect(Collectors.toMap(TechStackItem::id, TechStackItem::name));
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public EventDetailResponse getEvent(UUID eventId) {
 
         Event event = eventRepository.findWithDetailsByEventId(eventId)
             .orElseThrow(() -> new BusinessException(EventErrorCode.EVENT_NOT_FOUND));
+
+        // 1. 조회수 증가 : eventView 가져오기
+        EventView eventView = eventViewRepository.findByEvent(event)
+            .orElseGet(() -> eventViewRepository.save(EventView.of(event)));
+        // 2. 조회수 증가 : eventView 증가
+        eventView.increaseViewCount();
+
         String nickname = memberClient.getNickname(event.getSellerId());
 
         return EventDetailResponse.from(event, nickname);
@@ -179,12 +191,18 @@ public class EventService {
         if (request.status() != null) {
             allowedStatuses = List.of(request.status());
         } else if (!isOwnEventRequest) {
-            allowedStatuses = List.of(EventStatus.ON_SALE, EventStatus.SOLD_OUT, EventStatus.SALE_ENDED);
+            allowedStatuses = List.of(EventStatus.DRAFT, EventStatus.ON_SALE, EventStatus.SOLD_OUT, EventStatus.SALE_ENDED);
         }
 
         // ES 검색
         NativeQuery query = buildSearchQuery(request, allowedStatuses, pageable);
-        SearchHits<EventDocument> searchHits = elasticsearchOperations.search(query, EventDocument.class);
+        SearchHits<EventDocument> searchHits;
+        try {
+            searchHits = elasticsearchOperations.search(query, EventDocument.class);
+        } catch (Exception e) {
+            log.warn("[ES 검색 실패] DB 폴백 적용 - {}", e.getMessage());
+            return getEventListFromDb(request, allowedStatuses, pageable);
+        }
 
         List<UUID> pageEventIds = searchHits.stream()
             .map(hit -> UUID.fromString(hit.getContent().getId()))
@@ -206,13 +224,22 @@ public class EventService {
         Map<UUID, Event> imagesById = eventRepository.findEventImagesByEventIdIn(pageEventIds).stream()
             .collect(Collectors.toMap(Event::getEventId, e -> e));
 
+
+        // viewCount 조회
+        Map<UUID, Long> viewCountById = eventViewRepository.findAllByEventIdIn(pageEventIds).stream()
+            .collect(Collectors.toMap(
+                ev -> ev.getEvent().getEventId(),
+                EventView::getViewCount
+            ));
+
         // ES 결과 순서 유지
         List<EventListContentResponse> content = pageEventIds.stream()
             .map(id -> {
                 Event hydrated = hydratedById.get(id);
                 if (hydrated == null) return null;
                 Event withImages = imagesById.getOrDefault(id, hydrated);
-                return EventListContentResponse.from(withImages);
+                Long viewCount = viewCountById.getOrDefault(id, 0L);
+                return EventListContentResponse.from(withImages, viewCount);
             })
             .filter(Objects::nonNull)
             .toList();
@@ -255,10 +282,45 @@ public class EventService {
         return SellerEventSummaryResponse.from(event);
     }
 
+    @Scheduled(fixedDelay = 60000)
+    @Transactional
+    public void expireSaleEvents() {
+        List<Event> events = eventRepository.findAllByStatusInAndSaleEndAtBefore(
+            List.of(EventStatus.ON_SALE, EventStatus.SOLD_OUT), LocalDateTime.now());
+        events.forEach(event -> {
+            event.expireSale();
+            elasticsearchSyncService.sync(event);
+        });
+    }
+
+    @Scheduled(fixedDelay = 60000)
+    @Transactional
+    public void endEvents() {
+        List<Event> events = eventRepository.findAllByStatusInAndEventDateTimeBefore(
+            List.of(EventStatus.ON_SALE, EventStatus.SOLD_OUT, EventStatus.SALE_ENDED),
+            LocalDateTime.now());
+        events.forEach(event -> {
+            event.endEvent();
+            elasticsearchSyncService.sync(event);
+        });
+    }
+
+    @Scheduled(fixedDelay = 60000)
+    @Transactional
+    public void promoteDraftEvents() {
+        List<Event> events = eventRepository
+            .findAllByStatusAndSaleStartAtBefore(EventStatus.DRAFT, LocalDateTime.now());
+        events.forEach(event -> {
+            event.promoteToOnSale();
+            elasticsearchSyncService.sync(event);
+        });
+    }
+
     private boolean isPublicStatus(EventStatus status) {
         return status == EventStatus.ON_SALE ||
             status == EventStatus.SOLD_OUT ||
-            status == EventStatus.SALE_ENDED;
+            status == EventStatus.SALE_ENDED ||
+            status == EventStatus.DRAFT;
     }
 
     @Transactional
@@ -272,13 +334,21 @@ public class EventService {
             throw new BusinessException(EventErrorCode.UNAUTHORIZED_SELLER);
         }
 
-        // 판매중지 분기
+        // 판매 중지 분기 (Action B) — 신규 판매만 차단, 기존 구매자 환불 X.
+        // 환불 동반 강제 취소가 필요하면 forceCancel(...) 호출 (Payment.cancelSellerEvent 경유).
         if (EventStatus.CANCELLED.equals(request.status())) {
             if (!event.canBeCancelled()) {
                 throw new BusinessException(EventErrorCode.CANNOT_CHANGE_STATUS);
             }
             event.cancel();
-            syncToElasticsearch(event);
+            outboxService.save(
+                event.getEventId().toString(),
+                event.getEventId().toString(),
+                "EVENT_SALE_STOPPED",
+                KafkaTopics.EVENT_SALE_STOPPED,
+                new EventSaleStoppedEvent(event.getEventId(), event.getSellerId(), Instant.now())
+            );
+            elasticsearchSyncService.sync(event);
             return SellerEventUpdateResponse.from(event);
         }
 
@@ -345,131 +415,100 @@ public class EventService {
             }
         }
 
-        syncToElasticsearch(event);
+        elasticsearchSyncService.sync(event);
 
         return SellerEventUpdateResponse.from(event);
     }
 
     /**
-     * order.created Consumer 처리 — 재고 차감 + stock.deducted Outbox 저장
+     * 강제 취소 (Action A) — 이벤트를 FORCE_CANCELLED 로 전이하고 event.force-cancelled Outbox 발행.
+     * Commerce 가 수신해 해당 이벤트의 PAID 주문에 대해 환불 fan-out 을 수행한다.
      *
-     * <p>처리 순서: isDuplicate → 재고 차감(전체) → stock.deducted Outbox 저장 → markProcessed
-     * <p>재고 부족(BusinessException) 발생 시 StockDeductionException throw → @Transactional 전체 롤백
-     * Consumer가 이를 캐치하여 saveStockFailed()를 별도 트랜잭션으로 호출한다.
+     * <p>호출자별 권한:
+     * <ul>
+     *   <li>ADMIN — 모든 이벤트 가능 (관리자 권한은 gateway/admin-service 에서 사전 검증)</li>
+     *   <li>SELLER — 본인 이벤트만 가능 (소유권 검증)</li>
+     * </ul>
+     *
+     * <p><b>본 액션은 환불을 동반</b>한다. 단순 신규 판매 중단 (Action B — 기존 구매자 영향 없음)은
+     * {@link #updateEvent} 의 {@code status=CANCELLED} 분기로 호출 (별개 흐름).
      */
     @Transactional
-    public void processOrderCreated(UUID messageId, String topic, String payload) {
-        if (deduplicationService.isDuplicate(messageId)) {
-            return;
-        }
+    public void forceCancel(UUID userId, String userRole, UUID eventId, String reason) {
+        Event event = eventRepository.findByEventIdWithLock(eventId)
+            .orElseThrow(() -> new BusinessException(EventErrorCode.EVENT_NOT_FOUND));
 
-        OrderCreatedEvent event = deserialize(payload, OrderCreatedEvent.class);
-
-        // Phase 1: 모든 항목 재고 차감 — 실패 시 StockDeductionException throw (전체 롤백)
-        List<OrderCreatedEvent.OrderItem> sortedItems = event.orderItems().stream()
-            .sorted(Comparator.comparing(OrderCreatedEvent.OrderItem::eventId))
-            .toList();
-
-        List<StockDeductedEvent> deductedEvents = new ArrayList<>();
-        for (OrderCreatedEvent.OrderItem item : sortedItems) {
-            Event e = eventRepository.findByEventIdWithLock(item.eventId())
-                .orElseThrow(() -> new StockDeductionException(event.orderId(), item.eventId(), "이벤트를 찾을 수 없습니다"));
-            try {
-                e.deductStock(item.quantity());
-            } catch (BusinessException ex) {
-                throw new StockDeductionException(event.orderId(), item.eventId(), ex.getMessage());
+        // SELLER 는 본인 이벤트만 가능 — ADMIN 은 gateway 에서 사전 검증되므로 도메인 검증 생략
+        if ("SELLER".equals(userRole)) {
+            if (!event.getSellerId().equals(userId)) {
+                throw new BusinessException(EventErrorCode.UNAUTHORIZED_SELLER);
             }
-            deductedEvents.add(new StockDeductedEvent(event.orderId(), item.eventId(), item.quantity(), Instant.now()));
+        } else if (!"ADMIN".equals(userRole)) {
+            // 알 수 없는 role — 방어적 거부
+            throw new BusinessException(EventErrorCode.UNAUTHORIZED_SELLER);
         }
 
-        // Phase 2: 모두 성공 → Outbox 저장
-        for (StockDeductedEvent deducted : deductedEvents) {
-            outboxService.save(
-                event.orderId().toString(),
-                event.orderId().toString(),
-                "STOCK_DEDUCTED",
-                KafkaTopics.STOCK_DEDUCTED,
-                deducted
-            );
+        if (!event.canBeCancelled()) {
+            throw new BusinessException(EventErrorCode.CANNOT_CHANGE_STATUS);
         }
 
-        deduplicationService.markProcessed(messageId, topic);
-    }
-
-    /**
-     * 재고 차감 실패 시 stock.failed Outbox 저장 — Consumer가 별도 트랜잭션으로 호출
-     */
-    @Transactional
-    public void saveStockFailed(UUID messageId, String topic, UUID orderId, UUID eventId, String reason) {
-        if (deduplicationService.isDuplicate(messageId)) {
-            return;
-        }
-
+        event.forceCancel();
         outboxService.save(
-            orderId.toString(),
-            orderId.toString(),
-            "STOCK_FAILED",
-            KafkaTopics.STOCK_FAILED,
-            new StockFailedEvent(orderId, eventId, reason, Instant.now())
+            event.getEventId().toString(),
+            event.getEventId().toString(),
+            "EVENT_FORCE_CANCELLED",
+            KafkaTopics.EVENT_FORCE_CANCELLED,
+            new EventForceCancelledEvent(event.getEventId(), event.getSellerId(), reason, Instant.now())
         );
 
-        deduplicationService.markProcessed(messageId, topic);
+        elasticsearchSyncService.sync(event);
     }
 
-    private <T> T deserialize(String payload, Class<T> type) {
-        try {
-            return objectMapper.readValue(payload, type);
-        } catch (JsonProcessingException e) {
-            throw new IllegalArgumentException("Kafka 페이로드 역직렬화 실패: " + type.getSimpleName(), e);
+    private EventListResponse getEventListFromDb(
+        EventListRequest request, List<EventStatus> allowedStatuses, Pageable pageable) {
+
+        var page = eventRepository.searchEventsWithStatuses(
+            request.keyword(), allowedStatuses, request.category(), request.techStacks(),
+            request.sellerId(), pageable);
+
+        List<UUID> pageEventIds = page.getContent().stream()
+            .map(Event::getEventId)
+            .toList();
+
+        if (pageEventIds.isEmpty()) {
+            return new EventListResponse(
+                List.of(), pageable.getPageNumber(), pageable.getPageSize(), 0L, 0);
         }
-    }
 
-    /**
-     * Spring Data ES 컨버터를 완전히 우회하고 esClient.index()로 직접 인덱싱.
-     * dense_vector(embedding)은 Spring Data ES 컨버터가 직렬화하지 못하므로
-     * Map<String, Object>로 전체 문서를 구성해서 ES REST API에 직접 전송.
-     */
-    public void syncToElasticsearch(Event event) {
-        try {
-            List<String> techStackNames = event.getEventTechStacks().stream()
-                .map(EventTechStack::getTechStackName)
-                .toList();
+        Map<UUID, Event> hydratedById = eventRepository.findAllWithDetailsByEventIdIn(pageEventIds).stream()
+            .collect(Collectors.toMap(Event::getEventId, e -> e));
+        Map<UUID, Event> imagesById = eventRepository.findEventImagesByEventIdIn(pageEventIds).stream()
+            .collect(Collectors.toMap(Event::getEventId, e -> e));
 
-            String embeddingText = techStackNames.isEmpty()
-                ? event.getTitle() + ". Category: " + event.getCategory().name()
-                : event.getTitle() + ". Category: " + event.getCategory().name()
-                    + ". Tech Stacks: " + String.join(", ", techStackNames);
+        Map<UUID, Long> viewCountById = eventViewRepository.findAllByEventIdIn(pageEventIds).stream()
+            .collect(Collectors.toMap(
+                ev -> ev.getEvent().getEventId(),
+                EventView::getViewCount
+            ));
 
-            Map<String, Object> doc = new HashMap<>();
-            doc.put("id", event.getEventId().toString());
-            doc.put("title", event.getTitle());
-            doc.put("category", event.getCategory().name());
-            doc.put("techStacks", techStackNames);
-            doc.put("status", event.getStatus().name());
-            doc.put("sellerId", event.getSellerId().toString());
-            // mapping의 date_hour_minute_second 형식에 맞춤 (나노초 제외)
-            doc.put("indexedAt", LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")));
+        List<EventListContentResponse> content = pageEventIds.stream()
+            .map(id -> {
+                Event hydrated = hydratedById.get(id);
+                if (hydrated == null) return null;
+                Event withImages = imagesById.getOrDefault(id, hydrated);
+                Long viewCount = viewCountById.getOrDefault(id, 0L);
+                return EventListContentResponse.from(withImages, viewCount);
+            })
+            .filter(Objects::nonNull)
+            .toList();
 
-            float[] vector = openAiEmbeddingClient.embed(embeddingText);
-            if (vector != null) {
-                List<Float> vectorList = new ArrayList<>(vector.length);
-                for (float v : vector) vectorList.add(v);
-                doc.put("embedding", vectorList);
-            } else {
-                log.warn("[ES 동기화] embedding 생성 실패 - eventId: {}", event.getEventId());
-            }
-
-            String json = new ObjectMapper().writeValueAsString(doc);
-
-            esClient.index(i -> i
-                .index("event")
-                .id(event.getEventId().toString())
-                .withJson(new StringReader(json)));
-
-            log.debug("[ES 동기화 완료] eventId: {}", event.getEventId());
-        } catch (Exception e) {
-            log.warn("[ES 동기화 실패] eventId: {}", event.getEventId(), e);
-        }
+        return new EventListResponse(
+            content,
+            pageable.getPageNumber(),
+            pageable.getPageSize(),
+            page.getTotalElements(),
+            page.getTotalPages()
+        );
     }
 
     private NativeQuery buildSearchQuery(
@@ -536,6 +575,10 @@ public class EventService {
         queryBuilder
             .withFilter(Query.of(q -> q.bool(filterQuery.build())))
             .withPageable(pageable);
+
+        if (request.keyword() == null || request.keyword().isBlank()) {
+            queryBuilder.withSort(Sort.by(Sort.Direction.DESC, "saleStartAt"));
+        }
 
         return queryBuilder.build();
     }

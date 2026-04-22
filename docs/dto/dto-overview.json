@@ -1,0 +1,58 @@
+{
+  "schema": "dto-overview-v2",
+  "description": "9-module integrated DTO index. Module-level metadata + dtoCount. Detail per module: docs/dto/summary/{module}-summary.json",
+  "moduleCount": 9,
+  "modules": {
+    "admin": {
+      "presentationDtoCount": 27,
+      "kafkaPayloadCount": 0,
+      "summaryFile": "docs/dto/summary/admin-summary.json"
+    },
+    "ai": {
+      "presentationDtoCount": 3,
+      "kafkaPayloadCount": 0,
+      "summaryFile": "docs/dto/summary/ai-summary.json"
+    },
+    "apigateway": {
+      "presentationDtoCount": 0,
+      "kafkaPayloadCount": 0,
+      "summaryFile": "docs/dto/summary/apigateway-summary.json"
+    },
+    "commerce": {
+      "presentationDtoCount": 34,
+      "kafkaPayloadCount": 23,
+      "summaryFile": "docs/dto/summary/commerce-summary.json"
+    },
+    "event": {
+      "presentationDtoCount": 27,
+      "kafkaPayloadCount": 10,
+      "summaryFile": "docs/dto/summary/event-summary.json"
+    },
+    "log": {
+      "presentationDtoCount": 0,
+      "kafkaPayloadCount": 0,
+      "summaryFile": "docs/dto/summary/log-summary.json"
+    },
+    "member": {
+      "presentationDtoCount": 40,
+      "kafkaPayloadCount": 0,
+      "summaryFile": "docs/dto/summary/member-summary.json"
+    },
+    "payment": {
+      "presentationDtoCount": 25,
+      "kafkaPayloadCount": 0,
+      "summaryFile": "docs/dto/summary/payment-summary.json"
+    },
+    "settlement": {
+      "presentationDtoCount": 6,
+      "kafkaPayloadCount": 0,
+      "summaryFile": "docs/dto/summary/settlement-summary.json"
+    }
+  },
+  "totalPresentationDtoCount": 162,
+  "totalKafkaPayloadCount": 33,
+  "notes": [
+    "Kafka payload (commerce 23 + event 10 = 33) 는 messaging/event/** 하위로 자동 파서 미커버 — count 는 코드 검증 기반 수동 표기.",
+    "apigateway / log 는 Java DTO 0건 정당 누락."
+  ]
+}

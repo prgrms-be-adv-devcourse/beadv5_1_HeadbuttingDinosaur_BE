@@ -18,6 +18,18 @@ public class KafkaProducerConfig {
     @Value("${spring.kafka.bootstrap-servers}")
     private String bootstrapServers;
 
+    // Outbox Producer 타임아웃 3종 — 운영 기본값(ms)
+    // 불변식: max.block.ms < request.timeout.ms ≤ delivery.timeout.ms < OutboxEventProducer.sendTimeoutMs
+    // 테스트 프로파일(application-test.yml)에서 EmbeddedKafka 안정화 위해 완화값 오버라이드.
+    @Value("${kafka.outbox-producer.max-block-ms:500}")
+    private int maxBlockMs;
+
+    @Value("${kafka.outbox-producer.request-timeout-ms:1000}")
+    private int requestTimeoutMs;
+
+    @Value("${kafka.outbox-producer.delivery-timeout-ms:1500}")
+    private int deliveryTimeoutMs;
+
     @Bean
     @Primary
     public ProducerFactory<String, String> producerFactory() {
@@ -34,9 +46,9 @@ public class KafkaProducerConfig {
         // Scheduler lockAtMostFor(5m) 내에서 발행 실패 판정이 끝나도록 타임아웃 경계 고정
         //   delivery.timeout.ms  ≥ linger.ms + request.timeout.ms
         //   max.block.ms         = send() 블로킹 상한 (metadata/buffer 대기)
-        props.put(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, 1500);
-        props.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, 1000);
-        props.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, 500);
+        props.put(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, deliveryTimeoutMs);
+        props.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, requestTimeoutMs);
+        props.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, maxBlockMs);
         return new DefaultKafkaProducerFactory<>(props);
     }
 

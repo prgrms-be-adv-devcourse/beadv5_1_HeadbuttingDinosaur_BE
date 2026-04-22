@@ -1,0 +1,577 @@
+# 🔑 DevTicket 멱등성 구현 가이드
+
+> 이 문서는 팀원이 각 API의 멱등성을 **어디서, 어떤 순서로, 무엇으로** 막아야 하는지를
+> 바로 구현할 수 있도록 정리한 가이드입니다.
+> 코드는 포함하지 않지만, 각 레이어의 책임과 처리 순서를 고정합니다.
+>
+> **상위 원칙:** 본 가이드가 다루는 멱등성은 **1-A Sync HTTP** 경로(사용자 트리거 요청)의 `Idempotency-Key` 기반 전략. 1-B Async Kafka + Outbox 경로의 멱등성(`processed_message` + `canTransitionTo()` + `@Version`)은 `kafka-idempotency-guide.md` 참조. 통신 경계 분류 자체는 `kafka-sync-async-policy.md` §1-A 참조.
+
+---
+
+## 1. 멱등성은 어디서 보장하는가
+
+멱등성은 한 군데에서 해결하지 않는다.
+각 레이어는 아래 역할만 담당한다.
+
+| 레이어 | 역할 | 주력 여부 |
+|--------|------|----------|
+| 클라이언트 | 같은 요청 재시도 시 같은 키 재사용, 버튼 연타 방지 | 보조 |
+| Gateway | 짧은 시간 내 반복 호출 차단 (Bucket4j) | 보조 |
+| 서비스 레이어 | 이미 처리된 비즈니스 요청인지 판단 | **주력** |
+| DB | 동시 요청이 동시에 성공하지 못하게 제어 (락/UNIQUE) | **주력** |
+| 외부 시스템 (PG) | 승인/취소의 외부 멱등성 활용 | 보조이지만 중요 |
+| 보상 처리 | 이미 복구/취소/환불 완료면 재실행 스킵 | 필수 |
+
+**핵심 원칙은 하나다:**
+
+> 클라이언트 키는 보조 수단이고, 최종 판단은 서비스 레이어의 비즈니스 상태 가드가 한다.
+
+---
+
+## 2. 공통 처리 순서
+
+모든 멱등성 대상 API는 아래 순서로 처리한다.
+
+```
+1단계. 요청 진입
+   → 인증 완료 후 유저 식별
+   → API별 멱등 판단 기준 식별
+      주문: userId + cartId + cartHash (서버가 장바구니 내용으로 계산)
+      결제 준비: orderId
+      결제 승인: paymentId (또는 paymentKey)
+      환불: orderId
+
+2단계. 이미 처리된 비즈니스 상태인지 먼저 확인
+   → 서비스 레이어에서 조회
+   → 이미 처리된 상태면 새 작업을 만들지 말고 기존 결과를 반환
+   → 멱등성의 첫 판단은 항상 여기서 한다
+
+3단계. 동시에 들어온 요청 충돌 방지
+   → 필요한 API는 DB 락 또는 버전 기반 충돌 제어 적용
+   → 목적: "두 요청이 동시에 성공"하는 상황을 막는 것
+
+4단계. 새 작업 생성 또는 상태 전이
+   → 중복이 아니고 현재 처리 가능한 상태일 때만 진행
+   → 이 시점부터 실제 생성/승인/환불 로직 수행
+
+5단계. 외부 시스템 호출이 있으면 결과를 상태로 반영
+   → PG 승인/취소 등
+   → 외부 호출 결과를 내부 상태에 반영
+   → 이후 재요청은 그 상태를 기준으로 판단
+
+6단계. 보상 로직도 멱등하게 처리
+   → 재고 복구, 주문 취소, PG 취소, 환불 완료 처리
+   → 이미 수행된 보상은 다시 하지 않음
+```
+
+---
+
+## 3. 구현 원칙
+
+### 원칙 1. "이미 처리됨"이면 실패가 아니라 성공 취급한다
+
+- 이미 존재하는 주문이면 → 기존 주문 반환
+- 이미 생성된 Payment면 → 기존 Payment 반환
+- 이미 승인 완료면 → 저장된 결과 반환
+- 이미 진행 중 환불이면 → 기존 환불 반환
+
+> 멱등성은 "중복이면 에러"가 아니라 **"중복이면 기존 결과 재사용"**이 기본이다.
+
+### 원칙 2. 클라이언트 키가 달라져도 서버는 막아야 한다
+
+- 클라이언트 키가 같으면 좋다
+- 하지만 키가 달라져도 서버는 비즈니스 상태로 중복을 판별해야 한다
+- **서버 구현은 Idempotency-Key 유무와 별개로 완결되어 있어야 한다**
+
+### 원칙 3. 락/버전은 멱등성의 보조가 아니라 필수 구성이다
+
+같은 요청이 거의 동시에 두 번 들어오면, 비즈니스 조회만으로는 둘 다 "없음"을 보고 동시에 생성할 수 있다.
+
+- 주문 생성은 직렬화가 필요
+- 결제 승인 상태 전이는 충돌 제어가 필요
+- 환불도 진행 중 상태 생성 시 동시성 제어가 필요할 수 있다
+
+### 원칙 4. 외부 PG 처리 성공 여부는 내부 상태와 분리해서 생각한다
+
+"PG 성공"과 "우리 DB 반영 성공"은 같은 일이 아니다.
+팀원은 항상 아래를 구분해서 구현해야 한다:
+
+- 외부 승인 성공
+- 내부 상태 저장 성공
+- 응답 반환 성공
+
+이 셋은 각각 실패 가능하다.
+멱등성은 이 중간 실패를 다시 안전하게 이어붙일 수 있어야 한다.
+
+---
+
+## 4. API별 구현 지침
+
+> **구현 현황 (2026-04-27 기준 — 본 가이드는 설계 명세, 일부 미구현)**
+>
+> | § | API | 구현 여부 | 비고 |
+> |---|---|---|---|
+> | 4-1 | `POST /api/orders` | ⚠️ **부분 구현** | `userId + cartHash` 기반 비즈니스 가드는 적용됨 (`Order.cart_hash` 컬럼 + UNIQUE 인덱스 — `schema_plan.md` 참조). HTTP `Idempotency-Key` 헤더 처리 미구현 — `OrderController.createOrderByCart`는 `X-User-Id`만 수신 |
+> | 4-2 | `POST /api/payments/ready` | ❌ **미구현** | `PaymentController.readyPayment(L44)`는 `X-User-Id`만 수신, `Idempotency-Key` 미처리 |
+> | 4-3 | `POST /api/payments/confirm` | ❌ **미구현** | `PaymentController.confirm(L73)` 동일 — `@Version` 낙관적 락은 일부 적용되었으나 클라이언트 키 처리 부재 |
+> | 4-4 | `POST /api/refunds/...` | ✅ **dedup 가드 구현 완료** (PR #582 / 커밋 `e88294c`) | `refundPgTicket` 에 ticket 단위 동시성 가드 적용: `RefundTicket.ticket_id` UNIQUE 제약(`uk_refund_ticket_ticket_id`) + `existsByTicketId` 사전 체크 + `DataIntegrityViolationException` catch → `REFUND_ALREADY_IN_PROGRESS`(409). 운영 DB ⑪번 ALTER 함께 실행. HTTP `Idempotency-Key` 헤더 자체는 미수신 (비즈니스 가드로 멱등 보장) |
+> | 4-5 | `POST /api/wallet/charge` | ✅ **구현 완료 (시작 단계)** | `WalletController.charge(L42-45)`가 `@RequestHeader("Idempotency-Key")` 수신. 단 `/charge/confirm`(L72), `/withdraw`(L109)는 미구현 |
+>
+> 본 §4 의 각 절은 **목표 설계** 를 기술합니다. 위 표에서 ✅ 완료 표시 외 항목은 "구현 시 따를 지침"으로 읽어 주세요. 본격 적용은 별도 트랙으로 진행 예정.
+
+### 4-1. 주문 생성 (POST /api/orders)
+
+> **현행 흐름 — Kafka choreography → 동기 REST 차감으로 전환됨**
+> 본 문서가 처음 설계됐을 때는 `order.created` Kafka 발행 → Event 모듈이 `stock.deducted` 응답으로 `PAYMENT_PENDING` 전이하는 choreography 였습니다. 현재 코드는 **`OrderService.createOrderByCart` 내부에서 동기 REST(`PATCH /internal/events/stock-adjustments` via `OrderToEventClient`) 로 재고를 차감**하고, 성공 시 `Order.createPending(...)` 으로 곧장 `PAYMENT_PENDING` 상태 row를 저장합니다 (`OrderService.java:116-117`, `Order.java:123-141`).
+>
+> 이에 따라 `CREATED` 상태와 만료 스케줄러는 **활성 흐름에서 사용되지 않음** (`Order.create()` 와 `expires_at` 컬럼은 레거시). 본 §4-1 의 멱등 가드 원칙(`userId + cartId + cartHash`) 은 그대로 유효하나, 절차 표현은 REST 동기 차감 기준으로 읽어 주세요.
+
+주문 생성은 클라이언트 키가 아니라 **userId + cartId + cartHash**를 기준으로 멱등 처리한다.
+
+같은 계정의 여러 세션(브라우저 탭, 기기 등)이 동시에 같은 장바구니를 주문하려는 경우,
+`userId + cartId`만으로는 장바구니 내용이 실제로 동일한지 판단할 수 없다.
+장바구니 내용을 서버 사이드에서 해시화하여 **"같은 내용의 동시 주문 → 하나만 성공"** 을 보장한다.
+
+**어디서 막는가:**
+
+| 레이어 | 역할 |
+|--------|------|
+| 서비스 레이어 | 활성 주문 존재 여부 판단 (userId + cartId + cartHash 기준) |
+| DB 레이어 | 동시 요청 직렬화 (SELECT ... FOR UPDATE) |
+| Gateway | 짧은 시간 반복 호출 차단 |
+
+**무엇을 기준으로 중복 판단하는가:**
+
+- 같은 userId + 같은 cartId + 같은 cartHash + 아직 끝나지 않은 활성 주문
+- cartHash가 다르면 장바구니 내용이 변경된 것 → 새 주문 생성 허용
+
+**cartHash 생성 규칙:**
+
+- 생성 주체: **서버** (클라이언트 전달값 신뢰 금지 — 조작 가능)
+- 해시 대상: 장바구니 내 `(eventId, quantity)` 리스트 — unitPrice 미포함 (팀 합의)
+- 생성 방법: eventId 기준 오름차순 정렬 → 문자열 직렬화 (`eventId:quantity`, `,` 구분) → SHA-256
+
+```
+예시 입력: [{"eventId":"<UUID-3>","qty":1},{"eventId":"<UUID-1>","qty":2}]
+정렬 후 (eventId asc): [{"eventId":"<UUID-1>","qty":2},{"eventId":"<UUID-3>","qty":1}]
+직렬화:   "<UUID-1>:2,<UUID-3>:1"
+결과:     SHA-256(직렬화 문자열) → cart_hash 컬럼에 저장
+```
+
+**시나리오별 처리 정리:**
+
+| 시나리오 | userId | cartId | cartHash | 처리 |
+|----------|--------|--------|----------|------|
+| 동시 동일 요청 (멀티 세션) | 같음 | 같음 | 같음 | 하나만 생성, 나머지는 기존 주문 반환 |
+| 장바구니 내용 변경 후 재주문 | 같음 | 같음 | 다름 | 새 주문 생성 허용 |
+| 다른 유저가 동일 cartId 사용 | 다름 | 같음 | — | 각각 독립 주문으로 처리 |
+
+**현재 코드 구현 흐름 (REST 동기 차감 기준):**
+
+```
+0. 장바구니 내용 해시 생성 (서버 사이드)
+   → cartId로 현재 장바구니 상품 목록 조회
+   → (eventId, quantity) 리스트를 eventId 기준 정렬 — unitPrice 미포함 (팀 합의)
+   → 문자열 직렬화 (`eventId:quantity`, `,` 구분) 후 SHA-256 해시 생성 → cartHash 확보
+   → 이후 모든 중복 판단에 cartHash 포함
+
+1. tx1 검증·dedup (`OrderService.prepareAndValidate`)
+   → SELECT ... FOR UPDATE 로 user/cart 단위 직렬화
+   → 같은 userId + cartId + cartHash + 활성(PAYMENT_PENDING) 주문 존재 시 → 즉시 기존 주문 반환
+   → cartHash 불일치 = 장바구니 내용 변경 → "없음"으로 취급, 새 주문 진행
+   → 검증 통과 시 totalAmount/eventInfos 등 prepare 데이터 확보 후 tx1 커밋
+
+2. REST 동기 재고 차감 (`OrderService.adjustStocksOrThrow` → `PATCH /internal/events/stock-adjustments`)
+   → 트랜잭션 경계 밖 (커밋된 prepare 결과 사용)
+   → All-or-Nothing: 단 한 건이라도 실패 시 BusinessException → 전체 차단, 부분 차감 잔존 없음
+   → 성공 시 Event 모듈이 모든 대상 이벤트의 `quantity` 컬럼을 즉시 감산
+
+3. tx2 Order/OrderItem 저장 (`OrderService.persistOrder` → `Order.createPending`)
+   → 곧바로 status=PAYMENT_PENDING 으로 row 저장 (CREATED 거치지 않음)
+   → cart_hash 저장
+   → DB UNIQUE 제약 (`uk_active_order` 등) 위반 시: 동시 요청이 먼저 커밋한 케이스 → 재고 보상 없이 기존 주문 반환
+   → 그 외 RuntimeException 시: compensateStock 호출로 REST 재고 보상 후 예외 전파
+
+4. PAYMENT_PENDING 만료 스케줄러 (`OrderExpirationScheduler`)
+   → BaseEntity.updated_at 기준 30분 경과 시 → CANCELLED + 재고 복구 Outbox(payment.failed reason="ORDER_TIMEOUT") 발행
+   → 이 보상은 멱등 (이미 CANCELLED 면 스킵)
+```
+
+> **레거시 — `CREATED` 상태와 `Order.create()` 팩토리**
+> Kafka choreography 시절 `CREATED → stock.deducted 수신 → PAYMENT_PENDING` 흐름을 위한 코드(`Order.create()`, `processStockDeducted` 등)는 클래스에 남아 있으나 현재 활성 호출자가 없습니다 (테스트·레거시 path 정리 별도 트랙).
+
+**DB 설계 주의사항:**
+
+```
+Orders 테이블에 cart_hash 컬럼 추가 필요
+  → VARCHAR(64), 주문 생성 시 서버가 계산해서 저장
+  → (user_id, cart_id, cart_hash) + 활성 상태 기준 조회 인덱스 권장
+  → UNIQUE 제약은 걸지 않음 — 활성 상태가 아닌 이력 주문은 동일 해시 존재 가능
+```
+
+**활성 주문 상태 정의 (구현자 전원 공유):**
+
+```
+차단 — 새 주문 생성 거부, 기존 주문 반환:
+  PAYMENT_PENDING, PAID
+  REFUND_PENDING, REFUNDED  ← 사용 여부 미결 (kafka-impl-plan.md §4-1 참조)
+
+허용 — 새 주문 생성 가능:
+  FAILED    (재고 부족 등 실패 → 재시도 가능)
+  CANCELLED (만료/직접 취소 → 재시도 가능)
+```
+
+> 레거시 `CREATED` 상태는 현재 활성 흐름에서 진입하지 않습니다 (REST 동기 차감으로 곧장 `PAYMENT_PENDING` 진입).
+
+> 이 목록은 구현마다 다르게 해석하면 안 된다. 전원 동일 기준 적용.
+
+---
+
+### 4-2. 결제 준비 (POST /api/payments/ready)
+
+결제 준비는 **비즈니스 상태 가드가 주력**, Idempotency-Key는 응답 재전송 최적화용 보조로 사용한다.
+
+**결제 방식별 요청/응답 차이:**
+
+| 결제 방식 | PaymentReadyRequest 추가 필드 | 서버 처리 | PaymentReadyResponse 추가 필드 |
+|-----------|------------------------------|----------|-------------------------------|
+| PG | 없음 | Payment READY 생성 | 없음 (amount = totalAmount) |
+| WALLET | 없음 | Payment 생성 + 즉시 예치금 차감 + SUCCESS | 없음 |
+| WALLET_PG | `walletAmount` (사용자 지정 예치금 사용 금액) | 예치금 차감 + Payment READY 생성 | `walletAmount`, `pgAmount` |
+
+> **WALLET_PG 주의사항:**
+> - readyPayment에서 예치금이 **즉시 차감**된다. 따라서 중복 호출 시 이중 차감이 발생할 수 있으므로, orderId 기준 기존 Payment 조회 가드가 **필수**다.
+> - 프론트는 응답의 `pgAmount`를 Toss SDK에 넘겨야 한다 (totalAmount가 아닌 pgAmount 기준).
+> - 예치금 차감 후 PG 결제를 진행하지 않고 방치하면, 타임아웃 스케줄러가 FAILED 처리 + 예치금 자동 복구한다.
+
+**어디서 막는가:**
+
+| 레이어 | 역할 |
+|--------|------|
+| 서비스 레이어 | orderId 기준 기존 Payment 존재 여부 확인 |
+| DB 레이어 | Payment 생성 시 중복 생성 방지 + WalletTransaction transactionKey UNIQUE 제약 (WALLET_PG 2차 방어선) |
+| Idempotency 저장소 | 같은 키 재요청 시 응답 재사용 (보조) |
+| Gateway | 짧은 시간 반복 호출 차단 |
+
+**무엇을 기준으로 중복 판단하는가:**
+- 1차 기준: orderId 기준 기존 Payment 존재 여부
+- 2차 기준: 같은 Idempotency-Key 재요청 여부
+- WALLET_PG 동시성 방어: WalletTransaction transactionKey("USE_" + orderId) UNIQUE 제약
+
+**팀원이 구현해야 하는 순서:**
+
+```
+1. 요청에 Idempotency-Key가 있으면 읽는다
+   → 단, 키가 있다고 해서 그걸 신뢰의 중심으로 두면 안 된다
+
+2. 먼저 orderId 기준으로 기존 Payment 조회
+   → 이미 존재하면 새로 만들지 않는다
+   → 서버의 첫 판단은 항상 orderId다
+   → ⚠️ WALLET_PG에서 이 단계가 누락되면 예치금 이중 차감 발생
+
+   상태별 처리:
+     READY면      → 기존 Payment 반환
+     SUCCESS면    → 이미 결제 완료 에러
+     FAILED면     → 이미 실패한 건 에러 (새 주문으로 재시도 유도)
+     그 외 진행 중 → 현재 상태에 맞는 기존 결과 반환
+
+3. WALLET_PG인 경우 입력값 검증
+   → walletAmount > 0
+   → walletAmount < totalAmount (전액이면 WALLET 결제를 써야 함)
+   → 잔액 >= walletAmount (useBalanceAtomic이 0 반환으로도 잡히지만 사전 검증이 UX상 좋음)
+
+4. 기존 Payment가 없을 때만 새 Payment 생성
+   → 새 Payment 생성
+   → WALLET_PG: 예치금 차감 + WalletTransaction 기록 (같은 트랜잭션)
+   → 필요하면 idempotency_record도 함께 같은 트랜잭션에 저장
+
+5. 같은 Idempotency-Key 재요청이면 저장된 응답 반환
+   → 이 기능은 "응답 유실" 대응용
+   → 같은 키로 재전송된 요청을 빠르게 복구하기 위한 것
+
+6. 같은 키인데 payload가 다르면 → 409 Conflict
+   → 멱등 재요청이 아니라 잘못된 재사용
+```
+
+**WALLET_PG 동시성 극단 케이스:**
+
+```
+두 요청이 동시에 orderId 기준 조회 통과 (둘 다 "없음")
+→ 둘 다 Payment INSERT + 예치금 차감 시도
+→ WalletTransaction transactionKey("USE_" + orderId) UNIQUE 제약
+→ 먼저 INSERT한 쪽만 성공, 나머지는 UNIQUE 위반 → 트랜잭션 롤백
+→ 프론트 재시도 → orderId 조회에서 기존 Payment 발견 → 반환
+```
+
+> 핵심: 클라이언트 키가 바뀌어도 orderId 기준으로 기존 Payment를 반환할 수 있어야 한다.
+
+---
+
+### 4-3. 결제 승인 (POST /api/payments/confirm)
+
+결제 승인은 **상태 전이 제어가 핵심**이다. 이미 승인된 결제를 다시 승인하지 못하게 해야 한다.
+
+**어디서 막는가:**
+
+| 레이어 | 역할 |
+|--------|------|
+| 서비스 레이어 | Payment 현재 상태 검사 |
+| DB 레이어 | 상태 전이 시 동시성 제어 (@Version 낙관적 락) |
+| 외부 PG | 동일 paymentKey 재승인에 대한 멱등성 활용 |
+| 웹훅 처리 로직 | 중복 처리 방지 (같은 기준 적용) |
+
+**무엇을 기준으로 중복 판단하는가:**
+- Payment 상태
+- paymentKey
+- 현재 승인 가능한 상태인지 여부
+
+**팀원이 구현해야 하는 순서:**
+
+```
+1. 먼저 Payment 현재 상태 조회
+   → 이미 SUCCESS면 승인 재처리 금지 → 저장된 결과 그대로 반환
+
+2. 승인 가능한 상태인지 확인
+   → 승인 가능한 상태가 아니면 외부 PG 호출 금지
+   → 모든 요청이 PG까지 가면 안 된다
+
+3. 승인 직전 상태 전이에 동시성 제어 적용
+   → READY 상태에서 @Version 낙관적 락으로 동시 PG 호출 직렬화
+   → 동시에 두 요청이 들어와도 한 요청만 전이 성공
+
+4. 그 후에만 PG 승인 호출
+   → 외부 승인 호출은 동시성 제어 이후에만 실행
+
+5. PG 승인 결과를 내부 상태에 반영
+   → 성공이면 SUCCESS + Outbox 저장
+   → 실패면 정책에 맞는 실패 상태 반영
+
+6. PG 성공 + 내부 저장 실패 시 재시도로 복구 가능해야 함
+   → 재요청 시 Payment 상태가 여전히 READY (DB 커밋 실패)
+   → PG 재승인 호출 → PG가 "이미 승인됨" 응답 (Toss Payments 자체 멱등성)
+   → 정상 처리 계속 진행
+
+   즉:
+     "외부 PG가 이미 성공했는지"와
+     "우리 DB가 그 성공을 아직 반영했는지"를 분리해서 처리해야 한다
+
+7. 웹훅도 같은 기준으로 처리
+   → 이미 SUCCESS면 재처리 스킵
+   → confirm과 웹훅이 동시에 와도 @Version으로 하나만 상태 전이 성공
+```
+
+---
+
+### 4-4. 환불 요청 (POST /api/refunds)
+
+> **현행 구현 — `refundPgTicket` 동시성 dedup 가드 적용** (PR #582 / 커밋 `e88294c`, 2026-04-27)
+> `RefundServiceImpl.refundPgTicket` 진입 시 `existsByTicketId(ticketId)` 사전 체크 → 진행 중이면 `REFUND_ALREADY_IN_PROGRESS`(409). 사전 체크 통과 후에도 동시 INSERT race 시에는 `RefundTicket.ticket_id` **UNIQUE 제약(`uk_refund_ticket_ticket_id`)** 으로 DB 레벨 차단, `DataIntegrityViolationException` catch 하여 동일 에러 변환. 운영 DB ⑪번 ALTER 함께 실행.
+>
+> 정책: **한 ticket 환불 1회만 허용**. 부분/재환불 정책 도입 시 본 UNIQUE 제약과 가드를 재검토 (현재 정책은 ticket UNIQUE).
+
+환불은 **진행 중 환불이 이미 있는지**를 기준으로 멱등 처리한다.
+
+**어디서 막는가:**
+
+| 레이어 | 역할 |
+|--------|------|
+| 서비스 레이어 | 활성 환불 존재 여부 검사 |
+| DB 레이어 | 동시에 여러 환불이 생성되지 않도록 제어 |
+| Gateway | 짧은 시간 반복 호출 차단 |
+
+**무엇을 기준으로 중복 판단하는가:**
+- 같은 주문에 대해 현재 진행 중인 환불이 존재하는지
+
+**팀원이 구현해야 하는 순서:**
+
+```
+1. 주문 기준으로 활성 환불 조회
+   → 새 환불 생성 전에 항상 먼저 조회
+
+2. 진행 중 환불이 있으면 → 새로 만들지 않음
+   → 기존 환불 반환
+   → 멱등 성공 처리
+
+3. 진행 중 환불이 없을 때만 새 환불 생성
+   → 환불 요청 생성
+   → 이후 PG 취소 또는 내부 환불 프로세스 진행
+
+4. 환불 완료/거절/취소 상태는 정책적으로 분리
+   → 거절 또는 취소 후 재요청이 가능하면, 새 환불 생성 허용
+   → 따라서 "주문당 환불 1건 UNIQUE"처럼 막으면 안 된다
+```
+
+**상태별 판단:**
+
+```
+차단: PENDING, PROCESSING — 진행 중 환불이 있으면 새 환불 거부
+허용: REJECTED  — 거절 후 재환불 가능
+허용: CANCELLED — 취소 후 재환불 가능
+```
+
+> 핵심: "기록 존재 여부"가 아니라 **"활성 환불 존재 여부"**를 봐야 한다.
+
+---
+
+### 4-5. Wallet 충전/출금 (POST /api/wallet/charge, /api/wallet/withdraw)
+
+Wallet은 비즈니스 상태만으로 중복 판단이 불가능한 유일한 API다.
+"같은 금액을 의도적으로 2번 충전"이 정상 플로우이므로, **클라이언트 Idempotency-Key가 필수**다.
+
+**어디서 막는가:**
+
+| 레이어 | 역할 |
+|--------|------|
+| 서비스 레이어 | Idempotency-Key로 기존 처리 결과 조회 |
+| DB 레이어 | idempotency_record UNIQUE 제약으로 동시 진입 방지 |
+| Gateway | 짧은 시간 반복 호출 차단 |
+
+**무엇을 기준으로 중복 판단하는가:**
+- 클라이언트가 보낸 Idempotency-Key (UUID v4)
+
+**팀원이 구현해야 하는 순서:**
+
+```
+1. 요청에서 Idempotency-Key 헤더 읽기
+   → 없으면 400 에러 (이 API는 키 필수)
+
+2. idempotency_record 테이블에서 해당 키 조회
+   → 있으면 → 저장된 응답 body 그대로 반환 (재처리 없음)
+
+3. 없으면 → 비즈니스 로직 실행 (충전/출금)
+
+4. 비즈니스 엔티티 + IdempotencyRecord를 같은 트랜잭션에 저장
+   → 커밋
+
+5. 동시 진입 방지
+   → UNIQUE (idempotency_key) 제약
+   → 두 요청이 동시에 INSERT 시도 → 하나만 성공
+   → UNIQUE 위반 catch → 기존 레코드 조회 → 응답 반환
+
+6. 실패 응답은 저장하지 않는다
+   → 실패한 요청은 재시도 가능해야 하므로 멱등 레코드 없어야 재처리됨
+```
+
+**키 유실 (브라우저 재시작) 위험:**
+- 이전 요청 성공 + 응답 유실 + 브라우저 재시작 → 새 UUID 생성 → 이중 충전 가능
+- 대응: 충전 직전 화면에서 "최근 충전 내역" 표시하여 사용자가 직접 확인 유도
+
+**idempotency_record 테이블 (Wallet 전용):**
+
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| id | BIGSERIAL | PK |
+| idempotency_key | VARCHAR(255) | 클라이언트 UUID, **UNIQUE** |
+| endpoint | VARCHAR(255) | API 경로 |
+| user_id | UUID | 요청 유저 |
+| status | VARCHAR(20) | SUCCESS만 저장 |
+| response_body | TEXT | JSON 직렬화된 응답 |
+| expires_at | TIMESTAMP | TTL (생성 + 24시간) |
+| created_at | TIMESTAMP | 생성 시각 |
+
+- TTL 24시간, 매일 새벽 스케줄러로 만료 레코드 삭제
+
+---
+
+## 5. Gateway에서는 무엇을 하고, 무엇을 하지 않는가
+
+Gateway는 멱등성의 주력이 아니다. 하지만 아래는 반드시 한다.
+
+**Gateway가 하는 일:**
+- 짧은 시간 내 동일 유저의 같은 POST 연타 차단 (Bucket4j, 5초 내 1회)
+- 서비스 레이어로 가기 전 1차 필터 역할
+- Key Resolver: JWT에서 추출한 X-User-Id 기준
+
+**Gateway가 하지 않는 일:**
+- 중복 주문 최종 판단
+- 결제 승인 여부 판단
+- 환불 활성 여부 판단
+
+> 팀원은 Gateway를 트래픽 정리 레이어로만 구현하고,
+> 실제 멱등성 판단은 서비스 레이어에서 해야 한다.
+
+---
+
+## 6. Idempotency-Key 저장소는 어떻게 써야 하는가
+
+이 저장소는 **payments/ready + wallet 전용** 보조 저장소로 본다.
+
+**팀원이 구현해야 하는 원칙:**
+
+1. **모든 API에 무조건 붙이지 않는다** — 필요한 API에만 사용
+2. **비즈니스 상태 가드보다 먼저 신뢰하지 않는다** — 키 저장소가 비어 있어도 서버는 orderId로 기존 Payment를 찾아낼 수 있어야 함
+3. **같은 키 + 같은 요청이면** → 저장 응답 반환 (응답 유실 복구)
+4. **같은 키 + 다른 payload면** → 409 Conflict (잘못된 재사용 차단)
+5. **TTL이 지나도 서버는 안전해야 함** — 비즈니스 상태 가드가 2차 방어
+
+---
+
+## 7. 보상 로직은 어디서 어떻게 멱등하게 만드는가
+
+주 요청만 멱등하면 끝이 아니다.
+
+**대상:**
+- 재고 복구
+- 주문 취소
+- PG 취소
+- 환불 완료 처리
+
+**구현 원칙:**
+
+1. **보상 처리에도 "이미 처리됨" 상태를 둔다**
+   - 재고 이미 복구됨 (Stock 상태가 RESTORED — `canTransitionTo()`로 판단, 별도 플래그 불필요)
+   - 주문 이미 CANCELLED
+   - PG 이미 취소됨 (PG 자체 멱등성 활용)
+
+2. **재실행 시 중복 수행하지 않는다**
+   - 이미 처리 완료면 스킵
+   - 스킵도 성공으로 간주
+
+3. **보상은 여러 번 실행돼도 결과가 한 번과 같아야 한다**
+
+---
+
+## 8. 팀원이 실제 구현 시 체크해야 할 질문
+
+각 API를 구현하기 전에 **반드시 아래를 답할 수 있어야 한다.**
+
+```
+□ 이 API의 비즈니스 멱등 기준은 무엇인가?
+□ 중복 요청이 오면 새 작업을 막고 기존 결과를 반환하는가?
+□ 동시에 두 요청이 들어오면 하나만 성공하게 되는가?
+□ 외부 시스템 성공 후 내부 저장 실패 시 재시도로 복구 가능한가?
+□ 보상 로직도 중복 실행 시 안전한가?
+□ Idempotency-Key가 바뀌어도 서버가 막을 수 있는가?
+```
+
+> 이 질문에 답 못 하면 구현 시작하면 안 된다.
+
+---
+
+## 9. 최종 구현 기준 요약
+
+| API | 어디서 | 어떻게 |
+|-----|--------|--------|
+| **주문 생성** | 서비스 + DB | userId + cartId + cartHash 기준 활성 주문 조회, SELECT FOR UPDATE 직렬화, cartHash 일치 시 기존 주문 반환, 불일치 시 새 주문 허용 |
+| **결제 준비** | 서비스 + idempotency 저장소 | orderId 기준 기존 Payment 조회가 먼저, 있으면 반환, 없으면 생성, 같은 키면 저장 응답 재사용 |
+| **결제 승인** | 서비스 + DB + PG | Payment 상태 먼저 확인, 승인 가능 상태만 진행, @Version 동시성 제어, PG 결과를 내부 상태로 반영 |
+| **환불** | 서비스 + DB | 활성 환불 존재 여부 먼저 확인, 있으면 기존 환불 반환, 없으면 새 환불 생성 |
+| **Wallet 충전/출금** | 서비스 + idempotency 저장소 | 클라이언트 Idempotency-Key + DB UNIQUE, 같은 키면 저장 응답 반환 |
+
+---
+
+## 10. 이 문서의 최종 메시지
+
+DevTicket에서 멱등성은 클라이언트 키로 보장하지 않는다.
+
+우리는 다음 순서로 보장한다:
+
+```
+1. 서비스 레이어에서 이미 처리된 비즈니스 상태인지 먼저 확인한다
+2. DB 락/버전으로 동시 요청이 동시에 성공하지 못하게 한다
+3. 외부 PG 처리 결과를 내부 상태와 분리해서 안전하게 반영한다
+4. 보상 로직도 이미 처리된 경우 재실행하지 않도록 만든다
+5. Idempotency-Key는 필요한 API에서만 응답 재사용 용도로 쓴다
+```
+
+이게 팀원이 따라야 하는 구현 기준이다.

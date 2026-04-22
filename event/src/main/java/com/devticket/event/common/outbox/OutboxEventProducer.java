@@ -9,6 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.header.internals.RecordHeader;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
@@ -28,37 +29,43 @@ import org.springframework.stereotype.Component;
 public class OutboxEventProducer {
 
     private static final String MESSAGE_ID_HEADER = "X-Message-Id";
-    private static final long SEND_TIMEOUT_SECONDS = 2L;
 
     private final KafkaTemplate<String, String> kafkaTemplate;
+
+    // 앱 레벨 send().get() 타임아웃(ms). Spring 주입 실패 시 폴백 = @Value default 와 일치.
+    // 불변식: deliveryTimeoutMs < sendTimeoutMs (Producer 재시도가 앱 타임아웃 이전에 종료)
+    @Value("${kafka.outbox-producer.send-timeout-ms:2000}")
+    private long sendTimeoutMs = 2000L;
 
     /**
      * Outbox 메시지를 Kafka에 동기 발행한다.
      *
-     * @return 발행 성공 여부
+     * <p>성공 시 정상 반환, 실패 시 {@link OutboxPublishException}으로 감싸 던진다.
+     * Kafka/Future 계열 예외는 호출부가 단일 타입으로만 catch할 수 있도록 일원화한다.
+     *
+     * @throws OutboxPublishException 발행 실패 (broker ack 실패 / 타임아웃 / 메타데이터 실패 등)
      */
-    public boolean publish(OutboxEventMessage message) {
+    public void publish(OutboxEventMessage message) throws OutboxPublishException {
         ProducerRecord<String, String> record = buildRecord(message);
 
         try {
-            kafkaTemplate.send(record).get(SEND_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            kafkaTemplate.send(record).get(sendTimeoutMs, TimeUnit.MILLISECONDS);
             log.debug("Outbox 발행 성공 — topic={}, messageId={}", message.topic(), message.messageId());
-            return true;
         } catch (ExecutionException | TimeoutException e) {
             // future 결과 대기 중 실패 — broker ack 실패 / send 타임아웃
             log.error("Outbox 발행 실패 (future) — topic={}, messageId={}, error={}",
                     message.topic(), message.messageId(), e.getMessage());
-            return false;
+            throw new OutboxPublishException("Outbox 발행 실패 (future) — messageId=" + message.messageId(), e);
         } catch (InterruptedException e) {
             log.error("Outbox 발행 인터럽트 — topic={}, messageId={}", message.topic(), message.messageId());
             Thread.currentThread().interrupt();
-            return false;
+            throw new OutboxPublishException("Outbox 발행 인터럽트 — messageId=" + message.messageId(), e);
         } catch (KafkaException e) {
             // send() 호출 시점 런타임 예외 — max.block.ms 초과(TimeoutException),
             // 직렬화 실패(SerializationException), 메타데이터 실패 등
             log.error("Outbox 발행 실패 (send) — topic={}, messageId={}, error={}",
                     message.topic(), message.messageId(), e.getMessage());
-            return false;
+            throw new OutboxPublishException("Outbox 발행 실패 (send) — messageId=" + message.messageId(), e);
         }
     }
 

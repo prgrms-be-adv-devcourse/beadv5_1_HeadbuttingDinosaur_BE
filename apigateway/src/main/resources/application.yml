@@ -41,7 +41,7 @@ spring:
             - id: event-service
               uri: http://localhost:8082
               predicates:
-                - Path=/api/events, /api/events/**, /api/seller/events, /api/seller/events/**
+                - Path=/api/events, /api/events/**, /api/seller/events, /api/seller/events/**, /api/seller/images/**
 
             - id: payment-service
               uri: http://localhost:8084
@@ -51,7 +51,7 @@ spring:
             - id: settlement-service
               uri: http://localhost:8085
               predicates:
-                - Path=/api/settlements/**, /api/seller/settlements, /api/seller/settlements/**
+                - Path=/api/settlements/**, /api/seller/settlements, /api/seller/settlements/**, /api/admin/settlements/**
 
             - id: log-service
               uri: http://localhost:8086

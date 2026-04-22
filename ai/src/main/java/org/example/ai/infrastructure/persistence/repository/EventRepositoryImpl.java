@@ -15,7 +15,6 @@ public class EventRepositoryImpl implements EventRepository {
 
     @Override
     public PopularEventListResponse getPopularEvents(PopularEventListRequest popularEventRquest) {
-        eventServiceClient.getPopularEvents(popularEventRquest);
-        return null;
+        return eventServiceClient.getPopularEvents(popularEventRquest);
     }
 }

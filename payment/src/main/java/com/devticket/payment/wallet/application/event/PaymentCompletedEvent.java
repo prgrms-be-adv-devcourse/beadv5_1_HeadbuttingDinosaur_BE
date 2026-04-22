@@ -1,17 +1,26 @@
 package com.devticket.payment.wallet.application.event;
 
-import java.time.LocalDateTime;
+import com.devticket.payment.payment.domain.enums.PaymentMethod;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import lombok.Builder;
 
 @Builder
+@JsonIgnoreProperties(ignoreUnknown = true)
 public record PaymentCompletedEvent(
     UUID orderId,
-    String userId,
-    String paymentId,
-    String paymentMethod, // "WALLET" | "PG"
+    UUID userId,
+    UUID paymentId,
+    PaymentMethod paymentMethod,
     int totalAmount,
-    LocalDateTime timestamp
+    List<OrderItem> orderItems,
+    Instant timestamp
 ) {
-
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record OrderItem(
+        UUID eventId,
+        int quantity
+    ) {}
 }

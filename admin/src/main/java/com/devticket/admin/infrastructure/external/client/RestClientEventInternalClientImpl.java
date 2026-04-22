@@ -1,5 +1,6 @@
 package com.devticket.admin.infrastructure.external.client;
 
+import com.devticket.admin.infrastructure.external.dto.req.InternalEventForceCancelRequest;
 import com.devticket.admin.infrastructure.external.dto.res.InternalAdminEventPageResponse;
 import com.devticket.admin.infrastructure.external.dto.res.InternalResponse;
 import com.devticket.admin.presentation.dto.req.AdminEventSearchRequest;
@@ -7,6 +8,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Primary;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
@@ -41,9 +43,13 @@ public class RestClientEventInternalClientImpl implements EventInternalClient {
     }
 
     @Override
-    public void forceCancel(UUID eventId) {
-        restClient.post()
+    public void forceCancel(UUID adminId, UUID eventId) {
+        restClient.patch()
             .uri(eventServerUrl + "/internal/events/{eventId}/force-cancel", eventId)
+            .header("X-User-Id", adminId.toString())
+            .header("X-User-Role", "ADMIN")
+            .contentType(MediaType.APPLICATION_JSON)
+            .body(new InternalEventForceCancelRequest("관리자 강제 취소"))
             .retrieve()
             .toBodilessEntity();
     }

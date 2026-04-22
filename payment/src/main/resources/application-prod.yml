@@ -11,17 +11,21 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
+        default_schema: payment
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
     consumer:
       group-id: devticket-payment
       auto-offset-reset: latest
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
 
 internal:
   commerce:
-    base-url: http://localhost:8083
+    base-url: http://commerce:8083
   event:
-    base-url: http://localhost:8082
+    base-url: http://event:8082
 
 jwt:
   secret-key: ${JWT_SECRET_KEY}

@@ -27,7 +27,7 @@ import org.springframework.stereotype.Component;
  * <ul>
  *   <li>Order.@Version 낙관적 락 — 한쪽만 커밋 성공, 다른 쪽은 ObjectOptimisticLockingFailureException
  *   <li>canTransitionTo(CANCELLED) 선가드 — 이미 CANCELLED면 Outbox 발행 없이 스킵
- *   <li>결과: payment.failed Outbox는 최대 1회만 발행 (재고 복구 이중 실행 없음)
+ *   <li>결과: order.cancelled Outbox는 최대 1회만 발행 (재고 복구 이중 실행 없음)
  * </ul>
  */
 @Slf4j

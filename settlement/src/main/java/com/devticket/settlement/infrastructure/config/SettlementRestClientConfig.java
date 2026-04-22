@@ -17,4 +17,32 @@ public class SettlementRestClientConfig {
             .defaultHeader("Content-Type", "application/json")
             .build();
     }
+
+    @Bean
+    public RestClient settlementToMemberRestClient(
+        @Value("${external.member-base-url}") String baseUrl) {
+        return RestClient.builder()
+            .baseUrl(baseUrl)
+            .defaultHeader("Content-Type", "application/json")
+            .build();
+    }
+
+    @Bean
+    public RestClient settlementToEventRestClient(
+        @Value("${external.event-base-url}") String baseUrl) {
+        return RestClient.builder()
+            .baseUrl(baseUrl)
+            .defaultHeader("Content-Type", "application/json")
+            .build();
+    }
+
+    @Bean
+    public RestClient settlementToPaymentRestClient(
+        @Value("${external.payment-base-url}") String baseUrl) {
+        return RestClient.builder()
+            .baseUrl(baseUrl)
+            .defaultHeader("Content-Type", "application/json")
+            .build();
+    }
+
 }

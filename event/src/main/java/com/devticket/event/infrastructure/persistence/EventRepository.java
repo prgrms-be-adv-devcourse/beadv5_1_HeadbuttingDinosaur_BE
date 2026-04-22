@@ -1,5 +1,6 @@
 package com.devticket.event.infrastructure.persistence;
 
+import com.devticket.event.domain.enums.EventCategory;
 import com.devticket.event.domain.enums.EventStatus;
 import com.devticket.event.domain.model.Event;
 import jakarta.persistence.LockModeType;
@@ -32,6 +33,28 @@ public interface EventRepository extends JpaRepository<Event, Long> {
         @Param("sellerId") UUID sellerId,
         Pageable pageable
     );
+
+    @Query("""
+    SELECT DISTINCT e FROM Event e
+    WHERE (:keyword IS NULL OR e.title LIKE CONCAT('%', :keyword, '%'))
+      AND (:#{#statuses == null || #statuses.isEmpty()} = true OR e.status IN :statuses)
+      AND (:category IS NULL OR e.category = :category)
+      AND (:#{#techStacks == null || #techStacks.isEmpty()} = true
+           OR EXISTS (SELECT t FROM EventTechStack t WHERE t.event = e AND t.techStackId IN :techStacks))
+      AND (:sellerId IS NULL OR e.sellerId = :sellerId)
+    ORDER BY e.saleStartAt DESC
+    """)
+    Page<Event> searchEventsWithStatuses(
+        @Param("keyword") String keyword,
+        @Param("statuses") List<EventStatus> statuses,
+        @Param("category") EventCategory category,
+        @Param("techStacks") List<Long> techStacks,
+        @Param("sellerId") UUID sellerId,
+        Pageable pageable
+    );
+
+    @Query("SELECT e.eventId FROM Event e WHERE e.status IN :statuses")
+    List<UUID> findAllEventIdsByStatusIn(@Param("statuses") List<EventStatus> statuses);
 
     // 외부 API
     List<Event> findAllByEventIdIn(List<UUID> eventIds);
@@ -73,6 +96,12 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     @Query("SELECT e FROM Event e WHERE e.eventId IN :eventIds ORDER BY e.eventId ASC")
     List<Event> findAllByEventIdInWithLock(@Param("eventIds") List<UUID> eventIds);
 
+    List<Event> findAllByStatusAndSaleStartAtBefore(EventStatus status, LocalDateTime now);
+
+    List<Event> findAllByStatusInAndSaleEndAtBefore(List<EventStatus> statuses, LocalDateTime now);
+
+    List<Event> findAllByStatusInAndEventDateTimeBefore(List<EventStatus> statuses, LocalDateTime now);
+
     // 판매자별 이벤트 조회
     List<Event> findBySellerIdOrderByCreatedAtDesc(UUID sellerId);
 
@@ -96,5 +125,6 @@ public interface EventRepository extends JpaRepository<Event, Long> {
         @Param("startOfDay") LocalDateTime startOfDay,
         @Param("startOfNextDay") LocalDateTime startOfNextDay
     );
+
 
 }

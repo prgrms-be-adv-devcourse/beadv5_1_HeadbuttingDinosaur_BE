@@ -19,8 +19,6 @@ import org.example.ai.domain.repository.EventRepository;
 import org.example.ai.domain.repository.MemberRepository;
 import org.example.ai.domain.repository.TechStackEmbeddingRepository;
 import org.example.ai.domain.repository.UserVectorRepository;
-import org.example.ai.infrastructure.external.client.EventServiceClient;
-import org.example.ai.infrastructure.external.client.MemberServiceClient;
 import org.example.ai.infrastructure.external.dto.req.PopularEventListRequest;
 import org.example.ai.infrastructure.external.dto.res.PopularEventListResponse;
 import org.example.ai.infrastructure.external.dto.res.UserTechStackResponse;
@@ -104,41 +102,51 @@ public class RecommendationService {
 
         // 1.1 임베딩 값이 비었을 경우
         if(embeddingList.isEmpty()){
-            PopularEventListRequest popularEventRquest = new PopularEventListRequest(5);
-            PopularEventListResponse response = eventRepository.getPopularEvents(popularEventRquest);
-            List<String> popularEventIds = response.events().stream()
-                .map(PopularEventListResponse.EventInfo::eventId)
-                .toList();
-
-            return new RecommendationResponse(userId, popularEventIds);
+            try {
+                PopularEventListRequest popularEventRequest = new PopularEventListRequest(5);
+                PopularEventListResponse response = eventRepository.getPopularEvents(popularEventRequest);
+                log.info("[ColdStart] popular 응답: {}", response);
+                List<String> popularEventIds = response.data().stream()
+                    .map(PopularEventListResponse.EventInfo::id)
+                    .toList();
+                log.info("[ColdStart] popularEventIds: {}", popularEventIds);
+                return new RecommendationResponse(userId, popularEventIds);
+            } catch (Exception e) {
+                log.error("[ColdStart] popular 처리 실패", e);
+                throw e;
+            }
         }
 
         // 2. 테크 스택의 평균 벡터 연산
         float[] queryVector = combineVector(embeddingList);
 
         // 3. knn 검색
-        List<Map<String, Object>> events = searchKnn(queryVector,5);
+        List<Map<String, Object>> events = searchKnn(queryVector, 5);
 
         // 4. event_id 담기
         List<String> eventIds = events.stream()
-            .map(event -> event.get("eventId").toString())
+            .map(event -> event.get("id").toString())
             .toList();
 
         // 5. 추천 event가 5 개 이하일 경우, 부족한 추천 갯수 채우기
         if(eventIds.size() < 5){
             int neededCount = 5 - eventIds.size();
 
-            PopularEventListRequest popularEventRquest = new PopularEventListRequest(neededCount);
-            PopularEventListResponse response = eventRepository.getPopularEvents(popularEventRquest);
+            try {
+                PopularEventListRequest popularEventRequest = new PopularEventListRequest(neededCount);
+                PopularEventListResponse response = eventRepository.getPopularEvents(popularEventRequest);
+                log.info("[ColdStart] popular 보충 응답: {}", response);
+                List<String> popularEventIds = response.data().stream()
+                    .map(PopularEventListResponse.EventInfo::id)
+                    .toList();
 
-            List<String> popularEventIds = response.events().stream()
-                .map(PopularEventListResponse.EventInfo::eventId)
-                .toList();
-
-            List<String> combined = new ArrayList<>(eventIds);
-            combined.addAll(popularEventIds);
-
-            return new RecommendationResponse(userId, combined);
+                List<String> combined = new ArrayList<>(eventIds);
+                combined.addAll(popularEventIds);
+                return new RecommendationResponse(userId, combined);
+            } catch (Exception e) {
+                log.error("[ColdStart] popular 보충 처리 실패", e);
+                throw e;
+            }
         }
 
         return new RecommendationResponse(userId, eventIds);
@@ -193,7 +201,7 @@ public class RecommendationService {
 
             // kNN 쿼리문
             SearchResponse<Map> response = elasticsearchClient.search(s -> s
-                    .index("event-index")
+                    .index("event")
                     .knn(k -> k
                         .field("embedding")
                         .queryVector(queryList)
@@ -205,7 +213,7 @@ public class RecommendationService {
                                 .value("ON_SALE"))))
                     .source(src -> src
                         .filter(f -> f
-                            .includes("eventId", "embedding")
+                            .includes("id", "embedding")
                         )
                     ),
                 Map.class);
@@ -216,6 +224,7 @@ public class RecommendationService {
                     result.add(hit.source());
                 }
             }
+            log.info("[kNN] 검색 결과: {}개", result.size());
             return result;
         }
         catch(Exception e){
@@ -232,7 +241,7 @@ public class RecommendationService {
         List<ScoredEvent> scoreList = new ArrayList<>();
 
         for(Map<String, Object> candidate : candidates){
-            String eventId = candidate.get("eventId").toString();
+            String eventId = candidate.get("id").toString();
 
             List<Double> embeddingRaw = (List<Double>) candidate.get("embedding");
             if (embeddingRaw == null) continue;

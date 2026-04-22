@@ -7,6 +7,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * Outbox 저장·건별 발행 서비스
@@ -23,10 +25,9 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class OutboxService {
 
-    static final int MAX_RETRIES = 6;
-
     private final OutboxRepository outboxRepository;
     private final OutboxEventProducer outboxEventProducer;
+    private final OutboxAfterCommitPublisher outboxAfterCommitPublisher;
     private final ObjectMapper objectMapper;
 
     /**
@@ -35,7 +36,7 @@ public class OutboxService {
      *
      * @param aggregateId  비즈니스 키 UUID (운영 추적용 — orderId, eventId 등)
      * @param partitionKey Kafka Partition Key (순서 보장 기준 — orderId 또는 eventId)
-     * @param eventType    이벤트 유형 식별자 (예: STOCK_DEDUCTED)
+     * @param eventType    이벤트 유형 식별자 (예: EVENT_FORCE_CANCELLED)
      * @param topic        Kafka 토픽명
      * @param event        직렬화할 이벤트 DTO 객체
      */
@@ -45,35 +46,60 @@ public class OutboxService {
         String payload = serialize(event);
         Outbox outbox = Outbox.create(aggregateId, partitionKey, eventType, topic, payload);
         outboxRepository.save(outbox);
+        // IDENTITY 전략 — save() 직후 outbox.getId() 가 채워진다.
+        registerAfterCommitPublish(outbox.getId());
+    }
+
+    /**
+     * 비즈니스 트랜잭션 커밋 직후 비동기 직접 발행을 예약한다.
+     * 실패/누락 시에는 OutboxScheduler 가 grace period 경과 후 fallback 으로 발행한다.
+     */
+    private void registerAfterCommitPublish(Long outboxId) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            // MANDATORY 라 도달 불가지만 방어적으로 처리.
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                outboxAfterCommitPublisher.scheduleAfterCommit(outboxId);
+            }
+        });
     }
 
     /**
      * Outbox 한 건을 Kafka에 발행하고 상태를 반영한다.
      * Kafka 발행은 트랜잭션 밖, 상태 저장은 {@code save()} 자체 트랜잭션에서 수행.
      *
-     * <p>publish() 가 예상 외 RuntimeException 을 던져도 markFailed/save 를 보장해야
-     * Scheduler 루프가 중단되지 않고 동일 레코드의 무한 고착을 막을 수 있다.
+     * <p>예외 처리 정책:
+     * <ul>
+     *   <li>{@link OutboxPublishException} — Producer가 감싼 발행 실패 → markFailed</li>
+     *   <li>{@link RuntimeException} — 예상 외 전파 (최후 방어선) → markFailed</li>
+     * </ul>
+     * 어느 쪽이든 Scheduler 루프 중단·레코드 고착을 막기 위해 markFailed/save를 보장한다.
      */
     public void processOne(Outbox outbox) {
-        boolean success;
         try {
-            success = outboxEventProducer.publish(OutboxEventMessage.from(outbox));
+            outboxEventProducer.publish(OutboxEventMessage.from(outbox));
+            outbox.markSent();
+        } catch (OutboxPublishException e) {
+            log.warn("Outbox 발행 실패 — outboxId={}, topic={}, messageId={}, error={}",
+                    outbox.getId(), outbox.getTopic(), outbox.getMessageId(), e.getMessage());
+            markFailedAndLog(outbox);
         } catch (RuntimeException e) {
             log.error("Outbox 발행 중 예외 전파 — outboxId={}, topic={}, messageId={}, error={}",
                     outbox.getId(), outbox.getTopic(), outbox.getMessageId(), e.getMessage(), e);
-            success = false;
-        }
-
-        if (success) {
-            outbox.markSent();
-        } else {
-            outbox.markFailed(MAX_RETRIES);
-            if (outbox.getStatus() == OutboxStatus.FAILED) {
-                log.error("Outbox 최대 재시도 초과 → FAILED — outboxId={}, topic={}, messageId={}",
-                        outbox.getId(), outbox.getTopic(), outbox.getMessageId());
-            }
+            markFailedAndLog(outbox);
         }
         outboxRepository.save(outbox);
+    }
+
+    private void markFailedAndLog(Outbox outbox) {
+        outbox.markFailed();
+        if (outbox.getStatus() == OutboxStatus.FAILED) {
+            log.error("Outbox 최대 재시도 초과 → FAILED — outboxId={}, topic={}, messageId={}",
+                    outbox.getId(), outbox.getTopic(), outbox.getMessageId());
+        }
     }
 
     private String serialize(Object event) {

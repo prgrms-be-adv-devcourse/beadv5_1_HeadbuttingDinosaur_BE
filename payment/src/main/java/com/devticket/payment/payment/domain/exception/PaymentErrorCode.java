@@ -14,7 +14,8 @@ public enum PaymentErrorCode implements ErrorCode {
     PG_TIMEOUT(502, "PAYMENT_004", "PG사 응답 지연으로 결제에 실패했습니다."),
     PG_REFUND_FAILED(502, "PAYMENT_005", "PG사 환불 처리에 실패했습니다."),
     ORDER_COMPLETE_FAILED(502, "PAYMENT_006", "주문 완료 처리(Commerce 연동)에 실패했습니다."),
-    PG_CANCEL_FAILED(502,       "PAYMENT_007", "PG 결제 취소에 실패했습니다."),;
+    PG_CANCEL_FAILED(502,       "PAYMENT_007", "PG 결제 취소에 실패했습니다."),
+    INVALID_STATUS_TRANSITION(409, "PAYMENT_008", "허용되지 않는 결제 상태 전이입니다.");
 
     private final int status;
     private final String code;

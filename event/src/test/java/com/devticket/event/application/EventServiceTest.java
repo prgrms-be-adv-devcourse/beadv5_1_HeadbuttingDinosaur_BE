@@ -13,19 +13,21 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import com.devticket.event.common.exception.BusinessException;
+import com.devticket.event.common.outbox.OutboxService;
 import com.devticket.event.domain.enums.EventCategory;
 import com.devticket.event.domain.enums.EventStatus;
 import com.devticket.event.domain.exception.EventErrorCode;
 import com.devticket.event.domain.model.Event;
+import com.devticket.event.domain.model.EventView;
 import com.devticket.event.fixture.EventTestFixture;
 import com.devticket.event.infrastructure.client.AdminClient;
 import com.devticket.event.infrastructure.client.MemberClient;
-import com.devticket.event.infrastructure.client.OpenAiEmbeddingClient;
 import com.devticket.event.infrastructure.client.dto.TechStackItem;
 import com.devticket.event.infrastructure.persistence.EventRepository;
+import com.devticket.event.infrastructure.persistence.EventViewRepository;
 import com.devticket.event.infrastructure.search.EventDocument;
+import com.devticket.event.infrastructure.client.OpenAiEmbeddingClient;
 import com.devticket.event.presentation.dto.EventDetailResponse;
 import com.devticket.event.presentation.dto.EventListRequest;
 import com.devticket.event.presentation.dto.EventListResponse;
@@ -71,10 +73,19 @@ class EventServiceTest {
     private ElasticsearchOperations elasticsearchOperations;
 
     @Mock
-    private ElasticsearchClient esClient;
+    private ElasticsearchSyncService elasticsearchSyncService;
 
     @Mock
     private OpenAiEmbeddingClient openAiEmbeddingClient;
+
+    @Mock
+    private OutboxService outboxService;
+
+    @Mock
+    private MessageDeduplicationService deduplicationService;
+
+    @Mock
+    private EventViewRepository eventViewRepository;
 
     @InjectMocks
     private EventService eventService;
@@ -134,9 +145,10 @@ class EventServiceTest {
 
         // then
         assertThat(response.eventId()).isEqualTo(expectedUuid);
-        assertThat(response.status()).isEqualTo(EventStatus.ON_SALE);
+        assertThat(response.status()).isEqualTo(EventStatus.DRAFT);
 
-        verify(eventRepository, times(2)).save(argThat(event -> event != null));
+        // save 3회 호출 — (1) 이벤트 본체 + (2) techStackIds + (3) imageUrls (fixture 에 "url1" 포함)
+        verify(eventRepository, times(3)).save(argThat(event -> event != null));
     }
 
     @Test
@@ -196,6 +208,10 @@ class EventServiceTest {
         UUID eventId = event.getEventId();
 
         when(eventRepository.findWithDetailsByEventId(eventId)).thenReturn(Optional.of(event));
+        // memberClient.getNickname() 은 기본 null 반환 — CI 환경에서 일부 응답 합성 경로가 null 을 허용하지 않을 수 있어
+        // 명시적 stub 으로 NPE 재발 방지 (CI run 24766734663 재현 차단)
+        when(memberClient.getNickname(sellerId)).thenReturn("tester");
+        when(eventViewRepository.findByEvent(event)).thenReturn(Optional.of(EventView.of(event)));
 
         // when
         EventDetailResponse response = eventService.getEvent(eventId);
@@ -355,29 +371,39 @@ class EventServiceTest {
     }
 
     @Test
-    void 타인_비공개_이벤트_조회시_권한예외_발생() {
+    void DRAFT_상태는_공개_상태이므로_타인도_조회_가능하다() {
         // given
         UUID sellerId = UUID.randomUUID();
-        UUID otherUserId = UUID.randomUUID(); // 다른 사용자 (타인)
+        UUID otherUserId = UUID.randomUUID();
         EventListRequest request = new EventListRequest(null, null, null, sellerId, EventStatus.DRAFT);
         Pageable pageable = PageRequest.of(0, 20);
 
-        // when & then
-        assertThatThrownBy(() -> eventService.getEventList(request, otherUserId, pageable))
-            .isInstanceOf(BusinessException.class)
-            .hasMessageContaining(EventErrorCode.UNAUTHORIZED_SELLER.getMessage());
+        doReturn(mockEmptySearchHits())
+            .when(elasticsearchOperations).search(any(Query.class), eq(EventDocument.class));
+
+        // when
+        EventListResponse response = eventService.getEventList(request, otherUserId, pageable);
+
+        // then
+        assertThat(response).isNotNull();
+        assertThat(response.content()).isEmpty();
     }
 
     @Test
-    void 비로그인_사용자_비공개_이벤트_조회시_권한예외_발생() {
+    void DRAFT_상태는_공개_상태이므로_비로그인_사용자도_조회_가능하다() {
         // given
         EventListRequest request = new EventListRequest(null, null, null, null, EventStatus.DRAFT);
         Pageable pageable = PageRequest.of(0, 20);
 
-        // when & then (currentUserId에 null 전달)
-        assertThatThrownBy(() -> eventService.getEventList(request, null, pageable))
-            .isInstanceOf(BusinessException.class)
-            .hasMessageContaining(EventErrorCode.UNAUTHORIZED_SELLER.getMessage());
+        doReturn(mockEmptySearchHits())
+            .when(elasticsearchOperations).search(any(Query.class), eq(EventDocument.class));
+
+        // when
+        EventListResponse response = eventService.getEventList(request, null, pageable);
+
+        // then
+        assertThat(response).isNotNull();
+        assertThat(response.content()).isEmpty();
     }
 
     @Test

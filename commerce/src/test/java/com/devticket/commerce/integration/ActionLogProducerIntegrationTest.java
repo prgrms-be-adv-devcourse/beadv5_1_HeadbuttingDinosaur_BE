@@ -66,7 +66,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 @ActiveProfiles("test")
 @EmbeddedKafka(
         partitions = 1,
-        topics = {KafkaTopics.ACTION_LOG, KafkaTopics.ORDER_CREATED},
+        topics = {KafkaTopics.ACTION_LOG},
         bootstrapServersProperty = "spring.kafka.bootstrap-servers"
 )
 @DirtiesContext
@@ -162,7 +162,7 @@ class ActionLogProducerIntegrationTest {
         stubEventPrice(eventId, 8_000);
 
         // when
-        cartItemUseCase.deleteTicket(userId, item.getId());
+        cartItemUseCase.deleteTicket(userId, item.getCartItemId());
 
         // then
         ActionLogEvent event = awaitSingleActionLog(userId);
@@ -227,7 +227,7 @@ class ActionLogProducerIntegrationTest {
         CartItem item = cartItemRepository.save(CartItem.create(cart.getId(), eventId, 1));
         stubEventPrice(eventId, 3_000);
 
-        cartItemUseCase.updateTicket(userId, item.getId(), new CartItemQuantityRequest(2));
+        cartItemUseCase.updateTicket(userId, item.getCartItemId(), new CartItemQuantityRequest(2));
 
         ActionLogEvent event = awaitSingleActionLog(userId);
         assertThat(event.actionType()).isEqualTo(ActionType.CART_ADD);
@@ -245,7 +245,7 @@ class ActionLogProducerIntegrationTest {
         CartItem item = cartItemRepository.save(CartItem.create(cart.getId(), eventId, 5));
         stubEventPrice(eventId, 4_000);
 
-        cartItemUseCase.updateTicket(userId, item.getId(), new CartItemQuantityRequest(-2));
+        cartItemUseCase.updateTicket(userId, item.getCartItemId(), new CartItemQuantityRequest(-2));
 
         ActionLogEvent event = awaitSingleActionLog(userId);
         assertThat(event.actionType()).isEqualTo(ActionType.CART_REMOVE);
@@ -263,7 +263,7 @@ class ActionLogProducerIntegrationTest {
         CartItem item = cartItemRepository.save(CartItem.create(cart.getId(), eventId, 1));
         stubEventPrice(eventId, 5_000);
 
-        cartItemUseCase.updateTicket(userId, item.getId(), new CartItemQuantityRequest(0));
+        cartItemUseCase.updateTicket(userId, item.getCartItemId(), new CartItemQuantityRequest(0));
 
         assertNoActionLogFor(userId, Duration.ofSeconds(3));
     }
@@ -296,7 +296,7 @@ class ActionLogProducerIntegrationTest {
         given(eventClient.getValidateEventStatus(any(), any(), anyInt()))
                 .willThrow(new RuntimeException("event-service down"));
 
-        cartItemUseCase.deleteTicket(userId, item.getId());
+        cartItemUseCase.deleteTicket(userId, item.getCartItemId());
 
         ActionLogEvent event = awaitSingleActionLog(userId);
         assertThat(event.actionType()).isEqualTo(ActionType.CART_REMOVE);
@@ -310,7 +310,7 @@ class ActionLogProducerIntegrationTest {
     private void stubEventPrice(UUID eventId, int price) {
         given(eventClient.getValidateEventStatus(any(), any(), anyInt()))
                 .willReturn(new InternalPurchaseValidationResponse(
-                        eventId, Boolean.TRUE, null, 10, "테스트-이벤트", price));
+                        eventId, UUID.randomUUID(), Boolean.TRUE, null, 10, "테스트-이벤트", price));
     }
 
     private ActionLogEvent awaitSingleActionLog(UUID expectedUserId) throws Exception {

@@ -6,6 +6,7 @@ import com.devticket.event.domain.exception.EventErrorCode;
 import com.devticket.event.domain.model.Event;
 import com.devticket.event.infrastructure.client.MemberClient;
 import com.devticket.event.infrastructure.persistence.EventRepository;
+import com.devticket.event.infrastructure.persistence.EventViewRepository;
 import com.devticket.event.infrastructure.search.EventDocument;
 import com.devticket.event.infrastructure.search.EventSearchRepository;
 import com.devticket.event.presentation.dto.internal.InternalAdminEventResponse;
@@ -14,10 +15,10 @@ import com.devticket.event.presentation.dto.internal.InternalBulkStockAdjustment
 import com.devticket.event.presentation.dto.internal.InternalEndedEventsResponse;
 import com.devticket.event.presentation.dto.internal.InternalEventInfoResponse;
 import com.devticket.event.presentation.dto.internal.InternalPagedEventResponse;
+import com.devticket.event.presentation.dto.internal.InternalPopularEventResponse;
 import com.devticket.event.presentation.dto.internal.InternalPurchaseValidationResponse;
 import com.devticket.event.presentation.dto.internal.InternalSellerEventsResponse;
 import com.devticket.event.presentation.dto.internal.InternalStockAdjustmentResponse;
-import com.devticket.event.presentation.dto.internal.InternalStockOperationResponse;
 import com.devticket.event.presentation.dto.internal.PurchaseUnavailableReason;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -42,6 +43,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class EventInternalService {
 
+    private final EventViewRepository eventViewRepository;
     private final EventRepository eventRepository;
     private final EventSearchRepository eventSearchRepository;
     private final MemberClient memberClient;
@@ -139,42 +141,6 @@ public class EventInternalService {
         return new InternalSellerEventsResponse(sellerId, summaries);
     }
 
-
-    /**
-     * API 5: 단건 재고 차감
-     * Pessimistic Lock으로 동시성 제어
-     */
-    @Transactional
-    public InternalStockOperationResponse deductStock(UUID id, int quantity) {
-        Event event = eventRepository.findByEventIdWithLock(id)
-            .orElseThrow(() -> new BusinessException(EventErrorCode.EVENT_NOT_FOUND));
-
-        EventStatus statusBefore = event.getStatus();  // deductStock 호출 전으로 이동
-        event.deductStock(quantity);
-
-        if (!event.getStatus().equals(statusBefore)) {
-            syncToElasticsearch(id);
-        }
-        return new InternalStockOperationResponse(event.getEventId(), true, event.getRemainingQuantity(), event.getTitle());
-    }
-
-    /**
-     * API 6: 단건 재고 복원
-     * Pessimistic Lock으로 동시성 제어
-     */
-    @Transactional
-    public InternalStockOperationResponse restoreStock(UUID id, int quantity) {
-        Event event = eventRepository.findByEventIdWithLock(id)
-            .orElseThrow(() -> new BusinessException(EventErrorCode.EVENT_NOT_FOUND));
-
-        EventStatus statusBefore = event.getStatus();  // restoreStock 호출 전으로 이동
-        event.restoreStock(quantity);
-
-        if (!event.getStatus().equals(statusBefore)) {
-            syncToElasticsearch(id);
-        }
-        return new InternalStockOperationResponse(event.getEventId(), true, event.getRemainingQuantity(), event.getTitle());
-    }
 
     /**
      * API 4: 벌크 재고 조정 — 원자적 처리 (All or Nothing)
@@ -276,14 +242,18 @@ public class EventInternalService {
         if (status == EventStatus.CANCELLED || status == EventStatus.FORCE_CANCELLED) {
             return PurchaseUnavailableReason.EVENT_CANCELLED;
         }
+        if (status == EventStatus.ENDED) {
+            return PurchaseUnavailableReason.SALE_ENDED;
+        }
         if (status == EventStatus.SOLD_OUT) {
             return PurchaseUnavailableReason.SOLD_OUT;
         }
-        // InstantType으로 수정 필요 그래야 올바른 시간 비교 가능해짐
-        // LocalDateTime now = LocalDateTime.now();
-        // if (now.isBefore(event.getSaleStartAt()) || now.isAfter(event.getSaleEndAt())) {
-        //     return PurchaseUnavailableReason.SALE_ENDED;
-        // }
+        // 판매 기간 외 — ON_SALE 상태여도 사전판매 시작 전/종료 후이면 SALE_ENDED 로 분류
+        // (saleStartAt / saleEndAt 은 Event.isPurchasable() 와 동일하게 LocalDateTime 기준)
+        LocalDateTime now = LocalDateTime.now();
+        if (now.isBefore(event.getSaleStartAt()) || now.isAfter(event.getSaleEndAt())) {
+            return PurchaseUnavailableReason.SALE_ENDED;
+        }
         if (status == EventStatus.SALE_ENDED) {
             return PurchaseUnavailableReason.SALE_ENDED;
         }
@@ -320,6 +290,19 @@ public class EventInternalService {
             .toList();
     }
 
+    // 요청에 갯수만큼 이벤트 조회(인기순)
+    public List<InternalPopularEventResponse> getPopularEventsByCount(int count){
+        try{
+            return eventViewRepository.findTopByViewCount(count).stream()
+                .map(InternalPopularEventResponse::from)
+                .toList();
+        }catch (Exception e){
+            log.error("[인기 이벤트 조회 실패] count: {}", count, e);
+            return List.of();
+        }
+
+    }
+
     private void syncToElasticsearch(UUID eventId) {
         try {
             eventRepository.findWithDetailsByEventId(eventId)
@@ -328,6 +311,8 @@ public class EventInternalService {
             log.warn("[ES 동기화 실패] eventId: {}", eventId, e);
         }
     }
+
+
 
 
 }

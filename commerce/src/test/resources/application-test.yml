@@ -30,6 +30,10 @@ spring:
 devticket:
   outbox:
     send-timeout-ms: 10000
+    # afterCommit 직접 발행이 우선 처리되도록 짧은 grace 부여 — 스케줄러 중복 발행 방지.
+    publish-grace-seconds: 2
+    # 운영용 60초 폴링은 통합 테스트 응답 시간을 초과하므로 단축한다.
+    scheduler-delay-ms: 1000
   kafka:
     producer:
       delivery-timeout-ms: 8000

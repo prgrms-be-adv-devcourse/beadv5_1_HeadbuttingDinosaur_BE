@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -29,8 +30,10 @@ import org.hibernate.annotations.SQLRestriction;
 @Entity
 @Table(name = "events", schema = "event")
 @Getter
+@Builder(access = AccessLevel.PRIVATE)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@SQLRestriction("deleted_at IS NULL") // Soft Delete: 조회 시 삭제된 데이터 제외
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
+@SQLRestriction("deleted_at IS NULL")
 public class Event extends BaseEntity {
 
     @Id
@@ -74,6 +77,7 @@ public class Event extends BaseEntity {
     private Integer remainingQuantity;
 
     @Column(nullable = false)
+    @Builder.Default
     private Integer cancelledQuantity = 0;
 
     @Enumerated(EnumType.STRING)
@@ -88,31 +92,12 @@ public class Event extends BaseEntity {
     private Long version;
 
     @OneToMany(mappedBy = "event", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
     private List<EventTechStack> eventTechStacks = new ArrayList<>();
 
     @OneToMany(mappedBy = "event", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
     private List<EventImage> eventImages = new ArrayList<>();
-
-    @Builder(access = AccessLevel.PRIVATE)
-    private Event(UUID eventId, UUID sellerId, String title, String description, String location,
-        LocalDateTime eventDateTime, LocalDateTime saleStartAt, LocalDateTime saleEndAt,
-        Integer price, Integer totalQuantity, Integer maxQuantity, Integer remainingQuantity,
-        EventStatus status, EventCategory category) {
-        this.eventId = eventId;
-        this.sellerId = sellerId;
-        this.title = title;
-        this.description = description;
-        this.location = location;
-        this.eventDateTime = eventDateTime;
-        this.saleStartAt = saleStartAt;
-        this.saleEndAt = saleEndAt;
-        this.price = price;
-        this.totalQuantity = totalQuantity;
-        this.maxQuantity = maxQuantity;
-        this.remainingQuantity = remainingQuantity;
-        this.status = status;
-        this.category = category;
-    }
 
     public static Event create(
         UUID sellerId, String title, String description, String location,
@@ -132,8 +117,7 @@ public class Event extends BaseEntity {
             .totalQuantity(totalQuantity)
             .maxQuantity(maxQuantity)
             .remainingQuantity(totalQuantity)
-//            .status(EventStatus.DRAFT)
-            .status(EventStatus.ON_SALE)
+            .status(LocalDateTime.now().isBefore(saleStartAt) ? EventStatus.DRAFT : EventStatus.ON_SALE)
             .category(category)
             .build();
     }
@@ -145,7 +129,8 @@ public class Event extends BaseEntity {
     public boolean canBeCancelled() {
         return this.status != EventStatus.CANCELLED
             && this.status != EventStatus.FORCE_CANCELLED
-            && this.status != EventStatus.SALE_ENDED;
+            && this.status != EventStatus.SALE_ENDED
+            && this.status != EventStatus.ENDED;
     }
 
     public void update(String title, String description, String location,
@@ -165,8 +150,31 @@ public class Event extends BaseEntity {
         this.category = category;
     }
 
+    /**
+     * 판매 중지 (Action B) — status=CANCELLED 로 전이.
+     * 신규 판매만 차단하고 기존 구매자에게는 영향 없음 — 환불 트리거 X.
+     *
+     * <p>셀러가 "이벤트 수정" 화면에서 status 를 CANCELLED 로 명시 변경할 때만 호출됨
+     * ({@code EventService.updateEvent} 경로).
+     * 기존 구매자 환불을 동반하는 강제 취소는 {@link #forceCancel()} 사용.
+     */
     public void cancel() {
         this.status = EventStatus.CANCELLED;
+    }
+
+    /**
+     * 강제 취소 (Action A) — status=FORCE_CANCELLED 로 전이.
+     * 환불 fan-out 을 트리거하므로 기존 구매자에게 환불 처리됨.
+     *
+     * <p>어드민 또는 셀러(본인 이벤트) 의 강제 취소 시 호출됨
+     * ({@code EventService.forceCancel} 경로).
+     * 단순 판매 중단은 {@link #cancel()} 사용.
+     */
+    public void forceCancel() {
+        if (!canBeCancelled()) {
+            throw new BusinessException(EventErrorCode.CANNOT_CHANGE_STATUS);
+        }
+        this.status = EventStatus.FORCE_CANCELLED;
     }
 
     public void deductStock(int quantity) {
@@ -196,11 +204,48 @@ public class Event extends BaseEntity {
         if (quantity < 1) {
             throw new BusinessException(EventErrorCode.INVALID_STOCK_QUANTITY);
         }
-        if (this.status == EventStatus.CANCELLED || this.status == EventStatus.FORCE_CANCELLED) {
+        if (this.status == EventStatus.CANCELLED
+                || this.status == EventStatus.FORCE_CANCELLED
+                || this.status == EventStatus.ENDED) {
             throw new BusinessException(EventErrorCode.CANNOT_CHANGE_STATUS);
         }
         this.remainingQuantity = Math.min(this.totalQuantity, this.remainingQuantity + quantity);
         if (this.status == EventStatus.SOLD_OUT && this.remainingQuantity > 0) {
+            this.status = EventStatus.ON_SALE;
+        }
+    }
+
+    /**
+     * 종료된 이벤트(CANCELLED / FORCE_CANCELLED / ENDED)의 환불 카운터.
+     * remainingQuantity 는 그대로 두고 cancelledQuantity 만 누적.
+     * 운영 대시보드 / 정산에서 "결제됐다가 영구 환불된 티켓 수" 추적 용도.
+     */
+    public void markCancelledStock(int quantity) {
+        if (quantity < 1) {
+            throw new BusinessException(EventErrorCode.INVALID_STOCK_QUANTITY);
+        }
+        int current = this.cancelledQuantity == null ? 0 : this.cancelledQuantity;
+        this.cancelledQuantity = current + quantity;
+    }
+
+    public void expireSale() {
+        if ((this.status == EventStatus.ON_SALE || this.status == EventStatus.SOLD_OUT)
+                && LocalDateTime.now().isAfter(this.saleEndAt)) {
+            this.status = EventStatus.SALE_ENDED;
+        }
+    }
+
+    public void endEvent() {
+        if ((this.status == EventStatus.ON_SALE
+                || this.status == EventStatus.SOLD_OUT
+                || this.status == EventStatus.SALE_ENDED)
+                && LocalDateTime.now().isAfter(this.eventDateTime)) {
+            this.status = EventStatus.ENDED;
+        }
+    }
+
+    public void promoteToOnSale() {
+        if (this.status == EventStatus.DRAFT && !LocalDateTime.now().isBefore(this.saleStartAt)) {
             this.status = EventStatus.ON_SALE;
         }
     }
@@ -215,5 +260,4 @@ public class Event extends BaseEntity {
             && this.remainingQuantity >= requestedQuantity
             && requestedQuantity <= this.maxQuantity;
     }
-
 }
