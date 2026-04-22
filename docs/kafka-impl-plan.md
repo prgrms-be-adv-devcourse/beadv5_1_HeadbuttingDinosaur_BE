@@ -273,7 +273,7 @@ sequenceDiagram
 **Outbox / 스케줄러**
 - [x] ✅ `Outbox`: 엔티티 필드 수정 완료 — `topic`, `partitionKey`, `nextRetryAt`, `sentAt` 포함, `create()` 파라미터 반영
 - [x] ✅ `OutboxScheduler`: `outbox.getTopic()` + `outbox.getPartitionKey()` 사용으로 수정 완료
-- [x] ✅ `OutboxRepository`: 스케줄러 쿼리에 `next_retry_at IS NULL OR next_retry_at <= :now` 조건 추가 완료
+- [x] ✅ `OutboxRepository`: 스케줄러 쿼리에 `next_retry_at IS NULL OR next_retry_at < :now` 조건 추가 완료 (연산자 `<` — Commerce 기준으로 통일, 2026-04-22)
 - [x] ✅ `OutboxScheduler`: ShedLock 적용 완료 (`@SchedulerLock(name = "outbox-scheduler", lockAtMostFor = "5m", lockAtLeastFor = "5s")`) — `lockAtMostFor`는 2026-04-21 결정 이후 기준. 기존 `30s`는 최악 처리 시간(50건×건당 타임아웃)보다 짧아 중복 진입 경로 존재
 - [x] ✅ Outbox 발행 시 Partition Key 설정 완료 — `outbox.getPartitionKey()` (fallback: aggregateId)
 - [x] ✅ `OutboxEventProducer`: Kafka 발행 시 `X-Message-Id` 헤더 세팅 완료 — ProducerRecord 헤더에 Outbox messageId 포함
@@ -480,7 +480,7 @@ sequenceDiagram
 **Outbox 패턴**
 - [x] ✅ Outbox 패턴 구현 완료 — `common/outbox/` 전체 (`Outbox`, `OutboxStatus`, `OutboxEventMessage`, `OutboxRepository`, `OutboxService`, `OutboxScheduler`, `OutboxEventProducer`)
   - `OutboxService.save()`: `@Transactional(propagation=MANDATORY)` — 외부 트랜잭션 필수(단일 경계 강제)
-  - `OutboxRepository.findPendingOutboxes()`: `status=PENDING AND (nextRetryAt IS NULL OR nextRetryAt <= now)`, `ORDER BY createdAt ASC`, `LIMIT 50`
+  - `OutboxRepository.findPendingToPublish()`: `status=PENDING AND (nextRetryAt IS NULL OR nextRetryAt < now)`, `ORDER BY createdAt ASC`, `LIMIT 50` (메서드명·연산자 3모듈 통일 — Commerce 기준, 2026-04-22)
   - `OutboxEventProducer.publish()`: KafkaTemplate 동기 전송(2초 타임아웃 — 2026-04-21 공통값 결정) + `X-Message-Id` 헤더 세팅 + partition key 지정
 - [x] ✅ `OutboxScheduler` ShedLock 적용 완료 — `@SchedulerLock(name="outbox-scheduler", lockAtMostFor="5m", lockAtLeastFor="5s")`, `@Scheduled(fixedDelay=3_000)` — 2026-04-21 `30s → 5m` 확장 결정 반영
   > 2026-04-21 결정: 지수 백오프 6회(즉시→1→2→4→8→16초)를 **스펙으로 확정**. Payment의 기존 선형 5회(`retryCount*60s`)는 본 정책으로 수렴 예정. `kafka-design.md §4 재시도 정책` 동기화 완료

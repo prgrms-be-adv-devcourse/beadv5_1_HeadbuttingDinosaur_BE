@@ -485,15 +485,47 @@ Wallet은 비즈니스 상태만으로 중복 판단이 불가능한 유일한 A
 
 **타임아웃 처리 기준:**
 
-Outbox 재시도 정책 기준 누적 최대 대기 시간은 약 10분 (선형 백오프 `retryCount * 60초`, MAX_RETRY=5 — kafka-design.md §4 기준).
-이 시간이 지나도 종단 상태에 도달하지 않으면 서버 장애 또는 DLT 이동 상황이다.
+클라이언트 폴링 타임아웃은 **Saga 1회 완주 SLA + Outbox 재시도 창**을 기준으로 산정한다. (구 문서의 "Outbox 누적 재시도 시간 = 장애 임계값" 은 2026-04-22 폐기 — 클라이언트는 Outbox 내부 재시도를 몰라도 되는 정보이므로 Saga 관점 SLA가 올바른 근거)
+
+- **정상 Saga 완주 SLA** (잠정, 실측 전): 약 2초 (Order → Stock → Payment → Ticket — 3홉)
+- **Outbox 단일 홉 재시도 창** (누적 최악): 31초 (지수 백오프 6회 = 즉시/1/2/4/8/16초 — `kafka-design.md §4 재시도 정책`)
+- **서버 장애 판단 임계값**: `Saga SLA × 홉 수 + Outbox 재시도 창 + 여유`
+  - 3홉 기준: `2초 × 3 + 31초 + 여유 ≈ 60초`
+
+이 시간이 지나도 종단 상태에 도달하지 않으면 서버 장애 또는 DLT 이동 상황으로 간주한다.
 
 ```
 권장 폴링 전략:
   간격: 2초
-  최대 횟수: 20회 (= 40초)
+  최대 횟수: 30회 (= 60초)
   타임아웃 도달 시: 서버에 주문 상태 재확인 후 FAILED 처리 또는 고객 안내
 ```
+
+> Saga SLA 추정값(2초)은 부하 테스트 실측 후 업데이트 필요.
+> Outbox 재시도 창(31초)은 `kafka-design.md §4 재시도 정책` 변경 시 본 문서도 동기화.
+
+**프론트 UI 가이드 (N1 상태머신 패턴 — 2026-04-22 결정):**
+
+`/payment/complete` 라우트는 **URL을 유지**하고, 페이지 내부 상태머신으로 분기한다. (URL = "결제 플로우 결과 섹션"의 정체성 / 상태 = 내용물로 분리)
+
+```
+[LOADING] "결제 처리 중..." (2초 간격 폴링)
+   ├─ PAID       → 성공 화면 (티켓 표시)
+   ├─ FAILED     → 실패 화면 (사유 + 재시도 CTA)
+   ├─ CANCELLED  → 취소 화면 (만료/직접 취소 안내)
+   └─ 60초 초과  → TIMEOUT 화면 ("잠시 후 주문내역에서 확인")
+```
+
+**현재 프론트 갭 (2026-04-22 확인):**
+
+- `pages/PaymentSuccess.tsx:39` — Toss confirm 이후 `setTimeout(2000)` 단순 지연 + `/payment/complete` 이동 **만** 존재
+- 폴링 훅 / 주문 상태 조회 호출 / 상태머신 UI **미구현**
+- 프론트팀 수정 필요:
+  1. `PaymentSuccess.tsx` — `setTimeout(2000)` 제거, confirm 성공 즉시 `/payment/complete` 이동
+  2. `PaymentComplete` 페이지 — LOADING → PAID/FAILED/CANCELLED/TIMEOUT 상태머신 UI 재작성
+  3. `useOrderStatus` 훅 신규 — 2초 간격 폴링 + 종단 상태 자동 중지 + 언마운트 정리
+  4. `api/orders.ts` — `GET /api/orders/{orderId}` 래퍼 추가
+- 백엔드 선행 확인: `GET /api/orders/{orderId}` 구현 여부 + 응답 스키마에 `orderStatus` 포함 여부
 
 **서버가 보장해야 할 것:**
 

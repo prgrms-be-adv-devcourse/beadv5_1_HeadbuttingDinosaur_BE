@@ -70,8 +70,8 @@ Outbox INSERT (message_id = UUID.randomUUID()) → 커밋
 
 ### 2-5. Outbox 재시도 간격 (Exponential Backoff)
 
-> 재시도 횟수·간격·선형 백오프 확정값은 [kafka-design.md §4 — 재시도 정책](kafka-design.md#4-outbox-패턴) 참조
-> (최대 5회 재시도, `retryCount * 60초`, 누적 최대 대기 약 10분)
+> 재시도 횟수·간격·지수 백오프 확정값은 [kafka-design.md §4 — 재시도 정책](kafka-design.md#4-outbox-패턴) 참조
+> (총 시도 6회 = 최초 1 + 재시도 5, `2^(retryCount-1)초` = 즉시/1/2/4/8/16초, 누적 최대 대기 31초 — 2026-04-22 3모듈 통일)
 
 - **FAILED 수동 재발행**: Admin API로 FAILED → PENDING 전환 후 재발행 (이번 스코프 포함)
 

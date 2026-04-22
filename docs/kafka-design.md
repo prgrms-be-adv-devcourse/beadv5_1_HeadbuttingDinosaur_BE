@@ -533,15 +533,15 @@ config.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, 500);
 - `enable.idempotence=true` 전제 유지 (`retries>=1`, `max.in.flight<=5`, `acks=all` 자동 충족)
 - 3개 모듈(Commerce/Event/Payment) 공통 적용
 
-스케줄러 쿼리: `next_retry_at <= now()` 조건 추가
+스케줄러 쿼리: `next_retry_at < now()` 조건 추가 (경계 배제 — `nextRetryAt == now` 레코드는 다음 폴링 틱에서 픽업)
 
 ```java
 // OutboxRepository
 @Query("SELECT o FROM Outbox o WHERE o.status = :status " +
-       "AND (o.nextRetryAt IS NULL OR o.nextRetryAt <= :now) " +
+       "AND (o.nextRetryAt IS NULL OR o.nextRetryAt < :now) " +
        "ORDER BY o.createdAt ASC LIMIT 50")
-List<Outbox> findPendingForRetry(@Param("status") OutboxStatus status,
-                                 @Param("now") Instant now);
+List<Outbox> findPendingToPublish(@Param("status") OutboxStatus status,
+                                  @Param("now") Instant now);
 ```
 
 ---
@@ -1079,7 +1079,7 @@ topic: event.force-cancelled  → DLT: event.force-cancelled.DLT
 | 2 | dedupe 키 스코프 (message_id+topic 복합키는 fan-out 구조에서 Consumer 간 dedup 공유 문제 발생 → 모듈별 별도 테이블로 구독자 스코프 격리) | 격리 단위 = 서비스 DB, Outbox UUID를 Kafka 헤더로 전달 | `X-Message-Id` 헤더 + 모듈별 `processed_message` + `UNIQUE(message_id)` | Payment·Event 적용 완료 / Commerce 미적용 |
 | 3 | 메시지 순서 역전 | 3분류 처리 — ① 이미 목표 상태: 멱등 스킵 + ACK ② 설명 가능한 순서 역전(만료·보상 등): 정책적 스킵 + ACK ③ 설명 불가능한 상태: throw → 재시도 → DLT (단순 스킵 금지 — 정합성 문제 소거 위험) | `canTransitionTo()` + 예외 타입 3분류 | 미구현 |
 | 4 | Producer 재발행 시 dedupe | `Outbox.messageId` 생성 시 고정, 재발행 시 동일 ID | 현재 구현 유지 | 구현됨, 문서화 누락 |
-| 5 | Outbox 락·재시도 | ShedLock 채택, `next_retry_at` 컬럼 추가 | ShedLock + 선형 백오프 (`retryCount * 60초`, MAX_RETRY=5) | ShedLock 적용 완료 |
+| 5 | Outbox 락·재시도 | ShedLock 채택, `next_retry_at` 컬럼 추가 | ShedLock(`lockAtMostFor=5m`, `lockAtLeastFor=5s`) + 지수 백오프 6회(`2^(retryCount-1)초` = 즉시/1/2/4/8/16초, 누적 31초) → `retryCount >= 6` 도달 시 FAILED | ShedLock 적용 완료 — 3개 모듈 정책 통일 (2026-04-22) |
 | 6 | DLT 재처리 중복 반영 | ① `markProcessed()`는 성공 후 마지막에 호출 ② DLT 재처리 워커/Admin API에서 원본 토픽 재발행 시 반드시 원본 `X-Message-Id` 헤더 보존 (새 UUID 생성 시 dedup 우회 → 중복 처리 발생) | 코드 순서 원칙 + DLT 재발행 구현 정책 | ① 구현됨 ② Admin API 미구현 |
 | 7 | 보상 이벤트 중복 처리 | processed_message dedup + 보상 Consumer별 비즈니스 상태 확인 이중 방어 (이미 보상 완료 상태면 성공으로 간주 스킵) — 상태 확인은 별도 플래그 없이 기존 상태 전이 검증(`canTransitionTo()`)으로 커버 | 모든 보상 Consumer에 dedupe 강제 + `canTransitionTo()` (Case 3과 동일) | 원칙 미수립 |
 | 8 | 상태 전이 검증 없음 | processed_message + 상태 전이 검증 두 방어선 필수 | Case 3 동일, 예외 타입 분리 | 미구현 |
@@ -1096,7 +1096,7 @@ topic: event.force-cancelled  → DLT: event.force-cancelled.DLT
 - [x] ✅ `JacksonConfig`: `JavaTimeModule`, `WRITE_DATES_AS_TIMESTAMPS=false` 적용 확인 완료
 - [x] ✅ `ShedLockConfig`: JDBC provider 기반 ShedLock 설정 완료
 - [x] ✅ `Outbox`: 엔티티 필드 수정 완료 — `aggregate_id` VARCHAR(36), `topic`, `partitionKey`, `nextRetryAt`, `sentAt`
-- [x] ✅ `OutboxRepository`: `next_retry_at IS NULL OR next_retry_at <= :now` 조건 추가 완료
+- [x] ✅ `OutboxRepository`: `next_retry_at IS NULL OR next_retry_at < :now` 조건 추가 완료 (Commerce 기준으로 연산자 통일 — 2026-04-22)
 - [x] ✅ `OutboxScheduler`: ShedLock 적용 + `getTopic()` / `getPartitionKey()` 사용 완료
 - [x] ✅ `ProcessedMessage`: `topic VARCHAR(128)` 컬럼 추가 완료
 - [x] ✅ `PaymentCompletedEvent`: record, `UUID` / `PaymentMethod enum` / `Instant` 적용 완료
