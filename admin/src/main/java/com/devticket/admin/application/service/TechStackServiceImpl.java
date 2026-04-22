@@ -1,5 +1,8 @@
 package com.devticket.admin.application.service;
 
+import com.devticket.admin.application.event.TechStackCreatedEvent;
+import com.devticket.admin.application.event.TechStackDeletedEvent;
+import com.devticket.admin.application.event.TechStackUpdatedEvent;
 import com.devticket.admin.domain.model.TechStack;
 import com.devticket.admin.domain.repository.TechStackRepository;
 import com.devticket.admin.infrastructure.external.client.OpenAiEmbeddingClient;
@@ -14,6 +17,7 @@ import com.devticket.admin.presentation.dto.res.UpdateTechStackResponse;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,8 +26,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class TechStackServiceImpl implements TechStackService{
 
-    private final TechStackEsRepository  techStackEsRepository;
     private final TechStackRepository  techStackRepository;
+    private final ApplicationEventPublisher eventPublisher;
     private final OpenAiEmbeddingClient openAiEmbeddingClient;
 
     // =============== 1. TechStack 조회 =============== //
@@ -46,9 +50,11 @@ public class TechStackServiceImpl implements TechStackService{
         // 1. RDB 저장
         TechStack saved = techStackRepository.save(TechStack.of(null, name));
 
-        // 2. ES 저장
+        // 2. name -> (OpenAI) -> embedding
         float[] embedding = openAiEmbeddingClient.embed(name);
-        techStackEsRepository.save(saved.getId(),name, embedding);
+
+        // 3. DB 커밋 후 생성 이벤트 발행(이벤트 발행 -> ES 저장 실행)
+        eventPublisher.publishEvent(new TechStackCreatedEvent(saved.getId(), name, embedding));
 
         return CreateTechStackResponse.from(saved);
     }
@@ -62,9 +68,11 @@ public class TechStackServiceImpl implements TechStackService{
         // 1. RDB 업데이트
         techStack.updateName(request.name());
 
-        // 2. ES  업데이트
+        // 2. name 재임베딩
         float[] embedding = openAiEmbeddingClient.embed(request.name());
-        techStackEsRepository.update(id, request.name(), embedding);
+
+        // 3. DB 커밋 후 수정 이벤트 발행(이벤트 발행 -> ES 저장 실행)
+        eventPublisher.publishEvent(new TechStackUpdatedEvent(id, request.name(), embedding));
 
         return UpdateTechStackResponse.from(techStack);
     }
@@ -77,8 +85,9 @@ public class TechStackServiceImpl implements TechStackService{
 
         // 1. RDB 삭제
         techStackRepository.deleteById(id);
-        // 2. ES 삭제
-        techStackEsRepository.delete(id);
+        
+        // 2. DB 커밋 후 삭제 이벤트 발행(이벤트 발행 -> ES 삭제 실행)
+        eventPublisher.publishEvent(new TechStackDeletedEvent(id));
 
         return DeleteTechStackResponse.of(id);
     }

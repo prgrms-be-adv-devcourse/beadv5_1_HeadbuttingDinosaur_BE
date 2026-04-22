@@ -26,10 +26,6 @@ public class OpenAiEmbeddingClient {
     @Value("${openai.embedding.model}")
     private String model;
 
-    @PostConstruct
-    public void checkApiKey() {
-        log.info("[OpenAI] api-key 앞 10자: {}", apiKey.substring(0, Math.min(10, apiKey.length())));
-    }
 
     public float[] embed(String text){
         try{
