@@ -97,7 +97,5 @@ public interface EventRepository extends JpaRepository<Event, Long> {
         @Param("startOfNextDay") LocalDateTime startOfNextDay
     );
 
-    @Query("SELECT e FROM Event e WHERE e.status = 'ON_SALE' ORDER BY e.viewCount DESC LIMIT :limit")
-    List<Event> findTopByViewCount(@Param("limit") int limit);
 
 }

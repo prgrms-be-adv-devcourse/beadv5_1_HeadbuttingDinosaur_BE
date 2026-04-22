@@ -84,9 +84,6 @@ public class Event extends BaseEntity {
     @Column(nullable = false)
     private EventCategory category;
 
-    @Column(nullable = false)
-    private Long viewCount = 0L;
-
     @Version
     private Long version;
 
@@ -219,8 +216,5 @@ public class Event extends BaseEntity {
             && requestedQuantity <= this.maxQuantity;
     }
 
-    public void increaseViewCount() {
-        this.viewCount++;
-    }
 
 }
