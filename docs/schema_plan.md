@@ -1,6 +1,6 @@
 # Kafka 구현용 DB 스키마 변경 계획
 
-> 최종 업데이트: 2026-04-16
+> 최종 업데이트: 2026-04-22
 
 ---
 
@@ -12,6 +12,7 @@
 |------|------|-----------|------|
 | outbox 수정 | `aggregate_id` | BIGINT → VARCHAR(36) 타입 변경 | 수동 ALTER |
 | outbox 수정 | `aggregate_type` | 컬럼 제거 (설계 문서에 없는 컬럼) | 수동 ALTER |
+| outbox 수정 | `message_id` | UUID → VARCHAR(36) 타입 변경 (⚠️ B4-2 후속 — 별건 이슈 분리 권고) | 수동 ALTER (PostgreSQL `USING message_id::text` 명시 필요) |
 | outbox 수정 | `topic` | VARCHAR(128) 컬럼 추가 | 엔티티 필드 추가 → 자동 |
 | outbox 수정 | `partition_key` | VARCHAR(36) 컬럼 추가 | 엔티티 필드 추가 → 자동 |
 | outbox 수정 | `next_retry_at` | TIMESTAMP 컬럼 추가 | 엔티티 필드 추가 → 자동 |
@@ -47,7 +48,7 @@
 
 | 분류 | 대상 | 변경 내용 | 방법 | 상태 |
 |------|------|-----------|------|------|
-| outbox 생성 | 신규 테이블 | Commerce와 동일 구조 | @Entity 추가 → 자동 | ⬜ 미구현 |
+| outbox 생성 | 신규 테이블 | Commerce와 동일 구조 | @Entity 추가 → 자동 | ✅ 완료 (2026-04-22 실코드 대조 확인) |
 | processed_message 생성 | 신규 테이블 | Commerce와 동일 구조 (schema=`event`, `topic VARCHAR` 컬럼 포함) | @Entity 추가 → 자동 | ✅ 완료 |
 | shedlock 생성 | 신규 테이블 | Outbox 스케줄러 분산 락 | 수동 CREATE TABLE | ⬜ 미구현 |
 | event 엔티티 | `version` | BIGINT 컬럼 추가 (@Version) | 엔티티 필드 추가 → 자동 | ✅ 완료 |
@@ -95,6 +96,12 @@ CREATE TABLE event.shedlock (
     locked_by  VARCHAR(255) NOT NULL,
     PRIMARY KEY (name)
 );
+
+-- ⑦ Payment: outbox message_id 타입 변경 (B4-2 후속)
+-- ⚠️ 운영 배포 타이밍은 본 리팩토링과 별도 — 별건 이슈로 분리 권고 (outbox_fix.md §3-C B4-2)
+-- ddl-auto:update 자동 처리 불가 가능성 높음 — USING 명시 필수
+ALTER TABLE payment.outbox
+    ALTER COLUMN message_id TYPE VARCHAR(36) USING message_id::text;
 ```
 
 ---
