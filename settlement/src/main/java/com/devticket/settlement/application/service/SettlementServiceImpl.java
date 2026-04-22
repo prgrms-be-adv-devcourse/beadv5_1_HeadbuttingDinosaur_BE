@@ -26,6 +26,8 @@ import com.devticket.settlement.presentation.dto.SettlementTargetPreviewResponse
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -189,29 +191,42 @@ public class SettlementServiceImpl implements SettlementService {
 
     @Override
     public SettlementPeriodResponse getSettlementByPeriod(UUID sellerId, String yearMonth) {
-        int year = Integer.parseInt(yearMonth.substring(0, 4));
-        int month = Integer.parseInt(yearMonth.substring(4, 6));
-        // 202604 → periodStartAt = 3/26, periodEndAt = 4/25
-        // periodStartAt이 전월 26일 하루(00:00~23:59) 범위로 조회
-        LocalDate periodStartDate = YearMonth.of(year, month).minusMonths(1).atDay(26);
-        LocalDateTime periodStartFrom = periodStartDate.atStartOfDay();
-        LocalDateTime periodStartTo = periodStartDate.atTime(23, 59, 59);
-
-        return settlementRepository.findBySellerIdAndPeriodStartAtBetween(sellerId, periodStartFrom, periodStartTo)
-            .map(settlement -> {
-                List<EventItemResponse> items = settlementItemRepository.findBySettlementId(settlement.getSettlementId())
-                    .stream()
-                    .map(this::toResponse)
-                    .toList();
-                return new SettlementPeriodResponse(
-                    settlement.getFinalSettlementAmount(),
-                    settlement.getTotalFeeAmount(),
-                    settlement.getTotalSalesAmount(),
-                    settlement.getCarriedInAmount(),
-                    items
-                );
-            })
+        YearMonth ym = parseYearMonth(yearMonth);
+        LocalDate periodStartDate = toPeriodStartDate(ym);
+        return settlementRepository
+            .findBySellerIdAndPeriodStartAtBetween(
+                sellerId,
+                periodStartDate.atStartOfDay(),
+                periodStartDate.atTime(23, 59, 59))
+            .map(this::toSettlementPeriodResponse)
             .orElse(new SettlementPeriodResponse(0, 0, 0, 0, List.of()));
+    }
+
+    private YearMonth parseYearMonth(String yearMonth) {
+        try {
+            return YearMonth.parse(yearMonth, DateTimeFormatter.ofPattern("yyyyMM"));
+        } catch (DateTimeParseException e) {
+            throw new BusinessException(CommonErrorCode.INVALID_INPUT_VALUE);
+        }
+    }
+
+    private LocalDate toPeriodStartDate(YearMonth ym) {
+        return ym.minusMonths(1).atDay(26);
+    }
+
+    private SettlementPeriodResponse toSettlementPeriodResponse(Settlement settlement) {
+        List<EventItemResponse> items = settlementItemRepository
+            .findBySettlementId(settlement.getSettlementId())
+            .stream()
+            .map(this::toResponse)
+            .toList();
+        return new SettlementPeriodResponse(
+            settlement.getFinalSettlementAmount(),
+            settlement.getTotalFeeAmount(),
+            settlement.getTotalSalesAmount(),
+            settlement.getCarriedInAmount(),
+            items
+        );
     }
 
     @Override
