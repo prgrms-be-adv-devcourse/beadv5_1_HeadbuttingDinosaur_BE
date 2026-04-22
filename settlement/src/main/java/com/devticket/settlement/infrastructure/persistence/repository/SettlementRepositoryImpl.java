@@ -60,6 +60,11 @@ public class SettlementRepositoryImpl implements SettlementRepository {
     }
 
     @Override
+    public boolean existsBySellerIdAndPeriodStartAtBetweenAndStatusNot(UUID sellerId, LocalDateTime from, LocalDateTime to, SettlementStatus status) {
+        return settlementJpaRepository.existsBySellerIdAndPeriodStartAtBetweenAndStatusNot(sellerId, from, to, status);
+    }
+
+    @Override
     public Page<Settlement> search(SettlementStatus status, UUID sellerId,
         LocalDateTime startDate, LocalDateTime endDate, Pageable pageable) {
         return settlementJpaRepository.search(status, sellerId, startDate, endDate, pageable);

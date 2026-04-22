@@ -24,6 +24,8 @@ public interface SettlementJpaRepository extends JpaRepository<Settlement, Long>
 
     Optional<Settlement> findBySellerIdAndPeriodStartAtBetween(UUID sellerId, LocalDateTime from, LocalDateTime to);
 
+    boolean existsBySellerIdAndPeriodStartAtBetweenAndStatusNot(UUID sellerId, LocalDateTime from, LocalDateTime to, SettlementStatus status);
+
     @Query("""
     SELECT s FROM Settlement s
     WHERE (CAST(:status AS string) IS NULL OR s.status = :status)
