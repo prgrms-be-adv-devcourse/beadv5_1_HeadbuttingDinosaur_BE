@@ -6,11 +6,20 @@ spring:
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: update
     show-sql: false
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
+    consumer:
+      group-id: devticket-settlement
+      auto-offset-reset: latest
+
+external:
+  commerce-base-url: http://commerce:8083
+  member-base-url: http://member:8081
 
 logging:
   level:

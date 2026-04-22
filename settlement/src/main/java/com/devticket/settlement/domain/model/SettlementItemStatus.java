@@ -1,7 +1,6 @@
 package com.devticket.settlement.domain.model;
 
 public enum SettlementItemStatus {
-    PENDING,
-    COMPLETED,
-    FAILED
+    READY,      // 집계예정
+    FINALIZED   // 집계확정
 }

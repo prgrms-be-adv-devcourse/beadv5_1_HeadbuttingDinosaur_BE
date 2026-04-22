@@ -1,12 +1,11 @@
 package com.devticket.settlement.presentation.scheduler;
 
-import com.devticket.settlement.infrastructure.batch.SettlementItemProcessor;
-import com.devticket.settlement.infrastructure.batch.SettlementItemReader;
+import com.devticket.settlement.application.service.SettlementInternalService;
+import com.devticket.settlement.application.service.SettlementService;
+import com.devticket.settlement.presentation.dto.SettlementTargetPreviewResponse;
+import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.batch.core.job.Job;
-import org.springframework.batch.core.job.parameters.JobParameters;
-import org.springframework.batch.core.job.parameters.JobParametersBuilder;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -15,29 +14,31 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class SettlementScheduler {
 
-    private final Job settlementJob;
-    private final SettlementItemReader settlementItemReader;
-    private final SettlementItemProcessor settlementItemProcessor;
-    private final org.springframework.batch.core.launch.JobLauncher jobLauncher;
+    private final SettlementService settlementService;
+    private final SettlementInternalService settlementInternalService;
 
-
-    @Scheduled(cron = "0 0 0 1 * *")
-    public void runSettlementJob() {
+    @Scheduled(cron = "1 0 0 * * *")
+    public void collectDailySettlementTargets() {
+        LocalDate yesterday = LocalDate.now().minusDays(1);
+        log.info("[SettlementScheduler] 정산대상 데이터 수집 시작 - targetDate: {}", yesterday);
         try {
-            // 1. Reader 초기화
-            settlementItemReader.init();
-
-            // 2. Job 파라미터 생성 (중복 실행 방지용 time만 필요)
-            JobParameters jobParameters = new JobParametersBuilder()
-                .addLong("time", System.currentTimeMillis())
-                .toJobParameters();
-
-            // 3. Job 실행
-            jobLauncher.run(settlementJob, jobParameters);
-            log.info("[SettlementScheduler] 정산 배치 실행 완료");
-
+            SettlementTargetPreviewResponse result = settlementService.collectSettlementTargets(yesterday);
+            log.info("[SettlementScheduler] 정산대상 데이터 수집 완료 - 이벤트: {}건, 저장: {}건, 스킵: {}건",
+                result.totalEventCount(), result.savedCount(), result.skippedCount());
         } catch (Exception e) {
-            log.error("[SettlementScheduler] 정산 배치 실행 실패: ", e);
+            log.error("[SettlementScheduler] 정산대상 데이터 수집 실패 - targetDate: {}", yesterday, e);
         }
     }
+
+    @Scheduled(cron = "0 10 0 1 * *")
+    public void createMonthlySettlement() {
+        log.info("[SettlementScheduler] 월 정산 생성 시작");
+        try {
+            settlementInternalService.createSettlementFromItems();
+            log.info("[SettlementScheduler] 월 정산 생성 완료");
+        } catch (Exception e) {
+            log.error("[SettlementScheduler] 월 정산 생성 실패", e);
+        }
+    }
+
 }
