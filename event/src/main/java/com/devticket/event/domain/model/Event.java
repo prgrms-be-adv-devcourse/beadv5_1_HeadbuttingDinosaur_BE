@@ -216,4 +216,5 @@ public class Event extends BaseEntity {
             && requestedQuantity <= this.maxQuantity;
     }
 
+
 }

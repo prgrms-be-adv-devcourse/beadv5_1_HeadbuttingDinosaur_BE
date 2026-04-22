@@ -18,11 +18,13 @@ import com.devticket.event.domain.exception.StockDeductionException;
 import com.devticket.event.domain.model.Event;
 import com.devticket.event.domain.model.EventImage;
 import com.devticket.event.domain.model.EventTechStack;
+import com.devticket.event.domain.model.EventView;
 import com.devticket.event.infrastructure.client.AdminClient;
 import com.devticket.event.infrastructure.client.MemberClient;
 import com.devticket.event.infrastructure.client.OpenAiEmbeddingClient;
 import com.devticket.event.infrastructure.client.dto.TechStackItem;
 import com.devticket.event.infrastructure.persistence.EventRepository;
+import com.devticket.event.infrastructure.persistence.EventViewRepository;
 import com.devticket.event.infrastructure.search.EventDocument;
 import com.devticket.event.presentation.dto.EventDetailResponse;
 import com.devticket.event.presentation.dto.EventListContentResponse;
@@ -73,6 +75,7 @@ public class EventService {
     private final MessageDeduplicationService deduplicationService;
     private final ObjectMapper objectMapper;
     private final ApplicationEventPublisher eventPublisher;
+    private final EventViewRepository eventVeiwRepository;
 
     @Transactional
     public SellerEventCreateResponse createEvent(UUID sellerId, SellerEventCreateRequest request) {
@@ -132,11 +135,18 @@ public class EventService {
             .collect(Collectors.toMap(TechStackItem::techStackId, TechStackItem::name));
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public EventDetailResponse getEvent(UUID eventId) {
 
         Event event = eventRepository.findWithDetailsByEventId(eventId)
             .orElseThrow(() -> new BusinessException(EventErrorCode.EVENT_NOT_FOUND));
+
+        // 1. 조회수 증가 : eventView 가져오기
+        EventView eventView = eventVeiwRepository.findByEvent(event)
+            .orElseGet(()->eventVeiwRepository.save(EventView.of(event)));
+        // 2. 조회수 증가 : eventView 증가
+        eventView.increaseViewCount();
+
         String nickname = memberClient.getNickname(event.getSellerId());
 
         return EventDetailResponse.from(event, nickname);

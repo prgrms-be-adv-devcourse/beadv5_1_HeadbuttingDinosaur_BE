@@ -6,6 +6,7 @@ import com.devticket.event.domain.exception.EventErrorCode;
 import com.devticket.event.domain.model.Event;
 import com.devticket.event.infrastructure.client.MemberClient;
 import com.devticket.event.infrastructure.persistence.EventRepository;
+import com.devticket.event.infrastructure.persistence.EventViewRepository;
 import com.devticket.event.infrastructure.search.EventDocument;
 import com.devticket.event.infrastructure.search.EventSearchRepository;
 import com.devticket.event.presentation.dto.internal.InternalAdminEventResponse;
@@ -14,6 +15,7 @@ import com.devticket.event.presentation.dto.internal.InternalBulkStockAdjustment
 import com.devticket.event.presentation.dto.internal.InternalEndedEventsResponse;
 import com.devticket.event.presentation.dto.internal.InternalEventInfoResponse;
 import com.devticket.event.presentation.dto.internal.InternalPagedEventResponse;
+import com.devticket.event.presentation.dto.internal.InternalPopularEventResponse;
 import com.devticket.event.presentation.dto.internal.InternalPurchaseValidationResponse;
 import com.devticket.event.presentation.dto.internal.InternalSellerEventsResponse;
 import com.devticket.event.presentation.dto.internal.InternalStockAdjustmentResponse;
@@ -42,6 +44,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class EventInternalService {
 
+    private final EventViewRepository eventViewRepository;
     private final EventRepository eventRepository;
     private final EventSearchRepository eventSearchRepository;
     private final MemberClient memberClient;
@@ -320,6 +323,19 @@ public class EventInternalService {
             .toList();
     }
 
+    // 요청에 갯수만큼 이벤트 조회(인기순)
+    public List<InternalPopularEventResponse> getPopularEventsByCount(int count){
+        try{
+            return eventViewRepository.findTopByViewCount(count).stream()
+                .map(InternalPopularEventResponse::from)
+                .toList();
+        }catch (Exception e){
+            log.error("[인기 이벤트 조회 실패] count: {}", count, e);
+            return List.of();
+        }
+
+    }
+
     private void syncToElasticsearch(UUID eventId) {
         try {
             eventRepository.findWithDetailsByEventId(eventId)
@@ -328,6 +344,8 @@ public class EventInternalService {
             log.warn("[ES 동기화 실패] eventId: {}", eventId, e);
         }
     }
+
+
 
 
 }
