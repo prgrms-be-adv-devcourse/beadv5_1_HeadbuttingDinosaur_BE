@@ -25,12 +25,12 @@ jobs:
           cache: 'gradle' # 의존성 다운로드 캐싱 (빌드 속도 최적화)
 
       - name: 3. Grant execute permission for gradlew
-        run: chmod +x gradlew
+        run: chmod +x payment/gradlew
 
       - name: 4. Gradle Test
-        run: ./gradlew :payment:test
+        run: cd payment && ./gradlew test
         env:
           SPRING_PROFILES_ACTIVE: test
 
       - name: 5. Gradle Build
-        run: ./gradlew :payment:build -x test
+        run: cd payment && ./gradlew build -x test
