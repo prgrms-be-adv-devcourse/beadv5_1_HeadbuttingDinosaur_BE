@@ -223,11 +223,12 @@ public class SettlementInternalServiceImpl implements SettlementInternalService 
     }
 
     private boolean alreadySettledForPeriod(UUID sellerId, LocalDateTime periodStart) {
-        return settlementRepository.findBySellerIdAndPeriodStartAtBetween(
+        return settlementRepository.existsBySellerIdAndPeriodStartAtBetweenAndStatusNot(
             sellerId,
             periodStart,
-            periodStart.toLocalDate().atTime(23, 59, 59)
-        ).filter(s -> s.getStatus() != SettlementStatus.CANCELLED).isPresent();
+            periodStart.toLocalDate().atTime(23, 59, 59),
+            SettlementStatus.CANCELLED
+        );
     }
 
     private SellerAmounts aggregateAmounts(List<SettlementItem> items) {

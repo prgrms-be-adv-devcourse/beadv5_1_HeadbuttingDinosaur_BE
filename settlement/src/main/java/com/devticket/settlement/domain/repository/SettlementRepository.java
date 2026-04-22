@@ -21,6 +21,8 @@ public interface SettlementRepository {
 
     Optional<Settlement> findBySellerIdAndPeriodStartAtBetween(UUID sellerId, LocalDateTime from, LocalDateTime to);
 
+    boolean existsBySellerIdAndPeriodStartAtBetweenAndStatusNot(UUID sellerId, LocalDateTime from, LocalDateTime to, SettlementStatus status);
+
     List<Settlement> saveAll(List<? extends Settlement> settlements);
 
     Settlement save(Settlement settlement);

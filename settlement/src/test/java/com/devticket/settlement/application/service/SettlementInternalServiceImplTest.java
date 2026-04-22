@@ -21,7 +21,6 @@ import com.devticket.settlement.infrastructure.client.SettlementToMemberClient;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -88,21 +87,17 @@ class SettlementInternalServiceImplTest {
             .willReturn(List.of());
         given(settlementRepository.findBySellerIdAndStatus(sellerId, SettlementStatus.PENDING_MIN_AMOUNT))
             .willReturn(List.of(pending));
-        given(settlementRepository.findBySellerIdAndPeriodStartAtBetween(
-            eq(sellerId), any(LocalDateTime.class), any(LocalDateTime.class)))
-            .willReturn(Optional.empty());
+        givenNotAlreadySettled(sellerId);
         givenSaveReturnsArgument();
 
         service.createSettlementFromItems();
 
-        // 신규 정산 → COMPLETED, carriedInAmount 반영
         Settlement saved = captureNewSettlement();
         assertThat(saved.getStatus()).isEqualTo(SettlementStatus.COMPLETED);
         assertThat(saved.getFinalSettlementAmount()).isEqualTo(10670); // 4850 + 5820
         assertThat(saved.getCarriedInAmount()).isEqualTo(5820);
         assertThat(saved.getCarriedInSettlementId()).isEqualTo(pending.getSettlementId());
 
-        // 이월 체인 해소 → pending COMPLETED로 변경
         assertThat(pending.getStatus()).isEqualTo(SettlementStatus.COMPLETED);
     }
 
@@ -116,9 +111,7 @@ class SettlementInternalServiceImplTest {
             .willReturn(List.of());
         given(settlementRepository.findBySellerIdAndStatus(sellerId, SettlementStatus.PENDING_MIN_AMOUNT))
             .willReturn(List.of(pending));
-        given(settlementRepository.findBySellerIdAndPeriodStartAtBetween(
-            eq(sellerId), any(LocalDateTime.class), any(LocalDateTime.class)))
-            .willReturn(Optional.empty());
+        givenNotAlreadySettled(sellerId);
         givenSaveReturnsArgument();
 
         service.createSettlementFromItems();
@@ -140,9 +133,7 @@ class SettlementInternalServiceImplTest {
             .willReturn(List.of(pending));
         given(settlementRepository.findBySellerIdAndStatus(carryOverSellerId, SettlementStatus.PENDING_MIN_AMOUNT))
             .willReturn(List.of(pending));
-        given(settlementRepository.findBySellerIdAndPeriodStartAtBetween(
-            eq(carryOverSellerId), any(LocalDateTime.class), any(LocalDateTime.class)))
-            .willReturn(Optional.empty());
+        givenNotAlreadySettled(carryOverSellerId);
         givenSaveReturnsArgument();
 
         service.createSettlementFromItems();
@@ -170,9 +161,9 @@ class SettlementInternalServiceImplTest {
         givenReadyItems(List.of(item));
         given(settlementRepository.findByStatus(SettlementStatus.PENDING_MIN_AMOUNT))
             .willReturn(List.of());
-        given(settlementRepository.findBySellerIdAndPeriodStartAtBetween(
-            eq(sellerId), any(LocalDateTime.class), any(LocalDateTime.class)))
-            .willReturn(Optional.of(buildPendingSettlement(sellerId, 48500)));
+        given(settlementRepository.existsBySellerIdAndPeriodStartAtBetweenAndStatusNot(
+            eq(sellerId), any(LocalDateTime.class), any(LocalDateTime.class), eq(SettlementStatus.CANCELLED)))
+            .willReturn(true);
 
         service.createSettlementFromItems();
 
@@ -206,9 +197,7 @@ class SettlementInternalServiceImplTest {
             .willReturn(List.of(pending));
         given(settlementRepository.findBySellerIdAndStatus(carryOverSellerId, SettlementStatus.PENDING_MIN_AMOUNT))
             .willReturn(List.of(pending));
-        given(settlementRepository.findBySellerIdAndPeriodStartAtBetween(
-            eq(carryOverSellerId), any(LocalDateTime.class), any(LocalDateTime.class)))
-            .willReturn(Optional.empty());
+        givenNotAlreadySettled(carryOverSellerId);
         givenSaveReturnsArgument();
 
         service.createSettlementFromItems();
@@ -261,9 +250,13 @@ class SettlementInternalServiceImplTest {
             .willReturn(List.of());
         given(settlementRepository.findBySellerIdAndStatus(sellerId, SettlementStatus.PENDING_MIN_AMOUNT))
             .willReturn(List.of());
-        given(settlementRepository.findBySellerIdAndPeriodStartAtBetween(
-            eq(sellerId), any(LocalDateTime.class), any(LocalDateTime.class)))
-            .willReturn(Optional.empty());
+        givenNotAlreadySettled(sellerId);
+    }
+
+    private void givenNotAlreadySettled(UUID sellerId) {
+        given(settlementRepository.existsBySellerIdAndPeriodStartAtBetweenAndStatusNot(
+            eq(sellerId), any(LocalDateTime.class), any(LocalDateTime.class), eq(SettlementStatus.CANCELLED)))
+            .willReturn(false);
     }
 
     private void givenSaveReturnsArgument() {
