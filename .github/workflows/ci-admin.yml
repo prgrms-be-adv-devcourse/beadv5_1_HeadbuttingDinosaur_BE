@@ -1,4 +1,4 @@
-name: CI - Admin Service
+name: CI - admin Service
 
 # 트리거: 명시된 브랜치로 PR이 생성되거나 업데이트될 때 실행
 on:
@@ -25,12 +25,12 @@ jobs:
           cache: 'gradle' # 의존성 다운로드 캐싱 (빌드 속도 최적화)
 
       - name: 3. Grant execute permission for gradlew
-        run: chmod +x gradlew
+        run: chmod +x admin/gradlew
 
       - name: 4. Gradle Test
-        run: ./gradlew :admin:test
+        run: cd admin && ./gradlew test
         env:
           SPRING_PROFILES_ACTIVE: test
 
       - name: 5. Gradle Build
-        run: ./gradlew :admin:build -x test
+        run: cd admin && ./gradlew build -x test
