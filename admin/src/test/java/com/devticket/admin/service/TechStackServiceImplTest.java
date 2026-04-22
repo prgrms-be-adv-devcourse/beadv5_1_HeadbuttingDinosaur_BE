@@ -1,10 +1,11 @@
-package com.devticket.admin.service;
+package com.devticket.admin.application.service;
 
-import com.devticket.admin.application.service.TechStackServiceImpl;
+import com.devticket.admin.application.event.TechStackCreatedEvent;
+import com.devticket.admin.application.event.TechStackDeletedEvent;
+import com.devticket.admin.application.event.TechStackUpdatedEvent;
 import com.devticket.admin.domain.model.TechStack;
 import com.devticket.admin.domain.repository.TechStackRepository;
 import com.devticket.admin.infrastructure.external.client.OpenAiEmbeddingClient;
-import com.devticket.admin.infrastructure.persistence.repository.TechStackEsRepository;
 import com.devticket.admin.presentation.dto.req.CreateTechStackRequest;
 import com.devticket.admin.presentation.dto.req.UpdateTechStackRequest;
 import com.devticket.admin.presentation.dto.res.CreateTechStackResponse;
@@ -17,6 +18,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.List;
 import java.util.Optional;
@@ -24,15 +26,16 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.*;
+import static org.mockito.ArgumentMatchers.any;
 
 @ExtendWith(MockitoExtension.class)
 class TechStackServiceImplTest {
 
     @Mock
-    TechStackEsRepository techStackEsRepository;
+    TechStackRepository techStackRepository;
 
     @Mock
-    TechStackRepository techStackRepository;
+    ApplicationEventPublisher eventPublisher;
 
     @Mock
     OpenAiEmbeddingClient openAiEmbeddingClient;
@@ -78,7 +81,7 @@ class TechStackServiceImplTest {
 
         // then
         assertThat(결과.name()).isEqualTo(이름);
-        then(techStackEsRepository).should().save(1L, 이름, 임베딩);
+        then(eventPublisher).should().publishEvent(any(TechStackCreatedEvent.class));
     }
 
     @Test
@@ -92,6 +95,8 @@ class TechStackServiceImplTest {
         assertThatThrownBy(() -> techStackService.createTechStack(new CreateTechStackRequest(이름)))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("이미 존재하는 TechStack");
+
+        then(eventPublisher).shouldHaveNoInteractions();
     }
 
     // =============== 3. TechStack 수정 =============== //
@@ -110,9 +115,10 @@ class TechStackServiceImplTest {
 
         // when
         UpdateTechStackResponse 결과 = techStackService.updateTechStack(아이디, new UpdateTechStackRequest(null, 새이름));
+
         // then
         assertThat(결과.name()).isEqualTo(새이름);
-        then(techStackEsRepository).should().update(아이디, 새이름, 임베딩);
+        then(eventPublisher).should().publishEvent(any(TechStackUpdatedEvent.class));
     }
 
     @Test
@@ -126,6 +132,8 @@ class TechStackServiceImplTest {
         assertThatThrownBy(() -> techStackService.updateTechStack(아이디, new UpdateTechStackRequest(null, "Kotlin")))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("존재하지 않는 TechStack");
+
+        then(eventPublisher).shouldHaveNoInteractions();
     }
 
     // =============== 4. TechStack 삭제 =============== //
@@ -144,7 +152,7 @@ class TechStackServiceImplTest {
         // then
         assertThat(결과.id()).isEqualTo(아이디);
         then(techStackRepository).should().deleteById(아이디);
-        then(techStackEsRepository).should().delete(아이디);
+        then(eventPublisher).should().publishEvent(any(TechStackDeletedEvent.class));
     }
 
     @Test
@@ -158,5 +166,7 @@ class TechStackServiceImplTest {
         assertThatThrownBy(() -> techStackService.deleteTechStack(아이디))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("존재하지 않는 TechStack");
+
+        then(eventPublisher).shouldHaveNoInteractions();
     }
 }
