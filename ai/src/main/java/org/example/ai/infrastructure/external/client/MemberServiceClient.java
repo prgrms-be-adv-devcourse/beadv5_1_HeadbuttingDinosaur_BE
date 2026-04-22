@@ -20,17 +20,18 @@ public class MemberServiceClient {
     private String memberServiceUrl;
 
     public UserTechStackResponse getUserTechStack(String userId){
-        UserTechStackRequest request = new UserTechStackRequest(userId);
+        log.info("[MemberClient] TechStack 조회 - userId: {}", userId);
 
-        log.info("[MemberClient] TechStack 조회 (Mock) - userId: {}", userId);
-
-        // UserTeckStack Mock 데이터
-        List<UserTechStackResponse.TechStackInfo> mockStacks = List.of(
-            new UserTechStackResponse.TechStackInfo("1", "Java"),
-            new UserTechStackResponse.TechStackInfo("2", "Spring")
-        );
-
-        return new UserTechStackResponse(userId, mockStacks);
+        try {
+            return webClient.get()
+                .uri(memberServiceUrl + "/internal/members/" + userId + "/tech-stacks")
+                .retrieve()
+                .bodyToMono(UserTechStackResponse.class)
+                .block();
+        } catch (Exception e) {
+            log.error("[MemberClient] TechStack 조회 실패 - userId: {}", userId, e);
+            return new UserTechStackResponse(userId, List.of());
+        }
     }
 
 }
