@@ -18,12 +18,45 @@ public class TechStackEmbeddingRepositoryImpl implements TechStackEmbeddingRepos
     // mock 데이터
     @Override
     public Optional<float[]> findEmbeddingByName(String techStackName) {
-        log.info("[TechStackEmbedding] 조회 (Mock) - name: {}", techStackName);
+        log.info("[TechStackEmbedding] 조회 - name: {}", techStackName);
 
-        float[] mockEmbedding = new float[1536];
-        mockEmbedding[0] = 0.1f;
-        mockEmbedding[1] = 0.2f;
+        try {
+            var response = elasticsearchClient.search(s -> s
+                    .index("techstack")
+                    .query(q -> q
+                        .term(t -> t
+                            .field("name")
+                            .value(techStackName)
+                        )
+                    )
+                    .source(src -> src
+                        .filter(f -> f
+                            .includes("embedding")
+                        )
+                    ),
+                java.util.Map.class
+            );
 
-        return Optional.of(mockEmbedding);
+            if (response.hits().hits().isEmpty()) {
+                log.warn("[TechStackEmbedding] 조회 결과 없음 - name: {}", techStackName);
+                return Optional.empty();
+            }
+
+            var source = response.hits().hits().get(0).source();
+            if (source == null || !source.containsKey("embedding")) {
+                return Optional.empty();
+            }
+
+            java.util.List<Double> embeddingRaw = (java.util.List<Double>) source.get("embedding");
+            float[] embedding = new float[embeddingRaw.size()];
+            for (int i = 0; i < embeddingRaw.size(); i++) {
+                embedding[i] = embeddingRaw.get(i).floatValue();
+            }
+
+            return Optional.of(embedding);
+        } catch (Exception e) {
+            log.error("[TechStackEmbedding] 조회 실패 - name: {}", techStackName, e);
+            return Optional.empty();
+        }
     }
 }

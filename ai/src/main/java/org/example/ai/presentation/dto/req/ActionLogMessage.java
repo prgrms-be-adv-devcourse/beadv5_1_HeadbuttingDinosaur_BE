@@ -16,6 +16,12 @@ public record ActionLogMessage(
     @JsonProperty("actionType")
     String actionType,
 
+    @JsonProperty("searchKeyword")
+    String searchKeyword,
+
+    @JsonProperty("stackFilter")
+    String stackFilter,
+
     @JsonProperty("dwellTimeSeconds")
     Integer dwellTimeSeconds,
 
