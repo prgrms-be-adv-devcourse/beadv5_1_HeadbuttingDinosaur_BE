@@ -1,6 +1,7 @@
 package com.devticket.member.application;
 
 import com.devticket.member.common.exception.BusinessException;
+import com.devticket.member.infrastructure.external.client.AdminInternalClient;
 import com.devticket.member.presentation.domain.MemberErrorCode;
 import com.devticket.member.presentation.domain.SellerApplicationDecision;
 import com.devticket.member.presentation.domain.UserRole;
@@ -8,12 +9,15 @@ import com.devticket.member.presentation.domain.UserStatus;
 import com.devticket.member.presentation.domain.model.SellerApplication;
 import com.devticket.member.presentation.domain.model.User;
 import com.devticket.member.presentation.domain.model.UserProfile;
+import com.devticket.member.presentation.domain.model.UserTechStack;
 import com.devticket.member.presentation.domain.repository.SellerApplicationRepository;
 import com.devticket.member.presentation.domain.repository.UserProfileRepository;
 import com.devticket.member.presentation.domain.repository.UserRepository;
+import com.devticket.member.presentation.domain.repository.UserTechStackRepository;
 import com.devticket.member.presentation.dto.internal.request.InternalDecideSellerApplicationRequest;
 import com.devticket.member.presentation.dto.internal.request.InternalUpdateUserRoleRequest;
 import com.devticket.member.presentation.dto.internal.request.InternalUpdateUserStatusRequest;
+import com.devticket.member.presentation.dto.internal.response.InternalAdminTechStackResponse;
 import com.devticket.member.presentation.dto.internal.response.InternalDecideSellerApplicationResponse;
 import com.devticket.member.presentation.dto.internal.response.InternalMemberInfoResponse;
 import com.devticket.member.presentation.dto.internal.response.InternalMemberRoleResponse;
@@ -23,6 +27,9 @@ import com.devticket.member.presentation.dto.internal.response.InternalSellerApp
 import com.devticket.member.presentation.dto.internal.response.InternalSellerInfoResponse;
 import com.devticket.member.presentation.dto.internal.response.InternalUpdateRoleResponse;
 import com.devticket.member.presentation.dto.internal.response.InternalUpdateStatusResponse;
+import com.devticket.member.presentation.dto.internal.response.InternalUserTechStackResponse;
+import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.List;
 import java.util.Objects;
 import org.springframework.data.domain.Pageable;
@@ -40,6 +47,8 @@ public class InternalMemberService {
     private final UserRepository userRepository;
     private final UserProfileRepository userProfileRepository;
     private final SellerApplicationRepository sellerApplicationRepository;
+    private final UserTechStackRepository userTechStackRepository;
+    private final AdminInternalClient adminInternalClient;
 
 
     public InternalMemberInfoResponse getMemberInfo(UUID userId) {
@@ -154,6 +163,36 @@ public class InternalMemberService {
         return userRepository.findByRole(UserRole.SELLER).stream()
             .map(User::getUserId)
             .toList();
+    }
+
+    // 유저 기술 스택 조회 (AI 추천용)
+    public InternalUserTechStackResponse getUserTechStacks(UUID userId) {
+        User user = findUserByUuidOrThrow(userId);
+
+        List<Long> techStackIds = userTechStackRepository.findByUserId(user.getId()).stream()
+            .map(UserTechStack::getTechStackId)
+            .toList();
+
+        if (techStackIds.isEmpty()) {
+            return new InternalUserTechStackResponse(user.getUserId().toString(), List.of());
+        }
+
+        InternalAdminTechStackResponse adminResponse = adminInternalClient.getTechStacks();
+        Map<Long, String> nameById = adminResponse.techStacks().stream()
+            .collect(Collectors.toMap(
+                InternalAdminTechStackResponse.TechStackInfo::id,
+                InternalAdminTechStackResponse.TechStackInfo::name
+            ));
+
+        List<InternalUserTechStackResponse.TechStackInfo> techStacks = techStackIds.stream()
+            .filter(nameById::containsKey)
+            .map(id -> new InternalUserTechStackResponse.TechStackInfo(
+                id.toString(),
+                nameById.get(id)
+            ))
+            .toList();
+
+        return new InternalUserTechStackResponse(user.getUserId().toString(), techStacks);
     }
 
 }
