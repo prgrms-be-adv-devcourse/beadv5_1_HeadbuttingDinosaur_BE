@@ -26,7 +26,8 @@ public enum OrderErrorCode implements ErrorCode {
     INVALID_ORDER_STATUS_TRANSITION(400, "ORDER_015", "현재 주문 상태에서 허용되지 않는 전이입니다."),
     REFUND_NOT_REFUNDABLE(400, "ORDER_016", "환불 요청이 불가능한 주문 상태입니다."),
     REFUND_ROLLBACK_INVALID(400, "ORDER_017", "환불 보상 롤백이 불가능한 주문 상태입니다."),
-    REFUND_COMPLETE_INVALID(400, "ORDER_018", "환불 확정이 불가능한 주문 상태입니다.");
+    REFUND_COMPLETE_INVALID(400, "ORDER_018", "환불 확정이 불가능한 주문 상태입니다."),
+    INVALID_ORDER_STATUS_FILTER(400, "ORDER_019", "유효하지 않은 주문 상태 필터 값입니다.");
 
     private final int status;
     private final String code;
