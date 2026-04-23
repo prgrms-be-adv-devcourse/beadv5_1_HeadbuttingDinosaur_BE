@@ -17,4 +17,7 @@ public final class KafkaTopics {
     public static final String EVENT_SALE_STOPPED = "event.sale-stopped";
     public static final String REFUND_STOCK_DONE = "refund.stock.done";
     public static final String REFUND_STOCK_FAILED = "refund.stock.failed";
+
+    // action.log 전용 토픽 (AGENTS.md §6.10 별도 정책 — fire-and-forget, Outbox 미사용)
+    public static final String ACTION_LOG = "action.log";
 }

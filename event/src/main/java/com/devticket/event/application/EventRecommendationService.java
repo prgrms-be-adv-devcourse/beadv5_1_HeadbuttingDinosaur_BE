@@ -5,7 +5,7 @@ import com.devticket.event.domain.model.Event;
 import com.devticket.event.infrastructure.client.AiClient;
 import com.devticket.event.infrastructure.persistence.EventRepository;
 import com.devticket.event.presentation.dto.EventListContentResponse;
-import com.devticket.event.presentation.dto.internal.InternalRecommendationResponse;
+import com.devticket.event.presentation.dto.RecommendationResponse;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -34,10 +34,10 @@ public class EventRecommendationService {
     private final EventRepository eventRepository;
 
     @Transactional(readOnly = true)
-    public InternalRecommendationResponse getRecommendations(UUID userId) {
+    public RecommendationResponse getRecommendations(UUID userId) {
         List<String> rankedIdStrings = aiClient.getRecommendedEventIds(userId);
         if (rankedIdStrings.isEmpty()) {
-            return InternalRecommendationResponse.empty();
+            return RecommendationResponse.empty();
         }
 
         // AI 응답 ID 파싱 실패 항목 필터링 (graceful degradation)
@@ -53,7 +53,7 @@ public class EventRecommendationService {
             .toList();
 
         if (rankedIds.isEmpty()) {
-            return InternalRecommendationResponse.empty();
+            return RecommendationResponse.empty();
         }
 
         // N+1 방지: techStacks, images 각각 배치 로드
@@ -74,6 +74,6 @@ public class EventRecommendationService {
             .map(EventListContentResponse::from)
             .toList();
 
-        return new InternalRecommendationResponse(results);
+        return new RecommendationResponse(results);
     }
 }

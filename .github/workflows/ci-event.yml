@@ -13,22 +13,8 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
 
-    services:
-      elasticsearch:
-        image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
-        env:
-          discovery.type: single-node
-          xpack.security.enabled: "false"
-          xpack.security.http.ssl.enabled: "false"
-          xpack.security.transport.ssl.enabled: "false"
-        ports:
-          - 9200:9200
-        options: >-
-          --health-cmd="curl -fsS http://localhost:9200/_cluster/health || exit 1"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=30
-
+    # ES 는 Testcontainers 가 직접 기동 (ElasticsearchIntegrationTestBase)
+    # → GitHub Actions service container 불필요. Docker runtime 만 있으면 됨 (ubuntu-latest 기본 포함).
     steps:
       - name: 1. Checkout Repository
         uses: actions/checkout@v4
@@ -44,10 +30,10 @@ jobs:
         run: chmod +x event/gradlew
 
       - name: 4. Gradle Test
+        # @Tag("elasticsearch") 테스트는 CI 에서 스킵 (build.gradle 의 `CI` env 감지 → excludeTags 'elasticsearch')
         run: cd event && ./gradlew test
         env:
           SPRING_PROFILES_ACTIVE: test
-          SPRING_ELASTICSEARCH_URIS: http://localhost:9200
 
       - name: 5. Gradle Build
         run: cd event && ./gradlew build -x test
