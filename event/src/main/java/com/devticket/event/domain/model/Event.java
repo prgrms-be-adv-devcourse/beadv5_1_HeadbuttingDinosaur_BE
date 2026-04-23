@@ -153,6 +153,13 @@ public class Event extends BaseEntity {
         this.status = EventStatus.CANCELLED;
     }
 
+    public void forceCancel() {
+        if (!canBeCancelled()) {
+            throw new BusinessException(EventErrorCode.CANNOT_CHANGE_STATUS);
+        }
+        this.status = EventStatus.FORCE_CANCELLED;
+    }
+
     public void deductStock(int quantity) {
         if (quantity < 1) {
             throw new BusinessException(EventErrorCode.INVALID_STOCK_QUANTITY);

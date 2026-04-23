@@ -3,11 +3,13 @@ package com.devticket.event.presentation.controller;
 import com.devticket.event.application.EventInternalService;
 import com.devticket.event.common.response.SuccessResponse;
 import com.devticket.event.domain.enums.EventStatus;
+import com.devticket.event.application.EventService;
 import com.devticket.event.presentation.dto.internal.InternalBulkEventInfoRequest;
 import com.devticket.event.presentation.dto.internal.InternalPopularEventRequest;
 import com.devticket.event.presentation.dto.internal.InternalPopularEventResponse;
 import com.devticket.event.presentation.dto.internal.InternalBulkEventInfoResponse;
 import com.devticket.event.presentation.dto.internal.InternalBulkStockAdjustmentRequest;
+import com.devticket.event.presentation.dto.internal.InternalEventForceCancelRequest;
 import com.devticket.event.presentation.dto.internal.InternalPagedEventResponse;
 import com.devticket.event.presentation.dto.internal.InternalEndedEventsResponse;
 import com.devticket.event.presentation.dto.internal.InternalStockAdjustmentResponse;
@@ -41,6 +43,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class EventInternalController {
 
     private final EventInternalService eventInternalService;
+    private final EventService eventService;
 
     @GetMapping
     public ResponseEntity<SuccessResponse<InternalPagedEventResponse>> getEvents(
@@ -164,6 +167,19 @@ public class EventInternalController {
         return ResponseEntity.ok(SuccessResponse.success(
             eventInternalService.getEventsBySellerForSettlement(sellerId, periodStart, periodEnd)
         ));
+    }
+
+    /**
+     * API 9: 어드민 강제 취소
+     * Admin 서비스가 호출 — 이벤트를 FORCE_CANCELLED 로 전이하고 event.force-cancelled 발행.
+     * Commerce 가 이벤트를 수신해 환불 fan-out 을 시작한다.
+     */
+    @PatchMapping("/{eventId}/force-cancel")
+    public ResponseEntity<Void> forceCancel(
+        @PathVariable UUID eventId,
+        @RequestBody @Valid InternalEventForceCancelRequest request) {
+        eventService.forceCancel(eventId, request.reason());
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/popular")

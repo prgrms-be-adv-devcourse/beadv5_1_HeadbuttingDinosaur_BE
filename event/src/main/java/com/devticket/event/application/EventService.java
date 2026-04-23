@@ -6,6 +6,9 @@ import co.elastic.clients.elasticsearch._types.query_dsl.BoolQuery;
 import co.elastic.clients.elasticsearch._types.query_dsl.Query;
 import com.devticket.event.application.event.ActionLogDomainEvent;
 import com.devticket.event.common.exception.BusinessException;
+import com.devticket.event.common.messaging.KafkaTopics;
+import com.devticket.event.common.messaging.event.EventForceCancelledEvent;
+import com.devticket.event.common.messaging.event.EventSaleStoppedEvent;
 import com.devticket.event.common.messaging.event.ActionType;
 import com.devticket.event.domain.enums.EventStatus;
 import com.devticket.event.domain.exception.EventErrorCode;
@@ -287,6 +290,13 @@ public class EventService {
                 throw new BusinessException(EventErrorCode.CANNOT_CHANGE_STATUS);
             }
             event.cancel();
+            outboxService.save(
+                event.getEventId().toString(),
+                event.getEventId().toString(),
+                "EVENT_SALE_STOPPED",
+                KafkaTopics.EVENT_SALE_STOPPED,
+                new EventSaleStoppedEvent(event.getEventId(), event.getSellerId(), Instant.now())
+            );
             syncToElasticsearch(event);
             return SellerEventUpdateResponse.from(event);
         }
@@ -357,6 +367,102 @@ public class EventService {
         syncToElasticsearch(event);
 
         return SellerEventUpdateResponse.from(event);
+    }
+
+    /**
+     * 어드민 강제 취소 — 이벤트 상태를 FORCE_CANCELLED 로 전이하고 event.force-cancelled Outbox 발행.
+     * Commerce 가 이를 수신해 해당 이벤트의 PAID 주문에 대해 환불 fan-out 을 수행한다.
+     */
+    @Transactional
+    public void forceCancel(UUID eventId, String reason) {
+        Event event = eventRepository.findByEventIdWithLock(eventId)
+            .orElseThrow(() -> new BusinessException(EventErrorCode.EVENT_NOT_FOUND));
+
+        event.forceCancel();
+
+        outboxService.save(
+            event.getEventId().toString(),
+            event.getEventId().toString(),
+            "EVENT_FORCE_CANCELLED",
+            KafkaTopics.EVENT_FORCE_CANCELLED,
+            new EventForceCancelledEvent(event.getEventId(), event.getSellerId(), reason, Instant.now())
+        );
+
+        syncToElasticsearch(event);
+    }
+
+    /**
+     * order.created Consumer 처리 — 재고 차감 + stock.deducted Outbox 저장
+     *
+     * <p>처리 순서: isDuplicate → 재고 차감(전체) → stock.deducted Outbox 저장 → markProcessed
+     * <p>재고 부족(BusinessException) 발생 시 StockDeductionException throw → @Transactional 전체 롤백
+     * Consumer가 이를 캐치하여 saveStockFailed()를 별도 트랜잭션으로 호출한다.
+     */
+    @Transactional
+    public void processOrderCreated(UUID messageId, String topic, String payload) {
+        if (deduplicationService.isDuplicate(messageId)) {
+            return;
+        }
+
+        OrderCreatedEvent event = deserialize(payload, OrderCreatedEvent.class);
+
+        // Phase 1: 모든 항목 재고 차감 — 실패 시 StockDeductionException throw (전체 롤백)
+        List<OrderCreatedEvent.OrderItem> sortedItems = event.orderItems().stream()
+            .sorted(Comparator.comparing(OrderCreatedEvent.OrderItem::eventId))
+            .toList();
+
+        List<StockDeductedEvent> deductedEvents = new ArrayList<>();
+        for (OrderCreatedEvent.OrderItem item : sortedItems) {
+            Event e = eventRepository.findByEventIdWithLock(item.eventId())
+                .orElseThrow(() -> new StockDeductionException(event.orderId(), item.eventId(), "이벤트를 찾을 수 없습니다"));
+            try {
+                e.deductStock(item.quantity());
+            } catch (BusinessException ex) {
+                throw new StockDeductionException(event.orderId(), item.eventId(), ex.getMessage());
+            }
+            deductedEvents.add(new StockDeductedEvent(event.orderId(), item.eventId(), item.quantity(), Instant.now()));
+        }
+
+        // Phase 2: 모두 성공 → Outbox 저장
+        for (StockDeductedEvent deducted : deductedEvents) {
+            outboxService.save(
+                event.orderId().toString(),
+                event.orderId().toString(),
+                "STOCK_DEDUCTED",
+                KafkaTopics.STOCK_DEDUCTED,
+                deducted
+            );
+        }
+
+        deduplicationService.markProcessed(messageId, topic);
+    }
+
+    /**
+     * 재고 차감 실패 시 stock.failed Outbox 저장 — Consumer가 별도 트랜잭션으로 호출
+     */
+    @Transactional
+    public void saveStockFailed(UUID messageId, String topic, UUID orderId, UUID eventId, String reason) {
+        if (deduplicationService.isDuplicate(messageId)) {
+            return;
+        }
+
+        outboxService.save(
+            orderId.toString(),
+            orderId.toString(),
+            "STOCK_FAILED",
+            KafkaTopics.STOCK_FAILED,
+            new StockFailedEvent(orderId, eventId, reason, Instant.now())
+        );
+
+        deduplicationService.markProcessed(messageId, topic);
+    }
+
+    private <T> T deserialize(String payload, Class<T> type) {
+        try {
+            return objectMapper.readValue(payload, type);
+        } catch (JsonProcessingException e) {
+            throw new IllegalArgumentException("Kafka 페이로드 역직렬화 실패: " + type.getSimpleName(), e);
+        }
     }
 
     /**
