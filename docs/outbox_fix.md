@@ -313,9 +313,9 @@ class OutboxSchedulerIntegrationTest {
 
 ---
 
-### 3-B. Event — B3·B5·B6 후속
+### 3-B. Event — **후속 완료** (B3·B5·B6 반영)
 
-> 실코드 대조 결과: B1·B2·B4 **선례 확정** / B3·B5 후속 / B6 회귀 방지 테스트 이식 필요.
+> 실코드 대조 결과: B1·B2·B4 **선례 확정** / B3·B5·B6 **본 커밋 반영 완료** (2026-04-22).
 
 #### 선례 (작업 없음)
 - [x] ✅ **B1 선례**: `nextRetryAt` 필드 + 재시도 6회 지수 백오프 (Scheduler 주석 명시)
@@ -323,76 +323,81 @@ class OutboxSchedulerIntegrationTest {
 - [x] ✅ **B4 선례**: `@Table(schema="event")` + `messageId` String(36)
 - [x] ✅ `processOne()` 별도 빈 / Scheduler `@Transactional` 없음 / `lockAtMostFor=5m` — PR #484 A파트
 
-#### 후속 (필수 수정)
+#### 후속 — 완료
 
-- [ ] **B3 Producer `publish()` 시그니처 전환**
-  - 현재: `boolean publish(OutboxEventMessage msg)` — 실패 시 `false` 반환
-  - 변경: `void publish(OutboxEventMessage msg) throws OutboxPublishException`
-  - 근거: boolean 반환은 호출부 실패 감지 누락 위험 + Commerce와 예외 전파 방식 불일치
-  - 영향: `OutboxService.processOne()` 호출부 `success` 분기 → try/catch 구조로 변경
-- [ ] **B5-1 Repository 메서드명 통일**
-  - 현재: `findPendingOutboxes`
-  - 변경: `findPendingToPublish`
-- [ ] **B5-2 쿼리 연산자 통일**
-  - 현재: `<= :now`
-  - 변경: `< :now` (경계 배제)
-- [ ] **B5-3 `markFailed()` 상수 내부화**
-  - 현재: `markFailed(MAX_RETRIES)` — 파라미터 주입
-  - 변경: `markFailed()` — 엔티티 내부 상수 참조
-  - 영향: `OutboxService.processOne()`의 `MAX_RETRIES` 상수 제거 가능 (엔티티 내부 이전)
-- [ ] **B6 회귀 방지 테스트 이식** (Commerce 선례 기반)
-  - `KafkaProducerConfigTest` 신규 — 타임아웃 3종·acks·idempotence 값 고정 + 불변식 가드 (`max.block < request.timeout ≤ delivery.timeout < SEND_TIMEOUT*1000`)
-  - `OutboxSchedulerIntegrationTest` 신규 — EmbeddedKafka + `@MockitoBean LockProvider` 조합으로 Outbox row 저장 → 스케줄러 발행 → Kafka record 수신 + DB SENT 전이 E2E 검증
+- [x] ✅ **B3 Producer `publish()` 시그니처 전환**
+  - `boolean publish()` → `void publish(OutboxEventMessage msg) throws OutboxPublishException`
+  - `OutboxPublishException` (checked) 신규 — Kafka 계열 예외 단일 계약으로 감쌈
+  - 영향: `OutboxService.processOne()`이 `OutboxPublishException` 정상 분기 + `RuntimeException` 최후 방어선 이원화
+- [x] ✅ **B5-1 Repository 메서드명 통일**: `findPendingOutboxes` → `findPendingToPublish`
+- [x] ✅ **B5-2 쿼리 연산자 통일**: `<= :now` → `< :now` (경계 배제)
+- [x] ✅ **B5-3 `markFailed()` 상수 내부화**: `markFailed(MAX_RETRIES)` → `markFailed()`, 상수 `Outbox` 엔티티 내부 이전
+- [x] ✅ **B6 회귀 방지 테스트 이식** (Commerce 선례 복제)
+  - `KafkaProducerConfigTest` 신규 — 타임아웃 3종·acks·idempotence 값 고정 + 불변식 가드 4케이스
+  - `OutboxSchedulerIntegrationTest` 신규 — `@EmbeddedKafka` + `@TestConfiguration NoOp LockProvider` 조합으로 Outbox row 저장 → 스케줄러 발행 → Kafka record 수신 + DB `SENT` 전이 E2E 검증
+  - 선행 정합:
+    - `KafkaProducerConfig` — 타임아웃 3종 `@Value` 주입 전환 (`maxBlockMs` / `requestTimeoutMs` / `deliveryTimeoutMs`)
+    - `OutboxEventProducer.SEND_TIMEOUT_SECONDS`(초 상수) → `sendTimeoutMs`(ms `@Value`, 기본 2000)
+    - `application-test.yml` `kafka.outbox-producer.*` 완화 타임아웃 세트 추가 (3000/5000/8000/10000)
+    - `build.gradle` `org.awaitility:awaitility` 의존성 추가
+
+#### F2 — 워킹트리 청소 (본 커밋 diff 외 — 언트래킹 삭제)
+
+- [x] ✅ `event/src/main/java/com/devticket/event/infrastructure/messaging/` 죽은 복사본 제거
+  - `KafkaTopics.java` (구버전, `ACTION_LOG` 누락) / `event/PaymentFailedEvent.java` (내용 동일)
+  - `common/messaging/` 최신 본체 참조 0건 외부 → 삭제 안전
 
 ---
 
-### 3-C. Payment — A파트 머지 완료 + B1~B5·B6 후속
+### 3-C. Payment — A파트 머지 완료 + B1~B7 + T2/T3 **완료**
 
 > PR #483 A 파트(ShedLock 5m / Producer 타임아웃 3종 / `.get(2s)` / Scheduler 트랜잭션 해소 / `processOne()` 분리) 머지 완료.
-> B1~B5 + B6 이월 — 본 트랙에서 수거.
+> **B1~B5 + B6 후속 수거 완료** (commits `4fc0a20` refactor / `c70ba7e` test).
+> B7 (Commerce 선례 `@Value` 외부화) + T2/T3 (고가치 회귀 방지 테스트) 함께 반영.
 
 #### 선례 (A 파트 이후)
 - [x] ✅ `nextRetryAt` 필드 — 있음
 - [x] ✅ `processOne()` 별도 빈 — A 파트 적용
 - [x] ✅ Scheduler `@Transactional` 없음 / `lockAtMostFor=5m / lockAtLeastFor=5s` — A 파트 적용
-- [x] ✅ ProducerConfig 3종 타임아웃 (`1500/1000/500`) + `retries=3` 제거 — A 파트 적용
-- [x] ✅ `.get(2s)` — A 파트 적용
+- [x] ✅ ProducerConfig 3종 타임아웃 (`1500/1000/500`) + `retries=3` 제거 — A 파트 적용 (B7에서 `@Value` 외부화로 승격)
+- [x] ✅ `.get(2s)` — A 파트 적용 (B7에서 `sendTimeoutMs` `@Value` 외부화)
 
-#### 후속 (필수 수정)
+#### 후속 (완료)
 
-- [ ] **B1 재시도 6회 지수 백오프**
-  - 현재: 선형 5회 (`retryCount * 60s`, 누적 ~10분) — `increaseRetryCount()`
-  - 변경: 지수 6회 (`2^(retryCount-1)s` = 즉시/1/2/4/8/16s, 누적 31초)
-  - 영향: `Outbox.markFailed()` + `nextRetryAt` 재산정 로직
-- [ ] **B2 `OutboxService.save()` 시그니처 재정렬 + 전파 속성**
-  - 현재: `save(aggregateId, eventType, topic, partitionKey, payload)` — 순서 상이
-  - 변경: `save(aggregateId, partitionKey, eventType, topic, event)` — Commerce 기준 순서
-  - 전파: `@Transactional(propagation = Propagation.MANDATORY)` 명시
-  - 근거: 외부 `@Transactional` 없이 호출되면 비즈니스 DB 커밋과 Outbox 커밋 분리 위험 차단
-- [ ] **B3 Producer `publish()` 시그니처 전환**
-  - 현재: `send(topic, key, msg): void throws OutboxPublishException`
-  - 변경: `publish(OutboxEventMessage msg): void throws OutboxPublishException`
-  - 근거: `topic`/`key`는 `OutboxEventMessage` 내부에서 추출 — Producer가 호출부와 통일 계약 공유
-- [ ] **B4-1 `@Table(schema="payment")` 적용**
-  - 현재: schema 미지정
-  - 변경: `@Table(name = "outbox", schema = "payment")`
-- [ ] **B4-2 `messageId` 타입 전환**
-  - 현재: `UUID`
-  - 변경: `String` (`UUID.toString()` 저장, VARCHAR(36))
-  - 영향: 엔티티 필드 / DB 컬럼 타입 / 호출부 / Kafka 헤더 세팅
-  - **별건 이슈 권고**: PostgreSQL `USING message_id::text` 명시 필요, `ddl-auto:update` 자동 처리 불가 가능성 — 운영 마이그레이션 스크립트 분리
-- [ ] **B5-1 Repository 메서드명 통일**
-  - 현재: `findPendingForRetry`
-  - 변경: `findPendingToPublish`
-- [ ] **B5-2 쿼리 연산자 통일**
-  - 현재: `<= :now`
-  - 변경: `< :now`
-- [ ] **B5-3 `markFailed()` 상수 내부화**
-  - 현재: `increaseRetryCount()` — 메서드명 상이
-  - 변경: `markFailed()` — Commerce 기준 + 상수 내부화
-- [ ] **B6 회귀 방지 테스트 이식** (Commerce 선례 기반)
-  - `KafkaProducerConfigTest` 신규 — 타임아웃 3종·acks·idempotence 값 고정 + 불변식 가드
-  - `OutboxSchedulerIntegrationTest` 신규 — EmbeddedKafka E2E 검증
+- [x] ✅ **B1 재시도 6회 지수 백오프** — `4fc0a20`
+  - 선형 5회(`retryCount * 60s`, 누적 ~10분) → **지수 6회** (`2^(retryCount-1)s` = 1/2/4/8/16/32s, 누적 63초)
+  - `Outbox.markFailed()` + `nextRetryAt` 재산정 로직 반영
+- [x] ✅ **B2 `OutboxService.save()` 시그니처 재정렬 + MANDATORY 전파** — `4fc0a20`
+  - `save(aggregateId, partitionKey, eventType, topic, event)` — Commerce 기준 순서
+  - `@Transactional(propagation = Propagation.MANDATORY)` 명시
+  - 호출부 4곳 반영 (`PaymentServiceImpl` 2 / `WalletServiceImpl` 1 / `WalletPgTimeoutHandler` 1)
+- [x] ✅ **B3 Producer `publish()` 시그니처 전환** — `4fc0a20`
+  - `publish(OutboxEventMessage msg): void throws OutboxPublishException`
+  - `OutboxEventMessage`에 `topic` / `partitionKey` 필드 추가 → Producer가 엔티티 비의존
+- [x] ✅ **B4-1 `@Table(schema="payment")` 적용** — `4fc0a20`
+- [x] ✅ **B4-2 `messageId` 타입 전환** — `4fc0a20`
+  - 엔티티/호출부/Kafka 헤더 전부 `String` 일관
+  - **⚠️ 별건 이슈**: 운영 DB 컬럼 UUID→VARCHAR(36) 마이그레이션 스크립트 분리 필요 (PostgreSQL `USING message_id::text` 명시)
+- [x] ✅ **B5-1 Repository 메서드명 통일** — `findPendingToPublish` — `4fc0a20`
+- [x] ✅ **B5-2 쿼리 연산자 통일** — `< :now` (경계 배제) — `4fc0a20`
+- [x] ✅ **B5-3 `markFailed()` 상수 내부화** — `MAX_RETRY=6` 엔티티 내부화 — `4fc0a20`
+- [x] ✅ **B6 회귀 방지 테스트 이식 (Commerce 선례)** — `c70ba7e`
+  - `KafkaProducerConfigTest` — 타임아웃 불변식 `max.block < request ≤ delivery < sendTimeout` (운영/테스트 두 세트)
+  - `OutboxSchedulerIntegrationTest` — EmbeddedKafka E2E + `@KafkaListener` + `NoOpLockProviderConfig`
+
+#### 추가 반영 (본 PR 스코프 확장)
+
+- [x] ✅ **B7 Commerce 선례 — Producer 타임아웃 `@Value` 외부화** — `4fc0a20`
+  - `KafkaProducerConfig`: `maxBlockMs` / `requestTimeoutMs` / `deliveryTimeoutMs` `@Value` 주입 (기존 하드코딩 승격)
+  - `OutboxEventProducer`: `sendTimeoutMs` `@Value` 주입 (기존 `.get(2s)` 하드코딩 승격)
+  - `application.yml`: 운영값 (`kafka-producer.max-block-ms=500` / `request-timeout-ms=1000` / `delivery-timeout-ms=1500` / `send-timeout-ms=2000`)
+  - `application-test.yml`: EmbeddedKafka 완화값 (`3000/5000/8000/10000`)
+  - 근거: 테스트 프로파일에서 EmbeddedKafka 지연 대응 + 운영 튜닝 용이성
+- [x] ✅ **T2 `@Transactional(MANDATORY)` 불변식 E2E** — `c70ba7e`
+  - `OutboxServicePropagationTest` — 외부 TX 없이 `save()` 호출 시 `IllegalTransactionStateException` 기대
+  - 호출부에서 `@Transactional` 누락 시 **CI 즉시 감지** — 무결성 최후 방어선
+- [x] ✅ **T3 Repository 쿼리 경계 + LIMIT** — `c70ba7e`
+  - `OutboxRepositoryTest` — `< :now` 경계 4케이스 (NULL/past/equal/future) + SENT 배제 + LIMIT 50 배치 상한
 
 ---
 
@@ -462,27 +467,36 @@ config.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, 500);
 - `processOne()` 별도 빈 호출 경로 확인 (self-invocation 아님 — 다른 빈 주입 → 메서드 호출)
 - 개별 메시지 실패가 루프 전체를 롤백시키지 않는지 확인 (건별 경계 격리)
 
-### 5-C. `messageId` 타입 전환 영향 — Payment 후속 (B4-2)
+### 5-C. `messageId` 타입 전환 영향 — Payment **완료** (B4-2)
 
-- DB 컬럼 타입 변경 → 기존 데이터 마이그레이션 필요 여부 확인
-- Kafka 헤더 `X-Message-Id` 세팅 시 String 직접 전달 확인
-- `processed_message.message_id` 타입과 정합 확인
-- 운영 마이그레이션은 **별건 이슈로 분리 권고** (PostgreSQL `USING` 명시)
+- [x] 엔티티 필드 / Kafka 헤더 / 호출부 전부 `String` 일관 — 코드 검증 완료
+- [ ] **운영 DB 컬럼 UUID→VARCHAR(36) 마이그레이션** — 별건 이슈로 분리 (PostgreSQL `USING message_id::text` 명시 필요)
+- [ ] `processed_message.message_id` 타입 정합 확인 — Consumer 스코프 (별건)
 
-### 5-D. 재시도 정책 전환 영향 — Payment 후속 (B1)
+### 5-D. 재시도 정책 전환 영향 — Payment **완료** (B1)
 
-- 기존 선형 5회 상태로 PENDING 저장된 레코드의 `nextRetryAt` 재산정 필요 여부
-- `retryCount >= 6` 도달 시 FAILED 전환 로직 — 기존 `MAX_RETRY=5` 상수 일괄 치환
+- [x] `MAX_RETRY=6` 상수 엔티티 내부화 + `markFailed()` 구현 교체
+- [ ] **운영 데이터 전환**: 기존 선형 5회 상태로 저장된 PENDING 레코드의 `nextRetryAt` 재산정 필요 여부 운영팀 확인 (별건)
 
 ### 5-E. `lockAtMostFor` 확장 부작용 — 3모듈 완료
 
 - 인스턴스 장애 시 락 홀딩 5분 → 스케줄러 5분간 휴지 → **Outbox 지연 5분** 가능성 인지
 - 대안: Spring Boot graceful shutdown 훅에서 ShedLock 명시 해제 여부 검토
 
-### 5-F. 회귀 방지 테스트 이식 — Event/Payment 후속 (B6)
+### 5-F. 회귀 방지 테스트 이식 — **3모듈 완료**
 
-- `KafkaProducerConfigTest` 구성 값 고정 + 불변식 가드 → 향후 `.get(2s)` 축소 / `delivery.timeout.ms` 상향 회귀 CI 차단
-- `OutboxSchedulerIntegrationTest` EmbeddedKafka E2E → 스케줄러·Producer·DB 상태 전이 End-to-End 회귀 차단
+- [x] Commerce `KafkaProducerConfigTest` / `OutboxSchedulerIntegrationTest` — PR #482
+- [x] Event 이식 — PR #484 후속
+- [x] Payment 이식 — `c70ba7e` (`KafkaProducerConfigTest` + `OutboxSchedulerIntegrationTest` + `OutboxServicePropagationTest` + `OutboxRepositoryTest`)
+
+### 5-H. `@Transactional(MANDATORY)` 불변식 E2E — Payment **완료** (T2)
+
+- [x] `OutboxServicePropagationTest` — 외부 TX 없이 `save()` 호출 시 `IllegalTransactionStateException` 기대
+- 누군가 호출부에서 `@Transactional` 실수로 빠뜨릴 경우 **CI 즉시 감지** → 비즈니스 DB 커밋과 Outbox 커밋 분리 위험 최종 차단
+
+### 5-I. Repository 쿼리 경계 — Payment **완료** (T3)
+
+- [x] `OutboxRepositoryTest` — `< :now` 경계 4케이스 (NULL / past / equal-skip / future-skip) + SENT 배제 + LIMIT 50 배치 상한
 
 ### 5-G. 패키지 경로 상시 탐지 — F2 정책
 
@@ -503,8 +517,9 @@ config.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, 500);
 ## 🔑 주요내용 정리
 
 - Commerce = **선례 모듈** — §2 통합 결정값 전 항목 이미 일치, 회귀 방지 테스트(`KafkaProducerConfigTest`/`OutboxSchedulerIntegrationTest`) 보유
-- Event **후속 4건**: B3 (publish 시그니처) / B5 (Repo rename·`<`·markFailed 상수) / B6 (회귀 방지 테스트 이식) — B1·B2·B4는 선례 확정
-- Payment **후속 6건**: B1 (지수 6회) / B2 (save 시그니처·MANDATORY) / B3 (publish 시그니처) / B4 (schema·messageId 타입) / B5 (Repo rename) / B6 (회귀 방지 테스트) — A 파트는 PR #483 머지 완료
+- Event **후속 완료** (2026-04-22) — B3 (publish 시그니처) / B5 (Repo rename·`<`·markFailed 상수) / B6 (회귀 방지 테스트 이식) 반영 + F2 `infrastructure/messaging/` 청소 / B1·B2·B4는 선례 확정
+- **Payment 후속 완료** (2026-04-22) — B1~B7 전 항목 + T2/T3 고가치 회귀 방지 테스트 — commits `4fc0a20` (refactor) / `c70ba7e` (test). A 파트는 PR #483 머지 완료
 - **F2 현행 유지 확정** — `common.outbox` 3모듈 정착, `infrastructure.messaging` 이동분 0건 / "발견 시 리팩토링" 정책
-- **3모듈 A 파트 완료** (PR #482/#483/#484) — 이중 발행 3축 정합 완결
+- **3모듈 B 파트 완료** (PR #482/#484/Payment 신규 PR) — 이중 발행 3축 + 계약 정합 + 회귀 방지 테스트 완결
+- **미처리 (별건 이슈)**: Payment `outbox.message_id` UUID→VARCHAR(36) 운영 DB 마이그레이션 / 기존 PENDING 선형 5회 레코드 `nextRetryAt` 재산정 정책
 - **Frontend 폴링 연동 범위 제외** (2026-04-22 폴링 방식 폐기)
