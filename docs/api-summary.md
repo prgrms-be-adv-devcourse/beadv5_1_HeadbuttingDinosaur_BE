@@ -49,13 +49,14 @@
 
 ## event
 
-| HTTP | Path | Controller#Method | 설명 |
-|---|---|---|---|
-| GET | `/api/events` | `EventController#getEventList` | get event list |
+| HTTP | Path | Controller#Method | 설명 |                                                                                                          
+|---|---|---|---|                                                                                                                                   
+| GET | `/api/events` | `EventController#getEventList` | get event list (action.log `VIEW` 발행) |                                                  
 | POST | `/api/events` | `EventController#createEvent` | create event |
-| GET | `/api/events/seller/{eventId}` | `EventController#getSellerEventDetail` | get seller event detail |
-| GET | `/api/events/{eventId}` | `EventController#getEvent` | get event |
+| GET | `/api/events/seller/{eventId}` | `EventController#getSellerEventDetail` | get seller event detail |                                         
+| GET | `/api/events/{eventId}` | `EventController#getEvent` | get event (action.log `DETAIL_VIEW` 발행) |
 | PATCH | `/api/events/{eventId}` | `EventController#updateEvent` | update event |
+| POST | `/api/events/{eventId}/dwell` | `DwellController#reportDwell` | 페이지 이탈 체류 시간 기록 (action.log `DWELL_TIME` 발행, 204 No Content) |
 | GET | `/api/events/{eventId}/statistics` | `EventController#getEventSummary` | get event summary |
 | POST | `/internal/events/bulk` | `EventInternalController#getBulkEventInfo` | get bulk event info |
 | GET | `/internal/events/by-seller/{sellerId}` | `EventInternalController#getEventsBySeller` | get events by seller |
@@ -64,7 +65,6 @@
 | POST | `/internal/events/{eventId}/deduct-stock` | `EventInternalController#deductStock` | deduct stock |
 | POST | `/internal/events/{eventId}/restore-stock` | `EventInternalController#restoreStock` | restore stock |
 | GET | `/internal/events/{eventId}/validate-purchase` | `EventInternalController#validatePurchase` | validate purchase |
-
 ## member
 
 | HTTP | Path | Controller#Method | 설명 |
@@ -94,20 +94,20 @@
 
 | HTTP | Path | Controller#Method | 설명 |
 |---|---|---|---|
-| POST | `/api/payments/confirm` | `PaymentController#confirm` | PG 결제 승인 |
-| POST | `/api/payments/fail` | `PaymentController#fail` | PG 결제 실패 처리 |
-| POST | `/api/payments/ready` | `PaymentController#readyPayment` | ready payment |
-| GET | `/api/refunds` | `RefundController#getRefundList` | get refund list |
-| GET | `/api/refunds/info` | `RefundController#getRefundInfo` | get refund info |
-| POST | `/api/refunds/pg/{ticketId}` | `RefundController#refundPgTicket` | refund pg ticket |
-| GET | `/api/refunds/{refundId}` | `RefundController#getRefundDetail` | get refund detail |
-| GET | `/api/seller/refunds/events/{eventId}` | `SellerRefundController#getSellerRefundListByEventId` | get seller refund list by event id |
+| POST | `/api/payments/ready` | `PaymentController#readyPayment` | 결제 준비 (PG / WALLET / WALLET_PG 분기) |
+| POST | `/api/payments/confirm` | `PaymentController#confirm` | PG 결제 승인 (WALLET_PG 분기 포함) |
+| POST | `/api/payments/fail` | `PaymentController#fail` | PG 결제 실패 처리 (WALLET_PG 예치금 복구 포함) |
+| GET | `/api/refunds` | `RefundController#getRefundList` | 환불 내역 목록 조회 |
+| GET | `/api/refunds/info` | `RefundController#getRefundInfo` | 환불 정보 조회 |
+| POST | `/api/refunds/pg/{ticketId}` | `RefundController#refundPgTicket` | PG 티켓 환불 |
+| GET | `/api/refunds/{refundId}` | `RefundController#getRefundDetail` | 환불 상세 조회 |
+| GET | `/api/seller/refunds/events/{eventId}` | `SellerRefundController#getSellerRefundListByEventId` | 판매자 이벤트별 환불 내역 조회 |
 | GET | `/api/wallet` | `WalletController#getBalance` | 예치금 잔액 조회 |
 | POST | `/api/wallet/charge` | `WalletController#charge` | 예치금 충전 시작 |
 | POST | `/api/wallet/charge/confirm` | `WalletController#confirmCharge` | 예치금 충전 승인 |
 | GET | `/api/wallet/transactions` | `WalletController#getTransactions` | 예치금 거래 내역 조회 |
 | POST | `/api/wallet/withdraw` | `WalletController#withdraw` | 예치금 출금 요청 |
-| GET | `/internal/payments/by-order/{orderId}` | `PaymentInternalController#getPaymentByOrderId` | get payment by order id |
+| GET | `/internal/payments/by-order/{orderId}` | `PaymentInternalController#getPaymentByOrderId` | 주문 기반 결제 조회 |
 
 ## settlement
 

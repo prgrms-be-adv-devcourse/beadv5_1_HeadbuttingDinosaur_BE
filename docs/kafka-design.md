@@ -458,7 +458,7 @@ public record OutboxEventMessage(
 - 토픽 value = 실제 이벤트 DTO JSON **단일 파싱**으로 복원 (이중 래핑 없음)
 - `messageId`는 **Kafka 헤더 `X-Message-Id`에서 추출** (본문 파싱 불필요) — `processed_message` dedup 키
 - Java Consumer 예: `commerce/order/application/service/OrderService.java:405` `deserialize(payload, PaymentCompletedEvent.class)` (단일 파싱)
-- Node.js Consumer 예: `fastify-log/src/service/payment-completed.service.ts` `unwrapOutboxPayload()` (역사적 이중 파싱 호환 경로 포함 — consumer는 `src/consumer/action-log.consumer.ts` `dispatchMessage`가 topic 분기 후 service 호출, 1a469ce5에서 전용 consumer 파일 평탄화)
+- Node.js Consumer 예: `fastify-log/src/service/payment-completed.service.ts` `unwrapOutboxPayload()` — Outbox wrapper(`{messageId, eventType, payload, timestamp}`)의 `payload` 필드(JSON 문자열)를 **단일 `JSON.parse`로 복원**. wrapper 구조가 아니면 원본 그대로 반환. consumer 진입점은 `src/consumer/action-log.consumer.ts` `dispatchMessage`가 topic 분기 후 service 호출 (1a469ce5에서 전용 consumer 파일 평탄화)
 - **신규 Consumer 구현 시**: 헤더에서 `X-Message-Id` 추출 + value 단일 파싱 — 이중 래핑 파싱 금지 (역직렬화 실패로 DLT 적재 위험)
 
 ---

@@ -1,6 +1,6 @@
 # DTO 문서 요약
 
-자동 생성 기준: `presentation/dto` 하위 Java `record/class`를 기준으로 정리했습니다.
+자동 생성 기준: `presentation/dto` 하위 Java `record/class`를 기준으로 정리했습니다. 외부 계약 DTO(Kafka 이벤트 payload 등)는 해당 모듈 섹션 내에 포함합니다.
 
 ## admin
 
@@ -400,6 +400,27 @@
 | `tickets` | `List<TicketInfo>` |
 
 ## event
+
+### ActionLogEvent (record, Kafka payload)
+- source: `event/src/main/java/com/devticket/event/common/messaging/event/ActionLogEvent.java`
+- topic: `action.log` (Event Producer: VIEW / DETAIL_VIEW / DWELL_TIME)
+| 필드명 | 타입 |
+|---|---|
+| `userId` | `String` |
+| `eventId` | `String` |
+| `actionType` | `String` |
+| `searchKeyword` | `String` |
+| `stackFilter` | `String` |
+| `dwellTimeSeconds` | `Integer` |
+| `quantity` | `Integer` |
+| `totalAmount` | `Long` |
+| `timestamp` | `Instant` |
+
+### DwellRequest (record)
+- source: `event/src/main/java/com/devticket/event/presentation/dto/DwellRequest.java`
+| 필드명 | 타입 |
+|---|---|
+| `dwellTimeSeconds` | `Integer` (`@NotNull @Positive`) |
 
 ### EventDetailResponse (record)
 - source: `event/src/main/java/com/devticket/event/presentation/dto/EventDetailResponse.java`
@@ -965,6 +986,7 @@
 |---|---|
 | `orderId` | `UUID` |
 | `paymentMethod` | `PaymentMethod` |
+| `walletAmount` | `Integer` |
 
 ### PaymentReadyResponse (record)
 - source: `payment/src/main/java/com/devticket/payment/payment/presentation/dto/PaymentReadyResponse.java`
@@ -977,6 +999,8 @@
 | `orderStatus` | `String` |
 | `paymentStatus` | `PaymentStatus` |
 | `amount` | `Integer` |
+| `walletAmount` | `Integer` |
+| `pgAmount` | `Integer` |
 | `approvedAt` | `String` |
 
 ### PgRefundRequest (record)

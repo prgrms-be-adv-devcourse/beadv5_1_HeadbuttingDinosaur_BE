@@ -325,6 +325,15 @@
   },
   {
     "module": "event",
+    "controller": "DwellController",
+    "method": "reportDwell",
+    "httpMethod": "POST",
+    "path": "/{eventId}/dwell",
+    "summary": "페이지 이탈 체류 시간 기록 (action.log DWELL_TIME 발행, 204 No Content)",
+    "source": "event/src/main/java/com/devticket/event/presentation/controller/DwellController.java"
+  },
+  {
+    "module": "event",
     "controller": "EventInternalController",
     "method": "getEventInfo",
     "httpMethod": "GET",
@@ -566,33 +575,33 @@
     "summary": "withdraw",
     "source": "member/src/main/java/com/devticket/member/presentation/controller/UserController.java"
   },
-  {
+  {                                                                                                                                                 
     "module": "payment",
-    "controller": "PaymentController",
-    "method": "readyPayment",
+    "controller": "PaymentController",                                                                                                              
+    "method": "readyPayment",                                                                                                                     
     "httpMethod": "POST",
     "path": "/api/payments/ready",
-    "summary": "ready payment",
+    "summary": "결제 준비 (PG/WALLET/WALLET_PG 분기)",
     "source": "payment/src/main/java/com/devticket/payment/payment/presentation/controller/PaymentController.java"
-  },
-  {
+   },
+   {
     "module": "payment",
     "controller": "PaymentController",
     "method": "confirm",
     "httpMethod": "POST",
     "path": "/api/payments/confirm",
-    "summary": "PG 결제 승인",
+    "summary": "PG 결제 승인 (WALLET_PG 분기 포함)",
     "source": "payment/src/main/java/com/devticket/payment/payment/presentation/controller/PaymentController.java"
-  },
-  {
+   },
+   {
     "module": "payment",
     "controller": "PaymentController",
     "method": "fail",
     "httpMethod": "POST",
     "path": "/api/payments/fail",
-    "summary": "PG 결제 실패 처리",
+    "summary": "PG 결제 실패 처리 (WALLET_PG 예치금 복구 포함)",
     "source": "payment/src/main/java/com/devticket/payment/payment/presentation/controller/PaymentController.java"
-  },
+   },
   {
     "module": "payment",
     "controller": "PaymentInternalController",
