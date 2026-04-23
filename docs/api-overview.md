@@ -11,6 +11,7 @@
 | Cart | DELETE | `/api/cart` | `deleteCartItemAll` | - | `CartClearResponse` | 장바구니 전체 삭제 |
 | Order | POST | `/api/orders` | `createOrderByCart` | `CartOrderRequest` | `OrderResponse` | 장바구니 기반 주문 생성 |
 | Order | GET | `/api/orders` | `getOrderList` | `OrderListRequest`(query) | `OrderListResponse` | 주문 목록 조회 |
+| Order | GET | `/api/orders/{orderId}/status` | `getOrderStatus` | - | `OrderStatusResponse` | 주문 상태 폴링 (`CREATED → PAYMENT_PENDING` 확인) |
 | Order | GET | `/api/orders/{orderId}` | `getOrderDetail` | - | `OrderDetailResponse` | 주문 상세 조회 |
 | Order | PATCH | `/api/orders/{orderId}/cancel` | `cancelOrder` | - | `OrderCancelResponse` | 결제 전 주문 취소 |
 | Ticket | GET | `/api/tickets` | `getTicketList` | `TicketListRequest`(query) | `TicketListResponse` | 내 티켓 목록 조회 |

@@ -380,10 +380,10 @@ sequenceDiagram
 - [x] ✅ `Order.create()` 수정: 초기 status `CREATED`로 설정 완료 (`Order.java:111`). *`expires_at` 컬럼은 폐기 — `BaseEntity.updated_at` 재활용 방식으로 전환됨 (#4-2 참조)*
 - [x] ✅ `outbox` 테이블 신규 생성 — JPA `@Entity` 추가 시 ddl-auto 자동 생성
 - [x] ✅ `processed_message` 테이블 신규 생성 — JPA `@Entity` 추가 시 ddl-auto 자동 생성
-- [x] ✅ `shedlock` 테이블 생성 — `commerce/src/main/resources/schema.sql` 수동 CREATE
+- [x] ✅ `shedlock` 테이블 생성 — 운영 DB 수동 CREATE (소스 트리 `schema.sql` 미포함)
 
 **기반 인프라**
-- [x] ✅ **config 패키지 이전 (2026-04-21)** — `common/config/*` 8파일(`JacksonConfig`·`AsyncConfig`·`KafkaProducerConfig`·`KafkaConsumerConfig`·`ShedLockConfig`·`ActionLogKafkaProducerConfig`·`OpenApiConfig`·`TransactionConfig`) → **`infrastructure/config/*`** 로 이전 (AGENTS.md §2.1 규정 정합). Event·Payment 모듈은 여전히 `common/config/` 유지 (scope 외, 추후 리팩터링 트랙)
+- [ ] **config 패키지 이전 (계획)** — `common/config/*` 8파일(`JacksonConfig`·`AsyncConfig`·`KafkaProducerConfig`·`KafkaConsumerConfig`·`ShedLockConfig`·`ActionLogKafkaProducerConfig`·`OpenApiConfig`·`TransactionConfig`) → **`infrastructure/config/*`** 로 이전 예정 (AGENTS.md §2.1 규정 정합). 2026-04-21 docs 선반영됐으나 **실제 코드 이전 미수행** — 현재도 8파일 모두 `common/config/`에 잔존 (실코드 대조 2026-04-23). Event·Payment 모듈은 scope 외 (추후 리팩터링 트랙)
 - [x] ✅ `JacksonConfig` 추가 (JavaTimeModule + WRITE_DATES_AS_TIMESTAMPS=false) — `infrastructure/config/JacksonConfig.java`
 - [x] ✅ `KafkaTopics` 상수 클래스 생성 — Saga 6개 (`order.created`, `stock.deducted`, `stock.failed`, `payment.completed`, `payment.failed`, `ticket.issue-failed`) + 환불 1개 (`refund.completed`) + 이벤트 관리 2개 (`event.force-cancelled`, `event.sale-stopped`) + Orchestration 12개
 
