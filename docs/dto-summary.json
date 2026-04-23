@@ -402,6 +402,692 @@
     "source": "admin/src/main/java/com/devticket/admin/presentation/dto/res/UserListResponse.java"
   },
   {
+    "module": "commerce",
+    "name": "CartItemQuantityRequest",
+    "kind": "record",
+    "fieldCount": 1,
+    "fields": [
+      {
+        "name": "quantity",
+        "type": "int"
+      }
+    ],
+    "source": "commerce/src/main/java/com/devticket/commerce/cart/presentation/dto/req/CartItemQuantityRequest.java"
+  },
+  {
+    "module": "commerce",
+    "name": "CartItemRequest",
+    "kind": "record",
+    "fieldCount": 2,
+    "fields": [
+      {
+        "name": "eventId",
+        "type": "UUID"
+      },
+      {
+        "name": "quantity",
+        "type": "int"
+      }
+    ],
+    "source": "commerce/src/main/java/com/devticket/commerce/cart/presentation/dto/req/CartItemRequest.java"
+  },
+  {
+    "module": "commerce",
+    "name": "CartClearResponse",
+    "kind": "record",
+    "fieldCount": 1,
+    "fields": [
+      {
+        "name": "message",
+        "type": "String"
+      }
+    ],
+    "source": "commerce/src/main/java/com/devticket/commerce/cart/presentation/dto/res/CartClearResponse.java"
+  },
+  {
+    "module": "commerce",
+    "name": "CartItemDeleteResponse",
+    "kind": "record",
+    "fieldCount": 1,
+    "fields": [
+      {
+        "name": "message",
+        "type": "String"
+      }
+    ],
+    "source": "commerce/src/main/java/com/devticket/commerce/cart/presentation/dto/res/CartItemDeleteResponse.java"
+  },
+  {
+    "module": "commerce",
+    "name": "CartItemDetail",
+    "kind": "record",
+    "fieldCount": 5,
+    "fields": [
+      {
+        "name": "cartItemId",
+        "type": "UUID"
+      },
+      {
+        "name": "eventId",
+        "type": "UUID"
+      },
+      {
+        "name": "eventTitle",
+        "type": "String"
+      },
+      {
+        "name": "price",
+        "type": "int"
+      },
+      {
+        "name": "quantity",
+        "type": "int"
+      }
+    ],
+    "source": "commerce/src/main/java/com/devticket/commerce/cart/presentation/dto/res/CartItemDetail.java"
+  },
+  {
+    "module": "commerce",
+    "name": "CartItemQuantityResponse",
+    "kind": "record",
+    "fieldCount": 2,
+    "fields": [
+      {
+        "name": "cartItemId",
+        "type": "String"
+      },
+      {
+        "name": "quantity",
+        "type": "int"
+      }
+    ],
+    "source": "commerce/src/main/java/com/devticket/commerce/cart/presentation/dto/res/CartItemQuantityResponse.java"
+  },
+  {
+    "module": "commerce",
+    "name": "CartItemResponse",
+    "kind": "record",
+    "fieldCount": 3,
+    "fields": [
+      {
+        "name": "cartId",
+        "type": "String"
+      },
+      {
+        "name": "items",
+        "type": "List<CartItemDetail>"
+      },
+      {
+        "name": "totalAmount",
+        "type": "long"
+      }
+    ],
+    "source": "commerce/src/main/java/com/devticket/commerce/cart/presentation/dto/res/CartItemResponse.java"
+  },
+  {
+    "module": "commerce",
+    "name": "CartResponse",
+    "kind": "record",
+    "fieldCount": 3,
+    "fields": [
+      {
+        "name": "cartId",
+        "type": "String"
+      },
+      {
+        "name": "items",
+        "type": "List<CartItemDetail>"
+      },
+      {
+        "name": "totalAmount",
+        "type": "int"
+      }
+    ],
+    "source": "commerce/src/main/java/com/devticket/commerce/cart/presentation/dto/res/CartResponse.java"
+  },
+  {
+    "module": "commerce",
+    "name": "CartOrderRequest",
+    "kind": "record",
+    "fieldCount": 1,
+    "fields": [
+      {
+        "name": "cartItemIds",
+        "type": "List<UUID>"
+      }
+    ],
+    "source": "commerce/src/main/java/com/devticket/commerce/order/presentation/dto/req/CartOrderRequest.java"
+  },
+  {
+    "module": "commerce",
+    "name": "OrderListRequest",
+    "kind": "record",
+    "fieldCount": 3,
+    "fields": [
+      {
+        "name": "page",
+        "type": "int"
+      },
+      {
+        "name": "size",
+        "type": "int"
+      },
+      {
+        "name": "status",
+        "type": "String"
+      }
+    ],
+    "source": "commerce/src/main/java/com/devticket/commerce/order/presentation/dto/req/OrderListRequest.java"
+  },
+  {
+    "module": "commerce",
+    "name": "OrderRequest",
+    "kind": "record",
+    "fieldCount": 1,
+    "fields": [
+      {
+        "name": "cartItemEventIds",
+        "type": "List<String>"
+      }
+    ],
+    "source": "commerce/src/main/java/com/devticket/commerce/order/presentation/dto/req/OrderRequest.java"
+  },
+  {
+    "module": "commerce",
+    "name": "InternalOrderInfoResponse",
+    "kind": "record",
+    "fieldCount": 7,
+    "fields": [
+      {
+        "name": "id",
+        "type": "UUID"
+      },
+      {
+        "name": "userId",
+        "type": "UUID"
+      },
+      {
+        "name": "orderNumber",
+        "type": "String"
+      },
+      {
+        "name": "paymentMethod",
+        "type": "String"
+      },
+      {
+        "name": "totalAmount",
+        "type": "Integer"
+      },
+      {
+        "name": "status",
+        "type": "String"
+      },
+      {
+        "name": "orderedAt",
+        "type": "String"
+      }
+    ],
+    "source": "commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/InternalOrderInfoResponse.java"
+  },
+  {
+    "module": "commerce",
+    "name": "InternalOrderItemResponse",
+    "kind": "record",
+    "fieldCount": 10,
+    "fields": [
+      {
+        "name": "id",
+        "type": "Long"
+      },
+      {
+        "name": "orderItemId",
+        "type": "UUID"
+      },
+      {
+        "name": "orderId",
+        "type": "Long"
+      },
+      {
+        "name": "userId",
+        "type": "UUID"
+      },
+      {
+        "name": "eventId",
+        "type": "UUID"
+      },
+      {
+        "name": "price",
+        "type": "int"
+      },
+      {
+        "name": "quantity",
+        "type": "int"
+      },
+      {
+        "name": "subtotalAmount",
+        "type": "int"
+      },
+      {
+        "name": "createdAt",
+        "type": "LocalDateTime"
+      },
+      {
+        "name": "updatedAt",
+        "type": "LocalDateTime"
+      }
+    ],
+    "source": "commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/InternalOrderItemResponse.java"
+  },
+  {
+    "module": "commerce",
+    "name": "InternalOrderItemsResponse",
+    "kind": "record",
+    "fieldCount": 2,
+    "fields": [
+      {
+        "name": "eventId",
+        "type": "Long"
+      },
+      {
+        "name": "orders",
+        "type": "List<InternalOrderItemsResponse.OrderItems>"
+      }
+    ],
+    "source": "commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/InternalOrderItemsResponse.java"
+  },
+  {
+    "module": "commerce",
+    "name": "InternalSettlementDataResponse",
+    "kind": "record",
+    "fieldCount": 4,
+    "fields": [
+      {
+        "name": "sellerId",
+        "type": "UUID"
+      },
+      {
+        "name": "periodStart",
+        "type": "String"
+      },
+      {
+        "name": "periodEnd",
+        "type": "String"
+      },
+      {
+        "name": "eventSettlements",
+        "type": "List<EventSettlements>"
+      }
+    ],
+    "source": "commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/InternalSettlementDataResponse.java"
+  },
+  {
+    "module": "commerce",
+    "name": "OrderCancelResponse",
+    "kind": "record",
+    "fieldCount": 3,
+    "fields": [
+      {
+        "name": "orderId",
+        "type": "String"
+      },
+      {
+        "name": "status",
+        "type": "String"
+      },
+      {
+        "name": "cancelledAt",
+        "type": "String"
+      }
+    ],
+    "source": "commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/OrderCancelResponse.java"
+  },
+  {
+    "module": "commerce",
+    "name": "OrderDetailItemResponse",
+    "kind": "record",
+    "fieldCount": 4,
+    "fields": [
+      {
+        "name": "eventId",
+        "type": "UUID"
+      },
+      {
+        "name": "eventTitle",
+        "type": "String"
+      },
+      {
+        "name": "quantity",
+        "type": "int"
+      },
+      {
+        "name": "price",
+        "type": "int"
+      }
+    ],
+    "source": "commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/OrderDetailItemResponse.java"
+  },
+  {
+    "module": "commerce",
+    "name": "OrderDetailResponse",
+    "kind": "record",
+    "fieldCount": 6,
+    "fields": [
+      {
+        "name": "orderId",
+        "type": "UUID"
+      },
+      {
+        "name": "status",
+        "type": "OrderStatus"
+      },
+      {
+        "name": "totalAmount",
+        "type": "int"
+      },
+      {
+        "name": "orderItems",
+        "type": "List<OrderDetailItemResponse>"
+      },
+      {
+        "name": "paymentMethod",
+        "type": "PaymentMethod"
+      },
+      {
+        "name": "createdAt",
+        "type": "LocalDateTime"
+      }
+    ],
+    "source": "commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/OrderDetailResponse.java"
+  },
+  {
+    "module": "commerce",
+    "name": "OrderItemsResponse",
+    "kind": "record",
+    "fieldCount": 4,
+    "fields": [
+      {
+        "name": "eventId",
+        "type": "UUID"
+      },
+      {
+        "name": "eventTitle",
+        "type": "String"
+      },
+      {
+        "name": "quantity",
+        "type": "int"
+      },
+      {
+        "name": "price",
+        "type": "int"
+      }
+    ],
+    "source": "commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/OrderItemsResponse.java"
+  },
+  {
+    "module": "commerce",
+    "name": "OrderListResponse",
+    "kind": "record",
+    "fieldCount": 3,
+    "fields": [
+      {
+        "name": "orders",
+        "type": "List<OrderSummary>"
+      },
+      {
+        "name": "totalPages",
+        "type": "int"
+      },
+      {
+        "name": "totalElements",
+        "type": "long"
+      }
+    ],
+    "source": "commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/OrderListResponse.java"
+  },
+  {
+    "module": "commerce",
+    "name": "OrderResponse",
+    "kind": "record",
+    "fieldCount": 5,
+    "fields": [
+      {
+        "name": "orderId",
+        "type": "UUID"
+      },
+      {
+        "name": "totalAmount",
+        "type": "Long"
+      },
+      {
+        "name": "orderStatus",
+        "type": "OrderStatus"
+      },
+      {
+        "name": "orderItems",
+        "type": "List<OrderItemsResponse>"
+      },
+      {
+        "name": "createdAt",
+        "type": "LocalDateTime"
+      }
+    ],
+    "source": "commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/OrderResponse.java"
+  },
+  {
+    "module": "commerce",
+    "name": "OrderSummary",
+    "kind": "record",
+    "fieldCount": 4,
+    "fields": [
+      {
+        "name": "orderId",
+        "type": "UUID"
+      },
+      {
+        "name": "totalAmount",
+        "type": "int"
+      },
+      {
+        "name": "status",
+        "type": "OrderStatus"
+      },
+      {
+        "name": "createdAt",
+        "type": "LocalDateTime"
+      }
+    ],
+    "source": "commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/OrderSummary.java"
+  },
+  {
+    "module": "commerce",
+    "name": "SellerEventParticipantListRequest",
+    "kind": "record",
+    "fieldCount": 3,
+    "fields": [
+      {
+        "name": "page",
+        "type": "Integer"
+      },
+      {
+        "name": "size",
+        "type": "Integer"
+      },
+      {
+        "name": "keyword",
+        "type": "String"
+      }
+    ],
+    "source": "commerce/src/main/java/com/devticket/commerce/ticket/presentation/dto/req/SellerEventParticipantListRequest.java"
+  },
+  {
+    "module": "commerce",
+    "name": "TicketListRequest",
+    "kind": "record",
+    "fieldCount": 2,
+    "fields": [
+      {
+        "name": "page",
+        "type": "int"
+      },
+      {
+        "name": "size",
+        "type": "int"
+      }
+    ],
+    "source": "commerce/src/main/java/com/devticket/commerce/ticket/presentation/dto/req/TicketListRequest.java"
+  },
+  {
+    "module": "commerce",
+    "name": "TicketRequest",
+    "kind": "record",
+    "fieldCount": 1,
+    "fields": [
+      {
+        "name": "orderId",
+        "type": "Long"
+      }
+    ],
+    "source": "commerce/src/main/java/com/devticket/commerce/ticket/presentation/dto/req/TicketRequest.java"
+  },
+  {
+    "module": "commerce",
+    "name": "SellerEventParticipantListResponse",
+    "kind": "record",
+    "fieldCount": 5,
+    "fields": [
+      {
+        "name": "sellerEventParticipantListResponse",
+        "type": "List<SellerEventParticipantResponse>"
+      },
+      {
+        "name": "page",
+        "type": "int"
+      },
+      {
+        "name": "size",
+        "type": "int"
+      },
+      {
+        "name": "totalElements",
+        "type": "long"
+      },
+      {
+        "name": "totalPages",
+        "type": "int"
+      }
+    ],
+    "source": "commerce/src/main/java/com/devticket/commerce/ticket/presentation/dto/res/SellerEventParticipantListResponse.java"
+  },
+  {
+    "module": "commerce",
+    "name": "SellerEventParticipantResponse",
+    "kind": "record",
+    "fieldCount": 6,
+    "fields": [
+      {
+        "name": "ticketId",
+        "type": "String"
+      },
+      {
+        "name": "orderId",
+        "type": "String"
+      },
+      {
+        "name": "userId",
+        "type": "String"
+      },
+      {
+        "name": "email",
+        "type": "String"
+      },
+      {
+        "name": "purchasedAt",
+        "type": "String"
+      },
+      {
+        "name": "orderNumber",
+        "type": "String"
+      }
+    ],
+    "source": "commerce/src/main/java/com/devticket/commerce/ticket/presentation/dto/res/SellerEventParticipantResponse.java"
+  },
+  {
+    "module": "commerce",
+    "name": "TicketDetailResponse",
+    "kind": "record",
+    "fieldCount": 6,
+    "fields": [
+      {
+        "name": "ticketId",
+        "type": "UUID"
+      },
+      {
+        "name": "eventId",
+        "type": "UUID"
+      },
+      {
+        "name": "eventTitle",
+        "type": "String"
+      },
+      {
+        "name": "eventDateTime",
+        "type": "String"
+      },
+      {
+        "name": "status",
+        "type": "String"
+      },
+      {
+        "name": "issuedAt",
+        "type": "String"
+      }
+    ],
+    "source": "commerce/src/main/java/com/devticket/commerce/ticket/presentation/dto/res/TicketDetailResponse.java"
+  },
+  {
+    "module": "commerce",
+    "name": "TicketListResponse",
+    "kind": "record",
+    "fieldCount": 3,
+    "fields": [
+      {
+        "name": "totalPages",
+        "type": "int"
+      },
+      {
+        "name": "totalElements",
+        "type": "Long"
+      },
+      {
+        "name": "tickets",
+        "type": "List<TicketDetailResponse>"
+      }
+    ],
+    "source": "commerce/src/main/java/com/devticket/commerce/ticket/presentation/dto/res/TicketListResponse.java"
+  },
+  {
+    "module": "commerce",
+    "name": "TicketResponse",
+    "kind": "record",
+    "fieldCount": 3,
+    "fields": [
+      {
+        "name": "orderItemId",
+        "type": "Long"
+      },
+      {
+        "name": "totalCount",
+        "type": "Integer"
+      },
+      {
+        "name": "tickets",
+        "type": "List<TicketInfo>"
+      }
+    ],
+    "source": "commerce/src/main/java/com/devticket/commerce/ticket/presentation/dto/res/TicketResponse.java"
+  },
+  {
     "module": "event",
     "name": "EventDetailResponse",
     "kind": "record",
@@ -879,7 +1565,7 @@
     "fields": [
       {
         "name": "eventIds",
-        "type": "List<UUID>"
+        "type": "List< UUID>"
       }
     ],
     "source": "event/src/main/java/com/devticket/event/presentation/dto/internal/InternalBulkEventInfoRequest.java"
@@ -979,7 +1665,7 @@
       },
       {
         "name": "purchasable",
-        "type": "// Long id → UUID eventId boolean"
+        "type": "boolean"
       },
       {
         "name": "reason",
@@ -2164,8 +2850,8 @@
         "type": "boolean"
       },
       {
-        "name": "\"WALLET\"",
-        "type": "String paymentMethod // \"PG\" or"
+        "name": "paymentMethod",
+        "type": "String"
       }
     ],
     "source": "payment/src/main/java/com/devticket/payment/refund/presentation/dto/RefundInfoResponse.java"
@@ -2250,8 +2936,8 @@
         "type": "LocalDateTime"
       },
       {
-        "name": "추가",
-        "type": "LocalDateTime completedAt //TODO: 환불자 이름"
+        "name": "completedAt",
+        "type": "LocalDateTime"
       }
     ],
     "source": "payment/src/main/java/com/devticket/payment/refund/presentation/dto/SellerRefundListItemResponse.java"
