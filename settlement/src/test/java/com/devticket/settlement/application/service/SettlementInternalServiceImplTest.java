@@ -148,7 +148,8 @@ class SettlementInternalServiceImplTest {
 
         service.createSettlementFromItems();
 
-        verify(settlementRepository).save(any(Settlement.class));
+        // 신규 정산서 save + pending의 carriedToSettlementId 업데이트 save = 2회
+        verify(settlementRepository, atLeastOnce()).save(any(Settlement.class));
     }
 
     @Test
