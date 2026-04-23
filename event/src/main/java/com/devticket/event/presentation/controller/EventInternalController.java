@@ -1,13 +1,11 @@
 package com.devticket.event.presentation.controller;
 
 import com.devticket.event.application.EventInternalService;
-import com.devticket.event.application.EventRecommendationService;
 import com.devticket.event.common.response.SuccessResponse;
 import com.devticket.event.domain.enums.EventStatus;
 import com.devticket.event.presentation.dto.internal.InternalBulkEventInfoRequest;
 import com.devticket.event.presentation.dto.internal.InternalPopularEventRequest;
 import com.devticket.event.presentation.dto.internal.InternalPopularEventResponse;
-import com.devticket.event.presentation.dto.internal.InternalRecommendationResponse;
 import com.devticket.event.presentation.dto.internal.InternalBulkEventInfoResponse;
 import com.devticket.event.presentation.dto.internal.InternalBulkStockAdjustmentRequest;
 import com.devticket.event.presentation.dto.internal.InternalPagedEventResponse;
@@ -44,7 +42,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class EventInternalController {
 
     private final EventInternalService eventInternalService;
-    private final EventRecommendationService eventRecommendationService;
 
     @GetMapping
     public ResponseEntity<SuccessResponse<InternalPagedEventResponse>> getEvents(
@@ -167,14 +164,6 @@ public class EventInternalController {
         @RequestParam String periodEnd) {
         return ResponseEntity.ok(SuccessResponse.success(
             eventInternalService.getEventsBySellerForSettlement(sellerId, periodStart, periodEnd)
-        ));
-    }
-
-    @GetMapping("/recommendations")
-    public ResponseEntity<SuccessResponse<InternalRecommendationResponse>> getRecommendations(
-        @RequestHeader("X-User-Id") UUID userId) {
-        return ResponseEntity.ok(SuccessResponse.success(
-            eventRecommendationService.getRecommendations(userId)
         ));
     }
 
