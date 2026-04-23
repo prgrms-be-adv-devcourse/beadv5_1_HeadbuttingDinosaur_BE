@@ -242,7 +242,7 @@ public class SettlementServiceImpl implements SettlementService {
         long newSettlementAmount = readyItems.stream().mapToLong(SettlementItem::getSettlementAmount).sum();
 
         int carriedInAmount = settlementRepository
-            .findBySellerIdAndStatus(sellerId, SettlementStatus.PENDING_MIN_AMOUNT)
+            .findBySellerIdAndStatusAndCarriedToSettlementIdIsNull(sellerId, SettlementStatus.PENDING_MIN_AMOUNT)
             .stream()
             .max(Comparator.comparing(Settlement::getCreatedAt))
             .map(Settlement::getFinalSettlementAmount)

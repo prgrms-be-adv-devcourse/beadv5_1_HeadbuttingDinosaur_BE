@@ -63,14 +63,14 @@ public class Settlement extends BaseEntity {
     @Column(name = "carried_in_amount", nullable = false)
     private Integer carriedInAmount;
 
-    @Column(name = "carried_in_settlement_id")
-    private UUID carriedInSettlementId;
+    @Column(name = "carried_to_settlement_id")
+    private UUID carriedToSettlementId;
 
 
     @Builder
     public Settlement(Long id, UUID settlementId, UUID sellerId, LocalDateTime periodStartAt, LocalDateTime periodEndAt,
         Integer totalSalesAmount, Integer totalRefundAmount, Integer totalFeeAmount, Integer finalSettlementAmount,
-        SettlementStatus status, LocalDateTime settledAt, Integer carriedInAmount, UUID carriedInSettlementId) {
+        SettlementStatus status, LocalDateTime settledAt, Integer carriedInAmount) {
         this.id = id;
         this.settlementId = (settlementId != null) ? settlementId : UUID.randomUUID();
         this.sellerId = sellerId;
@@ -80,14 +80,17 @@ public class Settlement extends BaseEntity {
         this.totalRefundAmount = totalRefundAmount;
         this.totalFeeAmount = totalFeeAmount;
         this.finalSettlementAmount = finalSettlementAmount;
-        this.status = (status != null) ? status : SettlementStatus.COMPLETED;
+        this.status = (status != null) ? status : SettlementStatus.CONFIRMED;
         this.settledAt = settledAt;
         this.carriedInAmount = (carriedInAmount != null) ? carriedInAmount : 0;
-        this.carriedInSettlementId = carriedInSettlementId;
     }
 
     public void updateStatus(SettlementStatus status) {
         this.status = status;
+    }
+
+    public void updateCarriedToSettlementId(UUID settlementId) {
+        this.carriedToSettlementId = settlementId;
     }
 
 }

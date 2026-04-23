@@ -94,4 +94,15 @@ public class SettlementToCommerceClient {
             throw new BusinessException(CommonErrorCode.INTERNAL_SERVER_ERROR);
         }
     }
+
+
+    //정산금 지급처리 : 정산금 -> 예치금 전환
+    public void transferToDeposit(UUID sellerId, int amount) {
+        // TODO: Wallet 서비스 연동 구현
+        log.info("[Wallet] 예치금 전환 요청 - sellerId: {}, amount: {}", sellerId, amount);
+    }
+
+
+
+
 }

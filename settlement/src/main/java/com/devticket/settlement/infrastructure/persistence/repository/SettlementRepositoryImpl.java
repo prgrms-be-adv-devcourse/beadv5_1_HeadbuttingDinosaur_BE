@@ -70,5 +70,14 @@ public class SettlementRepositoryImpl implements SettlementRepository {
         return settlementJpaRepository.search(status, sellerId, startDate, endDate, pageable);
     }
 
+    @Override
+    public List<Settlement> findByCarriedToSettlementId(UUID settlementId) {
+        return settlementJpaRepository.findByCarriedToSettlementId(settlementId);
+    }
+
+    @Override
+    public List<Settlement> findBySellerIdAndStatusAndCarriedToSettlementIdIsNull(UUID sellerId, SettlementStatus status) {
+        return settlementJpaRepository.findBySellerIdAndStatusAndCarriedToSettlementIdIsNull(sellerId, status);
+    }
 
 }

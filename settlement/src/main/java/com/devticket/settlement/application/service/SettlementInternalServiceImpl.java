@@ -10,12 +10,15 @@ import com.devticket.settlement.domain.model.SettlementStatus;
 import com.devticket.settlement.domain.repository.FeePolicyRepository;
 import com.devticket.settlement.domain.repository.SettlementItemRepository;
 import com.devticket.settlement.domain.repository.SettlementRepository;
+import com.devticket.settlement.infrastructure.external.dto.AdminSettlementDetailResponse;
+import com.devticket.settlement.infrastructure.external.dto.AdminSettlementDetailResponse.CarriedInSettlement;
 import com.devticket.settlement.infrastructure.client.SettlementToCommerceClient;
 import com.devticket.settlement.infrastructure.client.SettlementToMemberClient;
 import com.devticket.settlement.infrastructure.client.dto.req.InternalSettlementDataRequest;
 import com.devticket.settlement.infrastructure.client.dto.res.InternalSettlementDataResponse;
 import com.devticket.settlement.infrastructure.external.dto.InternalSettlementPageResponse;
 import com.devticket.settlement.infrastructure.external.dto.InternalSettlementResponse;
+import com.devticket.settlement.presentation.dto.EventItemResponse;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
@@ -28,7 +31,6 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,6 +40,8 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class SettlementInternalServiceImpl implements SettlementInternalService {
 
+    private static final int MIN_SETTLEMENT_AMOUNT = 10_000;
+
     private final SettlementToCommerceClient settlementToCommerceClient;
     private final SettlementToMemberClient settlementToMemberClient;
     private final FeePolicyRepository feePolicyRepository;
@@ -45,49 +49,50 @@ public class SettlementInternalServiceImpl implements SettlementInternalService 
     private final SettlementItemRepository settlementItemRepository;
 
     // ────────────────────────────────────────────────
-    // Public API
+    // 정산서 목록 조회 (관리자)
     // ────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
     public InternalSettlementPageResponse getSettlements(
-        String status,
-        UUID sellerId,
-        String startDate,
-        String endDate,
-        Pageable pageable
+        String status, UUID sellerId, String yearMonth, Pageable pageable
     ) {
         SettlementStatus filterStatus = parseStatus(status);
-        LocalDateTime start = startDate != null && !startDate.isBlank()
-            ? LocalDate.parse(startDate).atStartOfDay() : null;
-        LocalDateTime end = endDate != null && !endDate.isBlank()
-            ? LocalDate.parse(endDate).plusDays(1).atStartOfDay() : null;
+        LocalDateTime monthStart = null;
+        LocalDateTime monthEnd = null;
+        if (yearMonth != null && !yearMonth.isBlank()) {
+            YearMonth ym = YearMonth.parse(yearMonth, java.time.format.DateTimeFormatter.ofPattern("yyyyMM"));
+            monthStart = ym.atDay(1).atStartOfDay();
+            monthEnd = ym.plusMonths(1).atDay(1).atStartOfDay();
+        }
 
-        Page<Settlement> page = settlementRepository.search(
-            filterStatus, sellerId, start, end, pageable
-        );
+        Page<Settlement> page = settlementRepository.search(filterStatus, sellerId, monthStart, monthEnd, pageable);
 
         List<InternalSettlementResponse> content = page.getContent().stream()
             .map(s -> new InternalSettlementResponse(
-                null,
+                s.getSettlementId(),
                 s.getPeriodStartAt().toLocalDate().toString(),
                 s.getPeriodEndAt().toLocalDate().toString(),
                 (long) s.getTotalSalesAmount(),
                 (long) s.getTotalRefundAmount(),
                 (long) s.getTotalFeeAmount(),
+                (long) s.getCarriedInAmount(),
                 (long) s.getFinalSettlementAmount(),
                 s.getStatus().name(),
-                s.getSettledAt().toString()
+                s.getSettledAt() != null ? s.getSettledAt().toString() : null,
+                s.getCarriedToSettlementId(),
+                s.getSellerId()
             ))
             .toList();
 
         return new InternalSettlementPageResponse(
-            content,
-            page.getNumber(),
-            page.getSize(),
-            (int) page.getTotalElements(),
-            page.getTotalPages()
+            content, page.getNumber(), page.getSize(),
+            (int) page.getTotalElements(), page.getTotalPages()
         );
     }
+
+    // ────────────────────────────────────────────────
+    // 정산서 생성 (Commerce 직접 호출 방식 - Legacy)
+    // ────────────────────────────────────────────────
 
     @Transactional
     public void runSettlement() {
@@ -103,7 +108,6 @@ public class SettlementInternalServiceImpl implements SettlementInternalService 
                 InternalSettlementDataRequest request = new InternalSettlementDataRequest(
                     sellerId, periodStart, periodEnd
                 );
-
                 InternalSettlementDataResponse data = settlementToCommerceClient.getSettlementData(request);
                 if (data == null || data.eventSettlements() == null) continue;
 
@@ -120,7 +124,7 @@ public class SettlementInternalServiceImpl implements SettlementInternalService 
                         .totalRefundAmount(eventSettlement.totalRefundAmount())
                         .totalFeeAmount((int) fee)
                         .finalSettlementAmount((int) finalAmount)
-                        .status(SettlementStatus.COMPLETED)
+                        .status(SettlementStatus.CONFIRMED)
                         .settledAt(LocalDateTime.now())
                         .build();
 
@@ -132,31 +136,153 @@ public class SettlementInternalServiceImpl implements SettlementInternalService 
         }
     }
 
-    private static final int MIN_SETTLEMENT_AMOUNT = 10_000;
+    // ────────────────────────────────────────────────
+    // 정산서 생성 (SettlementItem 기반 Batch)
+    // ────────────────────────────────────────────────
 
     @Transactional
     public void createSettlementFromItems() {
-        //매월1일 정산시작시 정산대상기간 설정 : 전전월 26일 ~ 전월 25일
         LocalDate periodFrom = YearMonth.now().minusMonths(2).atDay(26);
         LocalDate periodTo = YearMonth.now().minusMonths(1).atDay(25);
         LocalDateTime periodStart = periodFrom.atStartOfDay();
         LocalDateTime periodEnd = periodTo.atTime(23, 59, 59);
 
-        //판매자별 settlementItem데이터 조회
         Map<UUID, List<SettlementItem>> itemsBySeller = collectItemsBySeller(periodFrom, periodTo);
         includeCarryOverSellers(itemsBySeller);
 
         log.info("[정산 생성] 대상 기간: {} ~ {}, 판매자: {}명", periodFrom, periodTo, itemsBySeller.size());
 
-        //Settlement생성
         for (Map.Entry<UUID, List<SettlementItem>> entry : itemsBySeller.entrySet()) {
             processSellerSettlement(entry.getKey(), entry.getValue(), periodStart, periodEnd);
         }
     }
 
     // ────────────────────────────────────────────────
+    // 정산서 상세 조회 (관리자)
+    // ────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public AdminSettlementDetailResponse getSettlementDetail(UUID settlementId) {
+        Settlement settlement = settlementRepository.findBySettlementId(settlementId)
+            .orElseThrow(() -> new BusinessException(SettlementErrorCode.SETTLEMENT_BAD_REQUEST));
+
+        List<EventItemResponse> settlementItems = settlementItemRepository
+            .findBySettlementId(settlementId)
+            .stream()
+            .map(item -> new EventItemResponse(
+                item.getEventId().toString(),
+                "Unknown",
+                item.getSalesAmount(),
+                item.getRefundAmount(),
+                item.getFeeAmount(),
+                item.getSettlementAmount()
+            ))
+            .toList();
+
+        // 이 정산서에 이월된 출처 정산서 목록 (역조회)
+        List<CarriedInSettlement> carriedInSettlements = settlementRepository
+            .findByCarriedToSettlementId(settlementId)
+            .stream()
+            .map(s -> new CarriedInSettlement(
+                s.getSettlementId(),
+                s.getPeriodStartAt().toLocalDate().toString(),
+                s.getPeriodEndAt().toLocalDate().toString(),
+                (long) s.getFinalSettlementAmount(),
+                s.getStatus().name()
+            ))
+            .toList();
+
+        long settlementAmount = settlement.getFinalSettlementAmount() - settlement.getCarriedInAmount();
+
+        return new AdminSettlementDetailResponse(
+            settlement.getSettlementId(),
+            settlement.getSellerId(),
+            settlement.getPeriodStartAt().toLocalDate().toString(),
+            settlement.getPeriodEndAt().toLocalDate().toString(),
+            (long) settlement.getTotalSalesAmount(),
+            (long) settlement.getTotalRefundAmount(),
+            (long) settlement.getTotalFeeAmount(),
+            settlementAmount,
+            (long) settlement.getCarriedInAmount(),
+            (long) settlement.getFinalSettlementAmount(),
+            settlement.getStatus().name(),
+            settlement.getSettledAt() != null ? settlement.getSettledAt().toString() : null,
+            settlement.getCarriedToSettlementId(),
+            carriedInSettlements,
+            settlementItems
+        );
+    }
+
+    // ────────────────────────────────────────────────
+    // 정산서 취소
+    // ────────────────────────────────────────────────
+
+    @Transactional
+    public void cancelSettlement(UUID settlementId) {
+        Settlement settlement = settlementRepository.findBySettlementId(settlementId)
+            .orElseThrow(() -> new BusinessException(SettlementErrorCode.SETTLEMENT_BAD_REQUEST));
+
+        settlement.updateStatus(SettlementStatus.CANCELLED);
+        settlementRepository.save(settlement);
+
+        List<SettlementItem> items = settlementItemRepository.findBySettlementId(settlementId);
+        items.forEach(SettlementItem::resetToReady);
+        settlementItemRepository.saveAll(items);
+
+        // 이 정산서에 이월됐던 PENDING 정산서들을 복구
+        List<Settlement> carriedSettlements = settlementRepository.findByCarriedToSettlementId(settlementId);
+        carriedSettlements.forEach(s -> {
+            s.updateStatus(SettlementStatus.PENDING_MIN_AMOUNT);
+            s.updateCarriedToSettlementId(null);
+        });
+        settlementRepository.saveAll(carriedSettlements);
+
+        log.info("[정산 취소] settlementId={}, 이월복구={}건", settlementId, carriedSettlements.size());
+    }
+
+    // ────────────────────────────────────────────────
+    // 지급처리
+    // ────────────────────────────────────────────────
+
+    @Transactional
+    public void processPayment(UUID settlementId) {
+        Settlement settlement = settlementRepository.findBySettlementId(settlementId)
+            .orElseThrow(() -> new BusinessException(SettlementErrorCode.SETTLEMENT_BAD_REQUEST));
+
+        if (settlement.getStatus() != SettlementStatus.CONFIRMED
+            && settlement.getStatus() != SettlementStatus.PAID_FAILED) {
+            throw new BusinessException(SettlementErrorCode.SETTLEMENT_BAD_REQUEST);
+        }
+
+        try {
+            settlementToCommerceClient.transferToDeposit(
+                settlement.getSellerId(), settlement.getFinalSettlementAmount()
+            );
+
+            settlement.updateStatus(SettlementStatus.PAID);
+            settlementRepository.save(settlement);
+
+            // 이 정산서에 이월된 PENDING 정산서들도 PAID로 변경
+            markCarriedSettlementsAsPaid(settlementId);
+
+            log.info("[지급 완료] settlementId={}, amount={}", settlementId, settlement.getFinalSettlementAmount());
+
+        } catch (Exception e) {
+            settlement.updateStatus(SettlementStatus.PAID_FAILED);
+            settlementRepository.save(settlement);
+            log.error("[지급 실패] settlementId={}", settlementId, e);
+        }
+    }
+
+    // ────────────────────────────────────────────────
     // Private helpers
     // ────────────────────────────────────────────────
+
+    private void markCarriedSettlementsAsPaid(UUID settlementId) {
+        List<Settlement> carried = settlementRepository.findByCarriedToSettlementId(settlementId);
+        carried.forEach(s -> s.updateStatus(SettlementStatus.PAID));
+        settlementRepository.saveAll(carried);
+    }
 
     private Map<UUID, List<SettlementItem>> collectItemsBySeller(LocalDate from, LocalDate to) {
         List<SettlementItem> items = settlementItemRepository
@@ -167,7 +293,9 @@ public class SettlementInternalServiceImpl implements SettlementInternalService 
     }
 
     private void includeCarryOverSellers(Map<UUID, List<SettlementItem>> itemsBySeller) {
+        // 아직 이월되지 않은 PENDING 판매자도 포함
         settlementRepository.findByStatus(SettlementStatus.PENDING_MIN_AMOUNT).stream()
+            .filter(s -> s.getCarriedToSettlementId() == null)
             .map(Settlement::getSellerId)
             .distinct()
             .filter(sellerId -> !itemsBySeller.containsKey(sellerId))
@@ -177,20 +305,18 @@ public class SettlementInternalServiceImpl implements SettlementInternalService 
     private void processSellerSettlement(UUID sellerId, List<SettlementItem> items,
         LocalDateTime periodStart, LocalDateTime periodEnd) {
 
-        // Settlement가 이미 생
         if (alreadySettledForPeriod(sellerId, periodStart)) {
             log.info("[정산 생성 스킵] 이미 처리된 기간 - sellerId={}, periodStart={}", sellerId, periodStart);
             return;
         }
 
         SellerAmounts amounts = aggregateAmounts(items);
-        Settlement latestPending = resolveLatestPending(sellerId);
+        Settlement pendingSettlement = resolveLatestPending(sellerId);
 
-        int carriedInAmount = latestPending != null ? latestPending.getFinalSettlementAmount() : 0;
-        UUID carriedInSettlementId = latestPending != null ? latestPending.getSettlementId() : null;
-        long totalFinalAmount = amounts.settlementAmount() + carriedInAmount;
-        SettlementStatus status = totalFinalAmount >= MIN_SETTLEMENT_AMOUNT
-            ? SettlementStatus.COMPLETED
+        int carriedInAmount = pendingSettlement != null ? pendingSettlement.getFinalSettlementAmount() : 0;
+        long finalAmount = amounts.settlementAmount() + carriedInAmount;
+        SettlementStatus status = finalAmount >= MIN_SETTLEMENT_AMOUNT
+            ? SettlementStatus.CONFIRMED
             : SettlementStatus.PENDING_MIN_AMOUNT;
 
         Settlement settlement = Settlement.builder()
@@ -200,17 +326,18 @@ public class SettlementInternalServiceImpl implements SettlementInternalService 
             .totalSalesAmount((int) amounts.totalSales())
             .totalRefundAmount((int) amounts.totalRefund())
             .totalFeeAmount((int) amounts.totalFee())
-            .finalSettlementAmount((int) totalFinalAmount)
+            .finalSettlementAmount((int) finalAmount)
             .carriedInAmount(carriedInAmount)
-            .carriedInSettlementId(carriedInSettlementId)
             .status(status)
             .settledAt(LocalDateTime.now())
             .build();
 
         settlementRepository.save(settlement);
 
-        if (status == SettlementStatus.COMPLETED && latestPending != null) {
-            markChainAsPaidByCarryForward(latestPending);
+        // 이월된 PENDING 정산서에 carriedToSettlementId 설정
+        if (pendingSettlement != null) {
+            pendingSettlement.updateCarriedToSettlementId(settlement.getSettlementId());
+            settlementRepository.save(pendingSettlement);
         }
 
         if (!items.isEmpty()) {
@@ -219,7 +346,7 @@ public class SettlementInternalServiceImpl implements SettlementInternalService 
         }
 
         log.info("[정산 생성] sellerId={}, items={}건, carriedIn={}, finalAmount={}, status={}",
-            sellerId, items.size(), carriedInAmount, totalFinalAmount, status);
+            sellerId, items.size(), carriedInAmount, finalAmount, status);
     }
 
     private boolean alreadySettledForPeriod(UUID sellerId, LocalDateTime periodStart) {
@@ -242,25 +369,13 @@ public class SettlementInternalServiceImpl implements SettlementInternalService 
 
     private Settlement resolveLatestPending(UUID sellerId) {
         return settlementRepository
-            .findBySellerIdAndStatus(sellerId, SettlementStatus.PENDING_MIN_AMOUNT)
+            .findBySellerIdAndStatusAndCarriedToSettlementIdIsNull(sellerId, SettlementStatus.PENDING_MIN_AMOUNT)
             .stream()
             .max(Comparator.comparing(Settlement::getCreatedAt))
             .orElse(null);
     }
 
     private record SellerAmounts(long totalSales, long totalRefund, long totalFee, long settlementAmount) {}
-
-    private void markChainAsPaidByCarryForward(Settlement settlement) {
-        Settlement cursor = settlement;
-        while (cursor != null) {
-            cursor.updateStatus(SettlementStatus.COMPLETED);
-            settlementRepository.save(cursor);
-            UUID nextId = cursor.getCarriedInSettlementId();
-            cursor = (nextId != null)
-                ? settlementRepository.findBySettlementId(nextId).orElse(null)
-                : null;
-        }
-    }
 
     private SettlementStatus parseStatus(String status) {
         if (status == null || status.isBlank()) return null;

@@ -30,16 +30,20 @@ public interface SettlementJpaRepository extends JpaRepository<Settlement, Long>
     SELECT s FROM Settlement s
     WHERE (CAST(:status AS string) IS NULL OR s.status = :status)
       AND (CAST(:sellerId AS string) IS NULL OR s.sellerId = :sellerId)
-      AND (CAST(:startDate AS string) IS NULL OR s.periodStartAt >= :startDate)
-      AND (CAST(:endDate AS string) IS NULL OR s.periodEndAt <= :endDate)
+      AND (CAST(:monthStart AS string) IS NULL OR s.settledAt >= :monthStart)
+      AND (CAST(:monthEnd AS string) IS NULL OR s.settledAt < :monthEnd)
     ORDER BY s.createdAt DESC
     """)
     Page<Settlement> search(
         @Param("status") SettlementStatus status,
         @Param("sellerId") UUID sellerId,
-        @Param("startDate") LocalDateTime startDate,
-        @Param("endDate") LocalDateTime endDate,
+        @Param("monthStart") LocalDateTime monthStart,
+        @Param("monthEnd") LocalDateTime monthEnd,
         Pageable pageable
     );
+
+    List<Settlement> findByCarriedToSettlementId(UUID carriedToSettlementId);
+
+    List<Settlement> findBySellerIdAndStatusAndCarriedToSettlementIdIsNull(UUID sellerId, SettlementStatus status);
 
 }
