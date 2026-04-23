@@ -61,6 +61,49 @@ public class TechStackEsRepositoryImpl implements TechStackEsRepository{
             throw new RuntimeException("TechStack ES 삭제 실패", e);
         }
     }
+    @Override
+    public List<TechStackDocument> findAllWithoutEmbedding() {
+        try {
+            var response = elasticsearchClient.search(s -> s
+                    .index(INDEX)
+                    .query(q -> q
+                        .bool(b -> b
+                            .mustNot(m -> m
+                                .exists(e -> e
+                                    .field("embedding")
+                                )
+                            )
+                        )
+                    )
+                    .size(1000),
+                TechStackDocument.class
+            );
+
+            return response.hits().hits().stream()
+                .map(hit -> hit.source())
+                .filter(doc -> doc != null)
+                .toList();
+
+        } catch (Exception e) {
+            log.error("[ES] 임베딩 없는 TechStack 조회 실패", e);
+            throw new RuntimeException("임베딩 없는 TechStack 조회 실패", e);
+        }
+    }
+
+    @Override
+    public TechStackDocument findById(Long id) {
+        try {
+            var response = elasticsearchClient.get(g -> g
+                    .index(INDEX)
+                    .id(String.valueOf(id)),
+                TechStackDocument.class
+            );
+            return response.found() ? response.source() : null;
+        } catch (Exception e) {
+            log.error("[ES] TechStack 조회 실패 - id: {}", id, e);
+            return null;
+        }
+    }
 
 
 }

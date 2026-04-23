@@ -1,5 +1,6 @@
 package com.devticket.admin.application.service;
 
+import com.devticket.admin.domain.model.TechStackDocument;
 import com.devticket.admin.presentation.dto.req.CreateTechStackRequest;
 import com.devticket.admin.presentation.dto.req.DeleteTechStackRequest;
 import com.devticket.admin.presentation.dto.req.UpdateTechStackRequest;
@@ -18,6 +19,8 @@ public interface TechStackService {
     UpdateTechStackResponse updateTechStack(Long id, UpdateTechStackRequest request);
 
     DeleteTechStackResponse deleteTechStack(Long id);
+
+    void reindexEmptyEmbeddings();
 
 
 
