@@ -70,8 +70,8 @@ Outbox INSERT (message_id = UUID.randomUUID()) → 커밋
 
 ### 2-5. Outbox 재시도 간격 (Exponential Backoff)
 
-> 재시도 횟수·간격·선형 백오프 확정값은 [kafka-design.md §4 — 재시도 정책](kafka-design.md#4-outbox-패턴) 참조
-> (최대 5회 재시도, `retryCount * 60초`, 누적 최대 대기 약 10분)
+> 재시도 횟수·간격·지수 백오프 확정값은 [kafka-design.md §4 — 재시도 정책](kafka-design.md#4-outbox-패턴) 참조
+> (총 시도 6회 = 최초 1 + 재시도 5, `2^(retryCount-1)초` = 즉시/1/2/4/8/16초, 누적 최대 대기 31초 — 2026-04-22 3모듈 통일)
 
 - **FAILED 수동 재발행**: Admin API로 FAILED → PENDING 전환 후 재발행 (이번 스코프 포함)
 
@@ -167,7 +167,7 @@ Consumer 처리 흐름은 "조회 후 INSERT" 구조입니다.
 
 ### 3-5. messageId 생성 및 전달 방식
 
-Consumer의 dedup 키는 **Outbox가 생성한 `UUID.randomUUID()`** 입니다.
+Consumer의 dedup 키는 **Outbox가 생성한 `UUID.randomUUID().toString()`** (3모듈 통일: `String` / `VARCHAR(36)`) 입니다.
 Producer(Outbox 스케줄러)가 Kafka 헤더에 실어 보내고, Consumer가 이를 추출하여 사용합니다.
 
 **Producer 측 — Outbox 스케줄러:**
@@ -180,7 +180,7 @@ ProducerRecord<String, String> record = new ProducerRecord<>(
         outbox.getPayload()
     );
 record.headers().add("X-Message-Id",
-    outbox.getMessageId().toString().getBytes(StandardCharsets.UTF_8));
+    outbox.getMessageId().getBytes(StandardCharsets.UTF_8));  // messageId는 이미 String
 
     kafkaTemplate.send(record);
 ```
@@ -190,14 +190,14 @@ record.headers().add("X-Message-Id",
 ```java
 @KafkaListener(topics = "order.created")
 public void consume(ConsumerRecord<String, String> record, Acknowledgment ack) {
-    UUID messageId = extractMessageId(record.headers());
+    String messageId = extractMessageId(record.headers());
     consumerService.process(messageId, record.value());
     ack.acknowledge();
 }
 
-private UUID extractMessageId(Headers headers) {
+private String extractMessageId(Headers headers) {
     Header header = headers.lastHeader("X-Message-Id");
-    return UUID.fromString(new String(header.value(), StandardCharsets.UTF_8));
+    return new String(header.value(), StandardCharsets.UTF_8);
 }
 ```
 

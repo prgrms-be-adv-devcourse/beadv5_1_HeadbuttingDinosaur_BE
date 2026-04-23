@@ -201,6 +201,14 @@
   - `orderItems`: `List<OrderItemsResponse>`
   - `createdAt`: `LocalDateTime`
 
+### OrderStatusResponse
+- 파일: `commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/OrderStatusResponse.java`
+- 타입: `record`
+- 필드:
+  - `orderId`: `UUID`
+  - `status`: `OrderStatus`
+  - `updatedAt`: `LocalDateTime`
+
 ### OrderSummary
 - 파일: `commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/OrderSummary.java`
 - 타입: `record`

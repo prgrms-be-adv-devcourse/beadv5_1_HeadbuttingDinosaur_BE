@@ -1,6 +1,6 @@
 # DTO 문서 요약
 
-자동 생성 기준: `presentation/dto` 하위 Java `record/class`를 기준으로 정리했습니다.
+자동 생성 기준: `presentation/dto` 하위 Java `record/class`를 기준으로 정리했습니다. 외부 계약 DTO(Kafka 이벤트 payload 등)는 해당 모듈 섹션 내에 포함합니다.
 
 ## admin
 
@@ -143,7 +143,284 @@
 |---|---|
 | `status` | `String` |
 
+## commerce
+
+### CartClearResponse (record)
+- source: `commerce/src/main/java/com/devticket/commerce/cart/presentation/dto/res/CartClearResponse.java`
+| 필드명 | 타입 |
+|---|---|
+| `message` | `String` |
+
+### CartItemDeleteResponse (record)
+- source: `commerce/src/main/java/com/devticket/commerce/cart/presentation/dto/res/CartItemDeleteResponse.java`
+| 필드명 | 타입 |
+|---|---|
+| `message` | `String` |
+
+### CartItemDetail (record)
+- source: `commerce/src/main/java/com/devticket/commerce/cart/presentation/dto/res/CartItemDetail.java`
+| 필드명 | 타입 |
+|---|---|
+| `cartItemId` | `UUID` |
+| `eventId` | `UUID` |
+| `eventTitle` | `String` |
+| `price` | `int` |
+| `quantity` | `int` |
+
+### CartItemQuantityRequest (record)
+- source: `commerce/src/main/java/com/devticket/commerce/cart/presentation/dto/req/CartItemQuantityRequest.java`
+| 필드명 | 타입 |
+|---|---|
+| `quantity` | `int` |
+
+### CartItemQuantityResponse (record)
+- source: `commerce/src/main/java/com/devticket/commerce/cart/presentation/dto/res/CartItemQuantityResponse.java`
+| 필드명 | 타입 |
+|---|---|
+| `cartItemId` | `String` |
+| `quantity` | `int` |
+
+### CartItemRequest (record)
+- source: `commerce/src/main/java/com/devticket/commerce/cart/presentation/dto/req/CartItemRequest.java`
+| 필드명 | 타입 |
+|---|---|
+| `eventId` | `UUID` |
+| `quantity` | `int` |
+
+### CartItemResponse (record)
+- source: `commerce/src/main/java/com/devticket/commerce/cart/presentation/dto/res/CartItemResponse.java`
+| 필드명 | 타입 |
+|---|---|
+| `cartId` | `String` |
+| `items` | `List<CartItemDetail>` |
+| `totalAmount` | `long` |
+
+### CartOrderRequest (record)
+- source: `commerce/src/main/java/com/devticket/commerce/order/presentation/dto/req/CartOrderRequest.java`
+| 필드명 | 타입 |
+|---|---|
+| `cartItemIds` | `List<UUID>` |
+
+### CartResponse (record)
+- source: `commerce/src/main/java/com/devticket/commerce/cart/presentation/dto/res/CartResponse.java`
+| 필드명 | 타입 |
+|---|---|
+| `cartId` | `String` |
+| `items` | `List<CartItemDetail>` |
+| `totalAmount` | `int` |
+
+### InternalOrderInfoResponse (record)
+- source: `commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/InternalOrderInfoResponse.java`
+| 필드명 | 타입 |
+|---|---|
+| `id` | `UUID` |
+| `userId` | `UUID` |
+| `orderNumber` | `String` |
+| `paymentMethod` | `String` |
+| `totalAmount` | `Integer` |
+| `status` | `String` |
+| `orderedAt` | `String` |
+
+### InternalOrderItemResponse (record)
+- source: `commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/InternalOrderItemResponse.java`
+| 필드명 | 타입 |
+|---|---|
+| `id` | `Long` |
+| `orderItemId` | `UUID` |
+| `orderId` | `Long` |
+| `userId` | `UUID` |
+| `eventId` | `UUID` |
+| `price` | `int` |
+| `quantity` | `int` |
+| `subtotalAmount` | `int` |
+| `createdAt` | `LocalDateTime` |
+| `updatedAt` | `LocalDateTime` |
+
+### InternalOrderItemsResponse (record)
+- source: `commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/InternalOrderItemsResponse.java`
+| 필드명 | 타입 |
+|---|---|
+| `eventId` | `Long` |
+| `orders` | `List<InternalOrderItemsResponse.OrderItems>` |
+
+### InternalSettlementDataResponse (record)
+- source: `commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/InternalSettlementDataResponse.java`
+| 필드명 | 타입 |
+|---|---|
+| `sellerId` | `UUID` |
+| `periodStart` | `String` |
+| `periodEnd` | `String` |
+| `eventSettlements` | `List<EventSettlements>` |
+
+### OrderCancelResponse (record)
+- source: `commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/OrderCancelResponse.java`
+| 필드명 | 타입 |
+|---|---|
+| `orderId` | `String` |
+| `status` | `String` |
+| `cancelledAt` | `String` |
+
+### OrderDetailItemResponse (record)
+- source: `commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/OrderDetailItemResponse.java`
+| 필드명 | 타입 |
+|---|---|
+| `eventId` | `UUID` |
+| `eventTitle` | `String` |
+| `quantity` | `int` |
+| `price` | `int` |
+
+### OrderDetailResponse (record)
+- source: `commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/OrderDetailResponse.java`
+| 필드명 | 타입 |
+|---|---|
+| `orderId` | `UUID` |
+| `status` | `OrderStatus` |
+| `totalAmount` | `int` |
+| `orderItems` | `List<OrderDetailItemResponse>` |
+| `paymentMethod` | `PaymentMethod` |
+| `createdAt` | `LocalDateTime` |
+
+### OrderItemsResponse (record)
+- source: `commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/OrderItemsResponse.java`
+| 필드명 | 타입 |
+|---|---|
+| `eventId` | `UUID` |
+| `eventTitle` | `String` |
+| `quantity` | `int` |
+| `price` | `int` |
+
+### OrderListRequest (record)
+- source: `commerce/src/main/java/com/devticket/commerce/order/presentation/dto/req/OrderListRequest.java`
+| 필드명 | 타입 |
+|---|---|
+| `page` | `int` |
+| `size` | `int` |
+| `status` | `String` |
+
+### OrderListResponse (record)
+- source: `commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/OrderListResponse.java`
+| 필드명 | 타입 |
+|---|---|
+| `orders` | `List<OrderSummary>` |
+| `totalPages` | `int` |
+| `totalElements` | `long` |
+
+### OrderRequest (record)
+- source: `commerce/src/main/java/com/devticket/commerce/order/presentation/dto/req/OrderRequest.java`
+| 필드명 | 타입 |
+|---|---|
+| `cartItemEventIds` | `List<String>` |
+
+### OrderResponse (record)
+- source: `commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/OrderResponse.java`
+| 필드명 | 타입 |
+|---|---|
+| `orderId` | `UUID` |
+| `totalAmount` | `Long` |
+| `orderStatus` | `OrderStatus` |
+| `orderItems` | `List<OrderItemsResponse>` |
+| `createdAt` | `LocalDateTime` |
+
+### OrderSummary (record)
+- source: `commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/OrderSummary.java`
+| 필드명 | 타입 |
+|---|---|
+| `orderId` | `UUID` |
+| `totalAmount` | `int` |
+| `status` | `OrderStatus` |
+| `createdAt` | `LocalDateTime` |
+
+### SellerEventParticipantListRequest (record)
+- source: `commerce/src/main/java/com/devticket/commerce/ticket/presentation/dto/req/SellerEventParticipantListRequest.java`
+| 필드명 | 타입 |
+|---|---|
+| `page` | `Integer` |
+| `size` | `Integer` |
+| `keyword` | `String` |
+
+### SellerEventParticipantListResponse (record)
+- source: `commerce/src/main/java/com/devticket/commerce/ticket/presentation/dto/res/SellerEventParticipantListResponse.java`
+| 필드명 | 타입 |
+|---|---|
+| `sellerEventParticipantListResponse` | `List<SellerEventParticipantResponse>` |
+| `page` | `int` |
+| `size` | `int` |
+| `totalElements` | `long` |
+| `totalPages` | `int` |
+
+### SellerEventParticipantResponse (record)
+- source: `commerce/src/main/java/com/devticket/commerce/ticket/presentation/dto/res/SellerEventParticipantResponse.java`
+| 필드명 | 타입 |
+|---|---|
+| `ticketId` | `String` |
+| `orderId` | `String` |
+| `userId` | `String` |
+| `email` | `String` |
+| `purchasedAt` | `String` |
+| `orderNumber` | `String` |
+
+### TicketDetailResponse (record)
+- source: `commerce/src/main/java/com/devticket/commerce/ticket/presentation/dto/res/TicketDetailResponse.java`
+| 필드명 | 타입 |
+|---|---|
+| `ticketId` | `UUID` |
+| `eventId` | `UUID` |
+| `eventTitle` | `String` |
+| `eventDateTime` | `String` |
+| `status` | `String` |
+| `issuedAt` | `String` |
+
+### TicketListRequest (record)
+- source: `commerce/src/main/java/com/devticket/commerce/ticket/presentation/dto/req/TicketListRequest.java`
+| 필드명 | 타입 |
+|---|---|
+| `page` | `int` |
+| `size` | `int` |
+
+### TicketListResponse (record)
+- source: `commerce/src/main/java/com/devticket/commerce/ticket/presentation/dto/res/TicketListResponse.java`
+| 필드명 | 타입 |
+|---|---|
+| `totalPages` | `int` |
+| `totalElements` | `Long` |
+| `tickets` | `List<TicketDetailResponse>` |
+
+### TicketRequest (record)
+- source: `commerce/src/main/java/com/devticket/commerce/ticket/presentation/dto/req/TicketRequest.java`
+| 필드명 | 타입 |
+|---|---|
+| `orderId` | `Long` |
+
+### TicketResponse (record)
+- source: `commerce/src/main/java/com/devticket/commerce/ticket/presentation/dto/res/TicketResponse.java`
+| 필드명 | 타입 |
+|---|---|
+| `orderItemId` | `Long` |
+| `totalCount` | `Integer` |
+| `tickets` | `List<TicketInfo>` |
+
 ## event
+
+### ActionLogEvent (record, Kafka payload)
+- source: `event/src/main/java/com/devticket/event/common/messaging/event/ActionLogEvent.java`
+- topic: `action.log` (Event Producer: VIEW / DETAIL_VIEW / DWELL_TIME)
+| 필드명 | 타입 |
+|---|---|
+| `userId` | `String` |
+| `eventId` | `String` |
+| `actionType` | `String` |
+| `searchKeyword` | `String` |
+| `stackFilter` | `String` |
+| `dwellTimeSeconds` | `Integer` |
+| `quantity` | `Integer` |
+| `totalAmount` | `Long` |
+| `timestamp` | `Instant` |
+
+### DwellRequest (record)
+- source: `event/src/main/java/com/devticket/event/presentation/dto/DwellRequest.java`
+| 필드명 | 타입 |
+|---|---|
+| `dwellTimeSeconds` | `Integer` (`@NotNull @Positive`) |
 
 ### EventDetailResponse (record)
 - source: `event/src/main/java/com/devticket/event/presentation/dto/EventDetailResponse.java`
@@ -205,7 +482,7 @@
 - source: `event/src/main/java/com/devticket/event/presentation/dto/internal/InternalBulkEventInfoRequest.java`
 | 필드명 | 타입 |
 |---|---|
-| `eventIds` | `List<UUID>` |
+| `eventIds` | `List< UUID>` |
 
 ### InternalBulkEventInfoResponse (record)
 - source: `event/src/main/java/com/devticket/event/presentation/dto/internal/InternalBulkEventInfoResponse.java`
@@ -241,7 +518,7 @@
 | 필드명 | 타입 |
 |---|---|
 | `eventId` | `UUID` |
-| `purchasable` | `// Long id → UUID eventId boolean` |
+| `purchasable` | `boolean` |
 | `reason` | `PurchaseUnavailableReason` |
 | `maxQuantity` | `Integer` |
 | `title` | `String` |
@@ -709,6 +986,7 @@
 |---|---|
 | `orderId` | `UUID` |
 | `paymentMethod` | `PaymentMethod` |
+| `walletAmount` | `Integer` |
 
 ### PaymentReadyResponse (record)
 - source: `payment/src/main/java/com/devticket/payment/payment/presentation/dto/PaymentReadyResponse.java`
@@ -721,6 +999,8 @@
 | `orderStatus` | `String` |
 | `paymentStatus` | `PaymentStatus` |
 | `amount` | `Integer` |
+| `walletAmount` | `Integer` |
+| `pgAmount` | `Integer` |
 | `approvedAt` | `String` |
 
 ### PgRefundRequest (record)
@@ -768,7 +1048,7 @@
 | `refundRate` | `Integer` |
 | `dDay` | `long` |
 | `refundable` | `boolean` |
-| `"WALLET"` | `String paymentMethod // "PG" or` |
+| `paymentMethod` | `String` |
 
 ### RefundListItemResponse (record)
 - source: `payment/src/main/java/com/devticket/payment/refund/presentation/dto/RefundListItemResponse.java`
@@ -795,7 +1075,7 @@
 | `status` | `String` |
 | `paymentMethod` | `String` |
 | `requestedAt` | `LocalDateTime` |
-| `추가` | `LocalDateTime completedAt //TODO: 환불자 이름` |
+| `completedAt` | `LocalDateTime` |
 
 ### WalletBalanceResponse (record)
 - source: `payment/src/main/java/com/devticket/payment/wallet/presentation/dto/WalletBalanceResponse.java`

@@ -376,17 +376,18 @@ public enum ActionType {
 ### 원칙
 
 - 비즈니스 로직 + `outboxService.save()` 호출은 **반드시 단일 `@Transactional` 경계** 안에 위치
-- Outbox 레코드의 `messageId`는 생성 시 `UUID.randomUUID()`로 **단 한 번 고정** — 재발행 시에도 변경하지 않음
+- Outbox 레코드의 `messageId`는 생성 시 `UUID.randomUUID().toString()`로 **단 한 번 고정** — 재발행 시에도 변경하지 않음 (3모듈 통일: `String(VARCHAR(36))`)
 - **Outbox 스케줄러는 Kafka 발행 시 `message_id`를 Kafka 헤더(`X-Message-Id`)에 포함해야 한다**
 - Consumer는 이 헤더에서 `message_id`를 추출하여 `processed_message` dedup에 사용한다
 - **Commerce·Event 서비스 신규 적용 시 동일 원칙 적용 필수**
+- **패키지 경로**: `{module}.common.outbox.*` (3모듈 공통 — 2026-04-22 `infrastructure.messaging` 이동 방향 번복 확정 / `infrastructure.messaging` 하위 `Outbox*` 발견 시 `common.outbox`로 되돌리는 리팩토링 대상 / 상세: `outbox_fix.md §4-C`)
 
 ### Outbox 테이블 설계
 
 | 컬럼 | 타입 | 설명 |
 |------|------|------|
 | id | BIGSERIAL | PK |
-| message_id | UUID | `UUID.randomUUID()`로 생성 — Kafka 헤더로 전달, Consumer dedup 키로 사용 |
+| message_id | VARCHAR(36) | `UUID.randomUUID().toString()`로 생성 — Kafka 헤더 `X-Message-Id`로 전달, Consumer dedup 키로 사용 (3모듈 통일) |
 | aggregate_id | VARCHAR(36) | 비즈니스 키 UUID — 운영 추적용 (orderId, paymentId 등) |
 | partition_key | VARCHAR(36) | Kafka Partition Key — orderId 기준 순서 보장용 (kafka-design.md §6) |
 | event_type | VARCHAR(128) | 이벤트 유형. **현 구현은 토픽명과 동일 문자열을 저장** (예: `"payment.completed"`). 추적성을 높이려면 별도 enum-style 문자열(`PAYMENT_COMPLETED` 등)로 분리하는 리팩터 고려 가능 |
@@ -420,38 +421,45 @@ public enum ActionType {
 
 ### Kafka 발행 본문 구조 (`OutboxEventMessage`)
 
-> **모든 Outbox 기반 이벤트는 아래 래퍼로 이중 JSON 인코딩되어 발행된다.** Consumer는 본문을 **2단계**로 파싱해야 실제 이벤트 DTO를 복원할 수 있다.
+> **Outbox 기반 이벤트는 `payload` 필드(실제 이벤트 DTO JSON)를 `ProducerRecord` value에 단일 인코딩으로 발행하며, `messageId`는 Kafka 헤더 `X-Message-Id`로 분리 전달된다.**
+> `OutboxEventMessage`는 **스케줄러 → `OutboxEventProducer` 전달용 VO**로, 토픽 value에 JSON 직렬화되지 않는다 (`ProducerRecord` 구성 인자 추출 용도).
 > `action.log`는 Outbox 미사용이므로 래퍼 없이 `ActionLogEvent` JSON을 직접 발행 — 본 구조 적용 대상 아님.
 
 ```java
-// common/outbox/OutboxEventMessage.java
+// common/outbox/OutboxEventMessage.java (Commerce 기준 — 3모듈 통일)
 public record OutboxEventMessage(
-    UUID messageId,         // Kafka 헤더 X-Message-Id와 동일값, Consumer dedup 키
-    String eventType,       // 토픽명과 동일 문자열 (예: "payment.completed")
-    String payload,         // JSON 직렬화된 실제 이벤트 DTO (이중 인코딩)
-    Instant timestamp
-) {}
-```
-
-**발행 포맷 예시** (`payment.completed` 토픽 본문)
-
-```json
-{
-  "messageId": "0c6a...-...",
-  "eventType": "payment.completed",
-  "payload": "{\"orderId\":\"...\",\"userId\":\"...\",\"paymentId\":\"...\",\"paymentMethod\":\"PG\",\"totalAmount\":50000,\"orderItems\":[...],\"timestamp\":\"...\"}",
-  "timestamp": "2026-04-21T..."
+    Long outboxId,          // Outbox 엔티티 PK — 상태 갱신 참조용
+    String messageId,       // Kafka 헤더 X-Message-Id로 전달, Consumer dedup 키
+    String topic,           // Kafka 토픽명 (ProducerRecord 구성)
+    String partitionKey,    // Kafka Partition Key (ProducerRecord 구성)
+    String payload          // JSON 직렬화된 실제 이벤트 DTO — 토픽 value로 직접 발행
+) {
+    public static OutboxEventMessage from(Outbox outbox) { ... }
 }
 ```
 
-`payload` 필드는 문자열 — 내부의 `\"...\"` 이스케이프된 JSON이 실제 이벤트 DTO.
+**발행 포맷** (`payment.completed` 토픽)
 
-**Consumer 측 언래핑 의무**
+| 구성 요소 | 값 |
+|---|---|
+| `ProducerRecord.topic()` | `message.topic()` (예: `"payment.completed"`) |
+| `ProducerRecord.key()` | `message.partitionKey()` (예: `orderId` UUID) |
+| `ProducerRecord.value()` | `message.payload()` — **실제 이벤트 DTO JSON 단일 인코딩** |
+| Kafka 헤더 `X-Message-Id` | `message.messageId()` (UUID 문자열, UTF-8 bytes) |
 
-- outer JSON 파싱 → `payload` 필드 문자열 추출 → **다시 `JSON.parse` / Jackson `readValue`** 로 실제 이벤트 DTO 복원
-- Java Consumer 예: `commerce/order/application/service/OrderService.java:405` `deserialize(payload, PaymentCompletedEvent.class)`
-- Node.js Consumer 예: `fastify-log/src/service/payment-completed.service.ts` `unwrapOutboxPayload()` (consumer는 `src/consumer/action-log.consumer.ts` `dispatchMessage`가 topic 분기 후 service 호출 — 1a469ce5에서 전용 consumer 파일 평탄화)
-- **신규 Consumer 구현 시 이 2단계 파싱을 반드시 적용**해야 함 — 누락 시 역직렬화 실패로 DLT 적재 위험
+**토픽 value 예시** (문자열 이스케이프 없음 — 실제 DTO JSON 직접 발행)
+
+```json
+{"orderId":"...","userId":"...","paymentId":"...","paymentMethod":"PG","totalAmount":50000,"orderItems":[...],"timestamp":"2026-04-21T..."}
+```
+
+**Consumer 측 역직렬화**
+
+- 토픽 value = 실제 이벤트 DTO JSON **단일 파싱**으로 복원 (이중 래핑 없음)
+- `messageId`는 **Kafka 헤더 `X-Message-Id`에서 추출** (본문 파싱 불필요) — `processed_message` dedup 키
+- Java Consumer 예: `commerce/order/application/service/OrderService.java:405` `deserialize(payload, PaymentCompletedEvent.class)` (단일 파싱)
+- Node.js Consumer 예: `fastify-log/src/service/payment-completed.service.ts` `unwrapOutboxPayload()` — Outbox wrapper(`{messageId, eventType, payload, timestamp}`)의 `payload` 필드(JSON 문자열)를 **단일 `JSON.parse`로 복원**. wrapper 구조가 아니면 원본 그대로 반환. consumer 진입점은 `src/consumer/action-log.consumer.ts` `dispatchMessage`가 topic 분기 후 service 호출 (1a469ce5에서 전용 consumer 파일 평탄화)
+- **신규 Consumer 구현 시**: 헤더에서 `X-Message-Id` 추출 + value 단일 파싱 — 이중 래핑 파싱 금지 (역직렬화 실패로 DLT 적재 위험)
 
 ---
 
@@ -533,15 +541,15 @@ config.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, 500);
 - `enable.idempotence=true` 전제 유지 (`retries>=1`, `max.in.flight<=5`, `acks=all` 자동 충족)
 - 3개 모듈(Commerce/Event/Payment) 공통 적용
 
-스케줄러 쿼리: `next_retry_at <= now()` 조건 추가
+스케줄러 쿼리: `next_retry_at < now()` 조건 추가 (경계 배제 — `nextRetryAt == now` 레코드는 다음 폴링 틱에서 픽업)
 
 ```java
 // OutboxRepository
 @Query("SELECT o FROM Outbox o WHERE o.status = :status " +
-       "AND (o.nextRetryAt IS NULL OR o.nextRetryAt <= :now) " +
+       "AND (o.nextRetryAt IS NULL OR o.nextRetryAt < :now) " +
        "ORDER BY o.createdAt ASC LIMIT 50")
-List<Outbox> findPendingForRetry(@Param("status") OutboxStatus status,
-                                 @Param("now") Instant now);
+List<Outbox> findPendingToPublish(@Param("status") OutboxStatus status,
+                                  @Param("now") Instant now);
 ```
 
 ---
@@ -1079,7 +1087,7 @@ topic: event.force-cancelled  → DLT: event.force-cancelled.DLT
 | 2 | dedupe 키 스코프 (message_id+topic 복합키는 fan-out 구조에서 Consumer 간 dedup 공유 문제 발생 → 모듈별 별도 테이블로 구독자 스코프 격리) | 격리 단위 = 서비스 DB, Outbox UUID를 Kafka 헤더로 전달 | `X-Message-Id` 헤더 + 모듈별 `processed_message` + `UNIQUE(message_id)` | Payment·Event 적용 완료 / Commerce 미적용 |
 | 3 | 메시지 순서 역전 | 3분류 처리 — ① 이미 목표 상태: 멱등 스킵 + ACK ② 설명 가능한 순서 역전(만료·보상 등): 정책적 스킵 + ACK ③ 설명 불가능한 상태: throw → 재시도 → DLT (단순 스킵 금지 — 정합성 문제 소거 위험) | `canTransitionTo()` + 예외 타입 3분류 | 미구현 |
 | 4 | Producer 재발행 시 dedupe | `Outbox.messageId` 생성 시 고정, 재발행 시 동일 ID | 현재 구현 유지 | 구현됨, 문서화 누락 |
-| 5 | Outbox 락·재시도 | ShedLock 채택, `next_retry_at` 컬럼 추가 | ShedLock + 선형 백오프 (`retryCount * 60초`, MAX_RETRY=5) | ShedLock 적용 완료 |
+| 5 | Outbox 락·재시도 | ShedLock 채택, `next_retry_at` 컬럼 추가 | ShedLock(`lockAtMostFor=5m`, `lockAtLeastFor=5s`) + 지수 백오프 6회(`2^(retryCount-1)초` = 즉시/1/2/4/8/16초, 누적 31초) → `retryCount >= 6` 도달 시 FAILED | ShedLock 적용 완료 — 3개 모듈 정책 통일 (2026-04-22) |
 | 6 | DLT 재처리 중복 반영 | ① `markProcessed()`는 성공 후 마지막에 호출 ② DLT 재처리 워커/Admin API에서 원본 토픽 재발행 시 반드시 원본 `X-Message-Id` 헤더 보존 (새 UUID 생성 시 dedup 우회 → 중복 처리 발생) | 코드 순서 원칙 + DLT 재발행 구현 정책 | ① 구현됨 ② Admin API 미구현 |
 | 7 | 보상 이벤트 중복 처리 | processed_message dedup + 보상 Consumer별 비즈니스 상태 확인 이중 방어 (이미 보상 완료 상태면 성공으로 간주 스킵) — 상태 확인은 별도 플래그 없이 기존 상태 전이 검증(`canTransitionTo()`)으로 커버 | 모든 보상 Consumer에 dedupe 강제 + `canTransitionTo()` (Case 3과 동일) | 원칙 미수립 |
 | 8 | 상태 전이 검증 없음 | processed_message + 상태 전이 검증 두 방어선 필수 | Case 3 동일, 예외 타입 분리 | 미구현 |
@@ -1096,7 +1104,7 @@ topic: event.force-cancelled  → DLT: event.force-cancelled.DLT
 - [x] ✅ `JacksonConfig`: `JavaTimeModule`, `WRITE_DATES_AS_TIMESTAMPS=false` 적용 확인 완료
 - [x] ✅ `ShedLockConfig`: JDBC provider 기반 ShedLock 설정 완료
 - [x] ✅ `Outbox`: 엔티티 필드 수정 완료 — `aggregate_id` VARCHAR(36), `topic`, `partitionKey`, `nextRetryAt`, `sentAt`
-- [x] ✅ `OutboxRepository`: `next_retry_at IS NULL OR next_retry_at <= :now` 조건 추가 완료
+- [x] ✅ `OutboxRepository`: `next_retry_at IS NULL OR next_retry_at < :now` 조건 추가 완료 (Commerce 기준으로 연산자 통일 — 2026-04-22)
 - [x] ✅ `OutboxScheduler`: ShedLock 적용 + `getTopic()` / `getPartitionKey()` 사용 완료
 - [x] ✅ `ProcessedMessage`: `topic VARCHAR(128)` 컬럼 추가 완료
 - [x] ✅ `PaymentCompletedEvent`: record, `UUID` / `PaymentMethod enum` / `Instant` 적용 완료

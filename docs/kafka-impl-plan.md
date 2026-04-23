@@ -52,7 +52,7 @@ Kafka를 통해 서비스 간에 오가는 모든 이벤트를 한 눈에 확인
 | `refund.stock.done` / `refund.stock.failed` | Event | Payment (Orchestrator) | Stock 복구 처리 결과 | — | ⬜ 미구현 |
 | `refund.order.compensate` | Payment (Orchestrator) | Commerce | Order 취소 보상 (롤백) | — | ⬜ 미구현 |
 | `refund.ticket.compensate` | Payment (Orchestrator) | Commerce | Ticket 취소 보상 (롤백) | — | ⬜ 미구현 |
-| `action.log` (analytics) | Event (VIEW/DETAIL_VIEW/DWELL_TIME), Commerce (CART_ADD/CART_REMOVE), **Log 자체 consume**(PURCHASE) | **Log 서비스** (Fastify, 별도 스택) | 각 API 호출 시 (`acks=0`, Outbox 미사용). PURCHASE는 Log 서비스가 `payment.completed` 수신 → `log.action_log` 직접 INSERT | **없음** (at-most-once — 손실 허용) | ⬜ 미구현 (상세: [actionLog.md](actionLog.md)) |
+| `action.log` (analytics) | Event (VIEW/DETAIL_VIEW/DWELL_TIME), Commerce (CART_ADD/CART_REMOVE), **Log 자체 consume**(PURCHASE) | **Log 서비스** (Fastify, 별도 스택) | 각 API 호출 시 (`acks=0`, Outbox 미사용). PURCHASE는 Log 서비스가 `payment.completed` 수신 → `log.action_log` 직접 INSERT | **없음** (at-most-once — 손실 허용) | ✅ Log Consumer 확장 완료 / ✅ Event Producer 완료 (2026-04-23) / ⬜ Commerce Producer 미확인 (상세: [actionLog.md](actionLog.md)) |
 
 **구현 상태 범례**
 
@@ -273,7 +273,7 @@ sequenceDiagram
 **Outbox / 스케줄러**
 - [x] ✅ `Outbox`: 엔티티 필드 수정 완료 — `topic`, `partitionKey`, `nextRetryAt`, `sentAt` 포함, `create()` 파라미터 반영
 - [x] ✅ `OutboxScheduler`: `outbox.getTopic()` + `outbox.getPartitionKey()` 사용으로 수정 완료
-- [x] ✅ `OutboxRepository`: 스케줄러 쿼리에 `next_retry_at IS NULL OR next_retry_at <= :now` 조건 추가 완료
+- [x] ✅ `OutboxRepository`: 스케줄러 쿼리에 `next_retry_at IS NULL OR next_retry_at < :now` 조건 추가 완료 (연산자 `<` — Commerce 기준으로 통일, 2026-04-22)
 - [x] ✅ `OutboxScheduler`: ShedLock 적용 완료 (`@SchedulerLock(name = "outbox-scheduler", lockAtMostFor = "5m", lockAtLeastFor = "5s")`) — `lockAtMostFor`는 2026-04-21 결정 이후 기준. 기존 `30s`는 최악 처리 시간(50건×건당 타임아웃)보다 짧아 중복 진입 경로 존재
 - [x] ✅ Outbox 발행 시 Partition Key 설정 완료 — `outbox.getPartitionKey()` (fallback: aggregateId)
 - [x] ✅ `OutboxEventProducer`: Kafka 발행 시 `X-Message-Id` 헤더 세팅 완료 — ProducerRecord 헤더에 Outbox messageId 포함
@@ -316,8 +316,8 @@ sequenceDiagram
 - [x] ✅ `PaymentReadyResponse`에 `walletAmount(Integer)`, `pgAmount(Integer)` 필드 추가 완료 — 프론트 구성 표시 + Toss SDK에 pgAmount 전달용
 
 *readyPayment 멱등성 가드 (PG/WALLET/WALLET_PG 공통)*
-- [ ] `readyPayment()` 진입 시 orderId 기준 기존 Payment 조회 → READY면 기존 결과 반환, SUCCESS/FAILED면 에러 (상세: front-server-idempotency-guide.md §4-2)
-- [ ] WALLET_PG 동시성 2차 방어선: WalletTransaction transactionKey("USE_" + orderId) UNIQUE 제약 — 극단적 경쟁 조건에서 두 요청이 동시에 Payment 조회를 통과하더라도 하나만 성공
+- [x] ✅ `readyPayment()` 진입 시 orderId 기준 기존 Payment 조회 → READY(동일 method)면 기존 결과 반환, 그 외(method 불일치/SUCCESS/FAILED)는 `ALREADY_PROCESSED_PAYMENT` 에러 — `PaymentServiceImpl.java:64~76` 구현 완료 (상세: front-server-idempotency-guide.md §4-2)
+- [x] ✅ WALLET_PG 동시성 2차 방어선: WalletTransaction transactionKey("USE_" + orderId) UNIQUE 제약 적용 완료 — DB 컬럼 `unique=true` (`WalletTransaction.java:38`) + `existsByTransactionKey` 사전 체크 (`WalletServiceImpl.java:313~315`)
 
 *readyPayment WALLET_PG 분기*
 - [x] ✅ `readyPayment()` 내 `PaymentMethod.WALLET_PG` 분기 추가 완료 (`PaymentServiceImpl.java:78~118`)
@@ -339,10 +339,11 @@ sequenceDiagram
 - [x] ✅ `WalletServiceImpl` 위 두 메서드 구현 완료
 
 *타임아웃 스케줄러 (WALLET_PG READY 방치 대응)*
-- [ ] READY 상태 WALLET_PG 결제가 일정 시간(팀 합의 필요, 예: 30분) 경과 시 자동 FAILED 처리 + 예치금 복구
-- [ ] ShedLock 기반 스케줄러로 구현 (기존 OutboxScheduler 패턴 참고)
-- [ ] 예치금 복구는 `restoreForWalletPgFail()` 재사용, transactionKey 멱등성으로 중복 복구 방지
-- [ ] `payment.failed` Outbox 발행 (Commerce 주문 상태 FAILED 전이 + Event 재고 복구용)
+- [x] ✅ READY 상태 WALLET_PG 결제 **30분** 경과 시 자동 FAILED 처리 + 예치금 복구 — `WalletPgTimeoutScheduler.TIMEOUT_MINUTES = 30`
+- [x] ✅ ShedLock 기반 스케줄러 구현 — `@Scheduled(fixedDelay=60000)` + `@SchedulerLock(name="wallet-pg-timeout", lockAtMostFor="50s", lockAtLeastFor="10s")` (`WalletPgTimeoutScheduler.java:29~30`)
+  * **lockAtMostFor=50s 산정 기준**: fixedDelay(60s)의 ~83%. Outbox 스케줄러(`fixedDelay=3s`/`lockAtMostFor=5m`=100배 — `OutboxScheduler.java:19~20`)와 다른 기준을 적용하는 이유는 타임아웃 처리가 외부 IO(Wallet 복구·OutboxService.save·CommerceInternalClient HTTP) + DB Tx 1회로 짧기 때문. lock 만료 후 다음 tick(여유 10s) 안에 안전 종료 의도
+- [x] ✅ 예치금 복구는 `restoreForWalletPgFail()` 재사용, transactionKey `"PG_WALLET_RESTORE_" + orderId`로 중복 복구 방지 (`WalletPgTimeoutHandler.java:38~40`, `WalletServiceImpl.java:342~344`)
+- [x] ✅ `payment.failed` Outbox 발행 (Commerce 주문 상태 FAILED 전이 + Event 재고 복구용) — `WalletPgTimeoutHandler.java:50~64` (orderItems는 `CommerceInternalClient.getOrderInfo`로 조회 후 매핑)
 
 **Refund Saga Orchestrator (신규 구현)**
 - [ ] `RefundSagaOrchestrator` 클래스 신규 생성 — Payment 서비스 내 `@Service`
@@ -379,10 +380,10 @@ sequenceDiagram
 - [x] ✅ `Order.create()` 수정: 초기 status `CREATED`로 설정 완료 (`Order.java:111`). *`expires_at` 컬럼은 폐기 — `BaseEntity.updated_at` 재활용 방식으로 전환됨 (#4-2 참조)*
 - [x] ✅ `outbox` 테이블 신규 생성 — JPA `@Entity` 추가 시 ddl-auto 자동 생성
 - [x] ✅ `processed_message` 테이블 신규 생성 — JPA `@Entity` 추가 시 ddl-auto 자동 생성
-- [x] ✅ `shedlock` 테이블 생성 — `commerce/src/main/resources/schema.sql` 수동 CREATE
+- [x] ✅ `shedlock` 테이블 생성 — 운영 DB 수동 CREATE (소스 트리 `schema.sql` 미포함)
 
 **기반 인프라**
-- [x] ✅ **config 패키지 이전 (2026-04-21)** — `common/config/*` 8파일(`JacksonConfig`·`AsyncConfig`·`KafkaProducerConfig`·`KafkaConsumerConfig`·`ShedLockConfig`·`ActionLogKafkaProducerConfig`·`OpenApiConfig`·`TransactionConfig`) → **`infrastructure/config/*`** 로 이전 (AGENTS.md §2.1 규정 정합). Event·Payment 모듈은 여전히 `common/config/` 유지 (scope 외, 추후 리팩터링 트랙)
+- [ ] **config 패키지 이전 (계획)** — `common/config/*` 8파일(`JacksonConfig`·`AsyncConfig`·`KafkaProducerConfig`·`KafkaConsumerConfig`·`ShedLockConfig`·`ActionLogKafkaProducerConfig`·`OpenApiConfig`·`TransactionConfig`) → **`infrastructure/config/*`** 로 이전 예정 (AGENTS.md §2.1 규정 정합). 2026-04-21 docs 선반영됐으나 **실제 코드 이전 미수행** — 현재도 8파일 모두 `common/config/`에 잔존 (실코드 대조 2026-04-23). Event·Payment 모듈은 scope 외 (추후 리팩터링 트랙)
 - [x] ✅ `JacksonConfig` 추가 (JavaTimeModule + WRITE_DATES_AS_TIMESTAMPS=false) — `infrastructure/config/JacksonConfig.java`
 - [x] ✅ `KafkaTopics` 상수 클래스 생성 — Saga 6개 (`order.created`, `stock.deducted`, `stock.failed`, `payment.completed`, `payment.failed`, `ticket.issue-failed`) + 환불 1개 (`refund.completed`) + 이벤트 관리 2개 (`event.force-cancelled`, `event.sale-stopped`) + Orchestration 12개
 
@@ -480,7 +481,7 @@ sequenceDiagram
 **Outbox 패턴**
 - [x] ✅ Outbox 패턴 구현 완료 — `common/outbox/` 전체 (`Outbox`, `OutboxStatus`, `OutboxEventMessage`, `OutboxRepository`, `OutboxService`, `OutboxScheduler`, `OutboxEventProducer`)
   - `OutboxService.save()`: `@Transactional(propagation=MANDATORY)` — 외부 트랜잭션 필수(단일 경계 강제)
-  - `OutboxRepository.findPendingOutboxes()`: `status=PENDING AND (nextRetryAt IS NULL OR nextRetryAt <= now)`, `ORDER BY createdAt ASC`, `LIMIT 50`
+  - `OutboxRepository.findPendingToPublish()`: `status=PENDING AND (nextRetryAt IS NULL OR nextRetryAt < now)`, `ORDER BY createdAt ASC`, `LIMIT 50` (메서드명·연산자 3모듈 통일 — Commerce 기준, 2026-04-22)
   - `OutboxEventProducer.publish()`: KafkaTemplate 동기 전송(2초 타임아웃 — 2026-04-21 공통값 결정) + `X-Message-Id` 헤더 세팅 + partition key 지정
 - [x] ✅ `OutboxScheduler` ShedLock 적용 완료 — `@SchedulerLock(name="outbox-scheduler", lockAtMostFor="5m", lockAtLeastFor="5s")`, `@Scheduled(fixedDelay=3_000)` — 2026-04-21 `30s → 5m` 확장 결정 반영
   > 2026-04-21 결정: 지수 백오프 6회(즉시→1→2→4→8→16초)를 **스펙으로 확정**. Payment의 기존 선형 5회(`retryCount*60s`)는 본 정책으로 수렴 예정. `kafka-design.md §4 재시도 정책` 동기화 완료
@@ -527,18 +528,17 @@ sequenceDiagram
 - [x] ✅ `EventServiceKafkaTest` 신규 (+370라인) — `processOrderCreated` 시나리오 10종(중복 메시지 / 단건·다건 성공 / 재고 부족 / 이벤트 미존재 / 매진 / 판매 기간 외 / All-or-Nothing / `saveStockFailed`)
 - [x] ✅ `StockRestoreServiceTest` 업데이트 — `JacksonConfig` import, @DataJpaTest 기반
 
-**`action.log` Producer (analytics — 신규 적용)** *(상세: [actionLog.md](actionLog.md) §4 — 구현 지시서)*
-- [ ] 전용 `ActionLogKafkaProducerConfig` Bean 분리 — `acks=0`, `retries=0`, `enable.idempotence=false`, `linger.ms=10`, `batch.size=기본`, `compression.type=none`, `max.in.flight=5` (기존 Producer Bean과 공유 금지 — 기존 `kafkaTemplate` `@Primary` 부여 + 신규 `actionLogKafkaTemplate` `@Qualifier` 매칭)
-- [ ] `VIEW` 발행 — 이벤트 목록 조회 API 핸들러 내 트랜잭션 경계 **밖**에서 비동기 발행 (Partition Key: `userId`, `searchKeyword` / `stackFilter`가 있으면 포함, `eventId`는 nullable)
-- [ ] `DETAIL_VIEW` 발행 — 이벤트 상세 조회 API 핸들러 내 트랜잭션 경계 **밖**에서 비동기 발행 (필수: `userId`/`eventId`/`actionType`/`timestamp`)
-- [ ] `DWELL_TIME` 발행 — 프론트 이탈 시 호출 API 핸들러 내 트랜잭션 경계 **밖**에서 비동기 발행 (`dwellTimeSeconds` 필수)
-- [ ] **DWELL_TIME 전용 신규 API 엔드포인트 구현** — Event 모듈에 현재 부재 상태 확인됨 (grep 0건). 얇은 Controller(Path Variable `eventId` + Body `{ dwellTimeSeconds: Integer }`) + `ApplicationEventPublisher.publishEvent(ActionLogDomainEvent)` 호출 — 기존 Publisher 재사용. 응답 `204 No Content`. **프론트 스펙(경로/body/트리거 이벤트) 합의 선결**
-- [ ] **Producer 측 Bean Validation** — `DwellRequest.dwellTimeSeconds`에 `@NotNull @Positive` + Controller 파라미터에 `@Valid` 적용. 근거: `acks=0` + Consumer dedup 미적용 정책상 Producer validation이 `log.action_log` 오염 방지의 **최종 방어선** (숫자/필수 필드 스키마 검증 전담, 의미 검증은 Consumer=Log Fastify). 상세: [actionLog.md](actionLog.md) §2 #2 / §4 ③ / AGENTS.md §6.10 #7~#8
-- [ ] Outbox 미사용 확인 (비즈니스 트랜잭션에 INSERT 포함 금지)
-- [ ] 권장 구현 패턴: `ApplicationEventPublisher.publishEvent(ActionLogEvent)` → `@TransactionalEventListener(phase = AFTER_COMMIT)` + `@Async` → `actionLogKafkaTemplate.send(...)` (commit 후 발행 보장 + API 응답 지연 제로)
-- [ ] 실패 허용 정책 — 발행 예외 시 로깅만, 조회 API 응답에 영향 주지 말 것 (at-most-once)
-- [ ] 작업 순서 팁: VIEW → DETAIL_VIEW → DWELL_TIME (트래픽 큰 순)
-- [ ] 테스트: Bean 격리 단위 테스트 (`actionLogKafkaTemplate` 주입 검증), 대량 VIEW 발행 시 목록 API p99 응답 지연 영향 없음 부하 테스트
+**`action.log` Producer (analytics — 신규 적용) ✅ 구현 완료 (2026-04-23)** *(상세: [actionLog.md](actionLog.md) §4 — 구현 지시서)*
+- [x] ✅ 전용 `ActionLogKafkaProducerConfig` Bean 분리 — `acks=0`, `retries=0`, `enable.idempotence=false`, `linger.ms=10`, `compression.type=none`, `max.in.flight=5`. 구현: `event/src/main/java/com/devticket/event/common/config/ActionLogKafkaProducerConfig.java`. 기존 `kafkaTemplate`/`producerFactory` `@Primary` 부여 + 신규 `actionLogKafkaTemplate` `@Qualifier` 매칭 완료
+- [x] ✅ `VIEW` 발행 — 이벤트 목록 조회 API 핸들러 내 트랜잭션 경계 **밖**에서 비동기 발행 (Partition Key: `userId`, `searchKeyword` / `stackFilter` nullable). 트리거: `EventService#logEventListView`
+- [x] ✅ `DETAIL_VIEW` 발행 — 이벤트 상세 조회 API 핸들러 내 트랜잭션 경계 **밖**에서 비동기 발행 (필수: `userId`/`eventId`/`actionType`/`timestamp`). 트리거: `EventService#logDetailView`
+- [x] ✅ `DWELL_TIME` 발행 — 이탈 시 호출 API 핸들러 내 트랜잭션 경계 **밖**에서 비동기 발행 (`dwellTimeSeconds` 필수). 트리거: `DwellController#reportDwell`
+- [x] ✅ **DWELL_TIME 전용 신규 API 엔드포인트 구현** — `POST /api/events/{eventId}/dwell`. 얇은 Controller(Path Variable `eventId` + Body `DwellRequest { dwellTimeSeconds: Integer }`) + `ApplicationEventPublisher.publishEvent(ActionLogDomainEvent)`. 응답 `204 No Content`. 비로그인(`X-User-Id` 미전달) 시 skip + 204
+- [x] ✅ **Producer 측 Bean Validation** — `DwellRequest.dwellTimeSeconds`에 `@NotNull @Positive` + Controller `@Valid` 적용 완료. 근거: `acks=0` + Consumer dedup 미적용 정책상 Producer validation이 `log.action_log` 오염 방지의 **최종 방어선**
+- [x] ✅ Outbox 미사용 확인 (비즈니스 트랜잭션에 INSERT 포함 금지) — Publisher가 `actionLogKafkaTemplate.send()` 직접 호출, `outboxService` 미호출
+- [x] ✅ 권장 구현 패턴 적용 — `ApplicationEventPublisher.publishEvent(ActionLogDomainEvent)` → `@TransactionalEventListener(phase = AFTER_COMMIT, fallbackExecution = true)` + `@Async` → `actionLogKafkaTemplate.send(...)`. `fallbackExecution=true`로 트랜잭션 밖 호출(DWELL_TIME Controller)도 발행 보장
+- [x] ✅ 실패 허용 정책 — `JsonProcessingException` / 기타 예외 시 `log.warn()` 만, 예외 전파 금지 (at-most-once)
+- [ ] 테스트: Bean 격리 단위 테스트 (`actionLogKafkaTemplate` 주입 검증), 대량 VIEW 발행 시 목록 API p99 응답 지연 영향 없음 부하 테스트 (별도 트랙)
 
 > 설계 기준: kafka-design.md §12 / §5 Stock 상태 전이 표 참조, 통합 검증 항목 상세: [actionLog.md](actionLog.md) §4 ⑤
 
@@ -627,6 +627,43 @@ sequenceDiagram
   - **전제 조건 (동반 작업)**: `CartItem` 테이블 `(cart_id, event_id)` UNIQUE 제약 + `CartService.addOrUpdateCartItem` race catch 보강 — 광클 동시성 결함 해소 (별도 작업, 같은 PR에 묶음)
 
 - [x] ✅ **의존 관계 해소**: `Order.cart_hash` 컬럼 + 인덱스 + `CartHashUtil` 모두 구현 완료 — 본 작업 진입 가능
+
+---
+
+### 4-5. 📋 Outbox 정합 후속 트랙 — A파트 머지 완료 후 B·B6 잔여
+
+> 상세: [outbox_fix.md](outbox_fix.md) — 3모듈 실코드 대조 기반 체크리스트
+> 관련 PR (A파트 머지 완료): #482 Commerce / #483 Payment / #484 Event
+> 관련 Issue: #481 (Parent) / #495 (F2 본문 정정 필요)
+
+#### A파트 (머지 완료 — 이중 발행 완화 3축)
+
+- [x] ✅ 3모듈 공통: ShedLock `lockAtMostFor=5m / lockAtLeastFor=5s`
+- [x] ✅ 3모듈 공통: ProducerConfig `delivery.timeout.ms=1500 / request.timeout.ms=1000 / max.block.ms=500`
+- [x] ✅ 3모듈 공통: `OutboxEventProducer.get(2s)` 타임아웃
+- [x] ✅ Payment/Event: Scheduler 트랜잭션 해소 + `processOne()` 별도 빈 분리 (Commerce는 선례)
+- [x] ✅ Commerce: 회귀 방지 테스트(`KafkaProducerConfigTest` + `OutboxSchedulerIntegrationTest`) — PR #482 `e1d53c8`
+
+#### Commerce — 선례 모듈, 후속 없음
+
+- 실코드 대조 결과 §2 통합 결정값 전 항목 이미 일치
+- F2 실사 대상 포함 (`infrastructure.messaging` 하위 `Outbox*` 존재 여부 주기 확인)
+
+#### Event 후속 — ✅ 완료 (2026-04-22)
+
+> 상세: [outbox_fix.md §3-B](outbox_fix.md) — B3 publish 시그니처 전환 / B5 Repo rename·`<`·markFailed 상수 내부화 / B6 회귀 방지 테스트 이식 / F2 `infrastructure/messaging/` 죽은 복사본 청소
+
+#### Payment 후속 — ✅ 완료 (2026-04-22, commits `4fc0a20` refactor / `c70ba7e` test)
+
+> 상세: [outbox_fix.md §3-C](outbox_fix.md) — B1 (지수 6회 즉시/1/2/4/8/16s) / B2 (save 시그니처·MANDATORY) / B3 (publish) / B4-1 (schema) / B4-2 (messageId String) / B5 (Repo) / B6 (회귀 방지 테스트) / B7 (@Value 외부화) / T2 (MANDATORY 불변식 E2E) / T3 (Repo 경계 LIMIT)
+> ⚠️ **별건 이슈**: Payment `outbox.message_id` UUID→VARCHAR(36) 운영 DB 마이그레이션 — `schema_plan.md §Payment 수정 표 + ⑦ ALTER`
+
+#### F2 — 패키지 경로 `common.outbox` 현행 유지 확정
+
+- **2026-04-22 결정**: #495 본문의 `common.outbox → infrastructure.messaging` 이동 방향 **번복**
+- 표준 = `common.outbox` (3모듈 정착 완료, 실사 기준 `infrastructure.messaging` 이동분 0건)
+- **정책**: "발견 시 리팩토링" — 향후 `infrastructure.messaging` 하위 `Outbox*` 추가 발견 시 `common.outbox`로 되돌림
+- [ ] #495 이슈 본문 F2 항목 방향 정정 코멘트 (별건 후속)
 
 ---
 
