@@ -8,10 +8,13 @@ import com.devticket.commerce.cart.domain.repository.CartItemRepository;
 import com.devticket.commerce.cart.domain.repository.CartRepository;
 import com.devticket.commerce.common.enums.OrderStatus;
 import com.devticket.commerce.common.exception.BusinessException;
+import com.devticket.commerce.common.messaging.KafkaTopics;
 import com.devticket.commerce.common.messaging.MessageDeduplicationService;
+import com.devticket.commerce.common.messaging.event.OrderCreatedEvent;
 import com.devticket.commerce.common.messaging.event.PaymentCompletedEvent;
 import com.devticket.commerce.common.messaging.event.PaymentFailedEvent;
 import com.devticket.commerce.common.messaging.event.TicketIssueFailedEvent;
+import com.devticket.commerce.common.outbox.OutboxService;
 import com.devticket.commerce.order.application.usecase.OrderUsecase;
 import com.devticket.commerce.order.domain.exception.OrderErrorCode;
 import com.devticket.commerce.order.domain.model.Order;
@@ -35,7 +38,6 @@ import com.devticket.commerce.order.presentation.dto.res.OrderListResponse;
 import com.devticket.commerce.order.presentation.dto.res.OrderResponse;
 import com.devticket.commerce.order.presentation.dto.res.OrderStatusResponse;
 import com.devticket.commerce.ticket.application.usecase.TicketUsecase;
-import com.devticket.commerce.ticket.domain.enums.TicketStatus;
 import com.devticket.commerce.ticket.domain.exception.TicketErrorCode;
 import com.devticket.commerce.ticket.domain.model.Ticket;
 import com.devticket.commerce.ticket.domain.repository.TicketRepository;
@@ -46,6 +48,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
+
 import java.util.Objects;
 import java.util.stream.IntStream;
 import java.util.List;
@@ -53,6 +56,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.exception.ConstraintViolationException;
@@ -299,10 +303,14 @@ public class OrderService implements OrderUsecase {
                             continue;
                         }
 
-                        if (OrderStatus.PAID.equals(order.getStatus())) {
+                        OrderStatus orderStatus = order.getStatus();
+                        if (OrderStatus.PAID.equals(orderStatus)) {
                             totalSales += item.getPrice() * item.getQuantity();
                             soldQty += item.getQuantity();
-                        } else if (OrderStatus.CANCELLED.equals(order.getStatus())) {
+                        } else if (OrderStatus.CANCELLED.equals(orderStatus)
+                            || OrderStatus.REFUND_PENDING.equals(orderStatus)
+                            || OrderStatus.REFUNDED.equals(orderStatus)) {
+                            // REFUND_PENDING/REFUNDED: Saga 로 확정된 환불 — CANCELLED 와 동일하게 환불 집계에 포함.
                             totalRefund += item.getPrice() * item.getQuantity();
                             refundQty += item.getQuantity();
                         }
@@ -386,7 +394,7 @@ public class OrderService implements OrderUsecase {
 
         // Step 2. 상태 전이 유효성 검증 (3분류)
         Order order = orderRepository.findByOrderId(event.orderId())
-                .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
+            .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
 
         if (!order.canTransitionTo(OrderStatus.PAID)) {
             if (order.getStatus() == OrderStatus.PAID) {
@@ -397,17 +405,17 @@ public class OrderService implements OrderUsecase {
             if (order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.FAILED) {
                 // ② 정책적 스킵: 보상/만료가 먼저 처리됨
                 log.warn("[processPaymentCompleted] 정책적 스킵 — orderId={}, 현재상태={}",
-                        event.orderId(), order.getStatus());
+                    event.orderId(), order.getStatus());
                 deduplicationService.markProcessed(messageId, topic);
                 return;
             }
             // ③ 이상 상태 → throw → 재시도 → DLT
             throw new IllegalStateException(
-                    "Invalid transition: " + order.getStatus() + " -> PAID, orderId=" + event.orderId());
+                "Invalid transition: " + order.getStatus() + " -> PAID, orderId=" + event.orderId());
         }
 
-        // Step 3. 비즈니스 로직
-        order.completePayment();
+        // Step 3. 비즈니스 로직 — paymentId/paymentMethod 기록하면서 PAID 전이
+        order.completePayment(event.paymentId(), event.paymentMethod());
 
         // 티켓 발급 (직접 호출 — @Transactional 프록시 경유 시 rollback-only 오염 방지)
         List<OrderItem> orderItems = orderItemRepository.findAllByOrderId(order.getId());
@@ -416,24 +424,22 @@ public class OrderService implements OrderUsecase {
             log.error("[processPaymentCompleted] 티켓 발급 실패 — OrderItem 없음. orderId={}", event.orderId());
             order.cancel();
 
-            List<TicketIssueFailedEvent.FailedItem> failedItems = List.of();
-
             TicketIssueFailedEvent failedEvent = new TicketIssueFailedEvent(
-                    event.orderId(),
-                    event.userId(),
-                    event.paymentId(),
-                    failedItems,
-                    event.totalAmount(),
-                    "OrderItem not found",
-                    Instant.now()
+                event.orderId(),
+                event.userId(),
+                event.paymentId(),
+                List.of(),
+                event.totalAmount(),
+                "OrderItem not found",
+                Instant.now()
             );
 
             outboxService.save(
-                    event.orderId().toString(),
-                    event.orderId().toString(),
-                    "TICKET_ISSUE_FAILED",
-                    KafkaTopics.TICKET_ISSUE_FAILED,
-                    failedEvent
+                event.orderId().toString(),
+                event.orderId().toString(),
+                "TICKET_ISSUE_FAILED",
+                KafkaTopics.TICKET_ISSUE_FAILED,
+                failedEvent
             );
 
             deduplicationService.markProcessed(messageId, topic);
@@ -442,36 +448,32 @@ public class OrderService implements OrderUsecase {
 
         try {
             List<Ticket> tickets = orderItems.stream()
-                    .flatMap(item -> IntStream.range(0, item.getQuantity())
-                            .mapToObj(i -> Ticket.create(item.getOrderItemId(), item.getUserId(), item.getEventId())))
-                    .collect(Collectors.toList());
+                .flatMap(item -> IntStream.range(0, item.getQuantity())
+                    .mapToObj(i -> Ticket.create(item.getOrderItemId(), item.getUserId(), item.getEventId())))
+                .collect(Collectors.toList());
             ticketRepository.saveAll(tickets);
         } catch (Exception e) {
             // 영구 실패: 티켓 발급 실패 → Order CANCELLED + ticket.issue-failed Outbox 발행
             log.error("[processPaymentCompleted] 티켓 발급 실패 — orderId={}, error={}",
-                    event.orderId(), e.getMessage());
+                event.orderId(), e.getMessage());
             order.cancel();
 
-            List<TicketIssueFailedEvent.FailedItem> failedItems = orderItems.stream()
-                    .map(item -> new TicketIssueFailedEvent.FailedItem(item.getEventId(), item.getQuantity()))
-                    .toList();
-
             TicketIssueFailedEvent failedEvent = new TicketIssueFailedEvent(
-                    event.orderId(),
-                    event.userId(),
-                    event.paymentId(),
-                    failedItems,
-                    event.totalAmount(),
-                    e.getMessage(),
-                    Instant.now()
+                event.orderId(),
+                event.userId(),
+                event.paymentId(),
+                List.of(),
+                event.totalAmount(),
+                e.getMessage(),
+                Instant.now()
             );
 
             outboxService.save(
-                    event.orderId().toString(),
-                    event.orderId().toString(),
-                    "TICKET_ISSUE_FAILED",
-                    KafkaTopics.TICKET_ISSUE_FAILED,
-                    failedEvent
+                event.orderId().toString(),
+                event.orderId().toString(),
+                "TICKET_ISSUE_FAILED",
+                KafkaTopics.TICKET_ISSUE_FAILED,
+                failedEvent
             );
 
             deduplicationService.markProcessed(messageId, topic);
@@ -532,7 +534,7 @@ public class OrderService implements OrderUsecase {
 
         // Step 2. 상태 전이 유효성 검증 (3분류)
         Order order = orderRepository.findByOrderId(event.orderId())
-                .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
+            .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
 
         if (!order.canTransitionTo(OrderStatus.FAILED)) {
             if (order.getStatus() == OrderStatus.FAILED) {
@@ -543,13 +545,13 @@ public class OrderService implements OrderUsecase {
             if (order.getStatus() == OrderStatus.CANCELLED) {
                 // ② 정책적 스킵
                 log.warn("[processPaymentFailed] 정책적 스킵 — orderId={}, 현재상태={}",
-                        event.orderId(), order.getStatus());
+                    event.orderId(), order.getStatus());
                 deduplicationService.markProcessed(messageId, topic);
                 return;
             }
             // ③ 이상 상태 → throw → 재시도 → DLT
             throw new IllegalStateException(
-                    "Invalid transition: " + order.getStatus() + " -> FAILED, orderId=" + event.orderId());
+                "Invalid transition: " + order.getStatus() + " -> FAILED, orderId=" + event.orderId());
         }
 
         // Step 3. 비즈니스 로직
@@ -567,6 +569,19 @@ public class OrderService implements OrderUsecase {
         }
     }
 
+    /**
+     * stock.deducted 수신 처리: Order CREATED → PAYMENT_PENDING 전이
+     * <p>
+     * 처리 순서 : isDuplicate → canTransitionTo(3분류) → pendingPayment() → markProcessed
+     */
+    @Transactional
+    public void processStockDeducted(UUID messageId, String topic, String payload) {
+        // Step 1. Dedup 체크
+        if (deduplicationService.isDuplicate(messageId)) {
+            log.debug("[stock.deducted] 중복 메시지 스킵. messageId={}", messageId);
+            return;
+        }
+    }
     // ==== Private Helpers (Order Creation) ==============================
 
     private static final String ACTIVE_ORDER_DEDUP_INDEX = "idx_order_active_dedup";
@@ -699,45 +714,57 @@ public class OrderService implements OrderUsecase {
 
     @Override
     @Transactional(readOnly = true)
-    public InternalOrderItemResponse getOrderItemByTicketId(Long ticketId) {
-        Ticket ticket = ticketRepository.findById(ticketId)
+    public InternalOrderItemResponse getOrderItemByTicketId(UUID ticketId) {
+        Ticket ticket = ticketRepository.findByTicketId(ticketId)
             .orElseThrow(() -> new BusinessException(TicketErrorCode.TICKET_NOT_FOUND));
 
         OrderItem orderItem = orderItemRepository.findByOrderItemId(ticket.getOrderItemId())
             .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
 
-        return InternalOrderItemResponse.from(orderItem);
+        Order order = orderRepository.findById(orderItem.getOrderId())
+            .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
+
+        return InternalOrderItemResponse.from(orderItem, order.getOrderId());
     }
 
     @Override
-    @Transactional
-    public void completeRefund(Long ticketId) {
-        // 1. 티켓 조회 후 REFUNDED 상태 변경
-        Ticket ticket = ticketRepository.findById(ticketId)
-            .orElseThrow(() -> new BusinessException(TicketErrorCode.TICKET_NOT_FOUND));
+    @Transactional(readOnly = true)
+    public com.devticket.commerce.order.presentation.dto.res.InternalOrderTicketsResponse
+    getOrderTickets(UUID orderId, com.devticket.commerce.ticket.domain.enums.TicketStatus status) {
 
-        if (ticket.getStatus() == TicketStatus.REFUNDED) {
-            log.info("이미 환불 처리된 티켓입니다. ticketId: {}", ticketId);
-            return;
-        }
-
-        ticket.refundTicket();
-
-        // 2. OrderItem 수량 -1, subtotalAmount 재계산
-        OrderItem orderItem = orderItemRepository.findByOrderItemId(ticket.getOrderItemId())
+        Order order = orderRepository.findByOrderId(orderId)
             .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
-        orderItem.refundOneQuantity();
 
-        // 3. Order totalAmount에서 환불 금액(price * 1) 차감
-        Order order = orderRepository.findById(orderItem.getOrderId())
-            .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
-        order.adjustAmountForRefund(orderItem.getPrice());
+        List<Ticket> tickets = (status == null)
+            ? ticketRepository.findAllByOrderId(order.getId())
+            : ticketRepository.findAllByOrderIdAndStatus(order.getId(), status);
 
-        // 4. Event 재고 +1 복구
-        orderToEventClient.adjustStocks(
-            new InternalBulkStockAdjustmentRequest(
-                List.of(new InternalBulkStockAdjustmentRequest.EventItem(orderItem.getEventId(), 1))
-            )
+        // price 조회용 OrderItem map — orderItemId → OrderItem
+        Map<UUID, OrderItem> itemsByOrderItemId = orderItemRepository.findAllByOrderId(order.getId())
+            .stream()
+            .collect(Collectors.toMap(OrderItem::getOrderItemId, oi -> oi));
+
+        List<com.devticket.commerce.order.presentation.dto.res.InternalOrderTicketsResponse.TicketItem> ticketItems = tickets.stream()
+            .map(t -> new com.devticket.commerce.order.presentation.dto.res.InternalOrderTicketsResponse.TicketItem(
+                t.getTicketId(),
+                t.getEventId(),
+                itemsByOrderItemId.getOrDefault(t.getOrderItemId(),
+                    OrderItem.builder().price(0).build()).getPrice(),
+                t.getStatus()
+            ))
+            .toList();
+
+        int remainingAmount = ticketItems.stream()
+            .mapToInt(com.devticket.commerce.order.presentation.dto.res.InternalOrderTicketsResponse.TicketItem::amount)
+            .sum();
+
+        return new com.devticket.commerce.order.presentation.dto.res.InternalOrderTicketsResponse(
+            order.getOrderId(),
+            order.getUserId(),
+            order.getPaymentId(),
+            order.getTotalAmount(),
+            remainingAmount,
+            ticketItems
         );
     }
 

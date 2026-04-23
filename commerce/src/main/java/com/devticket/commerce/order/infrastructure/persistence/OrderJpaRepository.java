@@ -48,4 +48,16 @@ public interface OrderJpaRepository extends JpaRepository<Order, Long> {
             @Param("activeStatuses") List<OrderStatus> activeStatuses
     );
 
+    // Admin/Seller 강제 취소 fan-out용 — 해당 eventId의 PAID Order 를 OrderItem join 으로 조회
+    @Query("""
+            SELECT DISTINCT o FROM Order o, OrderItem oi
+            WHERE oi.orderId = o.id
+              AND oi.eventId = :eventId
+              AND o.status = :status
+            """)
+    List<Order> findAllByEventIdAndStatus(
+            @Param("eventId") UUID eventId,
+            @Param("status") OrderStatus status
+    );
+
 }
