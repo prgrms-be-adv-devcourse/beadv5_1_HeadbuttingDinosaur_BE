@@ -709,6 +709,7 @@
 |---|---|
 | `orderId` | `UUID` |
 | `paymentMethod` | `PaymentMethod` |
+| `walletAmount` | `Integer` |
 
 ### PaymentReadyResponse (record)
 - source: `payment/src/main/java/com/devticket/payment/payment/presentation/dto/PaymentReadyResponse.java`
@@ -721,6 +722,8 @@
 | `orderStatus` | `String` |
 | `paymentStatus` | `PaymentStatus` |
 | `amount` | `Integer` |
+| `walletAmount` | `Integer` |
+| `pgAmount` | `Integer` |
 | `approvedAt` | `String` |
 
 ### PgRefundRequest (record)

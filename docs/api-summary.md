@@ -75,12 +75,12 @@
 | GET | `/by-order/{orderId}` | `PaymentInternalController#getPaymentByOrderId` | get payment by order id |
 | POST | `/charge` | `WalletController#charge` | 예치금 충전 시작 |
 | POST | `/charge/confirm` | `WalletController#confirmCharge` | 예치금 충전 승인 |
-| POST | `/confirm` | `PaymentController#confirm` | confirm |
+| POST | `/confirm` | `PaymentController#confirm` | PG 결제 승인 (WALLET_PG 분기 포함) |
 | GET | `/events/{eventId}` | `SellerRefundController#getSellerRefundListByEventId` | 판매자 이벤트별 환불 내역 조회 |
-| POST | `/fail` | `PaymentController#fail` | fail |
+| POST | `/fail` | `PaymentController#fail` | PG 결제 실패 처리 (WALLET_PG 예치금 복구 포함) |
 | GET | `/info` | `RefundController#getRefundInfo` | 환불 정보 조회 |
 | POST | `/pg/{ticketId}` | `RefundController#refundPgTicket` | refund pg ticket |
-| POST | `/ready` | `PaymentController#readyPayment` | 결제 준비 |
+| POST | `/ready` | `PaymentController#readyPayment` | 결제 준비 (PG/WALLET/WALLET_PG 분기) |
 | GET | `/transactions` | `WalletController#getTransactions` | 예치금 거래 내역 조회 |
 | POST | `/withdraw` | `WalletController#withdraw` | 예치금 출금 요청 |
 | GET | `/{refundId}` | `RefundController#getRefundDetail` | 환불 상세 조회 |

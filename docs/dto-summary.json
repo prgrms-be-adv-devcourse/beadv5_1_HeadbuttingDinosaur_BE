@@ -1972,7 +1972,7 @@
     "module": "payment",
     "name": "PaymentReadyRequest",
     "kind": "record",
-    "fieldCount": 2,
+    "fieldCount": 3,
     "fields": [
       {
         "name": "orderId",
@@ -1981,6 +1981,10 @@
       {
         "name": "paymentMethod",
         "type": "PaymentMethod"
+      },
+      {
+        "name": "walletAmount",
+        "type": "Integer"
       }
     ],
     "source": "payment/src/main/java/com/devticket/payment/payment/presentation/dto/PaymentReadyRequest.java"
@@ -1989,7 +1993,7 @@
     "module": "payment",
     "name": "PaymentReadyResponse",
     "kind": "record",
-    "fieldCount": 8,
+    "fieldCount": 10,
     "fields": [
       {
         "name": "orderId",
@@ -2017,6 +2021,14 @@
       },
       {
         "name": "amount",
+        "type": "Integer"
+      },
+      {
+        "name": "walletAmount",
+        "type": "Integer"
+      },
+      {
+        "name": "pgAmount",
         "type": "Integer"
       },
       {
