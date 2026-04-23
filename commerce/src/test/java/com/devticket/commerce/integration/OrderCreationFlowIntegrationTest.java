@@ -23,9 +23,15 @@ import com.devticket.commerce.order.infrastructure.external.client.dto.InternalS
 import com.devticket.commerce.order.presentation.dto.req.CartOrderRequest;
 import com.devticket.commerce.order.presentation.dto.res.OrderResponse;
 import com.devticket.commerce.ticket.infrastructure.external.client.dto.InternalEventInfoResponse;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 import net.javacrumbs.shedlock.core.LockProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -43,8 +49,9 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * <p>검증 대상:
  * <ul>
  *   <li>createOrderByCart 단일 호출로 PAYMENT_PENDING 응답 즉시 반환
- *   <li>adjustStocks 부분 실패 시 OUT_OF_STOCK 예외 즉시 반환
+ *   <li>adjustStocks 실패 시 EXTERNAL_SERVICE_ERROR 예외 즉시 반환
  *   <li>중복 요청(동일 cart) 시 재고 차감 없이 기존 주문 반환
+ *   <li>동일 cart 동시 N건 요청 시 CartItem 비관적 락으로 직렬화 → 주문 1건만 생성
  * </ul>
  */
 @SpringBootTest
@@ -131,5 +138,56 @@ class OrderCreationFlowIntegrationTest {
         assertThat(second.orderId()).isEqualTo(first.orderId());
         // 두 번째 요청에서는 adjustStocks 추가 호출 없음 (총 1회)
         then(orderToEventClient).should(org.mockito.Mockito.times(1)).adjustStocks(any());
+    }
+
+    @Test
+    @DisplayName("IT-1-D: 동일 cart로 동시 10건 요청 시 CartItem 비관적 락으로 직렬화 → 주문 1건만 생성, 모든 응답의 orderId 동일")
+    void concurrentDuplicateRequestsCreateOnlyOneOrder() throws InterruptedException {
+        given(orderToEventClient.adjustStocks(any())).willReturn(
+                List.of(new InternalStockAdjustmentResponse(eventId, true, 96, "테스트 이벤트", 5_000, 10))
+        );
+
+        int threadCount = 10;
+        CartOrderRequest request = new CartOrderRequest(List.of(savedCartItem.getCartItemId()));
+
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        CountDownLatch ready = new CountDownLatch(threadCount);
+        CountDownLatch start = new CountDownLatch(1);
+        CountDownLatch done = new CountDownLatch(threadCount);
+
+        List<UUID> orderIds = Collections.synchronizedList(new ArrayList<>());
+        AtomicInteger successCount = new AtomicInteger(0);
+        AtomicInteger errorCount = new AtomicInteger(0);
+
+        for (int i = 0; i < threadCount; i++) {
+            executor.submit(() -> {
+                ready.countDown();
+                try {
+                    start.await();
+                    OrderResponse response = orderUsecase.createOrderByCart(userId, request);
+                    orderIds.add(response.orderId());
+                    successCount.incrementAndGet();
+                } catch (Exception e) {
+                    errorCount.incrementAndGet();
+                } finally {
+                    done.countDown();
+                }
+            });
+        }
+
+        ready.await();
+        start.countDown();
+        done.await();
+        executor.shutdown();
+
+        String cartHash = CartHashUtil.compute(List.of(savedCartItem));
+        long savedOrderCount = orderRepository.findActiveOrder(
+                userId, cartHash, List.of(OrderStatus.PAYMENT_PENDING)
+        ).stream().count();
+
+        assertThat(errorCount.get()).isZero();
+        assertThat(successCount.get()).isEqualTo(threadCount);
+        assertThat(orderIds.stream().distinct().count()).isEqualTo(1);
+        assertThat(savedOrderCount).isEqualTo(1);
     }
 }
