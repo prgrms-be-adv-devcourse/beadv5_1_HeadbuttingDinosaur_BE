@@ -24,7 +24,8 @@ public enum OrderErrorCode implements ErrorCode {
     INVALID_TOTAL_AMOUNT(400, "ORDER_013", "총 주문 금액이 유효하지 않습니다."),
     ORDER_CREATION_FAILED(500, "ORDER_014", "주문 생성 중 내부 오류가 발생했습니다."),
     INVALID_ORDER_STATUS_TRANSITION(400, "ORDER_015", "현재 주문 상태에서 허용되지 않는 전이입니다."),
-    INVALID_ORDER_STATUS_FILTER(400, "ORDER_016", "유효하지 않은 주문 상태 필터 값입니다.");
+    INVALID_ORDER_STATUS_FILTER(400, "ORDER_016", "유효하지 않은 주문 상태 필터 값입니다."),
+    ORDER_CREATION_CONFLICT(409, "ORDER_017", "동시 요청으로 주문이 생성됐으나 주문 조회에 실패했습니다.");
 
 
     private final int status;

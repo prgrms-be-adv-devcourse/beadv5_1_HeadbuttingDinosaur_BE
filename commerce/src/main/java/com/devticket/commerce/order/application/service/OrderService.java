@@ -23,7 +23,6 @@ import com.devticket.commerce.common.outbox.OutboxService;
 import com.devticket.commerce.order.domain.util.CartHashUtil;
 import com.devticket.commerce.order.infrastructure.external.client.OrderToEventClient;
 import com.devticket.commerce.order.infrastructure.external.client.dto.InternalBulkStockAdjustmentRequest;
-import com.devticket.commerce.order.infrastructure.external.client.dto.InternalStockAdjustmentResponse;
 import com.devticket.commerce.order.presentation.dto.req.CartOrderRequest;
 import com.devticket.commerce.order.presentation.dto.req.OrderListRequest;
 import com.devticket.commerce.order.presentation.dto.res.InternalOrderInfoResponse;
@@ -56,6 +55,8 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.hibernate.exception.ConstraintViolationException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -116,6 +117,23 @@ public class OrderService implements OrderUsecase {
             return Objects.requireNonNull(
                 new TransactionTemplate(txManager).execute(status -> persistOrder(p))
             );
+        } catch (DataIntegrityViolationException e) {
+            if (!isDuplicateActiveOrderViolation(e)) {
+                compensateStock(p.cartItems());
+                throw e;
+            }
+            // 동시 요청이 먼저 커밋한 경우 — 재고 보상 없이 기존 주문 반환
+            return orderRepository.findActiveOrder(
+                            p.userId(), p.cartHash(), List.of(OrderStatus.PAYMENT_PENDING))
+                    .map(existing -> {
+                        List<OrderItem> items = orderItemRepository.findAllByOrderId(existing.getId());
+                        Map<UUID, String> titles = p.eventInfos().stream()
+                                .collect(Collectors.toMap(
+                                        InternalEventInfoResponse::eventId,
+                                        InternalEventInfoResponse::title));
+                        return OrderResponse.of(existing, items, titles);
+                    })
+                    .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_CREATION_CONFLICT));
         } catch (RuntimeException e) {
             compensateStock(p.cartItems());
             throw e;
@@ -551,6 +569,17 @@ public class OrderService implements OrderUsecase {
 
     // ==== Private Helpers (Order Creation) ==============================
 
+    private static final String ACTIVE_ORDER_DEDUP_INDEX = "idx_order_active_dedup";
+
+    private boolean isDuplicateActiveOrderViolation(DataIntegrityViolationException e) {
+        Throwable cause = e.getCause();
+        if (cause instanceof ConstraintViolationException cve) {
+            String name = cve.getConstraintName();
+            return name != null && name.contains(ACTIVE_ORDER_DEDUP_INDEX);
+        }
+        return false;
+    }
+
     private PrepareResult prepareAndValidate(UUID userId, CartOrderRequest request) {
         // 1. Cart 조회 — cartId 확보 (소유자 검증용)
         Cart cart = cartRepository.findByUserId(userId)
@@ -601,12 +630,7 @@ public class OrderService implements OrderUsecase {
     }
 
     private void adjustStocksOrThrow(List<CartItem> cartItems) {
-        List<InternalStockAdjustmentResponse> results =
-            orderToEventClient.adjustStocks(InternalBulkStockAdjustmentRequest.createForOrder(cartItems));
-        boolean anyFailed = results.stream().anyMatch(r -> !Boolean.TRUE.equals(r.success()));
-        if (anyFailed) {
-            throw new BusinessException(OrderErrorCode.OUT_OF_STOCK);
-        }
+        orderToEventClient.adjustStocks(InternalBulkStockAdjustmentRequest.createForOrder(cartItems));
     }
 
     private void compensateStock(List<CartItem> cartItems) {
