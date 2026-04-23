@@ -173,10 +173,20 @@ public class RefundSagaOrchestrator {
             refundTicketRepository.saveAll(rts);
         }
 
-        // (2) quantity 계산도 ticketIds 로 변경
-        int quantity = event.quantity() > 0
-            ? event.quantity()
-            : (event.ticketIds() != null ? event.ticketIds().size() : existing.size());
+        // (2) quantity 계산 — 우선순위: event.quantity > event.ticketIds.size > RefundTicket > ledger.remainingTickets
+        // whole-order 환불에서 Commerce 가 빈 ticketIds 를 보내도 재고가 0 으로 복구되지 않도록 보정.
+        int quantity;
+        if (event.quantity() > 0) {
+            quantity = event.quantity();
+        } else if (event.ticketIds() != null && !event.ticketIds().isEmpty()) {
+            quantity = event.ticketIds().size();
+        } else if (!existing.isEmpty()) {
+            quantity = existing.size();
+        } else {
+            quantity = orderRefundRepository.findByOrderId(event.orderId())
+                .map(OrderRefund::getRemainingTickets)
+                .orElse(0);
+        }
 
         state.advance(SagaStep.STOCK_RESTORING);
         sagaStateRepository.save(state);

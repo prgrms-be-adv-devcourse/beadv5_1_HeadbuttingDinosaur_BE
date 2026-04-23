@@ -2,10 +2,6 @@ package com.devticket.payment.wallet.infrastructure.kafka;
 
 import com.devticket.payment.common.messaging.KafkaTopics;
 import com.devticket.payment.common.messaging.MessageDeduplicationService;
-import com.devticket.payment.common.messaging.OutboxPayloadExtractor;
-import com.devticket.payment.payment.domain.enums.PaymentMethod;
-import com.devticket.payment.wallet.application.event.RefundCompletedEvent;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -23,10 +19,13 @@ public class WalletEventConsumer {
 
     private final RefundCompletedHandler refundCompletedHandler;
     private final MessageDeduplicationService deduplicationService;
-    private final ObjectMapper objectMapper;
 
     /**
-     * refund.completed 소비 paymentMethod=WALLET인 경우에만 예치금 잔액 복구
+     * refund.completed 소비 — dedup 기록 전용.
+     *
+     * WALLET / WALLET_PG / PG 모두 {@link com.devticket.payment.refund.application.saga.RefundSagaOrchestrator}
+     * 가 saga 내부에서 PG 취소 + Wallet 복구를 수행한다. Consumer 에서 restore 를 다시 실행하면
+     * 이중 적립이 발생하므로 여기서는 dedup 마킹만 남긴다.
      *
      * NOTE: event.force-cancelled / event.sale-stopped 의 fan-out 은 Commerce 서비스 책임이다.
      * Payment 는 Commerce 가 orderId 별로 발행한 refund.requested 를 소비하여 Saga 를 진행하므로
@@ -47,26 +46,8 @@ public class WalletEventConsumer {
         }
 
         try {
-            RefundCompletedEvent event = OutboxPayloadExtractor.extract(
-                objectMapper, record.value(), RefundCompletedEvent.class);
-
-            if (PaymentMethod.WALLET == event.paymentMethod()) {
-                // restoreBalance + markProcessed를 하나의 @Transactional에서 처리
-                refundCompletedHandler.restoreBalanceAndMarkProcessed(
-                    event.userId(),
-                    event.refundAmount(),
-                    event.refundId(),
-                    event.orderId(),
-                    messageUUID,
-                    record.topic()
-                );
-            } else {
-                // PG/WALLET_PG 결제건은 Saga 내부에서 이미 PG 취소 + Wallet 복구 수행 — dedup만 기록
-                refundCompletedHandler.markProcessedOnly(messageUUID, record.topic());
-            }
-
+            refundCompletedHandler.markProcessedOnly(messageUUID, record.topic());
             ack.acknowledge();
-
         } catch (Exception e) {
             log.error("[Consumer] refund.completed 처리 실패 — messageId={}, error={}",
                 messageUUID, e.getMessage(), e);

@@ -106,6 +106,7 @@ class RefundSagaIntegrationTest {
 
         RefundRequestedEvent requested = new RefundRequestedEvent(
             refund.getRefundId(),
+            ledger.getOrderRefundId(),
             payment.getOrderId(),
             payment.getUserId(),
             payment.getPaymentId(),
@@ -114,6 +115,7 @@ class RefundSagaIntegrationTest {
             payment.getAmount(),
             100,
             false,
+            "integration-test",
             Instant.now()
         );
 
@@ -153,9 +155,10 @@ class RefundSagaIntegrationTest {
         ));
 
         RefundRequestedEvent requested = new RefundRequestedEvent(
-            refund.getRefundId(), payment.getOrderId(), payment.getUserId(),
-            payment.getPaymentId(), payment.getPaymentMethod(),
-            List.of(UUID.randomUUID()), payment.getAmount(), 100, false, Instant.now()
+            refund.getRefundId(), ledger.getOrderRefundId(), payment.getOrderId(),
+            payment.getUserId(), payment.getPaymentId(), payment.getPaymentMethod(),
+            List.of(UUID.randomUUID()), payment.getAmount(), 100, false,
+            "integration-test", Instant.now()
         );
         publishOutbox(KafkaTopics.REFUND_REQUESTED, refund.getRefundId().toString(),
             payment.getOrderId().toString(), requested);
@@ -251,8 +254,8 @@ class RefundSagaIntegrationTest {
                 KafkaTopics.REFUND_TICKET_DONE,
                 KafkaTopics.REFUND_TICKET_DONE,
                 orderId.toString(),
-                new RefundTicketDoneEvent(refundId, orderId, UUID.randomUUID(),
-                    List.of(UUID.randomUUID()), Instant.now())
+                new RefundTicketDoneEvent(refundId, orderId,
+                    List.of(UUID.randomUUID()), UUID.randomUUID(), 1, Instant.now())
             );
         }
 
