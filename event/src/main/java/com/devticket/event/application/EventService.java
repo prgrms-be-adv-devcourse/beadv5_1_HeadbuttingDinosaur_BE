@@ -75,7 +75,7 @@ public class EventService {
     private final MessageDeduplicationService deduplicationService;
     private final ObjectMapper objectMapper;
     private final ApplicationEventPublisher eventPublisher;
-    private final EventViewRepository eventVeiwRepository;
+    private final EventViewRepository eventViewRepository;
 
     @Transactional
     public SellerEventCreateResponse createEvent(UUID sellerId, SellerEventCreateRequest request) {
@@ -125,6 +125,15 @@ public class EventService {
             eventRepository.save(savedEvent);
         }
 
+        // 5. imageUrls 저장 로직 — updateEvent 와 대칭 보장 (생성 시 이미지 누락 방지)
+        if (request.imageUrls() != null && !request.imageUrls().isEmpty()) {
+            for (int i = 0; i < request.imageUrls().size(); i++) {
+                savedEvent.getEventImages().add(
+                    EventImage.of(savedEvent, request.imageUrls().get(i), i));
+            }
+            eventRepository.save(savedEvent);
+        }
+
         syncToElasticsearch(savedEvent);
 
         return SellerEventCreateResponse.from(savedEvent);
@@ -142,8 +151,8 @@ public class EventService {
             .orElseThrow(() -> new BusinessException(EventErrorCode.EVENT_NOT_FOUND));
 
         // 1. 조회수 증가 : eventView 가져오기
-        EventView eventView = eventVeiwRepository.findByEvent(event)
-            .orElseGet(()->eventVeiwRepository.save(EventView.of(event)));
+        EventView eventView = eventViewRepository.findByEvent(event)
+            .orElseGet(() -> eventViewRepository.save(EventView.of(event)));
         // 2. 조회수 증가 : eventView 증가
         eventView.increaseViewCount();
 

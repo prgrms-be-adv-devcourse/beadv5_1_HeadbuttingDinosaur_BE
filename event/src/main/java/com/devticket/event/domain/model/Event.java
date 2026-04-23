@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -29,8 +30,10 @@ import org.hibernate.annotations.SQLRestriction;
 @Entity
 @Table(name = "events", schema = "event")
 @Getter
+@Builder(access = AccessLevel.PRIVATE)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@SQLRestriction("deleted_at IS NULL") // Soft Delete: 조회 시 삭제된 데이터 제외
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
+@SQLRestriction("deleted_at IS NULL")
 public class Event extends BaseEntity {
 
     @Id
@@ -74,6 +77,7 @@ public class Event extends BaseEntity {
     private Integer remainingQuantity;
 
     @Column(nullable = false)
+    @Builder.Default
     private Integer cancelledQuantity = 0;
 
     @Enumerated(EnumType.STRING)
@@ -88,31 +92,12 @@ public class Event extends BaseEntity {
     private Long version;
 
     @OneToMany(mappedBy = "event", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
     private List<EventTechStack> eventTechStacks = new ArrayList<>();
 
     @OneToMany(mappedBy = "event", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
     private List<EventImage> eventImages = new ArrayList<>();
-
-    @Builder(access = AccessLevel.PRIVATE)
-    private Event(UUID eventId, UUID sellerId, String title, String description, String location,
-        LocalDateTime eventDateTime, LocalDateTime saleStartAt, LocalDateTime saleEndAt,
-        Integer price, Integer totalQuantity, Integer maxQuantity, Integer remainingQuantity,
-        EventStatus status, EventCategory category) {
-        this.eventId = eventId;
-        this.sellerId = sellerId;
-        this.title = title;
-        this.description = description;
-        this.location = location;
-        this.eventDateTime = eventDateTime;
-        this.saleStartAt = saleStartAt;
-        this.saleEndAt = saleEndAt;
-        this.price = price;
-        this.totalQuantity = totalQuantity;
-        this.maxQuantity = maxQuantity;
-        this.remainingQuantity = remainingQuantity;
-        this.status = status;
-        this.category = category;
-    }
 
     public static Event create(
         UUID sellerId, String title, String description, String location,
@@ -132,7 +117,6 @@ public class Event extends BaseEntity {
             .totalQuantity(totalQuantity)
             .maxQuantity(maxQuantity)
             .remainingQuantity(totalQuantity)
-//            .status(EventStatus.DRAFT)
             .status(EventStatus.ON_SALE)
             .category(category)
             .build();
@@ -215,6 +199,4 @@ public class Event extends BaseEntity {
             && this.remainingQuantity >= requestedQuantity
             && requestedQuantity <= this.maxQuantity;
     }
-
-
 }
