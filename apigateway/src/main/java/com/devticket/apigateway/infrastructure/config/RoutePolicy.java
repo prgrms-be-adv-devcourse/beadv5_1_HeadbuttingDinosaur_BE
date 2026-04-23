@@ -49,7 +49,6 @@ public final class RoutePolicy {
         PARSER.parse("/api/events/{eventId}"),
         PARSER.parse("/api/events/search"),
         PARSER.parse("/api/tech-stacks"),
-        PARSER.parse("/api/events/recommendations")
     );
 
     // ──────────────────────────────────────────────
