@@ -2,10 +2,6 @@ package com.devticket.payment.wallet.infrastructure.kafka;
 
 import com.devticket.payment.common.messaging.KafkaTopics;
 import com.devticket.payment.common.messaging.MessageDeduplicationService;
-import com.devticket.payment.payment.domain.enums.PaymentMethod;
-import com.devticket.payment.wallet.application.event.EventCancelledEvent;
-import com.devticket.payment.wallet.application.event.RefundCompletedEvent;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -23,10 +19,17 @@ public class WalletEventConsumer {
 
     private final RefundCompletedHandler refundCompletedHandler;
     private final MessageDeduplicationService deduplicationService;
-    private final ObjectMapper objectMapper;
 
     /**
-     * refund.completed 소비 paymentMethod=WALLET인 경우에만 예치금 잔액 복구
+     * refund.completed 소비 — dedup 기록 전용.
+     *
+     * WALLET / WALLET_PG / PG 모두 {@link com.devticket.payment.refund.application.saga.RefundSagaOrchestrator}
+     * 가 saga 내부에서 PG 취소 + Wallet 복구를 수행한다. Consumer 에서 restore 를 다시 실행하면
+     * 이중 적립이 발생하므로 여기서는 dedup 마킹만 남긴다.
+     *
+     * NOTE: event.force-cancelled / event.sale-stopped 의 fan-out 은 Commerce 서비스 책임이다.
+     * Payment 는 Commerce 가 orderId 별로 발행한 refund.requested 를 소비하여 Saga 를 진행하므로
+     * 본 Consumer 에서 이벤트 취소 토픽을 직접 처리하지 않는다.
      */
     @KafkaListener(
         topics = KafkaTopics.REFUND_COMPLETED,
@@ -43,68 +46,12 @@ public class WalletEventConsumer {
         }
 
         try {
-            RefundCompletedEvent event = objectMapper.readValue(record.value(), RefundCompletedEvent.class);
-
-            if (PaymentMethod.WALLET == event.paymentMethod()) {
-                // restoreBalance + markProcessed를 하나의 @Transactional에서 처리
-                refundCompletedHandler.restoreBalanceAndMarkProcessed(
-                    event.userId(),
-                    event.refundAmount(),
-                    event.refundId(),
-                    event.orderId(),
-                    messageUUID,
-                    record.topic()
-                );
-            } else {
-                // PG 결제건은 복구 불필요 — dedup만 기록
-                refundCompletedHandler.markProcessedOnly(messageUUID, record.topic());
-            }
-
+            refundCompletedHandler.markProcessedOnly(messageUUID, record.topic());
             ack.acknowledge();
-
         } catch (Exception e) {
             log.error("[Consumer] refund.completed 처리 실패 — messageId={}, error={}",
                 messageUUID, e.getMessage(), e);
             throw new RuntimeException("refund.completed 처리 실패", e);
-        }
-    }
-
-    /**
-     * event.force-cancelled / event.sale-stopped 소비 해당 이벤트의 PAID 주문에 대해 일괄 100% 환불 처리
-     */
-    @KafkaListener(
-        topics = {KafkaTopics.EVENT_FORCE_CANCELLED, KafkaTopics.EVENT_SALE_STOPPED},
-        groupId = "payment-event-cancel-group",
-        containerFactory = "kafkaListenerContainerFactory"
-    )
-    public void consumeEventCancelled(ConsumerRecord<String, String> record, Acknowledgment ack) {
-        UUID messageUUID = extractMessageId(record);
-
-        if (deduplicationService.isDuplicate(messageUUID)) {
-            log.info("[Consumer] 중복 메시지 스킵 — topic={}, offset={}", record.topic(), record.offset());
-            ack.acknowledge();
-            return;
-        }
-
-        try {
-            EventCancelledEvent event = objectMapper.readValue(record.value(), EventCancelledEvent.class);
-
-            log.info("[Consumer] 이벤트 취소 수신 — eventId={}, cancelledBy={}",
-                event.eventId(), event.cancelledBy());
-
-            // TODO: Refund 모듈 완성 전까지 일괄 환불 미처리 — ACK하지 않고 예외로 DLT 보존
-            // Refund 모듈 완성 후 아래 주석 해제하고 이 예외 블록 제거
-            throw new UnsupportedOperationException(
-                "event.cancelled 일괄 환불 미구현 — Refund 모듈 완성 후 처리 예정. eventId=" + event.eventId());
-
-            // walletService.processBatchRefund(event.eventId());
-            // refundCompletedHandler.markProcessedOnly(messageUUID, record.topic());
-            // ack.acknowledge();
-
-        } catch (Exception e) {
-            log.error("[Consumer] event.cancelled 처리 실패 — messageId={}, error={}",
-                messageUUID, e.getMessage(), e);
-            throw new RuntimeException("event.cancelled 처리 실패", e);
         }
     }
 

@@ -7,6 +7,14 @@ spring:
 server:
   port: 8084
 
+# Kafka Producer 타임아웃 정합 (kafka-design.md §4 / outbox_fix.md §2)
+# 불변식: max.block.ms < request.timeout.ms ≤ delivery.timeout.ms < send-timeout-ms
+kafka-producer:
+  max-block-ms: 500
+  request-timeout-ms: 1000
+  delivery-timeout-ms: 1500
+  send-timeout-ms: 2000
+
 springdoc:
   swagger-ui:
     path: /swagger-ui.html

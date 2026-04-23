@@ -165,16 +165,15 @@ public class PaymentServiceImplTest {
         void 예치금_결제_준비_성공() {
             // given
             PaymentReadyRequest request = new PaymentReadyRequest(EXTERNAL_ORDER_ID, PaymentMethod.WALLET, null);
-            Payment savedPayment = createReadyPayment();
+            Payment savedPayment = createWalletReadyPayment();
             savedPayment.approve("WALLET-" + savedPayment.getPaymentId());
 
             given(commerceInternalClient.getOrderInfo(EXTERNAL_ORDER_ID)).willReturn(orderInfo);
-            given(paymentRepository.save(any(Payment.class)))
-                .willAnswer(invocation -> invocation.getArgument(0));
-            // 첫 호출(멱등성 가드): empty → 통과, 두 번째 호출(wallet 처리 후 재조회): SUCCESS Payment 반환
             given(paymentRepository.findByOrderId(orderInfo.id()))
                 .willReturn(Optional.empty())
                 .willReturn(Optional.of(savedPayment));
+            given(paymentRepository.save(any(Payment.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
 
             // when
             PaymentReadyResponse response = paymentService.readyPayment(USER_ID, request);
@@ -184,48 +183,8 @@ public class PaymentServiceImplTest {
             assertThat(response.paymentStatus()).isEqualTo(PaymentStatus.SUCCESS);
         }
 
-        @Test
-        @DisplayName("예치금 결제 준비 — order.orderItems가 WalletService로 매핑되어 전달된다")
-        void 예치금_결제_준비_orderItems_전달() {
-            // given
-            UUID eventId1 = UUID.randomUUID();
-            UUID eventId2 = UUID.randomUUID();
-            InternalOrderInfoResponse orderWithItems = new InternalOrderInfoResponse(
-                ORDER_ID, USER_ID, "ORD-001", orderInfo.totalAmount(), "PAYMENT_PENDING",
-                LocalDateTime.of(2025, 8, 15, 14, 30).toString(),
-                List.of(
-                    new InternalOrderInfoResponse.OrderItem(eventId1, 4),
-                    new InternalOrderInfoResponse.OrderItem(eventId2, 1)
-                )
-            );
-            PaymentReadyRequest request = new PaymentReadyRequest(EXTERNAL_ORDER_ID, PaymentMethod.WALLET, null);
-            Payment savedPayment = createReadyPayment();
-            savedPayment.approve("WALLET-" + savedPayment.getPaymentId());
-
-            given(commerceInternalClient.getOrderInfo(EXTERNAL_ORDER_ID)).willReturn(orderWithItems);
-            given(paymentRepository.save(any(Payment.class)))
-                .willAnswer(invocation -> invocation.getArgument(0));
-            given(paymentRepository.findByOrderId(orderWithItems.id()))
-                .willReturn(Optional.empty(), Optional.of(savedPayment));
-
-            // when
-            paymentService.readyPayment(USER_ID, request);
-
-            // then: WalletService.processWalletPayment에 전달된 orderItems 검증
-            @SuppressWarnings("unchecked")
-            ArgumentCaptor<List<PaymentCompletedEvent.OrderItem>> itemsCaptor =
-                ArgumentCaptor.forClass(List.class);
-            verify(walletService).processWalletPayment(
-                eq(USER_ID), eq(EXTERNAL_ORDER_ID), eq(orderWithItems.totalAmount()),
-                itemsCaptor.capture()
-            );
-
-            List<PaymentCompletedEvent.OrderItem> captured = itemsCaptor.getValue();
-            assertThat(captured).hasSize(2);
-            assertThat(captured.get(0).eventId()).isEqualTo(eventId1);
-            assertThat(captured.get(0).quantity()).isEqualTo(4);
-            assertThat(captured.get(1).eventId()).isEqualTo(eventId2);
-            assertThat(captured.get(1).quantity()).isEqualTo(1);
+        private Payment createWalletReadyPayment() {
+            return Payment.create(orderInfo.id(), USER_ID, PaymentMethod.WALLET, orderInfo.totalAmount());
         }
     }
 

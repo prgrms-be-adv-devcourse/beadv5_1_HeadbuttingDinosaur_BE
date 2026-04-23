@@ -638,7 +638,7 @@ class WalletServiceTest {
 
             // then
             then(walletRepository).should(times(1)).useBalanceAtomic(USER_ID, 50_000);
-            then(outboxService).should(times(1)).save(anyString(), eq(KafkaTopics.PAYMENT_COMPLETED), eq(KafkaTopics.PAYMENT_COMPLETED), anyString(), any());
+            then(outboxService).should(times(1)).save(anyString(), anyString(), eq(KafkaTopics.PAYMENT_COMPLETED), eq(KafkaTopics.PAYMENT_COMPLETED), any());
         }
 
         @Test
@@ -711,8 +711,9 @@ class WalletServiceTest {
             // then: outboxService.save에 전달된 payload 검증
             ArgumentCaptor<Object> payloadCaptor = ArgumentCaptor.forClass(Object.class);
             then(outboxService).should(times(1)).save(
-                anyString(), eq(KafkaTopics.PAYMENT_COMPLETED),
-                eq(KafkaTopics.PAYMENT_COMPLETED), anyString(), payloadCaptor.capture()
+                anyString(), anyString(),
+                eq(KafkaTopics.PAYMENT_COMPLETED), eq(KafkaTopics.PAYMENT_COMPLETED),
+                payloadCaptor.capture()
             );
 
             Object captured = payloadCaptor.getValue();
@@ -745,8 +746,9 @@ class WalletServiceTest {
             // then
             ArgumentCaptor<Object> payloadCaptor = ArgumentCaptor.forClass(Object.class);
             then(outboxService).should(times(1)).save(
-                anyString(), eq(KafkaTopics.PAYMENT_COMPLETED),
-                eq(KafkaTopics.PAYMENT_COMPLETED), anyString(), payloadCaptor.capture()
+                anyString(), anyString(),
+                eq(KafkaTopics.PAYMENT_COMPLETED), eq(KafkaTopics.PAYMENT_COMPLETED),
+                payloadCaptor.capture()
             );
 
             PaymentCompletedEvent event = (PaymentCompletedEvent) payloadCaptor.getValue();
