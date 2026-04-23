@@ -58,6 +58,11 @@ dependencies {
     implementation 'net.javacrumbs.shedlock:shedlock-provider-jdbc-template:5.16.0'
 }
 
-tasks.named('test') {
-    useJUnitPlatform()
+test {
+    useJUnitPlatform {
+        // CI 환경에서만 @Tag("elasticsearch") 스킵 — 로컬은 Docker ES 기동 상태 기준 전체 실행
+        if (System.getenv('CI') == 'true') {
+            excludeTags 'elasticsearch'
+        }
+    }
 }

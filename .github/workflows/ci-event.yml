@@ -44,6 +44,7 @@ jobs:
         run: chmod +x event/gradlew
 
       - name: 4. Gradle Test
+        # @Tag("elasticsearch") 테스트는 CI 에서 스킵 (build.gradle 의 `CI` env 감지 → excludeTags 'elasticsearch')
         run: cd event && ./gradlew test
         env:
           SPRING_PROFILES_ACTIVE: test

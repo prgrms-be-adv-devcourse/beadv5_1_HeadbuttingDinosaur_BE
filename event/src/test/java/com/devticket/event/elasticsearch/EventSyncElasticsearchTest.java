@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -36,6 +37,7 @@ import org.springframework.test.util.ReflectionTestUtils;
  * esClient.index() 직접 인덱싱 방식이 실제 ES에서 올바르게 동작하는지,
  * dense_vector(embedding) 포함·미포함 두 경우를 검증한다.
  */
+@Tag("elasticsearch")
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.NONE,
     properties = {"spring.kafka.listener.auto-startup=false"}

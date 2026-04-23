@@ -19,12 +19,14 @@ import com.devticket.event.domain.enums.EventCategory;
 import com.devticket.event.domain.enums.EventStatus;
 import com.devticket.event.domain.exception.EventErrorCode;
 import com.devticket.event.domain.model.Event;
+import com.devticket.event.domain.model.EventView;
 import com.devticket.event.fixture.EventTestFixture;
 import com.devticket.event.infrastructure.client.AdminClient;
 import com.devticket.event.infrastructure.client.MemberClient;
 import com.devticket.event.infrastructure.client.OpenAiEmbeddingClient;
 import com.devticket.event.infrastructure.client.dto.TechStackItem;
 import com.devticket.event.infrastructure.persistence.EventRepository;
+import com.devticket.event.infrastructure.persistence.EventViewRepository;
 import com.devticket.event.infrastructure.search.EventDocument;
 import com.devticket.event.presentation.dto.EventDetailResponse;
 import com.devticket.event.presentation.dto.EventListRequest;
@@ -75,6 +77,9 @@ class EventServiceTest {
 
     @Mock
     private OpenAiEmbeddingClient openAiEmbeddingClient;
+
+    @Mock
+    private EventViewRepository eventViewRepository;
 
     @InjectMocks
     private EventService eventService;
@@ -197,6 +202,10 @@ class EventServiceTest {
         UUID eventId = event.getEventId();
 
         when(eventRepository.findWithDetailsByEventId(eventId)).thenReturn(Optional.of(event));
+        // memberClient.getNickname() 은 기본 null 반환 — CI 환경에서 일부 응답 합성 경로가 null 을 허용하지 않을 수 있어
+        // 명시적 stub 으로 NPE 재발 방지 (CI run 24766734663 재현 차단)
+        when(memberClient.getNickname(sellerId)).thenReturn("tester");
+        when(eventViewRepository.findByEvent(event)).thenReturn(Optional.of(EventView.of(event)));
 
         // when
         EventDetailResponse response = eventService.getEvent(eventId);

@@ -5,10 +5,11 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
- * Testcontainers 기반 ES 통합 테스트 공통 베이스.
+ * ES 통합 테스트 공통 베이스.
  *
- * 컨테이너는 JVM 당 한 번만 기동되어 모든 하위 테스트 클래스가 재사용한다(싱글턴 패턴).
- * xpack.security.enabled=false로 HTTP 통신을 사용해 SSL 설정 없이 테스트 가능.
+ * <p>로컬 개발 환경에서 기동 중인 ES(`localhost:9200`) 에 직접 연결.
+ * CI 환경에서는 {@code @Tag("elasticsearch")} + build.gradle 의 {@code excludeTags "elasticsearch"}
+ * 조건으로 본 계열 테스트를 스킵하여 ES 없이도 빌드 통과.
  */
 @Testcontainers
 public abstract class ElasticsearchIntegrationTestBase {

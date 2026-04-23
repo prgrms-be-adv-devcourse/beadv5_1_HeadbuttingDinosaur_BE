@@ -3,6 +3,7 @@ package com.devticket.event.common.outbox;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
+import com.devticket.event.infrastructure.search.EventSearchRepository;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
@@ -26,6 +27,7 @@ import org.springframework.kafka.test.context.EmbeddedKafka;
 import org.springframework.kafka.test.utils.KafkaTestUtils;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -50,6 +52,11 @@ class OutboxSchedulerIntegrationTest {
         }
     }
 
+    // ES 미기동 CI 환경에서 SimpleElasticsearchRepository 초기화 시점의 연결 시도를 차단.
+    // Outbox 스코프는 ES 와 무관하므로 Mock 대체로 충분 (CI run 24766734663 재현 차단).
+    @MockitoBean
+    private EventSearchRepository eventSearchRepository;
+
     @Autowired
     private OutboxRepository outboxRepository;
 
@@ -60,8 +67,9 @@ class OutboxSchedulerIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        // Spring Kafka 4.x 신 시그니처 (broker, group, autoCommit:boolean) — 구 시그니처 (group, autoCommit:String, broker) 는 deprecated
         Map<String, Object> consumerProperties =
-                KafkaTestUtils.consumerProps("outbox-scheduler-test", "true", embeddedKafkaBroker);
+                KafkaTestUtils.consumerProps(embeddedKafkaBroker, "outbox-scheduler-test", true);
         consumerProperties.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         consumer = new DefaultKafkaConsumerFactory<>(
                 consumerProperties,

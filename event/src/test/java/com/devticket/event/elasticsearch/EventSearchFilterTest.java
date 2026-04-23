@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -46,6 +47,7 @@ import org.springframework.test.util.ReflectionTestUtils;
  * ES 문서는 EventSearchRepository.save()로 직접 시드하여
  * OpenAI·JPA 의존성 없이 상태·카테고리·techStacks·sellerId·키워드·kNN·페이지네이션 필터 동작을 검증한다.
  */
+@Tag("elasticsearch")
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.NONE,
     properties = {"spring.kafka.listener.auto-startup=false"}
