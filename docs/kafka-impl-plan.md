@@ -52,7 +52,7 @@ Kafka를 통해 서비스 간에 오가는 모든 이벤트를 한 눈에 확인
 | `refund.stock.done` / `refund.stock.failed` | Event | Payment (Orchestrator) | Stock 복구 처리 결과 | — | ⬜ 미구현 |
 | `refund.order.compensate` | Payment (Orchestrator) | Commerce | Order 취소 보상 (롤백) | — | ⬜ 미구현 |
 | `refund.ticket.compensate` | Payment (Orchestrator) | Commerce | Ticket 취소 보상 (롤백) | — | ⬜ 미구현 |
-| `action.log` (analytics) | Event (VIEW/DETAIL_VIEW/DWELL_TIME), Commerce (CART_ADD/CART_REMOVE), **Log 자체 consume**(PURCHASE) | **Log 서비스** (Fastify, 별도 스택) | 각 API 호출 시 (`acks=0`, Outbox 미사용). PURCHASE는 Log 서비스가 `payment.completed` 수신 → `log.action_log` 직접 INSERT | **없음** (at-most-once — 손실 허용) | ⬜ 미구현 (상세: [actionLog.md](actionLog.md)) |
+| `action.log` (analytics) | Event (VIEW/DETAIL_VIEW/DWELL_TIME), Commerce (CART_ADD/CART_REMOVE), **Log 자체 consume**(PURCHASE) | **Log 서비스** (Fastify, 별도 스택) | 각 API 호출 시 (`acks=0`, Outbox 미사용). PURCHASE는 Log 서비스가 `payment.completed` 수신 → `log.action_log` 직접 INSERT | **없음** (at-most-once — 손실 허용) | ✅ Log Consumer 확장 완료 / ✅ Event Producer 완료 (2026-04-23) / ⬜ Commerce Producer 미확인 (상세: [actionLog.md](actionLog.md)) |
 
 **구현 상태 범례**
 
@@ -528,18 +528,17 @@ sequenceDiagram
 - [x] ✅ `EventServiceKafkaTest` 신규 (+370라인) — `processOrderCreated` 시나리오 10종(중복 메시지 / 단건·다건 성공 / 재고 부족 / 이벤트 미존재 / 매진 / 판매 기간 외 / All-or-Nothing / `saveStockFailed`)
 - [x] ✅ `StockRestoreServiceTest` 업데이트 — `JacksonConfig` import, @DataJpaTest 기반
 
-**`action.log` Producer (analytics — 신규 적용)** *(상세: [actionLog.md](actionLog.md) §4 — 구현 지시서)*
-- [ ] 전용 `ActionLogKafkaProducerConfig` Bean 분리 — `acks=0`, `retries=0`, `enable.idempotence=false`, `linger.ms=10`, `batch.size=기본`, `compression.type=none`, `max.in.flight=5` (기존 Producer Bean과 공유 금지 — 기존 `kafkaTemplate` `@Primary` 부여 + 신규 `actionLogKafkaTemplate` `@Qualifier` 매칭)
-- [ ] `VIEW` 발행 — 이벤트 목록 조회 API 핸들러 내 트랜잭션 경계 **밖**에서 비동기 발행 (Partition Key: `userId`, `searchKeyword` / `stackFilter`가 있으면 포함, `eventId`는 nullable)
-- [ ] `DETAIL_VIEW` 발행 — 이벤트 상세 조회 API 핸들러 내 트랜잭션 경계 **밖**에서 비동기 발행 (필수: `userId`/`eventId`/`actionType`/`timestamp`)
-- [ ] `DWELL_TIME` 발행 — 프론트 이탈 시 호출 API 핸들러 내 트랜잭션 경계 **밖**에서 비동기 발행 (`dwellTimeSeconds` 필수)
-- [ ] **DWELL_TIME 전용 신규 API 엔드포인트 구현** — Event 모듈에 현재 부재 상태 확인됨 (grep 0건). 얇은 Controller(Path Variable `eventId` + Body `{ dwellTimeSeconds: Integer }`) + `ApplicationEventPublisher.publishEvent(ActionLogDomainEvent)` 호출 — 기존 Publisher 재사용. 응답 `204 No Content`. **프론트 스펙(경로/body/트리거 이벤트) 합의 선결**
-- [ ] **Producer 측 Bean Validation** — `DwellRequest.dwellTimeSeconds`에 `@NotNull @Positive` + Controller 파라미터에 `@Valid` 적용. 근거: `acks=0` + Consumer dedup 미적용 정책상 Producer validation이 `log.action_log` 오염 방지의 **최종 방어선** (숫자/필수 필드 스키마 검증 전담, 의미 검증은 Consumer=Log Fastify). 상세: [actionLog.md](actionLog.md) §2 #2 / §4 ③ / AGENTS.md §6.10 #7~#8
-- [ ] Outbox 미사용 확인 (비즈니스 트랜잭션에 INSERT 포함 금지)
-- [ ] 권장 구현 패턴: `ApplicationEventPublisher.publishEvent(ActionLogEvent)` → `@TransactionalEventListener(phase = AFTER_COMMIT)` + `@Async` → `actionLogKafkaTemplate.send(...)` (commit 후 발행 보장 + API 응답 지연 제로)
-- [ ] 실패 허용 정책 — 발행 예외 시 로깅만, 조회 API 응답에 영향 주지 말 것 (at-most-once)
-- [ ] 작업 순서 팁: VIEW → DETAIL_VIEW → DWELL_TIME (트래픽 큰 순)
-- [ ] 테스트: Bean 격리 단위 테스트 (`actionLogKafkaTemplate` 주입 검증), 대량 VIEW 발행 시 목록 API p99 응답 지연 영향 없음 부하 테스트
+**`action.log` Producer (analytics — 신규 적용) ✅ 구현 완료 (2026-04-23)** *(상세: [actionLog.md](actionLog.md) §4 — 구현 지시서)*
+- [x] ✅ 전용 `ActionLogKafkaProducerConfig` Bean 분리 — `acks=0`, `retries=0`, `enable.idempotence=false`, `linger.ms=10`, `compression.type=none`, `max.in.flight=5`. 구현: `event/src/main/java/com/devticket/event/common/config/ActionLogKafkaProducerConfig.java`. 기존 `kafkaTemplate`/`producerFactory` `@Primary` 부여 + 신규 `actionLogKafkaTemplate` `@Qualifier` 매칭 완료
+- [x] ✅ `VIEW` 발행 — 이벤트 목록 조회 API 핸들러 내 트랜잭션 경계 **밖**에서 비동기 발행 (Partition Key: `userId`, `searchKeyword` / `stackFilter` nullable). 트리거: `EventService#logEventListView`
+- [x] ✅ `DETAIL_VIEW` 발행 — 이벤트 상세 조회 API 핸들러 내 트랜잭션 경계 **밖**에서 비동기 발행 (필수: `userId`/`eventId`/`actionType`/`timestamp`). 트리거: `EventService#logDetailView`
+- [x] ✅ `DWELL_TIME` 발행 — 이탈 시 호출 API 핸들러 내 트랜잭션 경계 **밖**에서 비동기 발행 (`dwellTimeSeconds` 필수). 트리거: `DwellController#reportDwell`
+- [x] ✅ **DWELL_TIME 전용 신규 API 엔드포인트 구현** — `POST /api/events/{eventId}/dwell`. 얇은 Controller(Path Variable `eventId` + Body `DwellRequest { dwellTimeSeconds: Integer }`) + `ApplicationEventPublisher.publishEvent(ActionLogDomainEvent)`. 응답 `204 No Content`. 비로그인(`X-User-Id` 미전달) 시 skip + 204
+- [x] ✅ **Producer 측 Bean Validation** — `DwellRequest.dwellTimeSeconds`에 `@NotNull @Positive` + Controller `@Valid` 적용 완료. 근거: `acks=0` + Consumer dedup 미적용 정책상 Producer validation이 `log.action_log` 오염 방지의 **최종 방어선**
+- [x] ✅ Outbox 미사용 확인 (비즈니스 트랜잭션에 INSERT 포함 금지) — Publisher가 `actionLogKafkaTemplate.send()` 직접 호출, `outboxService` 미호출
+- [x] ✅ 권장 구현 패턴 적용 — `ApplicationEventPublisher.publishEvent(ActionLogDomainEvent)` → `@TransactionalEventListener(phase = AFTER_COMMIT, fallbackExecution = true)` + `@Async` → `actionLogKafkaTemplate.send(...)`. `fallbackExecution=true`로 트랜잭션 밖 호출(DWELL_TIME Controller)도 발행 보장
+- [x] ✅ 실패 허용 정책 — `JsonProcessingException` / 기타 예외 시 `log.warn()` 만, 예외 전파 금지 (at-most-once)
+- [ ] 테스트: Bean 격리 단위 테스트 (`actionLogKafkaTemplate` 주입 검증), 대량 VIEW 발행 시 목록 API p99 응답 지연 영향 없음 부하 테스트 (별도 트랙)
 
 > 설계 기준: kafka-design.md §12 / §5 Stock 상태 전이 표 참조, 통합 검증 항목 상세: [actionLog.md](actionLog.md) §4 ⑤
 

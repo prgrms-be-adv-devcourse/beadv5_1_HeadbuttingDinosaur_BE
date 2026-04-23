@@ -190,6 +190,8 @@ export interface ActionLogMessage {
 ### ② 전용 `ActionLogKafkaProducerConfig` Bean 분리 — Event/Commerce 공통 선행
 
 > Producer 코드 작성의 **필수 선행 조건**. Event·Commerce가 각자 자기 모듈에서 독립 구현 (`common` 공유 모듈 없음).
+>
+> **Event 모듈 구현 완료 (2026-04-23)** — `event/src/main/java/com/devticket/event/common/config/ActionLogKafkaProducerConfig.java` (`acks=0` / `retries=0` / `enable.idempotence=false` / `linger.ms=10` / `max.in.flight=5` / `compression=none`) + `actionLogKafkaTemplate` Bean 등록 + 기존 `kafkaTemplate` · `producerFactory` `@Primary` 부여 + `JacksonConfig @Primary ObjectMapper` 준수. Commerce 모듈은 별도 조사 필요.
 
 **설정값** (상세 표: `docs/kafka-design.md §6` action.log Producer 예외 설정)
 
@@ -265,7 +267,16 @@ public class ActionLogKafkaProducerConfig {
 
 ---
 
-### ③ Event Producer 구현 (Commerce와 병렬 가능)
+### ③ Event Producer 구현 (Commerce와 병렬 가능) — ✅ 구현 완료 (2026-04-23)
+
+> **구현 위치**
+> - Spring 도메인 이벤트: `event/src/main/java/com/devticket/event/application/event/ActionLogDomainEvent.java`
+> - Kafka DTO: `event/src/main/java/com/devticket/event/common/messaging/event/ActionLogEvent.java`, `ActionType.java`
+> - Publisher(`@TransactionalEventListener(AFTER_COMMIT, fallbackExecution=true)` + `@Async`): `event/src/main/java/com/devticket/event/application/event/ActionLogKafkaPublisher.java`
+> - 발행 트리거: `EventService#logEventListView` (VIEW), `EventService#logDetailView` (DETAIL_VIEW), `DwellController#reportDwell` (DWELL_TIME)
+> - Bean Validation: `event/src/main/java/com/devticket/event/presentation/dto/DwellRequest.java` (`@NotNull @Positive Integer dwellTimeSeconds`) + Controller `@Valid` 적용 완료
+> - 비로그인 처리: `DwellController`에서 `X-User-Id` 미전달 시 publishEvent 미호출 + `204 No Content` 반환 (`get*` 비로그인 정책 일관)
+
 
 | actionType | 발행 시점 | 필수 필드 | 선택 필드 |
 |---|---|---|---|
@@ -405,26 +416,23 @@ public class ActionLogKafkaPublisher {
 
 **작업 순서 팁**: VIEW → DETAIL_VIEW → DWELL_TIME (트래픽 큰 순)
 
-**DWELL_TIME 전용 신규 API 엔드포인트 구현 필수**
+**DWELL_TIME 전용 신규 API 엔드포인트 — ✅ 구현 완료 (2026-04-23)**
 
-> Event 모듈에 현재 DWELL_TIME 수집용 엔드포인트 **부재 확인됨** (grep `dwell` / `DWELL` 0건). action.log Producer 단일 PR 범위에 **함께 포함 구현**.
->
-> **AI팀 수집 필요성 컨펌 완료 (2026-04-21)** — DWELL_TIME은 단순 조회(`VIEW`/`DETAIL_VIEW`)로 측정 불가능한 관심도·이탈 예측·전환 가능성 추정의 핵심 신호. 구현 확정.
+> **AI팀 수집 필요성 컨펌 완료 (2026-04-21)** — DWELL_TIME은 단순 조회(`VIEW`/`DETAIL_VIEW`)로 측정 불가능한 관심도·이탈 예측·전환 가능성 추정의 핵심 신호.
+> **구현 완료** — `event/src/main/java/com/devticket/event/presentation/controller/DwellController.java`.
 
-- **경로 예시**: `POST /api/events/{eventId}/dwell` (프론트 스펙 합의 결과 우선)
-- **Request Body**: `{ dwellTimeSeconds: Integer }` (eventId는 Path Variable, userId는 인증 추출)
-  - **Bean Validation 필수**: `DwellRequest` record의 `dwellTimeSeconds` 필드에 `@NotNull @Positive` 적용, Controller 파라미터에 `@Valid` 부여
+- **경로**: `POST /api/events/{eventId}/dwell` ✅
+- **Request Body**: `DwellRequest { dwellTimeSeconds: Integer }` (eventId는 Path Variable, userId는 `X-User-Id` 헤더)
+  - **Bean Validation 적용 완료** ✅ — `DwellRequest.dwellTimeSeconds`에 `@NotNull @Positive`, Controller 파라미터에 `@Valid`
   - 근거: `acks=0` + Consumer dedup 미적용 정책상 Producer validation이 `log.action_log.dwell_time_seconds` 오염 방지의 **최종 방어선** (null·음수 요청 선 차단)
-- **응답**: `204 No Content` (로그성 — body 불필요)
-- **Controller 구조**: 얇은 Controller → `ApplicationEventPublisher.publishEvent(ActionLogDomainEvent)` 호출만. **트랜잭션 불요, 기존 Publisher 재사용**
-- **비로그인 처리**: `X-User-Id` 미전달 시 → **발행 skip + `204 No Content` 반환** (`getEventList` / `getEvent` 등 `get*` 비로그인 정책과 일관. `userId` 필수 필드 누락 방지 + AI팀 수집 정책 일관성)
+- **응답**: `204 No Content` ✅
+- **Controller 구조**: 얇은 Controller → `ApplicationEventPublisher.publishEvent(ActionLogDomainEvent)` 호출. 트랜잭션 없음 (DB 접근 없음 — `fallbackExecution=true`로 리스너 실행 보장)
+- **비로그인 처리**: `X-User-Id` 미전달 시 publishEvent 미호출 + `204 No Content` 반환 ✅ (`get*` 비로그인 정책 일관)
 - **프론트 트리거 규약** (참고): `visibilitychange` → hidden 전환 시 `navigator.sendBeacon()` 전송 권장 — 백엔드 구현과 독립, 프론트 합의 영역
-- **선결 합의 사항** (프론트 한정, PO·AI팀 의도는 확정): 경로 / body / 트리거 이벤트 / 최소 체류 시간 필터 / 수집 대상 페이지 범위
-- **스펙 합의 지연 대응**: 스펙만 먼저 확정되면 백엔드 구현·배포는 선행 가능 (호출자 없어도 무해)
 
 ---
 
-### ④ Commerce Producer 구현 (Event와 병렬 가능)
+### ④ Commerce Producer 구현 (Event와 병렬 가능) — ⬜ 상태 미확인 (Commerce 모듈 조사 필요)
 
 | actionType | 발행 시점 | 필수 필드 | 권장 필드 |
 |---|---|---|---|
@@ -476,11 +484,11 @@ public class ActionLogKafkaPublisher {
       ↓
   ① Log 서비스 확장 ✅ (payment.completed 구독 + PURCHASE INSERT)
       ↓
-  ② Event/Commerce 전용 Bean 분리 (각 모듈 내)
+  ② Event/Commerce 전용 Bean 분리 (각 모듈 내)   ← Event ✅ / Commerce 미확인
       ↓
   ┌───┴───┐
-  ③ Event    ④ Commerce    ← 병렬 가능
-  (3종)      (2종)
+  ③ Event ✅   ④ Commerce ⬜    ← Event 완료(2026-04-23) / Commerce 미확인
+  (3종)        (2종)
   └───┬───┘
       ↓
   ⑤ 통합 검증 (Bean 격리 / Outbox 미개입 / E2E / 부하)

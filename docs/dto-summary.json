@@ -403,6 +403,35 @@
   },
   {
     "module": "event",
+    "name": "ActionLogEvent",
+    "kind": "record",
+    "kafkaTopic": "action.log",
+    "fieldCount": 9,
+    "fields": [
+      { "name": "userId", "type": "String" },
+      { "name": "eventId", "type": "String" },
+      { "name": "actionType", "type": "String" },
+      { "name": "searchKeyword", "type": "String" },
+      { "name": "stackFilter", "type": "String" },
+      { "name": "dwellTimeSeconds", "type": "Integer" },
+      { "name": "quantity", "type": "Integer" },
+      { "name": "totalAmount", "type": "Long" },
+      { "name": "timestamp", "type": "Instant" }
+    ],
+    "source": "event/src/main/java/com/devticket/event/common/messaging/event/ActionLogEvent.java"
+  },
+  {
+    "module": "event",
+    "name": "DwellRequest",
+    "kind": "record",
+    "fieldCount": 1,
+    "fields": [
+      { "name": "dwellTimeSeconds", "type": "Integer", "validation": "@NotNull @Positive" }
+    ],
+    "source": "event/src/main/java/com/devticket/event/presentation/dto/DwellRequest.java"
+  },
+  {
+    "module": "event",
     "name": "EventDetailResponse",
     "kind": "record",
     "fieldCount": 17,

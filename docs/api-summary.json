@@ -154,6 +154,15 @@
   },
   {
     "module": "event",
+    "controller": "DwellController",
+    "method": "reportDwell",
+    "httpMethod": "POST",
+    "path": "/{eventId}/dwell",
+    "summary": "페이지 이탈 체류 시간 기록 (action.log DWELL_TIME 발행, 204 No Content)",
+    "source": "event/src/main/java/com/devticket/event/presentation/controller/DwellController.java"
+  },
+  {
+    "module": "event",
     "controller": "EventInternalController",
     "method": "getEventInfo",
     "httpMethod": "GET",

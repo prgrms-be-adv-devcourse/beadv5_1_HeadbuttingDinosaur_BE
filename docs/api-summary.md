@@ -27,7 +27,7 @@
 
 | HTTP | Path | Controller#Method | 설명 |
 |---|---|---|---|
-| GET | `/` | `EventController#getEventList` | get event list |
+| GET | `/` | `EventController#getEventList` | get event list (action.log `VIEW` 발행) |
 | POST | `/` | `EventController#createEvent` | create event |
 | POST | `/internal/events/bulk` | `EventInternalController#getBulkEventInfo` | get bulk event info |
 | GET | `/internal/events/by-seller/{sellerId}` | `EventInternalController#getEventsBySeller` | get events by seller |
@@ -37,8 +37,9 @@
 | POST | `/internal/events/{eventId}/restore-stock` | `EventInternalController#restoreStock` | restore stock |
 | GET | `/internal/events/{eventId}/validate-purchase` | `EventInternalController#validatePurchase` | validate purchase |
 | GET | `/seller/{eventId}` | `EventController#getSellerEventDetail` | get seller event detail |
-| GET | `/{eventId}` | `EventController#getEvent` | get event |
+| GET | `/{eventId}` | `EventController#getEvent` | get event (action.log `DETAIL_VIEW` 발행) |
 | PATCH | `/{eventId}` | `EventController#updateEvent` | update event |
+| POST | `/{eventId}/dwell` | `DwellController#reportDwell` | 페이지 이탈 체류 시간 기록 (action.log `DWELL_TIME` 발행, 204 No Content) |
 | GET | `/{eventId}/statistics` | `EventController#getEventSummary` | get event summary |
 
 ## member
