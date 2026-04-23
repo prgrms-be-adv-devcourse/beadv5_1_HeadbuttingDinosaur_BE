@@ -167,7 +167,7 @@ Consumer 처리 흐름은 "조회 후 INSERT" 구조입니다.
 
 ### 3-5. messageId 생성 및 전달 방식
 
-Consumer의 dedup 키는 **Outbox가 생성한 `UUID.randomUUID()`** 입니다.
+Consumer의 dedup 키는 **Outbox가 생성한 `UUID.randomUUID().toString()`** (3모듈 통일: `String` / `VARCHAR(36)`) 입니다.
 Producer(Outbox 스케줄러)가 Kafka 헤더에 실어 보내고, Consumer가 이를 추출하여 사용합니다.
 
 **Producer 측 — Outbox 스케줄러:**
@@ -180,7 +180,7 @@ ProducerRecord<String, String> record = new ProducerRecord<>(
         outbox.getPayload()
     );
 record.headers().add("X-Message-Id",
-    outbox.getMessageId().toString().getBytes(StandardCharsets.UTF_8));
+    outbox.getMessageId().getBytes(StandardCharsets.UTF_8));  // messageId는 이미 String
 
     kafkaTemplate.send(record);
 ```
@@ -190,14 +190,14 @@ record.headers().add("X-Message-Id",
 ```java
 @KafkaListener(topics = "order.created")
 public void consume(ConsumerRecord<String, String> record, Acknowledgment ack) {
-    UUID messageId = extractMessageId(record.headers());
+    String messageId = extractMessageId(record.headers());
     consumerService.process(messageId, record.value());
     ack.acknowledge();
 }
 
-private UUID extractMessageId(Headers headers) {
+private String extractMessageId(Headers headers) {
     Header header = headers.lastHeader("X-Message-Id");
-    return UUID.fromString(new String(header.value(), StandardCharsets.UTF_8));
+    return new String(header.value(), StandardCharsets.UTF_8);
 }
 ```
 

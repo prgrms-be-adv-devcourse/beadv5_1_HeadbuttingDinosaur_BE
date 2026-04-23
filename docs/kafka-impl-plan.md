@@ -316,8 +316,8 @@ sequenceDiagram
 - [x] ✅ `PaymentReadyResponse`에 `walletAmount(Integer)`, `pgAmount(Integer)` 필드 추가 완료 — 프론트 구성 표시 + Toss SDK에 pgAmount 전달용
 
 *readyPayment 멱등성 가드 (PG/WALLET/WALLET_PG 공통)*
-- [ ] `readyPayment()` 진입 시 orderId 기준 기존 Payment 조회 → READY면 기존 결과 반환, SUCCESS/FAILED면 에러 (상세: front-server-idempotency-guide.md §4-2)
-- [ ] WALLET_PG 동시성 2차 방어선: WalletTransaction transactionKey("USE_" + orderId) UNIQUE 제약 — 극단적 경쟁 조건에서 두 요청이 동시에 Payment 조회를 통과하더라도 하나만 성공
+- [x] ✅ `readyPayment()` 진입 시 orderId 기준 기존 Payment 조회 → READY(동일 method)면 기존 결과 반환, 그 외(method 불일치/SUCCESS/FAILED)는 `ALREADY_PROCESSED_PAYMENT` 에러 — `PaymentServiceImpl.java:64~76` 구현 완료 (상세: front-server-idempotency-guide.md §4-2)
+- [x] ✅ WALLET_PG 동시성 2차 방어선: WalletTransaction transactionKey("USE_" + orderId) UNIQUE 제약 적용 완료 — DB 컬럼 `unique=true` (`WalletTransaction.java:38`) + `existsByTransactionKey` 사전 체크 (`WalletServiceImpl.java:313~315`)
 
 *readyPayment WALLET_PG 분기*
 - [x] ✅ `readyPayment()` 내 `PaymentMethod.WALLET_PG` 분기 추가 완료 (`PaymentServiceImpl.java:78~118`)
@@ -339,10 +339,11 @@ sequenceDiagram
 - [x] ✅ `WalletServiceImpl` 위 두 메서드 구현 완료
 
 *타임아웃 스케줄러 (WALLET_PG READY 방치 대응)*
-- [ ] READY 상태 WALLET_PG 결제가 일정 시간(팀 합의 필요, 예: 30분) 경과 시 자동 FAILED 처리 + 예치금 복구
-- [ ] ShedLock 기반 스케줄러로 구현 (기존 OutboxScheduler 패턴 참고)
-- [ ] 예치금 복구는 `restoreForWalletPgFail()` 재사용, transactionKey 멱등성으로 중복 복구 방지
-- [ ] `payment.failed` Outbox 발행 (Commerce 주문 상태 FAILED 전이 + Event 재고 복구용)
+- [x] ✅ READY 상태 WALLET_PG 결제 **30분** 경과 시 자동 FAILED 처리 + 예치금 복구 — `WalletPgTimeoutScheduler.TIMEOUT_MINUTES = 30`
+- [x] ✅ ShedLock 기반 스케줄러 구현 — `@Scheduled(fixedDelay=60000)` + `@SchedulerLock(name="wallet-pg-timeout", lockAtMostFor="50s", lockAtLeastFor="10s")` (`WalletPgTimeoutScheduler.java:29~30`)
+  * **lockAtMostFor=50s 산정 기준**: fixedDelay(60s)의 ~83%. Outbox 스케줄러(`fixedDelay=3s`/`lockAtMostFor=5m`=100배 — `OutboxScheduler.java:19~20`)와 다른 기준을 적용하는 이유는 타임아웃 처리가 외부 IO(Wallet 복구·OutboxService.save·CommerceInternalClient HTTP) + DB Tx 1회로 짧기 때문. lock 만료 후 다음 tick(여유 10s) 안에 안전 종료 의도
+- [x] ✅ 예치금 복구는 `restoreForWalletPgFail()` 재사용, transactionKey `"PG_WALLET_RESTORE_" + orderId`로 중복 복구 방지 (`WalletPgTimeoutHandler.java:38~40`, `WalletServiceImpl.java:342~344`)
+- [x] ✅ `payment.failed` Outbox 발행 (Commerce 주문 상태 FAILED 전이 + Event 재고 복구용) — `WalletPgTimeoutHandler.java:50~64` (orderItems는 `CommerceInternalClient.getOrderInfo`로 조회 후 매핑)
 
 **Refund Saga Orchestrator (신규 구현)**
 - [ ] `RefundSagaOrchestrator` 클래스 신규 생성 — Payment 서비스 내 `@Service`
@@ -649,31 +650,14 @@ sequenceDiagram
 - 실코드 대조 결과 §2 통합 결정값 전 항목 이미 일치
 - F2 실사 대상 포함 (`infrastructure.messaging` 하위 `Outbox*` 존재 여부 주기 확인)
 
-#### Event 후속 (B3 / B5 / B6)
+#### Event 후속 — ✅ 완료 (2026-04-22)
 
-- [ ] **B3** `OutboxEventProducer.publish()` 시그니처 전환 — `boolean → void throws OutboxPublishException`
-- [ ] **B5-1** Repository 메서드명 — `findPendingOutboxes → findPendingToPublish`
-- [ ] **B5-2** 쿼리 연산자 — `<= :now → < :now`
-- [ ] **B5-3** `markFailed(MAX_RETRIES)` 파라미터 주입 → `markFailed()` 상수 내부화
-- [ ] **B6** 회귀 방지 테스트 이식 (Commerce 선례 기반)
-  - `KafkaProducerConfigTest` — 타임아웃 3종·acks·idempotence 값 고정 + 불변식 가드 (`max.block < request.timeout ≤ delivery.timeout < SEND_TIMEOUT*1000`)
-  - `OutboxSchedulerIntegrationTest` — EmbeddedKafka + `@MockitoBean LockProvider` E2E 검증
+> 상세: [outbox_fix.md §3-B](outbox_fix.md) — B3 publish 시그니처 전환 / B5 Repo rename·`<`·markFailed 상수 내부화 / B6 회귀 방지 테스트 이식 / F2 `infrastructure/messaging/` 죽은 복사본 청소
 
-#### Payment 후속 (B1 / B2 / B3 / B4 / B5 / B6)
+#### Payment 후속 — ✅ 완료 (2026-04-22, commits `4fc0a20` refactor / `c70ba7e` test)
 
-- [ ] **B1** 재시도 전면 개편 — 선형 5회(`retryCount * 60s`) → 지수 6회(`2^(retryCount-1)s`, 누적 31초)
-- [ ] **B2** `OutboxService.save()` 시그니처 재정렬 + 전파 속성
-  - 현재: `(aggregateId, eventType, topic, partitionKey, payload)`
-  - 변경: `(aggregateId, partitionKey, eventType, topic, event)` + `@Transactional(propagation = MANDATORY)`
-- [ ] **B3** `OutboxEventProducer.send()` → `publish(OutboxEventMessage): void throws OutboxPublishException`
-- [ ] **B4-1** `@Table(schema="payment")` 적용 (현재 schema 미지정)
-- [ ] **B4-2** `messageId` `UUID → String(36)` 타입 전환
-  - 영향: 엔티티 필드 / DB 컬럼 / 호출부 / Kafka 헤더 / `processed_message` 정합
-  - ⚠️ **별건 이슈 분리 권고** — PostgreSQL `USING message_id::text` 명시 필요, `ddl-auto:update` 자동 처리 불가 가능성 / 운영 배포 타이밍 별도
-- [ ] **B5-1** `findPendingForRetry → findPendingToPublish`
-- [ ] **B5-2** `<= :now → < :now`
-- [ ] **B5-3** `increaseRetryCount() → markFailed()` (Commerce 기준 + 상수 내부화)
-- [ ] **B6** 회귀 방지 테스트 이식 (Commerce 선례 기반) — Event와 동일 2종
+> 상세: [outbox_fix.md §3-C](outbox_fix.md) — B1 (지수 6회 즉시/1/2/4/8/16s) / B2 (save 시그니처·MANDATORY) / B3 (publish) / B4-1 (schema) / B4-2 (messageId String) / B5 (Repo) / B6 (회귀 방지 테스트) / B7 (@Value 외부화) / T2 (MANDATORY 불변식 E2E) / T3 (Repo 경계 LIMIT)
+> ⚠️ **별건 이슈**: Payment `outbox.message_id` UUID→VARCHAR(36) 운영 DB 마이그레이션 — `schema_plan.md §Payment 수정 표 + ⑦ ALTER`
 
 #### F2 — 패키지 경로 `common.outbox` 현행 유지 확정
 

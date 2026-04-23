@@ -365,7 +365,7 @@ class OutboxSchedulerIntegrationTest {
 #### 후속 (완료)
 
 - [x] ✅ **B1 재시도 6회 지수 백오프** — `4fc0a20`
-  - 선형 5회(`retryCount * 60s`, 누적 ~10분) → **지수 6회** (`2^(retryCount-1)s` = 1/2/4/8/16/32s, 누적 63초)
+  - 선형 5회(`retryCount * 60s`, 누적 ~10분) → **지수 6회** (`2^(retryCount-1)s` = 즉시/1/2/4/8/16s, 누적 31초 — 총 시도 6회 = 최초 1 + 재시도 5, `retryCount >= 6` 도달 시 FAILED)
   - `Outbox.markFailed()` + `nextRetryAt` 재산정 로직 반영
 - [x] ✅ **B2 `OutboxService.save()` 시그니처 재정렬 + MANDATORY 전파** — `4fc0a20`
   - `save(aggregateId, partitionKey, eventType, topic, event)` — Commerce 기준 순서
@@ -519,6 +519,7 @@ config.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, 500);
 - Commerce = **선례 모듈** — §2 통합 결정값 전 항목 이미 일치, 회귀 방지 테스트(`KafkaProducerConfigTest`/`OutboxSchedulerIntegrationTest`) 보유
 - Event **후속 완료** (2026-04-22) — B3 (publish 시그니처) / B5 (Repo rename·`<`·markFailed 상수) / B6 (회귀 방지 테스트 이식) 반영 + F2 `infrastructure/messaging/` 청소 / B1·B2·B4는 선례 확정
 - **Payment 후속 완료** (2026-04-22) — B1~B7 전 항목 + T2/T3 고가치 회귀 방지 테스트 — commits `4fc0a20` (refactor) / `c70ba7e` (test). A 파트는 PR #483 머지 완료
+- **Payment WALLET_PG 타임아웃 스케줄러 완료** — `WalletPgTimeoutScheduler` (30분 경과 READY → 자동 FAILED + 예치금 복구 + `payment.failed` Outbox), ShedLock 적용 (`fixedDelay=60s`/`lockAtMostFor=50s`). B 시리즈 외 작업이며 kafka-impl-plan.md §3-1에서 추적
 - **F2 현행 유지 확정** — `common.outbox` 3모듈 정착, `infrastructure.messaging` 이동분 0건 / "발견 시 리팩토링" 정책
 - **3모듈 B 파트 완료** (PR #482/#484/Payment 신규 PR) — 이중 발행 3축 + 계약 정합 + 회귀 방지 테스트 완결
 - **미처리 (별건 이슈)**: Payment `outbox.message_id` UUID→VARCHAR(36) 운영 DB 마이그레이션 / 기존 PENDING 선형 5회 레코드 `nextRetryAt` 재산정 정책
