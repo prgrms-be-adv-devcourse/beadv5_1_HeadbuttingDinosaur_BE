@@ -33,7 +33,7 @@ public class OutboxService {
      *
      * @param aggregateId  비즈니스 키 UUID (운영 추적용 — orderId, eventId 등)
      * @param partitionKey Kafka Partition Key (순서 보장 기준 — orderId 또는 eventId)
-     * @param eventType    이벤트 유형 식별자 (예: STOCK_DEDUCTED)
+     * @param eventType    이벤트 유형 식별자 (예: EVENT_FORCE_CANCELLED)
      * @param topic        Kafka 토픽명
      * @param event        직렬화할 이벤트 DTO 객체
      */
