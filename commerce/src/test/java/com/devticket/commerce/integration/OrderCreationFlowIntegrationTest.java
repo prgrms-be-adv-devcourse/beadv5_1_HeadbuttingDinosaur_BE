@@ -13,10 +13,11 @@ import com.devticket.commerce.cart.domain.repository.CartItemRepository;
 import com.devticket.commerce.cart.domain.repository.CartRepository;
 import com.devticket.commerce.common.enums.OrderStatus;
 import com.devticket.commerce.common.exception.BusinessException;
+import com.devticket.commerce.common.exception.CommonErrorCode;
 import com.devticket.commerce.order.application.usecase.OrderUsecase;
-import com.devticket.commerce.order.domain.exception.OrderErrorCode;
 import com.devticket.commerce.order.domain.model.Order;
 import com.devticket.commerce.order.domain.repository.OrderRepository;
+import com.devticket.commerce.order.domain.util.CartHashUtil;
 import com.devticket.commerce.order.infrastructure.external.client.OrderToEventClient;
 import com.devticket.commerce.order.infrastructure.external.client.dto.InternalStockAdjustmentResponse;
 import com.devticket.commerce.order.presentation.dto.req.CartOrderRequest;
@@ -100,19 +101,19 @@ class OrderCreationFlowIntegrationTest {
     }
 
     @Test
-    @DisplayName("IT-1-B: adjustStocks 재고 부족 → OUT_OF_STOCK 예외 즉시 반환, Order 미저장")
-    void throwsOutOfStockWhenAdjustFails() {
-        given(orderToEventClient.adjustStocks(any())).willReturn(
-                List.of(new InternalStockAdjustmentResponse(eventId, false, 0, "테스트 이벤트", 5_000, 10))
-        );
+    @DisplayName("IT-1-B: adjustStocks 실패 → EXTERNAL_SERVICE_ERROR 예외 즉시 반환, Order 미저장")
+    void throwsExternalServiceErrorWhenAdjustFails() {
+        given(orderToEventClient.adjustStocks(any()))
+                .willThrow(new BusinessException(CommonErrorCode.EXTERNAL_SERVICE_ERROR));
 
         assertThatThrownBy(() -> orderUsecase.createOrderByCart(
                 userId, new CartOrderRequest(List.of(savedCartItem.getCartItemId()))))
                 .isInstanceOf(BusinessException.class)
                 .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
-                        .isEqualTo(OrderErrorCode.OUT_OF_STOCK));
+                        .isEqualTo(CommonErrorCode.EXTERNAL_SERVICE_ERROR));
 
-        assertThat(orderRepository.findActiveOrder(userId, null, List.of(OrderStatus.PAYMENT_PENDING))).isEmpty();
+        String cartHash = CartHashUtil.compute(List.of(savedCartItem));
+        assertThat(orderRepository.findActiveOrder(userId, cartHash, List.of(OrderStatus.PAYMENT_PENDING))).isEmpty();
     }
 
     @Test

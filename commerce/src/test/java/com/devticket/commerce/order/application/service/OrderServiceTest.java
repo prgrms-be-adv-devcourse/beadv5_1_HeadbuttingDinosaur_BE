@@ -17,6 +17,7 @@ import com.devticket.commerce.cart.domain.repository.CartItemRepository;
 import com.devticket.commerce.cart.domain.repository.CartRepository;
 import com.devticket.commerce.common.enums.OrderStatus;
 import com.devticket.commerce.common.exception.BusinessException;
+import com.devticket.commerce.common.exception.CommonErrorCode;
 import com.devticket.commerce.common.messaging.MessageDeduplicationService;
 import com.devticket.commerce.common.outbox.OutboxService;
 import com.devticket.commerce.order.domain.exception.OrderErrorCode;
@@ -196,7 +197,7 @@ class OrderServiceTest {
         }
 
         @Test
-        void 재고_부족_시_OUT_OF_STOCK_예외를_던진다() {
+        void 재고_차감_실패_시_EXTERNAL_SERVICE_ERROR_예외를_던진다() {
             UUID userId = UUID.randomUUID();
             UUID eventId = UUID.randomUUID();
 
@@ -209,12 +210,12 @@ class OrderServiceTest {
                     .willReturn(Optional.empty());
             given(orderToEventClient.getBulkEventInfo(anyList())).willReturn(List.of(info));
             given(orderToEventClient.adjustStocks(any()))
-                    .willReturn(List.of(new InternalStockAdjustmentResponse(eventId, false, 0, "이벤트", 5_000, 10)));
+                    .willThrow(new BusinessException(CommonErrorCode.EXTERNAL_SERVICE_ERROR));
 
             assertThatThrownBy(() -> orderService.createOrderByCart(userId, new CartOrderRequest(List.of(UUID.randomUUID()))))
                     .isInstanceOf(BusinessException.class)
                     .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
-                            .isEqualTo(OrderErrorCode.OUT_OF_STOCK));
+                            .isEqualTo(CommonErrorCode.EXTERNAL_SERVICE_ERROR));
 
             then(orderRepository).should(never()).save(any());
         }
