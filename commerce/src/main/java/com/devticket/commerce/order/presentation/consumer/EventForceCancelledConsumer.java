@@ -1,7 +1,9 @@
 package com.devticket.commerce.order.presentation.consumer;
 
 import com.devticket.commerce.common.messaging.KafkaTopics;
-import com.devticket.commerce.order.application.service.OrderService;
+import com.devticket.commerce.common.messaging.PayloadExtractor;
+import com.devticket.commerce.order.application.service.RefundFanoutService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -14,52 +16,32 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Component;
 
+/**
+ * Admin 이벤트 강제 취소 / Seller 이벤트 취소 fan-out 진입점.
+ * <p>
+ * event.force-cancelled 수신 → 해당 eventId 의 PAID Order 들에 대해 refund.requested fan-out.
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class StockEventConsumer {
+public class EventForceCancelledConsumer {
 
-    private final OrderService orderService;
+    private final RefundFanoutService refundFanoutService;
+    private final ObjectMapper objectMapper;
 
-    /**
-     * stock.deducted 수신: Order CREATED → PAYMENT_PENDING 전이
-     * groupId: commerce-stock.deducted
-     */
     @KafkaListener(
-        topics = KafkaTopics.STOCK_DEDUCTED,
-        groupId = "commerce-stock.deducted"
+        topics = KafkaTopics.EVENT_FORCE_CANCELLED,
+        groupId = "commerce-event.force-cancelled"
     )
-    public void consumeStockDeducted(ConsumerRecord<String, String> record, Acknowledgment ack) {
+    public void consume(ConsumerRecord<String, String> record, Acknowledgment ack) {
         UUID messageId = extractMessageId(record.headers());
+        String payload = PayloadExtractor.extract(objectMapper, record.value());
         try {
-            orderService.processStockDeducted(messageId, record.topic(), record.value());
+            refundFanoutService.processEventForceCancelled(messageId, record.topic(), payload);
             ack.acknowledge();
         } catch (DataIntegrityViolationException e) {
             if (isProcessedMessageUniqueConflict(e)) {
-                log.warn("[stock.deducted] messageId={} processed_message UNIQUE 충돌 — 이미 처리 완료, 스킵", messageId);
-                ack.acknowledge();
-                return;
-            }
-            throw e;
-        }
-    }
-
-    /**
-     * stock.failed 수신: Order CREATED → FAILED 전이 (재고 부족 보상)
-     * groupId: commerce-stock.failed
-     */
-    @KafkaListener(
-        topics = KafkaTopics.STOCK_FAILED,
-        groupId = "commerce-stock.failed"
-    )
-    public void consumeStockFailed(ConsumerRecord<String, String> record, Acknowledgment ack) {
-        UUID messageId = extractMessageId(record.headers());
-        try {
-            orderService.processStockFailed(messageId, record.topic(), record.value());
-            ack.acknowledge();
-        } catch (DataIntegrityViolationException e) {
-            if (isProcessedMessageUniqueConflict(e)) {
-                log.warn("[stock.failed] messageId={} processed_message UNIQUE 충돌 — 이미 처리 완료, 스킵", messageId);
+                log.warn("[event.force-cancelled] messageId={} processed_message UNIQUE 충돌 — 스킵", messageId);
                 ack.acknowledge();
                 return;
             }
@@ -71,14 +53,13 @@ public class StockEventConsumer {
         Header header = headers.lastHeader("X-Message-Id");
         if (header == null) {
             throw new IllegalArgumentException(
-                "X-Message-Id 헤더 누락 — Outbox Producer 설정 확인 필요 (kafka-idempotency-guide.md §3-5)");
+                "X-Message-Id 헤더 누락 — Outbox Producer 설정 확인 필요");
         }
         return UUID.fromString(new String(header.value(), StandardCharsets.UTF_8));
     }
 
     private boolean isProcessedMessageUniqueConflict(DataIntegrityViolationException e) {
         Throwable cause = e.getCause();
-
         while (cause != null) {
             if (cause instanceof org.hibernate.exception.ConstraintViolationException constraintViolation) {
                 String constraintName = constraintViolation.getConstraintName();
@@ -86,7 +67,6 @@ public class StockEventConsumer {
             }
             cause = cause.getCause();
         }
-
         return false;
     }
 }

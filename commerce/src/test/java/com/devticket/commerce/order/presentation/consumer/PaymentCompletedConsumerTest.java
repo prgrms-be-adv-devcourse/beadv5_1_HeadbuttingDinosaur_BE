@@ -10,7 +10,8 @@ import static org.mockito.Mockito.never;
 
 import com.devticket.commerce.common.messaging.KafkaTopics;
 import com.devticket.commerce.order.application.usecase.OrderUsecase;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -36,7 +37,8 @@ class PaymentCompletedConsumerTest {
 
     @BeforeEach
     void setUp() {
-        consumer = new PaymentCompletedConsumer(orderUsecase, new ObjectMapper());
+        ObjectMapper objectMapper = JsonMapper.builder().build();
+        consumer = new PaymentCompletedConsumer(orderUsecase, objectMapper);
     }
 
     // ── 헬퍼 ──────────────────────────────────────────────────────────
