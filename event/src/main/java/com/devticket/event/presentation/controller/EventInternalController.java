@@ -44,7 +44,6 @@ public class EventInternalController {
 
     private final EventInternalService eventInternalService;
     private final EventService eventService;
-    private final EventRecommendationService eventRecommendationService;
 
     @GetMapping
     public ResponseEntity<SuccessResponse<InternalPagedEventResponse>> getEvents(
@@ -181,14 +180,8 @@ public class EventInternalController {
         @RequestBody @Valid InternalEventForceCancelRequest request) {
         eventService.forceCancel(eventId, request.reason());
         return ResponseEntity.noContent().build();
- 
-    @GetMapping("/recommendations")
-    public ResponseEntity<SuccessResponse<InternalRecommendationResponse>> getRecommendations(
-        @RequestHeader("X-User-Id") UUID userId) {
-        return ResponseEntity.ok(SuccessResponse.success(
-            eventRecommendationService.getRecommendations(userId)
-        ));
-    
+    }
+
     @PostMapping("/popular")
     public ResponseEntity<SuccessResponse<List<InternalPopularEventResponse>>> getPopularEvents(
         @RequestBody InternalPopularEventRequest request) {
