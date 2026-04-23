@@ -1,9 +1,7 @@
 package com.devticket.event.presentation.consumer;
 
-import com.devticket.event.application.MessageDeduplicationService;
+import com.devticket.event.application.RefundCompletedService;
 import com.devticket.event.common.messaging.KafkaTopics;
-import com.devticket.event.common.messaging.PayloadExtractor;
-import com.devticket.event.common.messaging.event.RefundCompletedEvent;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -15,39 +13,33 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
-import tools.jackson.databind.ObjectMapper;
 
 /**
  * refund.completed 수신자.
  * 현재는 모니터링/로깅 only — Saga 최종 완료를 추적하기 위한 dedup 기록만 수행한다.
  * 추후 환불 확정 후 Event 측 정산/집계 트리거가 필요하면 여기에 확장한다.
+ *
+ * <p>ACK 는 서비스 트랜잭션 커밋 성공 이후에만 호출되어, AckMode.MANUAL 환경에서
+ * 오프셋이 먼저 커밋된 뒤 DB 커밋이 실패해 메시지가 유실되는 시나리오를 방지한다.
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class RefundCompletedConsumer {
 
-    private final MessageDeduplicationService deduplicationService;
-    private final ObjectMapper objectMapper;
+    private final RefundCompletedService refundCompletedService;
 
     @KafkaListener(
         topics = KafkaTopics.REFUND_COMPLETED,
         groupId = "event-refund.completed"
     )
-    @Transactional
     public void consume(ConsumerRecord<String, String> record, Acknowledgment ack) {
         UUID messageId = extractMessageId(record.headers());
         log.info("[refund.completed 수신] messageId={}, key={}", messageId, record.key());
 
         try {
-            if (!deduplicationService.isDuplicate(messageId)) {
-                RefundCompletedEvent event = deserialize(record.value());
-                log.info("[refund.completed 처리] refundId={}, orderId={}, paymentMethod={}, amount={}, rate={}, ts={}",
-                    event.refundId(), event.orderId(), event.paymentMethod(),
-                    event.refundAmount(), event.refundRate(), event.timestamp());
-                deduplicationService.markProcessed(messageId, record.topic());
-            }
+            refundCompletedService.recordRefundCompleted(
+                messageId, record.topic(), record.value());
         } catch (DataIntegrityViolationException e) {
             log.warn("[refund.completed dedup] UNIQUE 충돌로 스킵 — messageId={}", messageId);
         } catch (Exception e) {
@@ -56,15 +48,6 @@ public class RefundCompletedConsumer {
         }
 
         ack.acknowledge();
-    }
-
-    private RefundCompletedEvent deserialize(String payload) {
-        try {
-            String actualPayload = PayloadExtractor.extract(objectMapper, payload);
-            return objectMapper.readValue(actualPayload, RefundCompletedEvent.class);
-        } catch (Exception e) {
-            throw new IllegalArgumentException("RefundCompletedEvent 역직렬화 실패", e);
-        }
     }
 
     private UUID extractMessageId(Headers headers) {
