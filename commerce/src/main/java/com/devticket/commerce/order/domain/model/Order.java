@@ -120,6 +120,28 @@ public class Order extends BaseEntity {
 
     }
 
+    // 동기 재고 차감 흐름 전용 — CREATED 를 거치지 않고 PAYMENT_PENDING 으로 직접 생성
+    public static Order createPending(UUID userId, int totalAmount, String cartHash) {
+        LocalDateTime now = LocalDateTime.now();
+        String datePrefix = now.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        String uniqueSuffix = UUID.randomUUID().toString().substring(0, 8);
+        String generatedOrderNumber = String.format("%s-%s", datePrefix, uniqueSuffix);
+
+        validateTotalAmount(totalAmount);
+
+        return Order.builder()
+            .orderId(UUID.randomUUID())
+            .userId(userId)
+            .orderNumber(generatedOrderNumber)
+            .paymentMethod(null)
+            .totalAmount(totalAmount)
+            .status(OrderStatus.PAYMENT_PENDING)
+            .orderedAt(now)
+            .cartHash(cartHash)
+            .deletedAt(null)
+            .build();
+    }
+
     //---- 도메인 비즈니스 메서드 ------------------------------
 
     // ⚠️ 사용 금지 — OrderExpirationScheduler 만료 타이머가 BaseEntity.updated_at 에 의존함.

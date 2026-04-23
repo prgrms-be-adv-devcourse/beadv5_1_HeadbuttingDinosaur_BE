@@ -66,7 +66,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 @ActiveProfiles("test")
 @EmbeddedKafka(
         partitions = 1,
-        topics = {KafkaTopics.ACTION_LOG, KafkaTopics.ORDER_CREATED},
+        topics = {KafkaTopics.ACTION_LOG},
         bootstrapServersProperty = "spring.kafka.bootstrap-servers"
 )
 @DirtiesContext
