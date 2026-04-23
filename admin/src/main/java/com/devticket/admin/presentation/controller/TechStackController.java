@@ -64,6 +64,11 @@ public class TechStackController {
         return ResponseEntity.ok(techStackService.getTechStacks());
     }
 
+    @PostMapping("/reindex")
+    public ResponseEntity<Void> reindexEmptyEmbeddings() {
+        techStackService.reindexEmptyEmbeddings();
+        return ResponseEntity.ok().build();
+    }
 
 }
 
