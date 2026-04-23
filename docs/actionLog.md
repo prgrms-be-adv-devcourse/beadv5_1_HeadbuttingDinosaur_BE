@@ -66,13 +66,15 @@ export interface ActionLogMessage {
 
 | 항목 | 값 |
 |---|---|
-| 구독 토픽 | **`action.log`** (현재) / **`payment.completed` 추가 구독 예정** (PURCHASE 처리용 — §3 참조) |
+| 구독 토픽 | **`action.log`** + **`payment.completed`** (PURCHASE 처리용 — §3 참조, ✅ 구독 완료 2026-04-21) |
 | GroupId | `log-group` |
 | ClientId | `devticket-log` |
 | AutoCommit | `false` (수동 offset commit) |
 | 예외 처리 | 예외 시 로깅 + 스킵 + offset commit (**at-most-once**) |
 
-### Producer 측 설정 (신규 구현 대상 — Event / Commerce / Log)
+### Producer 측 설정 (신규 구현 대상 — Event / Commerce)
+
+> Log 서비스는 Producer 아님 — PURCHASE는 `payment.completed` 수신 후 `log.action_log`에 **직접 INSERT** (§3.1 참조).
 
 > 기존 비즈니스 이벤트(`order.created`·`payment.completed` 등)와 **정책이 완전히 다른 별도 Producer 경로** 필요.
 
