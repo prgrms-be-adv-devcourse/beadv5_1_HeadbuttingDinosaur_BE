@@ -90,8 +90,8 @@ class SettlementServiceImplTest {
             .settledAt(LocalDateTime.of(2026, 4, 1, 0, 10))
             .build();
 
-        given(settlementRepository.findBySellerIdAndPeriodStartAtBetween(
-            eq(sellerId), any(LocalDateTime.class), any(LocalDateTime.class)))
+        given(settlementRepository.findFirstBySellerIdAndPeriodStartAtBetweenAndStatusNotOrderByCreatedAtDesc(
+            eq(sellerId), any(LocalDateTime.class), any(LocalDateTime.class), eq(SettlementStatus.CANCELLED)))
             .willReturn(Optional.of(settlement));
         given(settlementItemRepository.findBySettlementId(settlement.getSettlementId()))
             .willReturn(List.of());
@@ -107,8 +107,8 @@ class SettlementServiceImplTest {
 
     @Test
     void getSettlementByPeriod_정산없음_빈응답반환() {
-        given(settlementRepository.findBySellerIdAndPeriodStartAtBetween(
-            eq(sellerId), any(LocalDateTime.class), any(LocalDateTime.class)))
+        given(settlementRepository.findFirstBySellerIdAndPeriodStartAtBetweenAndStatusNotOrderByCreatedAtDesc(
+            eq(sellerId), any(LocalDateTime.class), any(LocalDateTime.class), eq(SettlementStatus.CANCELLED)))
             .willReturn(Optional.empty());
 
         SettlementPeriodResponse result = settlementServiceImpl.getSettlementByPeriod(sellerId, "202603");

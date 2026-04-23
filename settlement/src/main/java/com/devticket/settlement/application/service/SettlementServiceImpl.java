@@ -191,15 +191,34 @@ public class SettlementServiceImpl implements SettlementService {
 
     @Override
     public SettlementPeriodResponse getSettlementByPeriod(UUID sellerId, String yearMonth) {
-        YearMonth ym = parseYearMonth(yearMonth);
-        LocalDate periodStartDate = toPeriodStartDate(ym);
-        return settlementRepository
-            .findBySellerIdAndPeriodStartAtBetween(
-                sellerId,
-                periodStartDate.atStartOfDay(),
-                periodStartDate.atTime(23, 59, 59))
-            .map(this::toSettlementPeriodResponse)
-            .orElse(new SettlementPeriodResponse(0, 0, 0, 0, List.of()));
+        log.debug("[getSettlementByPeriod] 시작 - sellerId={}, yearMonth={}", sellerId, yearMonth);
+        try {
+            YearMonth ym = parseYearMonth(yearMonth);
+            LocalDate periodStartDate = toPeriodStartDate(ym);
+            log.debug("[getSettlementByPeriod] 조회 기간 - periodStartDate={} ({} ~ {})",
+                periodStartDate, periodStartDate.atStartOfDay(), periodStartDate.atTime(23, 59, 59));
+
+            return settlementRepository
+                .findFirstBySellerIdAndPeriodStartAtBetweenAndStatusNotOrderByCreatedAtDesc(
+                    sellerId,
+                    periodStartDate.atStartOfDay(),
+                    periodStartDate.atTime(23, 59, 59),
+                    SettlementStatus.CANCELLED)
+                .map(settlement -> {
+                    log.debug("[getSettlementByPeriod] 정산서 조회 성공 - settlementId={}, status={}, finalAmount={}",
+                        settlement.getSettlementId(), settlement.getStatus(), settlement.getFinalSettlementAmount());
+                    return toSettlementPeriodResponse(settlement);
+                })
+                .orElseGet(() -> {
+                    log.debug("[getSettlementByPeriod] 정산서 없음 - sellerId={}, periodStartDate={}", sellerId, periodStartDate);
+                    return new SettlementPeriodResponse(0, 0, 0, 0, List.of());
+                });
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("[getSettlementByPeriod] 처리 중 오류 - sellerId={}, yearMonth={}", sellerId, yearMonth, e);
+            throw e;
+        }
     }
 
     private YearMonth parseYearMonth(String yearMonth) {
@@ -215,11 +234,14 @@ public class SettlementServiceImpl implements SettlementService {
     }
 
     private SettlementPeriodResponse toSettlementPeriodResponse(Settlement settlement) {
+        log.debug("[toSettlementPeriodResponse] SettlementItem 조회 시작 - settlementId={}",
+            settlement.getSettlementId());
         List<EventItemResponse> items = settlementItemRepository
             .findBySettlementId(settlement.getSettlementId())
             .stream()
             .map(this::toResponse)
             .toList();
+        log.debug("[toSettlementPeriodResponse] SettlementItem 조회 완료 - {}건", items.size());
         return new SettlementPeriodResponse(
             settlement.getFinalSettlementAmount(),
             settlement.getTotalFeeAmount(),

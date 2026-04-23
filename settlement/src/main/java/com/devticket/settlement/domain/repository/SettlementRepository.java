@@ -19,7 +19,8 @@ public interface SettlementRepository {
 
     List<Settlement> findByStatus(SettlementStatus status);
 
-    Optional<Settlement> findBySellerIdAndPeriodStartAtBetween(UUID sellerId, LocalDateTime from, LocalDateTime to);
+    Optional<Settlement> findFirstBySellerIdAndPeriodStartAtBetweenAndStatusNotOrderByCreatedAtDesc(
+        UUID sellerId, LocalDateTime from, LocalDateTime to, SettlementStatus status);
 
     boolean existsBySellerIdAndPeriodStartAtBetweenAndStatusNot(UUID sellerId, LocalDateTime from, LocalDateTime to, SettlementStatus status);
 
