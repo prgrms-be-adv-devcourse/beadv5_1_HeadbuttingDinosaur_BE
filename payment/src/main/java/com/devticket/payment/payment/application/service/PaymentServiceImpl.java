@@ -163,9 +163,9 @@ public class PaymentServiceImpl implements PaymentService {
             .build();
         outboxService.save(
             payment.getPaymentId().toString(),
-            KafkaTopics.PAYMENT_COMPLETED,
-            KafkaTopics.PAYMENT_COMPLETED,
             payment.getOrderId().toString(),
+            KafkaTopics.PAYMENT_COMPLETED,
+            KafkaTopics.PAYMENT_COMPLETED,
             event
         );
 
@@ -248,9 +248,9 @@ public class PaymentServiceImpl implements PaymentService {
             .build();
         outboxService.save(
             payment.getPaymentId().toString(),
-            KafkaTopics.PAYMENT_FAILED,
-            KafkaTopics.PAYMENT_FAILED,
             payment.getOrderId().toString(),
+            KafkaTopics.PAYMENT_FAILED,
+            KafkaTopics.PAYMENT_FAILED,
             event
         );
 

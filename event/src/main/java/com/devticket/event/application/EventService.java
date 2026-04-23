@@ -7,6 +7,8 @@ import co.elastic.clients.elasticsearch._types.query_dsl.Query;
 import com.devticket.event.application.event.ActionLogDomainEvent;
 import com.devticket.event.common.exception.BusinessException;
 import com.devticket.event.common.messaging.KafkaTopics;
+import com.devticket.event.common.messaging.event.EventForceCancelledEvent;
+import com.devticket.event.common.messaging.event.EventSaleStoppedEvent;
 import com.devticket.event.common.messaging.event.ActionType;
 import com.devticket.event.common.messaging.event.OrderCreatedEvent;
 import com.devticket.event.common.messaging.event.StockDeductedEvent;
@@ -18,11 +20,13 @@ import com.devticket.event.domain.exception.StockDeductionException;
 import com.devticket.event.domain.model.Event;
 import com.devticket.event.domain.model.EventImage;
 import com.devticket.event.domain.model.EventTechStack;
+import com.devticket.event.domain.model.EventView;
 import com.devticket.event.infrastructure.client.AdminClient;
 import com.devticket.event.infrastructure.client.MemberClient;
 import com.devticket.event.infrastructure.client.OpenAiEmbeddingClient;
 import com.devticket.event.infrastructure.client.dto.TechStackItem;
 import com.devticket.event.infrastructure.persistence.EventRepository;
+import com.devticket.event.infrastructure.persistence.EventViewRepository;
 import com.devticket.event.infrastructure.search.EventDocument;
 import com.devticket.event.presentation.dto.EventDetailResponse;
 import com.devticket.event.presentation.dto.EventListContentResponse;
@@ -73,6 +77,7 @@ public class EventService {
     private final MessageDeduplicationService deduplicationService;
     private final ObjectMapper objectMapper;
     private final ApplicationEventPublisher eventPublisher;
+    private final EventViewRepository eventViewRepository;
 
     @Transactional
     public SellerEventCreateResponse createEvent(UUID sellerId, SellerEventCreateRequest request) {
@@ -122,6 +127,15 @@ public class EventService {
             eventRepository.save(savedEvent);
         }
 
+        // 5. imageUrls 저장 로직 — updateEvent 와 대칭 보장 (생성 시 이미지 누락 방지)
+        if (request.imageUrls() != null && !request.imageUrls().isEmpty()) {
+            for (int i = 0; i < request.imageUrls().size(); i++) {
+                savedEvent.getEventImages().add(
+                    EventImage.of(savedEvent, request.imageUrls().get(i), i));
+            }
+            eventRepository.save(savedEvent);
+        }
+
         syncToElasticsearch(savedEvent);
 
         return SellerEventCreateResponse.from(savedEvent);
@@ -129,14 +143,21 @@ public class EventService {
 
     private Map<Long, String> buildTechStackMap() {
         return adminClient.getTechStacks().stream()
-            .collect(Collectors.toMap(TechStackItem::techStackId, TechStackItem::name));
+            .collect(Collectors.toMap(TechStackItem::id, TechStackItem::name));
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public EventDetailResponse getEvent(UUID eventId) {
 
         Event event = eventRepository.findWithDetailsByEventId(eventId)
             .orElseThrow(() -> new BusinessException(EventErrorCode.EVENT_NOT_FOUND));
+
+        // 1. 조회수 증가 : eventView 가져오기
+        EventView eventView = eventViewRepository.findByEvent(event)
+            .orElseGet(() -> eventViewRepository.save(EventView.of(event)));
+        // 2. 조회수 증가 : eventView 증가
+        eventView.increaseViewCount();
+
         String nickname = memberClient.getNickname(event.getSellerId());
 
         return EventDetailResponse.from(event, nickname);
@@ -278,6 +299,13 @@ public class EventService {
                 throw new BusinessException(EventErrorCode.CANNOT_CHANGE_STATUS);
             }
             event.cancel();
+            outboxService.save(
+                event.getEventId().toString(),
+                event.getEventId().toString(),
+                "EVENT_SALE_STOPPED",
+                KafkaTopics.EVENT_SALE_STOPPED,
+                new EventSaleStoppedEvent(event.getEventId(), event.getSellerId(), Instant.now())
+            );
             syncToElasticsearch(event);
             return SellerEventUpdateResponse.from(event);
         }
@@ -348,6 +376,28 @@ public class EventService {
         syncToElasticsearch(event);
 
         return SellerEventUpdateResponse.from(event);
+    }
+
+    /**
+     * 어드민 강제 취소 — 이벤트 상태를 FORCE_CANCELLED 로 전이하고 event.force-cancelled Outbox 발행.
+     * Commerce 가 이를 수신해 해당 이벤트의 PAID 주문에 대해 환불 fan-out 을 수행한다.
+     */
+    @Transactional
+    public void forceCancel(UUID eventId, String reason) {
+        Event event = eventRepository.findByEventIdWithLock(eventId)
+            .orElseThrow(() -> new BusinessException(EventErrorCode.EVENT_NOT_FOUND));
+
+        event.forceCancel();
+
+        outboxService.save(
+            event.getEventId().toString(),
+            event.getEventId().toString(),
+            "EVENT_FORCE_CANCELLED",
+            KafkaTopics.EVENT_FORCE_CANCELLED,
+            new EventForceCancelledEvent(event.getEventId(), event.getSellerId(), reason, Instant.now())
+        );
+
+        syncToElasticsearch(event);
     }
 
     /**

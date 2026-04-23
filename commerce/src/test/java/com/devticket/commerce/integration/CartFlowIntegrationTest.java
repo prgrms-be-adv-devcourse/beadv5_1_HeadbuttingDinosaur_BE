@@ -13,7 +13,6 @@ import com.devticket.commerce.cart.presentation.dto.req.CartItemQuantityRequest;
 import com.devticket.commerce.cart.presentation.dto.res.CartClearResponse;
 import com.devticket.commerce.cart.presentation.dto.res.CartResponse;
 import com.devticket.commerce.common.exception.BusinessException;
-import com.devticket.commerce.common.messaging.KafkaTopics;
 import java.util.Optional;
 import java.util.UUID;
 import net.javacrumbs.shedlock.core.LockProvider;
@@ -41,7 +40,6 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 @ActiveProfiles("test")
 @EmbeddedKafka(
         partitions = 1,
-        topics = {KafkaTopics.ORDER_CREATED},
         bootstrapServersProperty = "spring.kafka.bootstrap-servers"
 )
 @DirtiesContext

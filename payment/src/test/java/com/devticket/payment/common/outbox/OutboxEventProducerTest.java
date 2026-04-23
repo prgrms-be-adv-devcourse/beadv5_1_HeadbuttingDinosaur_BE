@@ -54,10 +54,12 @@ class OutboxEventProducerTest {
         producer = new OutboxEventProducer(kafkaTemplate, objectMapper);
     }
 
-    private OutboxEventMessage createMessage(UUID messageId) {
+    private OutboxEventMessage createMessage(String messageId) {
         return new OutboxEventMessage(
             messageId,
             "payment.completed",
+            "payment.completed",
+            "order-001",
             "{\"orderId\":\"order-001\"}",
             Instant.now()
         );
@@ -65,7 +67,7 @@ class OutboxEventProducerTest {
 
     private void stubSendSuccess() throws Exception {
         given(kafkaTemplate.send(any(ProducerRecord.class))).willReturn(future);
-        given(future.get(2L, TimeUnit.SECONDS)).willReturn(sendResult);
+        given(future.get(2000L, TimeUnit.MILLISECONDS)).willReturn(sendResult);
         given(sendResult.getRecordMetadata()).willReturn(recordMetadata);
         given(recordMetadata.offset()).willReturn(42L);
     }
@@ -76,21 +78,21 @@ class OutboxEventProducerTest {
 
         @Test
         void 발행_성공_시_예외_없음() throws Exception {
-            OutboxEventMessage message = createMessage(UUID.randomUUID());
+            OutboxEventMessage message = createMessage(UUID.randomUUID().toString());
             stubSendSuccess();
 
-            assertThatCode(() -> producer.send("payment.completed", "order-001", message))
+            assertThatCode(() -> producer.publish(message))
                 .doesNotThrowAnyException();
         }
 
         @Test
         @SuppressWarnings("unchecked")
         void X_Message_Id_헤더_세팅됨() throws Exception {
-            UUID messageId = UUID.randomUUID();
+            String messageId = UUID.randomUUID().toString();
             OutboxEventMessage message = createMessage(messageId);
             stubSendSuccess();
 
-            producer.send("payment.completed", "order-001", message);
+            producer.publish(message);
 
             ArgumentCaptor<ProducerRecord<String, String>> captor =
                 ArgumentCaptor.forClass(ProducerRecord.class);
@@ -98,7 +100,22 @@ class OutboxEventProducerTest {
             Header header = captor.getValue().headers().lastHeader("X-Message-Id");
             assertThat(header).isNotNull();
             assertThat(new String(header.value(), StandardCharsets.UTF_8))
-                .isEqualTo(messageId.toString());
+                .isEqualTo(messageId);
+        }
+
+        @Test
+        @SuppressWarnings("unchecked")
+        void ProducerRecord의_topic과_key가_메시지와_일치() throws Exception {
+            OutboxEventMessage message = createMessage(UUID.randomUUID().toString());
+            stubSendSuccess();
+
+            producer.publish(message);
+
+            ArgumentCaptor<ProducerRecord<String, String>> captor =
+                ArgumentCaptor.forClass(ProducerRecord.class);
+            then(kafkaTemplate).should().send(captor.capture());
+            assertThat(captor.getValue().topic()).isEqualTo("payment.completed");
+            assertThat(captor.getValue().key()).isEqualTo("order-001");
         }
     }
 
@@ -108,35 +125,35 @@ class OutboxEventProducerTest {
 
         @Test
         void TimeoutException_래핑() throws Exception {
-            OutboxEventMessage message = createMessage(UUID.randomUUID());
+            OutboxEventMessage message = createMessage(UUID.randomUUID().toString());
             given(kafkaTemplate.send(any(ProducerRecord.class))).willReturn(future);
-            given(future.get(2L, TimeUnit.SECONDS))
+            given(future.get(2000L, TimeUnit.MILLISECONDS))
                 .willThrow(new TimeoutException("send timed out"));
 
-            assertThatThrownBy(() -> producer.send("payment.completed", "order-001", message))
+            assertThatThrownBy(() -> producer.publish(message))
                 .isInstanceOf(OutboxPublishException.class)
                 .hasMessageContaining("Kafka 발행 실패");
         }
 
         @Test
         void ExecutionException_래핑() throws Exception {
-            OutboxEventMessage message = createMessage(UUID.randomUUID());
+            OutboxEventMessage message = createMessage(UUID.randomUUID().toString());
             given(kafkaTemplate.send(any(ProducerRecord.class))).willReturn(future);
-            given(future.get(2L, TimeUnit.SECONDS))
+            given(future.get(2000L, TimeUnit.MILLISECONDS))
                 .willThrow(new ExecutionException("broker error", new RuntimeException()));
 
-            assertThatThrownBy(() -> producer.send("payment.completed", "order-001", message))
+            assertThatThrownBy(() -> producer.publish(message))
                 .isInstanceOf(OutboxPublishException.class)
                 .hasMessageContaining("Kafka 발행 실패");
         }
 
         @Test
         void KafkaException_래핑() {
-            OutboxEventMessage message = createMessage(UUID.randomUUID());
+            OutboxEventMessage message = createMessage(UUID.randomUUID().toString());
             given(kafkaTemplate.send(any(ProducerRecord.class)))
                 .willThrow(new KafkaException("producer closed"));
 
-            assertThatThrownBy(() -> producer.send("payment.completed", "order-001", message))
+            assertThatThrownBy(() -> producer.publish(message))
                 .isInstanceOf(OutboxPublishException.class)
                 .hasMessageContaining("Kafka 발행 실패");
         }

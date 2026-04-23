@@ -111,4 +111,29 @@ class PaymentCompletedEventSerializationTest {
         assertThat(event.totalAmount()).isEqualTo(10000);
         assertThat(event.orderItems()).isEmpty();
     }
+
+    @Test
+    @DisplayName("OrderItem 내부에 알 수 없는 필드가 있어도 역직렬화 성공")
+    void OrderItem_알_수_없는_필드_무시() throws Exception {
+        UUID eventId = UUID.randomUUID();
+        String json = "{"
+            + "\"orderId\":\"" + UUID.randomUUID() + "\","
+            + "\"userId\":\"" + UUID.randomUUID() + "\","
+            + "\"paymentId\":\"" + UUID.randomUUID() + "\","
+            + "\"paymentMethod\":\"WALLET_PG\","
+            + "\"totalAmount\":10000,"
+            + "\"orderItems\":[{"
+            +     "\"eventId\":\"" + eventId + "\","
+            +     "\"quantity\":2,"
+            +     "\"futureFieldOnItem\":\"x\""
+            + "}],"
+            + "\"timestamp\":\"2025-01-01T00:00:00Z\""
+            + "}";
+
+        PaymentCompletedEvent event = objectMapper.readValue(json, PaymentCompletedEvent.class);
+
+        assertThat(event.orderItems()).hasSize(1);
+        assertThat(event.orderItems().get(0).eventId()).isEqualTo(eventId);
+        assertThat(event.orderItems().get(0).quantity()).isEqualTo(2);
+    }
 }

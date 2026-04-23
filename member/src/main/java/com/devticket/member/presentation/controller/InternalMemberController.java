@@ -15,6 +15,7 @@ import com.devticket.member.presentation.dto.internal.response.InternalSellerApp
 import com.devticket.member.presentation.dto.internal.response.InternalSellerInfoResponse;
 import com.devticket.member.presentation.dto.internal.response.InternalUpdateRoleResponse;
 import com.devticket.member.presentation.dto.internal.response.InternalUpdateStatusResponse;
+import com.devticket.member.presentation.dto.internal.response.InternalUserTechStackResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -175,5 +176,17 @@ public class InternalMemberController {
         @RequestParam List<UUID> userIds
     ) {
         return ResponseEntity.ok(internalMemberService.getMemberInfoBatch(userIds));
+    }
+
+    @Operation(summary = "유저 기술 스택 조회", description = "내부 서비스용 — AI 추천을 위한 유저 기술 스택 조회")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "조회 성공"),
+        @ApiResponse(responseCode = "404", description = "회원 없음")
+    })
+    @GetMapping("/{userId}/tech-stacks")
+    public ResponseEntity<InternalUserTechStackResponse> getUserTechStacks(
+        @PathVariable UUID userId
+    ) {
+        return ResponseEntity.ok(internalMemberService.getUserTechStacks(userId));
     }
 }

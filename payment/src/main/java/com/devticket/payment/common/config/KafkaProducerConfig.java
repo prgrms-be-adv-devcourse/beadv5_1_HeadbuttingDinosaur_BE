@@ -17,6 +17,15 @@ public class KafkaProducerConfig {
     @Value("${spring.kafka.bootstrap-servers}")
     private String bootstrapServers;
 
+    @Value("${kafka-producer.max-block-ms:500}")
+    private int maxBlockMs;
+
+    @Value("${kafka-producer.request-timeout-ms:1000}")
+    private int requestTimeoutMs;
+
+    @Value("${kafka-producer.delivery-timeout-ms:1500}")
+    private int deliveryTimeoutMs;
+
     @Bean
     public ProducerFactory<String, String> producerFactory() {
         Map<String, Object> props = new HashMap<>();
@@ -25,9 +34,9 @@ public class KafkaProducerConfig {
         props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         props.put(ProducerConfig.ACKS_CONFIG, "all");
         props.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
-        props.put(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, 1500);
-        props.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, 1000);
-        props.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, 500);
+        props.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, maxBlockMs);
+        props.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, requestTimeoutMs);
+        props.put(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, deliveryTimeoutMs);
         return new DefaultKafkaProducerFactory<>(props);
     }
 

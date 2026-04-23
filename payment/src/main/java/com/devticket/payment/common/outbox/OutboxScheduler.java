@@ -20,7 +20,7 @@ public class OutboxScheduler {
     @SchedulerLock(name = "outbox-scheduler", lockAtMostFor = "5m", lockAtLeastFor = "5s")
     public void publishPendingEvents() {
         List<Outbox> pendingList =
-            outboxRepository.findPendingForRetry(OutboxStatus.PENDING, Instant.now());
+            outboxRepository.findPendingToPublish(OutboxStatus.PENDING, Instant.now());
 
         if (pendingList.isEmpty()) {
             return;

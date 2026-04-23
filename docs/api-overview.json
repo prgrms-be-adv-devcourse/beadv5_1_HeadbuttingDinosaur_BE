@@ -10,6 +10,7 @@
 
     {"domain":"order","httpMethod":"POST","path":"/api/orders","controller":"OrderController","method":"createOrderByCart","requestDto":"CartOrderRequest","responseDto":"OrderResponse","summary":"장바구니 기반 주문 생성"},
     {"domain":"order","httpMethod":"GET","path":"/api/orders","controller":"OrderController","method":"getOrderList","requestDto":"OrderListRequest","responseDto":"OrderListResponse","summary":"주문 목록 조회"},
+    {"domain":"order","httpMethod":"GET","path":"/api/orders/{orderId}/status","controller":"OrderController","method":"getOrderStatus","requestDto":null,"responseDto":"OrderStatusResponse","summary":"주문 상태 폴링 (CREATED → PAYMENT_PENDING 확인)"},
     {"domain":"order","httpMethod":"GET","path":"/api/orders/{orderId}","controller":"OrderController","method":"getOrderDetail","requestDto":null,"responseDto":"OrderDetailResponse","summary":"주문 상세 조회"},
     {"domain":"order","httpMethod":"PATCH","path":"/api/orders/{orderId}/cancel","controller":"OrderController","method":"cancelOrder","requestDto":null,"responseDto":"OrderCancelResponse","summary":"결제 전 주문 취소"},
 

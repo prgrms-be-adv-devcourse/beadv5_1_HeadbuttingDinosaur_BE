@@ -97,4 +97,5 @@ public interface EventRepository extends JpaRepository<Event, Long> {
         @Param("startOfNextDay") LocalDateTime startOfNextDay
     );
 
+
 }

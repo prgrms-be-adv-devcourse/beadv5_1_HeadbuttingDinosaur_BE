@@ -1,6 +1,6 @@
 {
   "module": "commerce",
-  "dtoCount": 30,
+  "dtoCount": 31,
   "dtos": [
     {
       "name": "CartItemQuantityRequest",
@@ -450,6 +450,26 @@
         },
         {
           "name": "createdAt",
+          "type": "LocalDateTime"
+        }
+      ]
+    },
+    {
+      "name": "OrderStatusResponse",
+      "group": "response",
+      "kind": "record",
+      "path": "commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/OrderStatusResponse.java",
+      "fields": [
+        {
+          "name": "orderId",
+          "type": "UUID"
+        },
+        {
+          "name": "status",
+          "type": "OrderStatus"
+        },
+        {
+          "name": "updatedAt",
           "type": "LocalDateTime"
         }
       ]
