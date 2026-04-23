@@ -49,7 +49,7 @@ public class Outbox {
     @Column(nullable = false, length = 36)
     private String partitionKey;
 
-    /** 이벤트 유형 식별자 (ORDER_CREATED, STOCK_DEDUCTED 등) */
+    /** 이벤트 유형 식별자 (EVENT_FORCE_CANCELLED, REFUND_STOCK_DONE 등) */
     @Column(nullable = false, length = 128)
     private String eventType;
 
