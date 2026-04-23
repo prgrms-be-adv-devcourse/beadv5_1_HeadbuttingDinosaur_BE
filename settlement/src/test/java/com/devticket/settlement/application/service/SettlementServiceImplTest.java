@@ -86,7 +86,7 @@ class SettlementServiceImplTest {
             .totalFeeAmount(3000)
             .finalSettlementAmount(97000)
             .carriedInAmount(0)
-            .status(SettlementStatus.COMPLETED)
+            .status(SettlementStatus.CONFIRMED)
             .settledAt(LocalDateTime.of(2026, 4, 1, 0, 10))
             .build();
 

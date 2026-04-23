@@ -48,7 +48,7 @@ class SettlementInternalServiceImplTest {
     // ────────────────────────────────────────────────
 
     @Test
-    void createSettlementFromItems_최소금액충족_COMPLETED생성() {
+    void createSettlementFromItems_최소금액충족_CONFIRMED생성() {
         SettlementItem item = buildItem(sellerId, 48500L);
         givenReadyItems(List.of(item));
         givenNoPendingSettlements();
@@ -57,7 +57,7 @@ class SettlementInternalServiceImplTest {
         service.createSettlementFromItems();
 
         Settlement saved = captureNewSettlement();
-        assertThat(saved.getStatus()).isEqualTo(SettlementStatus.COMPLETED);
+        assertThat(saved.getStatus()).isEqualTo(SettlementStatus.CONFIRMED);
         assertThat(saved.getFinalSettlementAmount()).isEqualTo(48500);
         assertThat(saved.getCarriedInAmount()).isEqualTo(0);
     }
@@ -78,14 +78,14 @@ class SettlementInternalServiceImplTest {
     }
 
     @Test
-    void createSettlementFromItems_이월합산으로_최소금액충족_COMPLETED_체인해소() {
+    void createSettlementFromItems_이월합산으로_최소금액충족_CONFIRMED_이월처리() {
         SettlementItem item = buildItem(sellerId, 4850L);
         Settlement pending = buildPendingSettlement(sellerId, 5820);
 
         givenReadyItems(List.of(item));
         given(settlementRepository.findByStatus(SettlementStatus.PENDING_MIN_AMOUNT))
             .willReturn(List.of());
-        given(settlementRepository.findBySellerIdAndStatus(sellerId, SettlementStatus.PENDING_MIN_AMOUNT))
+        given(settlementRepository.findBySellerIdAndStatusAndCarriedToSettlementIdIsNull(sellerId, SettlementStatus.PENDING_MIN_AMOUNT))
             .willReturn(List.of(pending));
         givenNotAlreadySettled(sellerId);
         givenSaveReturnsArgument();
@@ -93,12 +93,13 @@ class SettlementInternalServiceImplTest {
         service.createSettlementFromItems();
 
         Settlement saved = captureNewSettlement();
-        assertThat(saved.getStatus()).isEqualTo(SettlementStatus.COMPLETED);
+        assertThat(saved.getStatus()).isEqualTo(SettlementStatus.CONFIRMED);
         assertThat(saved.getFinalSettlementAmount()).isEqualTo(10670); // 4850 + 5820
         assertThat(saved.getCarriedInAmount()).isEqualTo(5820);
-        assertThat(saved.getCarriedInSettlementId()).isEqualTo(pending.getSettlementId());
 
-        assertThat(pending.getStatus()).isEqualTo(SettlementStatus.COMPLETED);
+        // 이월된 pending 정산서에 carriedToSettlementId 설정 확인
+        assertThat(pending.getCarriedToSettlementId()).isEqualTo(saved.getSettlementId());
+        assertThat(pending.getStatus()).isEqualTo(SettlementStatus.PENDING_MIN_AMOUNT);
     }
 
     @Test
@@ -109,7 +110,7 @@ class SettlementInternalServiceImplTest {
         givenReadyItems(List.of(item));
         given(settlementRepository.findByStatus(SettlementStatus.PENDING_MIN_AMOUNT))
             .willReturn(List.of());
-        given(settlementRepository.findBySellerIdAndStatus(sellerId, SettlementStatus.PENDING_MIN_AMOUNT))
+        given(settlementRepository.findBySellerIdAndStatusAndCarriedToSettlementIdIsNull(sellerId, SettlementStatus.PENDING_MIN_AMOUNT))
             .willReturn(List.of(pending));
         givenNotAlreadySettled(sellerId);
         givenSaveReturnsArgument();
@@ -131,7 +132,7 @@ class SettlementInternalServiceImplTest {
             .willReturn(List.of());
         given(settlementRepository.findByStatus(SettlementStatus.PENDING_MIN_AMOUNT))
             .willReturn(List.of(pending));
-        given(settlementRepository.findBySellerIdAndStatus(carryOverSellerId, SettlementStatus.PENDING_MIN_AMOUNT))
+        given(settlementRepository.findBySellerIdAndStatusAndCarriedToSettlementIdIsNull(carryOverSellerId, SettlementStatus.PENDING_MIN_AMOUNT))
             .willReturn(List.of(pending));
         givenNotAlreadySettled(carryOverSellerId);
         givenSaveReturnsArgument();
@@ -195,7 +196,7 @@ class SettlementInternalServiceImplTest {
             .willReturn(List.of());
         given(settlementRepository.findByStatus(SettlementStatus.PENDING_MIN_AMOUNT))
             .willReturn(List.of(pending));
-        given(settlementRepository.findBySellerIdAndStatus(carryOverSellerId, SettlementStatus.PENDING_MIN_AMOUNT))
+        given(settlementRepository.findBySellerIdAndStatusAndCarriedToSettlementIdIsNull(carryOverSellerId, SettlementStatus.PENDING_MIN_AMOUNT))
             .willReturn(List.of(pending));
         givenNotAlreadySettled(carryOverSellerId);
         givenSaveReturnsArgument();
@@ -248,7 +249,7 @@ class SettlementInternalServiceImplTest {
     private void givenNoPendingSettlements() {
         given(settlementRepository.findByStatus(SettlementStatus.PENDING_MIN_AMOUNT))
             .willReturn(List.of());
-        given(settlementRepository.findBySellerIdAndStatus(sellerId, SettlementStatus.PENDING_MIN_AMOUNT))
+        given(settlementRepository.findBySellerIdAndStatusAndCarriedToSettlementIdIsNull(sellerId, SettlementStatus.PENDING_MIN_AMOUNT))
             .willReturn(List.of());
         givenNotAlreadySettled(sellerId);
     }
