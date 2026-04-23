@@ -15,6 +15,7 @@ import static org.mockito.Mockito.when;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import com.devticket.event.common.exception.BusinessException;
+import com.devticket.event.common.outbox.OutboxService;
 import com.devticket.event.domain.enums.EventCategory;
 import com.devticket.event.domain.enums.EventStatus;
 import com.devticket.event.domain.exception.EventErrorCode;
@@ -26,6 +27,7 @@ import com.devticket.event.infrastructure.client.MemberClient;
 import com.devticket.event.infrastructure.client.OpenAiEmbeddingClient;
 import com.devticket.event.infrastructure.client.dto.TechStackItem;
 import com.devticket.event.infrastructure.persistence.EventRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.devticket.event.infrastructure.persistence.EventViewRepository;
 import com.devticket.event.infrastructure.search.EventDocument;
 import com.devticket.event.presentation.dto.EventDetailResponse;
@@ -79,6 +81,14 @@ class EventServiceTest {
     private OpenAiEmbeddingClient openAiEmbeddingClient;
 
     @Mock
+    private OutboxService outboxService;
+
+    @Mock
+    private MessageDeduplicationService deduplicationService;
+
+    @Mock
+    private ObjectMapper objectMapper;
+  
     private EventViewRepository eventViewRepository;
 
     @InjectMocks
