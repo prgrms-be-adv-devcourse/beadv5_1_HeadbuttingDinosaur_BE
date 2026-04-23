@@ -37,6 +37,7 @@ import com.devticket.payment.wallet.domain.repository.WalletChargeRepository;
 import com.devticket.payment.wallet.domain.repository.WalletRepository;
 import com.devticket.payment.wallet.domain.repository.WalletTransactionRepository;
 import com.devticket.payment.wallet.infrastructure.client.dto.InternalEventOrdersResponse;
+import com.devticket.payment.wallet.presentation.dto.SettlementDepositRequest;
 import com.devticket.payment.wallet.presentation.dto.WalletBalanceResponse;
 import com.devticket.payment.wallet.presentation.dto.WalletChargeConfirmRequest;
 import com.devticket.payment.wallet.presentation.dto.WalletChargeConfirmResponse;
@@ -530,6 +531,39 @@ public class WalletServiceImpl implements WalletService {
             walletCharge.fail();
             log.info("[Recovery] PG 상태 '{}' — chargeId={} → FAILED", pgStatus.status(), chargeId);
         }
+    }
+
+    // =====================================================================
+    // Settlement 요청 — 정산금을 예치금으로 전환
+    // =====================================================================
+
+    @Override
+    @Transactional
+    public void depositFromSettlement(SettlementDepositRequest request) {
+        String transactionKey = "SETTLEMENT_" + request.settlementId();
+
+        if (walletTransactionRepository.existsByTransactionKey(transactionKey)) {
+            log.info("[Settlement] 이미 처리된 정산 — settlementId={}", request.settlementId());
+            return;
+        }
+
+        // 지갑이 없으면 생성
+        walletRepository.findByUserId(request.userId())
+            .orElseGet(() -> walletRepository.save(Wallet.create(request.userId())));
+
+        walletRepository.chargeBalanceAtomic(request.userId(), request.amount());
+
+        Wallet wallet = walletRepository.findByUserId(request.userId())
+            .orElseThrow(() -> new WalletException(WalletErrorCode.WALLET_NOT_FOUND));
+
+        WalletTransaction tx = WalletTransaction.createSettlement(
+            wallet.getId(), request.userId(), transactionKey,
+            request.amount(), wallet.getBalance()
+        );
+        walletTransactionRepository.save(tx);
+
+        log.info("[Settlement] 정산금 예치금 전환 완료 — settlementId={}, userId={}, amount={}, balanceAfter={}",
+            request.settlementId(), request.userId(), request.amount(), wallet.getBalance());
     }
 
     // =====================================================================
