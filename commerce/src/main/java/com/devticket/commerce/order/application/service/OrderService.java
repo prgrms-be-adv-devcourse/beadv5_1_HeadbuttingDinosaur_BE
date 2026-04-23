@@ -235,116 +235,110 @@ public class OrderService implements OrderUsecase {
 
     @Override
     public InternalSettlementDataResponse getSettelmentData(UUID sellerId, String periodStart, String periodEnd) {
-        try {
-            log.info("[Settlement Debug] 시작 - sellerId: {}, period: {} ~ {}", sellerId, periodStart, periodEnd);
+        log.info("[Settlement Debug] 시작 - sellerId: {}, period: {} ~ {}", sellerId, periodStart, periodEnd);
 
-            // 1. Event 서비스에서 sellerId + 기간으로 해당 판매자의 이벤트 목록 조회
-            List<InternalEventInfoResponse> sellerEvents = orderToEventClient.getSellerEventsByPeriod(
-                sellerId, periodStart, periodEnd);
-            log.info("[Settlement Debug] 정산 기간 내 판매자 Event 수: {}", sellerEvents.size());
+        // 1. Event 서비스에서 sellerId + 기간으로 해당 판매자의 이벤트 목록 조회
+        List<InternalEventInfoResponse> sellerEvents = orderToEventClient.getSellerEventsByPeriod(
+            sellerId, periodStart, periodEnd);
+        log.info("[Settlement Debug] 정산 기간 내 판매자 Event 수: {}", sellerEvents.size());
 
-            if (sellerEvents.isEmpty()) {
-                log.warn("[Settlement Debug] 정산 기간 내 이벤트가 없어 빈 응답을 반환합니다.");
-                return new InternalSettlementDataResponse(sellerId, periodStart, periodEnd, List.of());
-            }
+        if (sellerEvents.isEmpty()) {
+            log.warn("[Settlement Debug] 정산 기간 내 이벤트가 없어 빈 응답을 반환합니다.");
+            return new InternalSettlementDataResponse(sellerId, periodStart, periodEnd, List.of());
+        }
 
-            // 2. eventId 목록 추출 후 해당 OrderItem만 조회
-            List<UUID> eventIds = sellerEvents.stream()
-                .map(InternalEventInfoResponse::eventId)
-                .toList();
-            log.info("[Settlement Debug] 조회할 Event ID 목록: {}", eventIds);
+        // 2. eventId 목록 추출 후 해당 OrderItem만 조회
+        List<UUID> eventIds = sellerEvents.stream()
+            .map(InternalEventInfoResponse::eventId)
+            .toList();
+        log.info("[Settlement Debug] 조회할 Event ID 목록: {}", eventIds);
 
-            List<OrderItem> orderItems = orderItemRepository.findSettlementItems(eventIds);
-            log.info("[Settlement Debug] 조회된 OrderItem 수: {}", orderItems.size());
+        List<OrderItem> orderItems = orderItemRepository.findSettlementItems(eventIds);
+        log.info("[Settlement Debug] 조회된 OrderItem 수: {}", orderItems.size());
 
-            if (orderItems.isEmpty()) {
-                log.warn("[Settlement Debug] 조회된 데이터가 없어 빈 응답을 반환합니다.");
-                return new InternalSettlementDataResponse(sellerId, periodStart, periodEnd, List.of());
-            }
+        if (orderItems.isEmpty()) {
+            log.warn("[Settlement Debug] 조회된 데이터가 없어 빈 응답을 반환합니다.");
+            return new InternalSettlementDataResponse(sellerId, periodStart, periodEnd, List.of());
+        }
 
-            // 3. OrderId 추출 및 Order 조회
-            List<Long> orderIds = orderItems.stream()
-                .map(OrderItem::getOrderId)
-                .distinct()
-                .toList();
-            log.info("[Settlement Debug] 추출된 중복 제거 Order PK 리스트: {}", orderIds);
+        // 3. OrderId 추출 및 Order 조회
+        List<Long> orderIds = orderItems.stream()
+            .map(OrderItem::getOrderId)
+            .distinct()
+            .toList();
+        log.info("[Settlement Debug] 추출된 중복 제거 Order PK 리스트: {}", orderIds);
 
-            List<Order> orders = orderRepository.findAllByIds(orderIds);
-            log.info("[Settlement Debug] DB에서 조회된 Order 엔티티 수: {}", orders.size());
+        List<Order> orders = orderRepository.findAllByIds(orderIds);
+        log.info("[Settlement Debug] DB에서 조회된 Order 엔티티 수: {}", orders.size());
 
-            // [주의] 여기서 중복 키 에러가 자주 발생하므로 안전하게 처리
-            Map<Long, Order> orderMap = orders.stream()
-                .collect(Collectors.toMap(
-                    Order::getId,
-                    order -> order,
-                    (existing, replacement) -> existing // 중복 시 기존값 유지
-                ));
+        // [주의] 여기서 중복 키 에러가 자주 발생하므로 안전하게 처리
+        Map<Long, Order> orderMap = orders.stream()
+            .collect(Collectors.toMap(
+                Order::getId,
+                order -> order,
+                (existing, replacement) -> existing // 중복 시 기존값 유지
+            ));
 
-            // 4. eventId별로 그룹화
-            Map<UUID, List<OrderItem>> itemsByEvent = orderItems.stream()
-                .collect(Collectors.groupingBy(OrderItem::getEventId));
-            log.info("[Settlement Debug] 그룹화된 Event 수: {}", itemsByEvent.size());
+        // 4. eventId별로 그룹화
+        Map<UUID, List<OrderItem>> itemsByEvent = orderItems.stream()
+            .collect(Collectors.groupingBy(OrderItem::getEventId));
+        log.info("[Settlement Debug] 그룹화된 Event 수: {}", itemsByEvent.size());
 
-            // 5. 데이터 집계
-            List<InternalSettlementDataResponse.EventSettlements> eventSettlements = itemsByEvent.entrySet().stream()
-                .map(entry -> {
-                    UUID eventId = entry.getKey();
-                    List<OrderItem> itemList = entry.getValue();
+        // 5. 데이터 집계
+        List<InternalSettlementDataResponse.EventSettlements> eventSettlements = itemsByEvent.entrySet().stream()
+            .map(entry -> {
+                UUID eventId = entry.getKey();
+                List<OrderItem> itemList = entry.getValue();
 
-                    int totalSales = 0;
-                    int totalRefund = 0;
-                    int soldQty = 0;
-                    int refundQty = 0;
+                int totalSales = 0;
+                int totalRefund = 0;
+                int soldQty = 0;
+                int refundQty = 0;
 
-                    for (OrderItem item : itemList) {
-                        Order order = orderMap.get(item.getOrderId());
-                        if (order == null) {
-                            log.warn("[Settlement Debug] Order를 찾을 수 없음 - orderId: {}", item.getOrderId());
-                            continue;
-                        }
-
-                        OrderStatus orderStatus = order.getStatus();
-                        if (OrderStatus.PAID.equals(orderStatus)) {
-                            totalSales += item.getPrice() * item.getQuantity();
-                            soldQty += item.getQuantity();
-                        } else if (OrderStatus.CANCELLED.equals(orderStatus)
-                            || OrderStatus.REFUND_PENDING.equals(orderStatus)
-                            || OrderStatus.REFUNDED.equals(orderStatus)) {
-                            // REFUND_PENDING/REFUNDED: Saga 로 확정된 환불 — CANCELLED 와 동일하게 환불 집계에 포함.
-                            totalRefund += item.getPrice() * item.getQuantity();
-                            refundQty += item.getQuantity();
-                        }
+                for (OrderItem item : itemList) {
+                    Order order = orderMap.get(item.getOrderId());
+                    if (order == null) {
+                        log.warn("[Settlement Debug] Order를 찾을 수 없음 - orderId: {}", item.getOrderId());
+                        continue;
                     }
 
-                    List<InternalSettlementDataResponse.EventSettlements.OrderItems> detailItems = itemList.stream()
-                        .map(i -> {
-                            Order itemOrder = orderMap.get(i.getOrderId());
-                            String orderStatus = (itemOrder != null) ? itemOrder.getStatus().name() : "UNKNOWN";
+                    OrderStatus orderStatus = order.getStatus();
+                    if (OrderStatus.PAID.equals(orderStatus)) {
+                        totalSales += item.getPrice() * item.getQuantity();
+                        soldQty += item.getQuantity();
+                    } else if (OrderStatus.CANCELLED.equals(orderStatus)
+                        || OrderStatus.REFUND_PENDING.equals(orderStatus)
+                        || OrderStatus.REFUNDED.equals(orderStatus)) {
+                        // REFUND_PENDING/REFUNDED: Saga 로 확정된 환불 — CANCELLED 와 동일하게 환불 집계에 포함.
+                        totalRefund += item.getPrice() * item.getQuantity();
+                        refundQty += item.getQuantity();
+                    }
+                }
 
-                            return new InternalSettlementDataResponse.EventSettlements.OrderItems(
-                                i.getOrderItemId(),
-                                i.getEventId(),
-                                i.getPrice(),
-                                i.getQuantity(),
-                                i.getSubtotalAmount(),
-                                orderStatus
-                            );
-                        })
-                        .toList();
+                List<InternalSettlementDataResponse.EventSettlements.OrderItems> detailItems = itemList.stream()
+                    .map(i -> {
+                        Order itemOrder = orderMap.get(i.getOrderId());
+                        String orderStatus = (itemOrder != null) ? itemOrder.getStatus().name() : "UNKNOWN";
 
-                    return new InternalSettlementDataResponse.EventSettlements(
-                        eventId, totalSales, totalRefund, soldQty, refundQty, detailItems
-                    );
-                })
-                .toList();
+                        return new InternalSettlementDataResponse.EventSettlements.OrderItems(
+                            i.getOrderItemId(),
+                            i.getEventId(),
+                            i.getPrice(),
+                            i.getQuantity(),
+                            i.getSubtotalAmount(),
+                            orderStatus
+                        );
+                    })
+                    .toList();
 
-            log.info("[Settlement Debug] 최종 응답 구성 완료");
-            return new InternalSettlementDataResponse(sellerId, periodStart, periodEnd, eventSettlements);
+                return new InternalSettlementDataResponse.EventSettlements(
+                    eventId, totalSales, totalRefund, soldQty, refundQty, detailItems
+                );
+            })
+            .toList();
 
-        } catch (Exception e) {
-            log.error("[Settlement Debug] 에러 발생 원인: ", e);
-            throw e;
-        }
+        log.info("[Settlement Debug] 최종 응답 구성 완료");
+        return new InternalSettlementDataResponse(sellerId, periodStart, periodEnd, eventSettlements);
     }
 
     // 결제 전 주문 취소
