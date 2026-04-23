@@ -10,6 +10,7 @@ import com.devticket.settlement.domain.model.SettlementStatus;
 import com.devticket.settlement.domain.repository.FeePolicyRepository;
 import com.devticket.settlement.domain.repository.SettlementItemRepository;
 import com.devticket.settlement.domain.repository.SettlementRepository;
+import com.devticket.settlement.infrastructure.client.SettlementToPaymentClient;
 import com.devticket.settlement.infrastructure.external.dto.AdminSettlementDetailResponse;
 import com.devticket.settlement.infrastructure.external.dto.AdminSettlementDetailResponse.CarriedInSettlement;
 import com.devticket.settlement.infrastructure.client.SettlementToCommerceClient;
@@ -43,6 +44,7 @@ public class SettlementInternalServiceImpl implements SettlementInternalService 
     private static final int MIN_SETTLEMENT_AMOUNT = 10_000;
 
     private final SettlementToCommerceClient settlementToCommerceClient;
+    private final SettlementToPaymentClient settlementToPaymentClient;
     private final SettlementToMemberClient settlementToMemberClient;
     private final FeePolicyRepository feePolicyRepository;
     private final SettlementRepository settlementRepository;
@@ -244,7 +246,7 @@ public class SettlementInternalServiceImpl implements SettlementInternalService 
     // 지급처리
     // ────────────────────────────────────────────────
 
-    @Transactional
+    @Transactional(noRollbackFor = BusinessException.class)
     public void processPayment(UUID settlementId) {
         Settlement settlement = settlementRepository.findBySettlementId(settlementId)
             .orElseThrow(() -> new BusinessException(SettlementErrorCode.SETTLEMENT_BAD_REQUEST));
@@ -255,14 +257,13 @@ public class SettlementInternalServiceImpl implements SettlementInternalService 
         }
 
         try {
-            settlementToCommerceClient.transferToDeposit(
-                settlement.getSellerId(), settlement.getFinalSettlementAmount()
+            settlementToPaymentClient.transferToDeposit(
+                settlement.getSettlementId(), settlement.getSellerId(), settlement.getFinalSettlementAmount()
             );
 
             settlement.updateStatus(SettlementStatus.PAID);
             settlementRepository.save(settlement);
 
-            // 이 정산서에 이월된 PENDING 정산서들도 PAID로 변경
             markCarriedSettlementsAsPaid(settlementId);
 
             log.info("[지급 완료] settlementId={}, amount={}", settlementId, settlement.getFinalSettlementAmount());
@@ -271,6 +272,7 @@ public class SettlementInternalServiceImpl implements SettlementInternalService 
             settlement.updateStatus(SettlementStatus.PAID_FAILED);
             settlementRepository.save(settlement);
             log.error("[지급 실패] settlementId={}", settlementId, e);
+            throw new BusinessException(SettlementErrorCode.PAYMENT_FAILED);
         }
     }
 
