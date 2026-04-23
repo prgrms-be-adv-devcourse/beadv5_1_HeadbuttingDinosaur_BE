@@ -7,6 +7,8 @@ import com.devticket.commerce.common.messaging.event.refund.EventForceCancelledE
 import com.devticket.commerce.common.messaging.event.refund.RefundRequestedEvent;
 import com.devticket.commerce.common.outbox.OutboxService;
 import com.devticket.commerce.order.domain.model.Order;
+import com.devticket.commerce.order.domain.model.OrderItem;
+import com.devticket.commerce.order.domain.repository.OrderItemRepository;
 import com.devticket.commerce.order.domain.repository.OrderRepository;
 import com.devticket.commerce.ticket.domain.enums.TicketStatus;
 import com.devticket.commerce.ticket.domain.model.Ticket;
@@ -15,7 +17,9 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -33,6 +37,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class RefundFanoutService {
 
     private final OrderRepository orderRepository;
+    private final OrderItemRepository orderItemRepository;
     private final TicketRepository ticketRepository;
     private final OutboxService outboxService;
     private final MessageDeduplicationService deduplicationService;
@@ -63,16 +68,34 @@ public class RefundFanoutService {
             // 대상 티켓 — 이 이벤트에 해당하면서 ISSUED 인 것만
             List<Ticket> orderTickets = ticketRepository
                 .findAllByOrderIdAndStatus(order.getId(), TicketStatus.ISSUED);
-            List<UUID> ticketIds = orderTickets.stream()
+            List<Ticket> targetTickets = orderTickets.stream()
                 .filter(t -> t.getEventId().equals(event.eventId()))
-                .map(Ticket::getTicketId)
                 .toList();
 
-            if (ticketIds.isEmpty()) {
+            if (targetTickets.isEmpty()) {
                 log.warn("[event.force-cancelled] ISSUED 티켓 없음 — skip. orderId={}, eventId={}",
                     order.getOrderId(), event.eventId());
                 continue;
             }
+
+            // 환불 금액 — 대상 티켓 합계로 한정 (다중 이벤트 주문의 과환불 방지).
+            // 티켓 : OrderItem = N:1 (결제 완료 시 OrderItem.quantity 만큼 티켓 생성),
+            // 각 티켓의 단가는 해당 OrderItem.price 와 동일하므로 단가 × 티켓수 로 산정.
+            Map<UUID, Integer> priceByOrderItemId = orderItemRepository.findAllByOrderId(order.getId())
+                .stream()
+                .collect(Collectors.toMap(OrderItem::getOrderItemId, OrderItem::getPrice));
+            int refundAmount = targetTickets.stream()
+                .mapToInt(t -> priceByOrderItemId.getOrDefault(t.getOrderItemId(), 0))
+                .sum();
+
+            if (refundAmount <= 0) {
+                log.warn("[event.force-cancelled] 환불 금액 산정 실패 — skip. orderId={}, eventId={}",
+                    order.getOrderId(), event.eventId());
+                continue;
+            }
+
+            List<UUID> ticketIds = targetTickets.stream().map(Ticket::getTicketId).toList();
+            boolean wholeOrder = ticketIds.size() == orderTickets.size();
 
             RefundRequestedEvent request = new RefundRequestedEvent(
                 UUID.randomUUID(),           // refundId — Commerce 생성
@@ -82,9 +105,9 @@ public class RefundFanoutService {
                 order.getPaymentId(),         // payment.completed 수신 시 기록된 값
                 order.getPaymentMethod(),
                 ticketIds,
-                order.getTotalAmount(),       // 전체 환불 금액
+                refundAmount,                 // 대상 티켓 합계
                 100,                          // refundRate — 강제 취소는 100%
-                true,                         // wholeOrder — 강제 취소는 항상 전체 환불
+                wholeOrder,                   // 대상 티켓이 주문 전체 티켓과 일치할 때만 true
                 reason,
                 now
             );

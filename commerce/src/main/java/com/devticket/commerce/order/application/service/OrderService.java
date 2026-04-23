@@ -324,10 +324,14 @@ public class OrderService implements OrderUsecase {
                             continue;
                         }
 
-                        if (OrderStatus.PAID.equals(order.getStatus())) {
+                        OrderStatus orderStatus = order.getStatus();
+                        if (OrderStatus.PAID.equals(orderStatus)) {
                             totalSales += item.getPrice() * item.getQuantity();
                             soldQty += item.getQuantity();
-                        } else if (OrderStatus.CANCELLED.equals(order.getStatus())) {
+                        } else if (OrderStatus.CANCELLED.equals(orderStatus)
+                            || OrderStatus.REFUND_PENDING.equals(orderStatus)
+                            || OrderStatus.REFUNDED.equals(orderStatus)) {
+                            // REFUND_PENDING/REFUNDED: Saga 로 확정된 환불 — CANCELLED 와 동일하게 환불 집계에 포함.
                             totalRefund += item.getPrice() * item.getQuantity();
                             refundQty += item.getQuantity();
                         }

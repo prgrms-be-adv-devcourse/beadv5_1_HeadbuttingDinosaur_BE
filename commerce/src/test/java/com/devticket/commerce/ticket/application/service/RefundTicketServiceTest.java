@@ -13,6 +13,7 @@ import com.devticket.commerce.common.messaging.MessageDeduplicationService;
 import com.devticket.commerce.common.messaging.event.refund.RefundTicketCancelEvent;
 import com.devticket.commerce.common.messaging.event.refund.RefundTicketCompensateEvent;
 import com.devticket.commerce.common.outbox.OutboxService;
+import com.devticket.commerce.order.domain.repository.OrderRepository;
 import com.devticket.commerce.ticket.domain.enums.TicketStatus;
 import com.devticket.commerce.ticket.domain.model.Ticket;
 import com.devticket.commerce.ticket.domain.repository.TicketRepository;
@@ -37,6 +38,7 @@ class RefundTicketServiceTest {
     @Mock private TicketRepository ticketRepository;
     @Mock private OutboxService outboxService;
     @Mock private MessageDeduplicationService deduplicationService;
+    @Mock private OrderRepository orderRepository;
 
     private final ObjectMapper objectMapper = JsonMapper.builder()
         .addModule(new JavaTimeModule())
@@ -48,7 +50,7 @@ class RefundTicketServiceTest {
     @BeforeEach
     void setUp() {
         refundTicketService = new RefundTicketService(
-            ticketRepository, outboxService, deduplicationService, objectMapper);
+            ticketRepository, outboxService, deduplicationService, orderRepository, objectMapper);
     }
 
     private Ticket ticketWith(UUID eventId, TicketStatus status) {
@@ -80,7 +82,7 @@ class RefundTicketServiceTest {
         Ticket t2 = ticketWith(eventId, TicketStatus.ISSUED);
         List<UUID> ids = List.of(t1.getTicketId(), t2.getTicketId());
         RefundTicketCancelEvent event = new RefundTicketCancelEvent(
-            UUID.randomUUID(), orderId, ids, Instant.now());
+            UUID.randomUUID(), orderId, ids, true, Instant.now());
 
         given(deduplicationService.isDuplicate(messageId)).willReturn(false);
         given(ticketRepository.findAllByTicketIdIn(ids)).willReturn(List.of(t1, t2));
@@ -106,7 +108,7 @@ class RefundTicketServiceTest {
         Ticket t3 = ticketWith(eventB, TicketStatus.ISSUED);
         List<UUID> ids = List.of(t1.getTicketId(), t2.getTicketId(), t3.getTicketId());
         RefundTicketCancelEvent event = new RefundTicketCancelEvent(
-            UUID.randomUUID(), orderId, ids, Instant.now());
+            UUID.randomUUID(), orderId, ids, true, Instant.now());
 
         given(deduplicationService.isDuplicate(messageId)).willReturn(false);
         given(ticketRepository.findAllByTicketIdIn(ids)).willReturn(List.of(t1, t2, t3));
@@ -127,7 +129,7 @@ class RefundTicketServiceTest {
         Ticket t2 = ticketWith(UUID.randomUUID(), TicketStatus.REFUNDED);
         List<UUID> ids = List.of(t1.getTicketId(), t2.getTicketId());
         RefundTicketCancelEvent event = new RefundTicketCancelEvent(
-            UUID.randomUUID(), orderId, ids, Instant.now());
+            UUID.randomUUID(), orderId, ids, true, Instant.now());
 
         given(deduplicationService.isDuplicate(messageId)).willReturn(false);
         given(ticketRepository.findAllByTicketIdIn(ids)).willReturn(List.of(t1, t2));
@@ -147,7 +149,7 @@ class RefundTicketServiceTest {
         UUID orderId = UUID.randomUUID();
         List<UUID> ids = List.of(UUID.randomUUID(), UUID.randomUUID());
         RefundTicketCancelEvent event = new RefundTicketCancelEvent(
-            UUID.randomUUID(), orderId, ids, Instant.now());
+            UUID.randomUUID(), orderId, ids, true, Instant.now());
 
         given(deduplicationService.isDuplicate(messageId)).willReturn(false);
         given(ticketRepository.findAllByTicketIdIn(ids)).willReturn(List.of());
