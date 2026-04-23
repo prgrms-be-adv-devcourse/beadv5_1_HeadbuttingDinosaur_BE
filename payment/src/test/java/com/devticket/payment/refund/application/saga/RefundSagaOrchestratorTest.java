@@ -76,9 +76,9 @@ class RefundSagaOrchestratorTest {
 
     private RefundRequestedEvent newRequested(PaymentMethod method, boolean wholeOrder) {
         return new RefundRequestedEvent(
-            refundId, orderId, userId, paymentId, method,
+            refundId, UUID.randomUUID(), orderId, userId, paymentId, method,
             wholeOrder ? List.of() : List.of(UUID.randomUUID()),
-            10_000, 100, wholeOrder, Instant.now()
+            10_000, 100, wholeOrder, "test-reason", Instant.now()
         );
     }
 
