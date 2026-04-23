@@ -2,7 +2,6 @@ package com.devticket.payment.wallet.application.event;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.devticket.payment.payment.domain.enums.PaymentMethod;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -12,7 +11,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-class PaymentCompletedEventSerializationTest {
+class PaymentFailedEventSerializationTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper()
         .registerModule(new JavaTimeModule());
@@ -22,16 +21,14 @@ class PaymentCompletedEventSerializationTest {
     void orderItems_직렬화_포함() throws Exception {
         UUID eventId1 = UUID.randomUUID();
         UUID eventId2 = UUID.randomUUID();
-        PaymentCompletedEvent event = PaymentCompletedEvent.builder()
+        PaymentFailedEvent event = PaymentFailedEvent.builder()
             .orderId(UUID.randomUUID())
             .userId(UUID.randomUUID())
-            .paymentId(UUID.randomUUID())
-            .paymentMethod(PaymentMethod.PG)
-            .totalAmount(50_000)
             .orderItems(List.of(
-                new PaymentCompletedEvent.OrderItem(eventId1, 2),
-                new PaymentCompletedEvent.OrderItem(eventId2, 1)
+                new PaymentFailedEvent.OrderItem(eventId1, 2),
+                new PaymentFailedEvent.OrderItem(eventId2, 1)
             ))
+            .reason("PG_TIMEOUT")
             .timestamp(Instant.now())
             .build();
 
@@ -51,13 +48,11 @@ class PaymentCompletedEventSerializationTest {
     @Test
     @DisplayName("orderItems가 빈 리스트여도 직렬화 가능")
     void 빈_orderItems_직렬화() throws Exception {
-        PaymentCompletedEvent event = PaymentCompletedEvent.builder()
+        PaymentFailedEvent event = PaymentFailedEvent.builder()
             .orderId(UUID.randomUUID())
             .userId(UUID.randomUUID())
-            .paymentId(UUID.randomUUID())
-            .paymentMethod(PaymentMethod.WALLET)
-            .totalAmount(10_000)
             .orderItems(List.of())
+            .reason("INSUFFICIENT_BALANCE")
             .timestamp(Instant.now())
             .build();
 
@@ -73,22 +68,21 @@ class PaymentCompletedEventSerializationTest {
     @DisplayName("역직렬화 후 OrderItem 값이 보존된다")
     void 역직렬화_orderItems_보존() throws Exception {
         UUID eventId = UUID.randomUUID();
-        PaymentCompletedEvent original = PaymentCompletedEvent.builder()
+        PaymentFailedEvent original = PaymentFailedEvent.builder()
             .orderId(UUID.randomUUID())
             .userId(UUID.randomUUID())
-            .paymentId(UUID.randomUUID())
-            .paymentMethod(PaymentMethod.WALLET_PG)
-            .totalAmount(70_000)
-            .orderItems(List.of(new PaymentCompletedEvent.OrderItem(eventId, 3)))
+            .orderItems(List.of(new PaymentFailedEvent.OrderItem(eventId, 3)))
+            .reason("STOCK_FAIL")
             .timestamp(Instant.now())
             .build();
 
         String json = objectMapper.writeValueAsString(original);
-        PaymentCompletedEvent deserialized = objectMapper.readValue(json, PaymentCompletedEvent.class);
+        PaymentFailedEvent deserialized = objectMapper.readValue(json, PaymentFailedEvent.class);
 
         assertThat(deserialized.orderItems()).hasSize(1);
         assertThat(deserialized.orderItems().get(0).eventId()).isEqualTo(eventId);
         assertThat(deserialized.orderItems().get(0).quantity()).isEqualTo(3);
+        assertThat(deserialized.reason()).isEqualTo("STOCK_FAIL");
     }
 
     @Test
@@ -97,18 +91,16 @@ class PaymentCompletedEventSerializationTest {
         String json = "{"
             + "\"orderId\":\"" + UUID.randomUUID() + "\","
             + "\"userId\":\"" + UUID.randomUUID() + "\","
-            + "\"paymentId\":\"" + UUID.randomUUID() + "\","
-            + "\"paymentMethod\":\"PG\","
-            + "\"totalAmount\":10000,"
             + "\"orderItems\":[],"
+            + "\"reason\":\"PG_TIMEOUT\","
             + "\"timestamp\":\"2025-01-01T00:00:00Z\","
             + "\"unknownFutureField\":\"some-value\","
             + "\"anotherNewField\":123"
             + "}";
 
-        PaymentCompletedEvent event = objectMapper.readValue(json, PaymentCompletedEvent.class);
+        PaymentFailedEvent event = objectMapper.readValue(json, PaymentFailedEvent.class);
 
-        assertThat(event.totalAmount()).isEqualTo(10000);
+        assertThat(event.reason()).isEqualTo("PG_TIMEOUT");
         assertThat(event.orderItems()).isEmpty();
     }
 
@@ -119,18 +111,16 @@ class PaymentCompletedEventSerializationTest {
         String json = "{"
             + "\"orderId\":\"" + UUID.randomUUID() + "\","
             + "\"userId\":\"" + UUID.randomUUID() + "\","
-            + "\"paymentId\":\"" + UUID.randomUUID() + "\","
-            + "\"paymentMethod\":\"WALLET_PG\","
-            + "\"totalAmount\":10000,"
             + "\"orderItems\":[{"
             +     "\"eventId\":\"" + eventId + "\","
             +     "\"quantity\":2,"
             +     "\"futureFieldOnItem\":\"x\""
             + "}],"
+            + "\"reason\":\"WALLET_PG_TIMEOUT\","
             + "\"timestamp\":\"2025-01-01T00:00:00Z\""
             + "}";
 
-        PaymentCompletedEvent event = objectMapper.readValue(json, PaymentCompletedEvent.class);
+        PaymentFailedEvent event = objectMapper.readValue(json, PaymentFailedEvent.class);
 
         assertThat(event.orderItems()).hasSize(1);
         assertThat(event.orderItems().get(0).eventId()).isEqualTo(eventId);
