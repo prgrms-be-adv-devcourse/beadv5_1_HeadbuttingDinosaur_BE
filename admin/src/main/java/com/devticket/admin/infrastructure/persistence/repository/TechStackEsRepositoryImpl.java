@@ -90,5 +90,20 @@ public class TechStackEsRepositoryImpl implements TechStackEsRepository{
         }
     }
 
+    @Override
+    public TechStackDocument findById(Long id) {
+        try {
+            var response = elasticsearchClient.get(g -> g
+                    .index(INDEX)
+                    .id(String.valueOf(id)),
+                TechStackDocument.class
+            );
+            return response.found() ? response.source() : null;
+        } catch (Exception e) {
+            log.error("[ES] TechStack 조회 실패 - id: {}", id, e);
+            return null;
+        }
+    }
+
 
 }

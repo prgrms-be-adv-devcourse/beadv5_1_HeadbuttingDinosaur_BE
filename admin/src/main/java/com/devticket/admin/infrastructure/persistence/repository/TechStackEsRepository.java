@@ -9,5 +9,6 @@ public interface TechStackEsRepository{
     void update(Long id, String name, float[] embedding);
     void delete(Long id);
     List<TechStackDocument> findAllWithoutEmbedding();
+    TechStackDocument findById(Long id);
 
 }

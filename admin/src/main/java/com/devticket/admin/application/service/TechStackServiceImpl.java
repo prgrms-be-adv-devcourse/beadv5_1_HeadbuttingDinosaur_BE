@@ -96,22 +96,31 @@ public class TechStackServiceImpl implements TechStackService{
 
     // =============== 5. TechStack 재색인 =============== //
     public void reindexEmptyEmbeddings(){
-        List<TechStackDocument> emptyEmbeddings = techStackEsRepository.findAllWithoutEmbedding();
+        // 1. 테크 스택 전체 조회
+        List<TechStack> allFromDb = techStackRepository.getTechStacks();
+        // 2. RDB 안에 있지만, ES에는 없는 TechStack을 조회
+        List<TechStack> targets = allFromDb.stream()
+            .filter(ts -> {
+                TechStackDocument doc = techStackEsRepository.findById(ts.getId());
+                return doc == null || doc.getEmbedding() == null;
+            })
+            .toList();
 
-        if(emptyEmbeddings.isEmpty()){
+        if(targets.isEmpty()){
             log.info("[Reindex] 임베딩 없는 TechStack 없음");
             return;
         }
 
-        log.info("[Reindex] 임베딩 없는 TechStack {} 개 재색인 시작", emptyEmbeddings.size());
+        log.info("[Reindex] 대상 TechStack {} 개 재색인 시작", targets.size());
 
-        for (TechStackDocument doc : emptyEmbeddings) {
-            try {
-                float[] embedding = openAiEmbeddingClient.embed(doc.getName());
-                techStackEsRepository.update(Long.valueOf(doc.getId()), doc.getName(), embedding);
-                log.info("[Reindex] 완료 - id: {}, name: {}", doc.getId(), doc.getName());
+        // 3. 테크스택 재색인 및 es 저장
+        for(TechStack ts : targets){
+            try{
+                float[] embedding = openAiEmbeddingClient.embed(ts.getName());
+                techStackEsRepository.update(ts.getId(), ts.getName(), embedding);
+                log.info("[Reindex] 완료 - id: {}, name: {}", ts.getId(), ts.getName());
             } catch (Exception e) {
-                log.error("[Reindex] 실패 - id: {}, name: {}", doc.getId(), doc.getName(), e);
+                log.error("[Reindex] 실패 - id: {}, name: {}", ts.getId(), ts.getName(), e);
             }
         }
 
