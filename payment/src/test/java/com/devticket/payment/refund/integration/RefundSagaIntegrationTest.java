@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
 import com.devticket.payment.common.messaging.KafkaTopics;
-import com.devticket.payment.common.outbox.OutboxRepository;
 import com.devticket.payment.common.outbox.OutboxService;
 import com.devticket.payment.payment.domain.enums.PaymentMethod;
 import com.devticket.payment.payment.domain.model.Payment;
@@ -12,8 +11,11 @@ import com.devticket.payment.payment.domain.repository.PaymentRepository;
 import com.devticket.payment.refund.application.saga.event.RefundOrderDoneEvent;
 import com.devticket.payment.refund.application.saga.event.RefundRequestedEvent;
 import com.devticket.payment.refund.application.saga.event.RefundStockDoneEvent;
+import com.devticket.payment.refund.application.saga.event.RefundStockRestoreEvent;
+import com.devticket.payment.refund.application.saga.event.RefundTicketCancelEvent;
 import com.devticket.payment.refund.application.saga.event.RefundTicketDoneEvent;
 import com.devticket.payment.refund.application.saga.event.RefundTicketFailedEvent;
+import com.devticket.payment.refund.application.saga.event.RefundOrderCancelEvent;
 import com.devticket.payment.refund.domain.enums.OrderRefundStatus;
 import com.devticket.payment.refund.domain.model.OrderRefund;
 import com.devticket.payment.refund.domain.model.Refund;
@@ -25,7 +27,6 @@ import com.devticket.payment.refund.domain.saga.SagaStatus;
 import com.devticket.payment.refund.domain.saga.SagaStep;
 import com.devticket.payment.wallet.domain.model.Wallet;
 import com.devticket.payment.wallet.domain.repository.WalletRepository;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Duration;
 import java.time.Instant;
@@ -45,7 +46,7 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.test.context.EmbeddedKafka;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Refund Saga E2E 통합 테스트 — Payment Orchestrator + Outbox + Kafka + Mock Commerce/Event Consumer 연동 검증.
@@ -78,15 +79,13 @@ class RefundSagaIntegrationTest {
     @Autowired
     SagaStateRepository sagaStateRepository;
     @Autowired
-    OutboxRepository outboxRepository;
-    @Autowired
     OutboxService outboxService;
-    @Autowired
-    ObjectMapper objectMapper;
     @Autowired
     MockSagaPartner mockPartner;
     @Autowired
     WalletRepository walletRepository;
+    @Autowired
+    TransactionTemplate transactionTemplate;
 
     @BeforeEach
     void setUp() {
@@ -126,8 +125,12 @@ class RefundSagaIntegrationTest {
             Instant.now()
         );
 
-        publishOutbox(KafkaTopics.REFUND_REQUESTED, refund.getRefundId().toString(),
-            payment.getOrderId().toString(), requested);
+        publishOutbox(
+            refund.getRefundId().toString(),
+            payment.getOrderId().toString(),
+            KafkaTopics.REFUND_REQUESTED,
+            requested
+        );
 
         await().atMost(Duration.ofSeconds(90)).untilAsserted(() -> {
             SagaState state = sagaStateRepository.findByRefundId(refund.getRefundId()).orElse(null);
@@ -167,8 +170,12 @@ class RefundSagaIntegrationTest {
             List.of(UUID.randomUUID()), payment.getAmount(), 100, false,
             "integration-test", Instant.now()
         );
-        publishOutbox(KafkaTopics.REFUND_REQUESTED, refund.getRefundId().toString(),
-            payment.getOrderId().toString(), requested);
+        publishOutbox(
+            refund.getRefundId().toString(),
+            payment.getOrderId().toString(),
+            KafkaTopics.REFUND_REQUESTED,
+            requested
+        );
 
         await().atMost(Duration.ofSeconds(60)).untilAsserted(() -> {
             SagaState state = sagaStateRepository.findByRefundId(refund.getRefundId()).orElse(null);
@@ -179,9 +186,10 @@ class RefundSagaIntegrationTest {
 
     // ---------- helpers ----------
 
-    @Transactional
-    protected void publishOutbox(String topic, String aggregateId, String partitionKey, Object payload) {
-        outboxService.save(aggregateId, topic, topic, partitionKey, payload);
+    protected void publishOutbox(String aggregateId, String partitionKey, String topic, Object payload) {
+        transactionTemplate.executeWithoutResult(status ->
+            outboxService.save(aggregateId, partitionKey, topic, topic, payload)
+        );
     }
 
     private Payment createAndSavePgPayment() {
@@ -203,8 +211,12 @@ class RefundSagaIntegrationTest {
     static class MockSagaPartnerConfig {
 
         @Bean
-        MockSagaPartner mockSagaPartner(OutboxService outboxService, ObjectMapper objectMapper) {
-            return new MockSagaPartner(outboxService, objectMapper);
+        MockSagaPartner mockSagaPartner(
+            OutboxService outboxService,
+            ObjectMapper objectMapper,
+            TransactionTemplate transactionTemplate
+        ) {
+            return new MockSagaPartner(outboxService, objectMapper, transactionTemplate);
         }
     }
 
@@ -214,74 +226,97 @@ class RefundSagaIntegrationTest {
 
         private final OutboxService outboxService;
         private final ObjectMapper objectMapper;
+        private final TransactionTemplate transactionTemplate;
 
-        MockSagaPartner(OutboxService outboxService, ObjectMapper objectMapper) {
+        MockSagaPartner(
+            OutboxService outboxService,
+            ObjectMapper objectMapper,
+            TransactionTemplate transactionTemplate
+        ) {
             this.outboxService = outboxService;
             this.objectMapper = objectMapper;
+            this.transactionTemplate = transactionTemplate;
         }
 
         void reset() {
             failOnTicketCancel.set(false);
         }
 
-        @KafkaListener(topics = KafkaTopics.REFUND_ORDER_CANCEL, groupId = "mock-partner-order-cancel")
-        void onOrderCancel(ConsumerRecord<String, String> record) throws Exception {
-            JsonNode node = objectMapper.readTree(record.value());
-            JsonNode payload = objectMapper.readTree(node.get("payload").asText());
-            UUID refundId = UUID.fromString(payload.get("refundId").asText());
-            UUID orderId = UUID.fromString(payload.get("orderId").asText());
+        @KafkaListener(
+            topics = KafkaTopics.REFUND_ORDER_CANCEL,
+            groupId = "mock-partner-order-cancel",
+            properties = "auto.offset.reset=earliest"
+        )
+        public void onOrderCancel(ConsumerRecord<String, String> record) throws Exception {
+            RefundOrderCancelEvent event = extractPayload(record, RefundOrderCancelEvent.class);
 
-            outboxService.save(
-                refundId.toString(),
-                orderId.toString(),
+            savePartnerOutbox(
+                event.refundId(),
+                event.orderId(),
                 KafkaTopics.REFUND_ORDER_DONE,
-                KafkaTopics.REFUND_ORDER_DONE,
-                new RefundOrderDoneEvent(refundId, orderId, Instant.now())
+                new RefundOrderDoneEvent(event.refundId(), event.orderId(), Instant.now())
             );
         }
 
-        @KafkaListener(topics = KafkaTopics.REFUND_TICKET_CANCEL, groupId = "mock-partner-ticket-cancel")
-        void onTicketCancel(ConsumerRecord<String, String> record) throws Exception {
-            JsonNode node = objectMapper.readTree(record.value());
-            JsonNode payload = objectMapper.readTree(node.get("payload").asText());
-            UUID refundId = UUID.fromString(payload.get("refundId").asText());
-            UUID orderId = UUID.fromString(payload.get("orderId").asText());
+        @KafkaListener(
+            topics = KafkaTopics.REFUND_TICKET_CANCEL,
+            groupId = "mock-partner-ticket-cancel",
+            properties = "auto.offset.reset=earliest"
+        )
+        public void onTicketCancel(ConsumerRecord<String, String> record) throws Exception {
+            RefundTicketCancelEvent event = extractPayload(record, RefundTicketCancelEvent.class);
 
             if (failOnTicketCancel.get()) {
-                outboxService.save(
-                    refundId.toString(),
-                    orderId.toString(),
+                savePartnerOutbox(
+                    event.refundId(),
+                    event.orderId(),
                     KafkaTopics.REFUND_TICKET_FAILED,
-                    KafkaTopics.REFUND_TICKET_FAILED,
-                    new RefundTicketFailedEvent(refundId, orderId, "mock-fail", Instant.now())
+                    new RefundTicketFailedEvent(event.refundId(), event.orderId(), "mock-fail", Instant.now())
                 );
                 return;
             }
-            outboxService.save(
-                refundId.toString(),
-                orderId.toString(),
+            savePartnerOutbox(
+                event.refundId(),
+                event.orderId(),
                 KafkaTopics.REFUND_TICKET_DONE,
-                KafkaTopics.REFUND_TICKET_DONE,
-                new RefundTicketDoneEvent(refundId, orderId,
+                new RefundTicketDoneEvent(event.refundId(), event.orderId(),
                     List.of(UUID.randomUUID()),
                     List.of(new RefundTicketDoneEvent.Item(UUID.randomUUID(), 1)),
                     Instant.now())
             );
         }
 
-        @KafkaListener(topics = KafkaTopics.REFUND_STOCK_RESTORE, groupId = "mock-partner-stock-restore")
-        void onStockRestore(ConsumerRecord<String, String> record) throws Exception {
-            JsonNode node = objectMapper.readTree(record.value());
-            JsonNode payload = objectMapper.readTree(node.get("payload").asText());
-            UUID refundId = UUID.fromString(payload.get("refundId").asText());
-            UUID orderId = UUID.fromString(payload.get("orderId").asText());
-            outboxService.save(
-                refundId.toString(),
-                orderId.toString(),
+        @KafkaListener(
+            topics = KafkaTopics.REFUND_STOCK_RESTORE,
+            groupId = "mock-partner-stock-restore",
+            properties = "auto.offset.reset=earliest"
+        )
+        public void onStockRestore(ConsumerRecord<String, String> record) throws Exception {
+            RefundStockRestoreEvent event = extractPayload(record, RefundStockRestoreEvent.class);
+            savePartnerOutbox(
+                event.refundId(),
+                event.orderId(),
                 KafkaTopics.REFUND_STOCK_DONE,
-                KafkaTopics.REFUND_STOCK_DONE,
-                new RefundStockDoneEvent(refundId, orderId, Instant.now())
+                new RefundStockDoneEvent(event.refundId(), event.orderId(), Instant.now())
             );
+        }
+
+        private void savePartnerOutbox(UUID refundId, UUID orderId, String topic, Object payload) {
+            transactionTemplate.executeWithoutResult(status ->
+                outboxService.save(
+                    refundId.toString(),
+                    orderId.toString(),
+                    topic,
+                    topic,
+                    payload
+                )
+            );
+        }
+
+        private <T> T extractPayload(ConsumerRecord<String, String> record, Class<T> payloadType) throws Exception {
+            String rootJson = record.value();
+            String payloadJson = objectMapper.readTree(rootJson).get("payload").asText();
+            return objectMapper.readValue(payloadJson, payloadType);
         }
     }
 }
