@@ -36,4 +36,13 @@ public class SettlementRestClientConfig {
             .build();
     }
 
+    @Bean
+    public RestClient settlementToPaymentRestClient(
+        @Value("${external.payment-base-url}") String baseUrl) {
+        return RestClient.builder()
+            .baseUrl(baseUrl)
+            .defaultHeader("Content-Type", "application/json")
+            .build();
+    }
+
 }

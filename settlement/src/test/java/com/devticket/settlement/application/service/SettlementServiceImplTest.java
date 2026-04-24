@@ -86,12 +86,12 @@ class SettlementServiceImplTest {
             .totalFeeAmount(3000)
             .finalSettlementAmount(97000)
             .carriedInAmount(0)
-            .status(SettlementStatus.COMPLETED)
+            .status(SettlementStatus.CONFIRMED)
             .settledAt(LocalDateTime.of(2026, 4, 1, 0, 10))
             .build();
 
-        given(settlementRepository.findBySellerIdAndPeriodStartAtBetween(
-            eq(sellerId), any(LocalDateTime.class), any(LocalDateTime.class)))
+        given(settlementRepository.findFirstBySellerIdAndPeriodStartAtBetweenAndStatusNotOrderByCreatedAtDesc(
+            eq(sellerId), any(LocalDateTime.class), any(LocalDateTime.class), eq(SettlementStatus.CANCELLED)))
             .willReturn(Optional.of(settlement));
         given(settlementItemRepository.findBySettlementId(settlement.getSettlementId()))
             .willReturn(List.of());
@@ -107,8 +107,8 @@ class SettlementServiceImplTest {
 
     @Test
     void getSettlementByPeriod_정산없음_빈응답반환() {
-        given(settlementRepository.findBySellerIdAndPeriodStartAtBetween(
-            eq(sellerId), any(LocalDateTime.class), any(LocalDateTime.class)))
+        given(settlementRepository.findFirstBySellerIdAndPeriodStartAtBetweenAndStatusNotOrderByCreatedAtDesc(
+            eq(sellerId), any(LocalDateTime.class), any(LocalDateTime.class), eq(SettlementStatus.CANCELLED)))
             .willReturn(Optional.empty());
 
         SettlementPeriodResponse result = settlementServiceImpl.getSettlementByPeriod(sellerId, "202603");
@@ -141,7 +141,7 @@ class SettlementServiceImplTest {
         given(settlementItemRepository.findBySellerIdAndStatusAndEventDateTimeBetween(
             eq(sellerId), eq(SettlementItemStatus.READY), any(LocalDate.class), any(LocalDate.class)))
             .willReturn(List.of(item));
-        given(settlementRepository.findBySellerIdAndStatus(sellerId, SettlementStatus.PENDING_MIN_AMOUNT))
+        given(settlementRepository.findBySellerIdAndStatusAndCarriedToSettlementIdIsNull(sellerId, SettlementStatus.PENDING_MIN_AMOUNT))
             .willReturn(List.of());
 
         SettlementPeriodResponse result = settlementServiceImpl.getSettlementPreview(sellerId);
@@ -171,7 +171,7 @@ class SettlementServiceImplTest {
         given(settlementItemRepository.findBySellerIdAndStatusAndEventDateTimeBetween(
             eq(sellerId), eq(SettlementItemStatus.READY), any(LocalDate.class), any(LocalDate.class)))
             .willReturn(List.of());
-        given(settlementRepository.findBySellerIdAndStatus(sellerId, SettlementStatus.PENDING_MIN_AMOUNT))
+        given(settlementRepository.findBySellerIdAndStatusAndCarriedToSettlementIdIsNull(sellerId, SettlementStatus.PENDING_MIN_AMOUNT))
             .willReturn(List.of(pending));
 
         SettlementPeriodResponse result = settlementServiceImpl.getSettlementPreview(sellerId);
@@ -185,7 +185,7 @@ class SettlementServiceImplTest {
         given(settlementItemRepository.findBySellerIdAndStatusAndEventDateTimeBetween(
             eq(sellerId), eq(SettlementItemStatus.READY), any(LocalDate.class), any(LocalDate.class)))
             .willReturn(List.of());
-        given(settlementRepository.findBySellerIdAndStatus(sellerId, SettlementStatus.PENDING_MIN_AMOUNT))
+        given(settlementRepository.findBySellerIdAndStatusAndCarriedToSettlementIdIsNull(sellerId, SettlementStatus.PENDING_MIN_AMOUNT))
             .willReturn(List.of());
 
         SettlementPeriodResponse result = settlementServiceImpl.getSettlementPreview(sellerId);
