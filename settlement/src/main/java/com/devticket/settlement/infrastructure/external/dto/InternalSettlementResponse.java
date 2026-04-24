@@ -9,8 +9,11 @@ public record InternalSettlementResponse(
     Long totalSalesAmount,
     Long totalRefundAmount,
     Long totalFeeAmount,
+    Long carriedInAmount,
     Long finalSettlementAmount,
     String status,
-    String settledAt
+    String settledAt,
+    UUID carriedToSettlementId,
+    UUID sellerId
 ) {
 }
