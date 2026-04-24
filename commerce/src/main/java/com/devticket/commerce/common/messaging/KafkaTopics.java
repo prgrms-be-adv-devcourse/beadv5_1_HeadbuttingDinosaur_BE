@@ -6,6 +6,7 @@ public final class KafkaTopics {
 
     // Saga 흐름
     public static final String ORDER_CREATED       = "order.created";
+    public static final String ORDER_CANCELLED     = "order.cancelled";
     public static final String STOCK_DEDUCTED      = "stock.deducted";
     public static final String STOCK_FAILED        = "stock.failed";
     public static final String PAYMENT_COMPLETED   = "payment.completed";
