@@ -5,6 +5,7 @@ import { closeDatabase } from './config/database';
 import { disconnectConsumer } from './config/kafka';
 import { startActionLogConsumer } from './consumer/action-log.consumer';
 import { healthRoutes } from './route/health.route';
+import { internalLogRoutes } from './route/internal-log.route';
 import { logger } from './util/logger';
 
 async function main(): Promise<void> {
@@ -12,6 +13,7 @@ async function main(): Promise<void> {
 
   // 라우트 등록
   await app.register(healthRoutes);
+  await app.register(internalLogRoutes);
 
   // Kafka consumer 시작
   try {

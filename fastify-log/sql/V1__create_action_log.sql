@@ -29,4 +29,6 @@ COMMENT ON COLUMN log.action_log.event_id           IS '이벤트 외부 식별�
 COMMENT ON COLUMN log.action_log.action_type        IS 'VIEW|DETAIL_VIEW|CART_ADD|CART_REMOVE|PURCHASE|DWELL_TIME|REFUND';
 COMMENT ON COLUMN log.action_log.dwell_time_seconds IS 'DWELL_TIME 시 체류 시간(초)';
 COMMENT ON COLUMN log.action_log.quantity           IS 'PURCHASE, CART_ADD 시 수량';
-COMMENT ON COLUMN log.action_log.total_amount       IS 'PURCHASE, REFUND 시 금액';
+COMMENT ON COLUMN log.action_log.total_amount       IS 'PURCHASE, REFUND 시 금액 (PURCHASE 다건 주문은 NULL — SUM 부풀림 방지. 정확한 매출은 Payment.payment.total_amount 집계)';
+COMMENT ON COLUMN log.action_log.created_at         IS '이벤트 발생 시각 (Kafka 메시지 timestamp 저장, AI 시퀀스 분석 기준) — 수신 시각 아님';
+COMMENT ON COLUMN log.action_log.updated_at         IS '현재 미사용 — action_log는 append-only 로그 특성상 UPDATE 없음. 향후 확장 여지로 보존';
