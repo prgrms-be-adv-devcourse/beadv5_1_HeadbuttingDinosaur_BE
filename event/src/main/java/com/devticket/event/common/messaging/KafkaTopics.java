@@ -5,6 +5,7 @@ public final class KafkaTopics {
     private KafkaTopics() {}
 
     // Event 서비스가 소비하는 토픽
+    public static final String ORDER_CANCELLED = "order.cancelled";
     public static final String PAYMENT_FAILED = "payment.failed";
     public static final String REFUND_COMPLETED = "refund.completed";
     public static final String REFUND_STOCK_RESTORE = "refund.stock.restore";
