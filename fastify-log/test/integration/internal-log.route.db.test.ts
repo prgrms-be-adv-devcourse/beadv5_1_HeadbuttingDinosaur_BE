@@ -149,18 +149,23 @@ describeIfDb('InternalLogRoutes (실 Postgres)', () => {
   });
 
   it('created_at DESC 정렬', async () => {
+    // 상대 시간 기반 — 실행 시점에 독립적 (days=7 기본 범위 내 보장)
+    const now = Date.now();
+    const threeHoursAgo = new Date(now - 3 * 60 * 60 * 1000).toISOString();
+    const oneHourAgo = new Date(now - 60 * 60 * 1000).toISOString();
+
     await seed([
       {
         userId: USER_UUID,
         eventId: EVENT_A,
         actionType: 'VIEW',
-        createdAt: '2026-01-01T00:00:00Z',
+        createdAt: threeHoursAgo,
       },
       {
         userId: USER_UUID,
         eventId: EVENT_B,
         actionType: 'VIEW',
-        createdAt: '2026-04-01T00:00:00Z',
+        createdAt: oneHourAgo,
       },
     ]);
 
@@ -174,6 +179,72 @@ describeIfDb('InternalLogRoutes (실 Postgres)', () => {
     expect(logs[0].eventId).toBe(EVENT_B);
     expect(logs[1].eventId).toBe(EVENT_A);
   });
+
+  it('응답 필드 완전성 — eventId/actionType/dwellTimeSeconds 3개만 (추가 필드 유출 없음)', async () => {
+    // 상대 시간 기반 — 실행 시점에 독립적 (days=7 기본 범위 내 보장)
+    const now = Date.now();
+    const threeHoursAgo = new Date(now - 3 * 60 * 60 * 1000).toISOString();
+    const oneHourAgo = new Date(now - 60 * 60 * 1000).toISOString();
+
+    await seed([
+      {
+        userId: USER_UUID,
+        eventId: EVENT_A,
+        actionType: 'VIEW',
+        createdAt: threeHoursAgo,
+      },
+      {
+        userId: USER_UUID,
+        eventId: EVENT_B,
+        actionType: 'DWELL_TIME',
+        dwellTimeSeconds: 30,
+        createdAt: oneHourAgo,
+      },
+    ]);
+
+    const res = await app.inject({
+      method: 'GET',
+      url: `/internal/logs/actions?userId=${USER_UUID}&actionTypes=VIEW,DWELL_TIME`,
+      headers: AI_HEADER,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+
+    // 각 log 객체는 정확히 3개 필드만 — search_keyword, quantity, total_amount 등 DB 원본 누출 없어야 함
+    for (const log of body.logs) {
+      expect(Object.keys(log).sort()).toEqual([
+        'actionType',
+        'dwellTimeSeconds',
+        'eventId',
+      ]);
+    }
+
+    // DESC 정렬 + 필드 정확 매칭
+    expect(body.logs).toEqual([
+      { eventId: EVENT_B, actionType: 'DWELL_TIME', dwellTimeSeconds: 30 },
+      { eventId: EVENT_A, actionType: 'VIEW', dwellTimeSeconds: null },
+    ]);
+  });
+
+  it('LIMIT 5000 — 10001건 삽입 시 최신 5000건만 반환', async () => {
+    // generate_series로 단일 쿼리 대량 삽입 — beforeEach TRUNCATE로 격리됨
+    await pool.query(
+      `INSERT INTO log.action_log (user_id, event_id, action_type, created_at)
+       SELECT $1::uuid, $2::uuid, 'VIEW', NOW() - (s || ' seconds')::INTERVAL
+       FROM generate_series(1, 10001) AS s`,
+      [USER_UUID, EVENT_A],
+    );
+
+    const res = await app.inject({
+      method: 'GET',
+      url: `/internal/logs/actions?userId=${USER_UUID}&days=1&actionTypes=VIEW`,
+      headers: AI_HEADER,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().logs).toHaveLength(5000);
+  }, 30000);
 
   it('days 범위 밖 (40일 전) 로그 제외', async () => {
     const fortyDaysAgo = new Date(
