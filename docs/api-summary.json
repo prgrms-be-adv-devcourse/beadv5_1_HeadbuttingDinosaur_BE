@@ -90,6 +90,24 @@
     "source": "admin/src/main/java/com/devticket/admin/presentation/controller/AdminUsersController.java"
   },
   {
+    "module": "ai",
+    "controller": "KafkaTestController",
+    "method": "send",
+    "httpMethod": "POST",
+    "path": "/test/kafka",
+    "summary": "send",
+    "source": "ai/src/main/java/org/example/ai/presentation/controller/KafkaTestController.java"
+  },
+  {
+    "module": "ai",
+    "controller": "RecommendationController",
+    "method": "recommend",
+    "httpMethod": "POST",
+    "path": "internal/ai/recommendation",
+    "summary": "recommend",
+    "source": "ai/src/main/java/org/example/ai/presentation/controller/RecommendationController.java"
+  },
+  {
     "module": "apigateway",
     "controller": "GatewayHealthController",
     "method": "health",
@@ -575,16 +593,16 @@
     "summary": "withdraw",
     "source": "member/src/main/java/com/devticket/member/presentation/controller/UserController.java"
   },
-  {                                                                                                                                                 
+  {
     "module": "payment",
-    "controller": "PaymentController",                                                                                                              
-    "method": "readyPayment",                                                                                                                     
+    "controller": "PaymentController",
+    "method": "readyPayment",
     "httpMethod": "POST",
     "path": "/api/payments/ready",
     "summary": "결제 준비 (PG/WALLET/WALLET_PG 분기)",
     "source": "payment/src/main/java/com/devticket/payment/payment/presentation/controller/PaymentController.java"
-   },
-   {
+  },
+  {
     "module": "payment",
     "controller": "PaymentController",
     "method": "confirm",
@@ -592,8 +610,8 @@
     "path": "/api/payments/confirm",
     "summary": "PG 결제 승인 (WALLET_PG 분기 포함)",
     "source": "payment/src/main/java/com/devticket/payment/payment/presentation/controller/PaymentController.java"
-   },
-   {
+  },
+  {
     "module": "payment",
     "controller": "PaymentController",
     "method": "fail",
@@ -601,7 +619,7 @@
     "path": "/api/payments/fail",
     "summary": "PG 결제 실패 처리 (WALLET_PG 예치금 복구 포함)",
     "source": "payment/src/main/java/com/devticket/payment/payment/presentation/controller/PaymentController.java"
-   },
+  },
   {
     "module": "payment",
     "controller": "PaymentInternalController",
