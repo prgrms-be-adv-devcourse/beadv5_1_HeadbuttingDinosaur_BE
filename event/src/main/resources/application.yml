@@ -7,6 +7,10 @@ spring:
     datatype:
       datetime:
         write-dates-as-timestamps: false
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 10MB
 
 server:
   port: 8082

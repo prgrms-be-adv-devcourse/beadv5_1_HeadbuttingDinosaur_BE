@@ -41,7 +41,7 @@ public class EventController {
         return ResponseEntity.ok(SuccessResponse.success(response));
     }
 
-    @GetMapping("/recommendations")
+    @GetMapping("/user/recommendations")
     public ResponseEntity<SuccessResponse<RecommendationResponse>> getRecommendations(
         @RequestHeader("X-User-Id") UUID userId) {
         return ResponseEntity.ok(SuccessResponse.success(
