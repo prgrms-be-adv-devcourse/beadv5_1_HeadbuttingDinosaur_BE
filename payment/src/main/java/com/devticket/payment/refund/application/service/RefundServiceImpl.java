@@ -159,9 +159,9 @@ public class RefundServiceImpl implements RefundService {
         );
         outboxService.save(
             refund.getRefundId().toString(),
-            KafkaTopics.REFUND_REQUESTED,
-            KafkaTopics.REFUND_REQUESTED,
             orderItem.orderId().toString(),
+            KafkaTopics.REFUND_REQUESTED,
+            KafkaTopics.REFUND_REQUESTED,
             requested
         );
 
@@ -248,9 +248,9 @@ public class RefundServiceImpl implements RefundService {
         );
         outboxService.save(
             refund.getRefundId().toString(),
-            KafkaTopics.REFUND_REQUESTED,
-            KafkaTopics.REFUND_REQUESTED,
             orderId.toString(),
+            KafkaTopics.REFUND_REQUESTED,
+            KafkaTopics.REFUND_REQUESTED,
             requested
         );
 

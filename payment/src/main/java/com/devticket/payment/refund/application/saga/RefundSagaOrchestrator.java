@@ -58,8 +58,7 @@ public class RefundSagaOrchestrator {
     private final WalletService walletService;
 
     /**
-     * Saga 진입점 — refund.requested 수신 또는 ticket.issue-failed 수신 시 호출.
-     * SagaState 생성 + refund.order.cancel 발행.
+     * Saga 진입점 — refund.requested 수신 또는 ticket.issue-failed 수신 시 호출. SagaState 생성 + refund.order.cancel 발행.
      */
     @Transactional
     public void start(RefundRequestedEvent event) {
@@ -84,9 +83,9 @@ public class RefundSagaOrchestrator {
         );
         outboxService.save(
             event.refundId().toString(),
-            KafkaTopics.REFUND_ORDER_CANCEL,
-            KafkaTopics.REFUND_ORDER_CANCEL,
             event.orderId().toString(),
+            KafkaTopics.REFUND_ORDER_CANCEL,
+            KafkaTopics.REFUND_ORDER_CANCEL,
             cancelEvent
         );
 
@@ -122,9 +121,9 @@ public class RefundSagaOrchestrator {
         );
         outboxService.save(
             event.refundId().toString(),
-            KafkaTopics.REFUND_TICKET_CANCEL,
-            KafkaTopics.REFUND_TICKET_CANCEL,
             event.orderId().toString(),
+            KafkaTopics.REFUND_TICKET_CANCEL,
+            KafkaTopics.REFUND_TICKET_CANCEL,
             next
         );
 
@@ -164,7 +163,7 @@ public class RefundSagaOrchestrator {
             return;
         }
 
-        // (1) cancelledTicketIds → ticketIds 로 필드명 변경
+        // (1) 원본 ticketIds 보존 — RefundTicket 테이블이 비어있고 이벤트에 ticketIds 가 있으면 upsert
         List<RefundTicket> existing = refundTicketRepository.findByRefundId(event.refundId());
         if (existing.isEmpty() && event.ticketIds() != null && !event.ticketIds().isEmpty()) {
             List<RefundTicket> rts = event.ticketIds().stream()
@@ -173,41 +172,49 @@ public class RefundSagaOrchestrator {
             refundTicketRepository.saveAll(rts);
         }
 
-        // (2) quantity 계산 — 우선순위: event.quantity > event.ticketIds.size > RefundTicket > ledger.remainingTickets
-        // whole-order 환불에서 Commerce 가 빈 ticketIds 를 보내도 재고가 0 으로 복구되지 않도록 보정.
-        int quantity;
-        if (event.quantity() > 0) {
-            quantity = event.quantity();
-        } else if (event.ticketIds() != null && !event.ticketIds().isEmpty()) {
-            quantity = event.ticketIds().size();
-        } else if (!existing.isEmpty()) {
-            quantity = existing.size();
+        // (2) items 정규화 — Commerce 가 (eventId, quantity) 배열을 묶어 보내므로 그대로 사용.
+        // 단 items 가 비어 있으면(마이그레이션·폴백) ledger.remainingTickets 기준으로 최소 1건을 추정.
+        List<RefundStockRestoreEvent.Item> stockItems;
+        if (event.items() != null && !event.items().isEmpty()) {
+            stockItems = event.items().stream()
+                .map(i -> new RefundStockRestoreEvent.Item(i.eventId(), i.quantity()))
+                .toList();
         } else {
-            quantity = orderRefundRepository.findByOrderId(event.orderId())
-                .map(OrderRefund::getRemainingTickets)
-                .orElse(0);
+            int fallbackQty = !existing.isEmpty()
+                ? existing.size()
+                : (event.ticketIds() != null && !event.ticketIds().isEmpty())
+                    ? event.ticketIds().size()
+                    : orderRefundRepository.findByOrderId(event.orderId())
+                        .map(OrderRefund::getRemainingTickets)
+                        .orElse(0);
+            stockItems = List.of(new RefundStockRestoreEvent.Item(null, fallbackQty));
         }
 
         state.advance(SagaStep.STOCK_RESTORING);
         sagaStateRepository.save(state);
 
-        // (3) RefundStockRestoreEvent 를 items 리스트 구조로 발행
+        // (3) partitionKey — 단일 이벤트면 eventId, 다중이면 orderId 로 고정해 순서 보장.
+        String partitionKey = stockItems.size() == 1 && stockItems.get(0).eventId() != null
+            ? stockItems.get(0).eventId().toString()
+            : event.orderId().toString();
+
         RefundStockRestoreEvent next = new RefundStockRestoreEvent(
             event.refundId(),
             event.orderId(),
-            List.of(new RefundStockRestoreEvent.Item(event.eventId(), quantity)),
+            stockItems,
             Instant.now()
         );
+
         outboxService.save(
             event.refundId().toString(),
+            partitionKey,
             KafkaTopics.REFUND_STOCK_RESTORE,
             KafkaTopics.REFUND_STOCK_RESTORE,
-            event.eventId() != null ? event.eventId().toString() : event.orderId().toString(),
             next
         );
 
-        log.info("[Saga] ticket.done → stock.restore 발행 — refundId={}, eventId={}, quantity={}",
-            event.refundId(), event.eventId(), quantity);
+        log.info("[Saga] ticket.done → stock.restore 발행 — refundId={}, items={}",
+            event.refundId(), stockItems);
     }
 
     @Transactional
@@ -233,9 +240,9 @@ public class RefundSagaOrchestrator {
         );
         outboxService.save(
             event.refundId().toString(),
-            KafkaTopics.REFUND_ORDER_COMPENSATE,
-            KafkaTopics.REFUND_ORDER_COMPENSATE,
             event.orderId().toString(),
+            KafkaTopics.REFUND_ORDER_COMPENSATE,
+            KafkaTopics.REFUND_ORDER_COMPENSATE,
             comp
         );
 
@@ -285,9 +292,9 @@ public class RefundSagaOrchestrator {
         );
         outboxService.save(
             event.refundId().toString(),
-            KafkaTopics.REFUND_TICKET_COMPENSATE,
-            KafkaTopics.REFUND_TICKET_COMPENSATE,
             event.orderId().toString(),
+            KafkaTopics.REFUND_TICKET_COMPENSATE,
+            KafkaTopics.REFUND_TICKET_COMPENSATE,
             ticketComp
         );
 
@@ -299,9 +306,9 @@ public class RefundSagaOrchestrator {
         );
         outboxService.save(
             event.refundId().toString(),
-            KafkaTopics.REFUND_ORDER_COMPENSATE,
-            KafkaTopics.REFUND_ORDER_COMPENSATE,
             event.orderId().toString(),
+            KafkaTopics.REFUND_ORDER_COMPENSATE,
+            KafkaTopics.REFUND_ORDER_COMPENSATE,
             orderComp
         );
 
@@ -328,7 +335,8 @@ public class RefundSagaOrchestrator {
             case PG -> {
                 state.advance(SagaStep.PG_CANCELLING);
                 sagaStateRepository.save(state);
-                completedAt = executePgCancel(payment, refund.getRefundAmount(), completedAt);
+                completedAt = executePgCancel(payment, refund.getRefundAmount(),
+                    refund.getRefundId().toString(), completedAt);
             }
             case WALLET -> {
                 state.advance(SagaStep.WALLET_RESTORING);
@@ -347,7 +355,8 @@ public class RefundSagaOrchestrator {
                     : 0;
                 int pgPortion = refund.getRefundAmount() - walletPortion;
 
-                log.info("[Saga] WALLET_PG 분배 — refundId={}, total={}, walletPortion={}, pgPortion={} (원결제 wallet={}/pg={}/total={})",
+                log.info(
+                    "[Saga] WALLET_PG 분배 — refundId={}, total={}, walletPortion={}, pgPortion={} (원결제 wallet={}/pg={}/total={})",
                     refund.getRefundId(), refund.getRefundAmount(),
                     walletPortion, pgPortion,
                     walletOriginal, payment.getPgAmount(), totalPaid);
@@ -356,7 +365,8 @@ public class RefundSagaOrchestrator {
                 if (pgPortion > 0) {
                     state.advance(SagaStep.PG_CANCELLING);
                     sagaStateRepository.save(state);
-                    completedAt = executePgCancel(payment, pgPortion, completedAt);
+                    completedAt = executePgCancel(payment, pgPortion,
+                        refund.getRefundId().toString() + "-pg", completedAt);
                 }
 
                 // Wallet 복구 — walletPortion 만
@@ -397,9 +407,9 @@ public class RefundSagaOrchestrator {
 
         outboxService.save(
             refund.getRefundId().toString(),
-            KafkaTopics.REFUND_COMPLETED,
-            KafkaTopics.REFUND_COMPLETED,
             refund.getOrderId().toString(),
+            KafkaTopics.REFUND_COMPLETED,
+            KafkaTopics.REFUND_COMPLETED,
             completed
         );
 
@@ -407,20 +417,21 @@ public class RefundSagaOrchestrator {
             refund.getRefundId(), method, refund.getRefundAmount());
     }
 
-    private LocalDateTime executePgCancel(Payment payment, int amount, LocalDateTime fallback) {
+    private LocalDateTime executePgCancel(Payment payment, int amount, String idempotencyKey,
+        LocalDateTime fallback) {
         if (payment.getPaymentKey() == null || amount <= 0) {
             return fallback;
         }
         try {
             PgPaymentCancelResult result = pgPaymentClient.cancelPartial(
-                new PgPaymentCancelCommand(payment.getPaymentKey(), amount, "refund-saga")
+                new PgPaymentCancelCommand(payment.getPaymentKey(), amount, "refund-saga", idempotencyKey)
             );
             return result.canceledAt() != null
                 ? OffsetDateTime.parse(result.canceledAt()).toLocalDateTime()
                 : fallback;
         } catch (Exception e) {
-            log.error("[Saga] PG 취소 실패 — paymentKey={}, amount={}",
-                payment.getPaymentKey(), amount, e);
+            log.error("[Saga] PG 취소 실패 — paymentKey={}, amount={}, idemKey={}",
+                payment.getPaymentKey(), amount, idempotencyKey, e);
             throw new RefundException(RefundErrorCode.PG_REFUND_FAILED);
         }
     }

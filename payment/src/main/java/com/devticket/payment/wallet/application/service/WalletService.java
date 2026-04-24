@@ -1,6 +1,7 @@
 package com.devticket.payment.wallet.application.service;
 
 import com.devticket.payment.wallet.application.event.PaymentCompletedEvent;
+import com.devticket.payment.wallet.presentation.dto.SettlementDepositRequest;
 import com.devticket.payment.wallet.presentation.dto.WalletBalanceResponse;
 import com.devticket.payment.wallet.presentation.dto.WalletChargeConfirmRequest;
 import com.devticket.payment.wallet.presentation.dto.WalletChargeConfirmResponse;
@@ -38,4 +39,6 @@ public interface WalletService {
     void processBatchRefund(UUID eventId);
 
     void recoverStalePendingCharge(UUID chargeId);
+
+    void depositFromSettlement(SettlementDepositRequest request);
 }
