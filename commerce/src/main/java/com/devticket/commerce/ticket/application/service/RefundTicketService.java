@@ -103,22 +103,17 @@ public class RefundTicketService {
             ticket.cancelledTicket();
         }
 
-        // eventId 별로 그룹화 → 이벤트별 refund.ticket.done 발행 (Stock 복구 단계 연결용)
+        // eventId 별 (eventId, quantity) 를 items 리스트로 묶어 refund.ticket.done 1건 발행.
+        // 다중 이벤트 오더에서도 Payment 가 단일 stock.restore 로 재고 복구를 일괄 요청할 수 있도록.
         Map<UUID, List<Ticket>> byEvent = tickets.stream()
             .collect(Collectors.groupingBy(Ticket::getEventId));
 
-        for (Map.Entry<UUID, List<Ticket>> entry : byEvent.entrySet()) {
-            UUID eventId = entry.getKey();
-            List<Ticket> group = entry.getValue();
-            List<UUID> groupTicketIds = group.stream().map(Ticket::getTicketId).toList();
-            publishTicketDone(
-                event.refundId(),
-                event.orderId(),
-                groupTicketIds,
-                eventId,
-                group.size()
-            );
-        }
+        List<RefundTicketDoneEvent.Item> items = byEvent.entrySet().stream()
+            .map(e -> new RefundTicketDoneEvent.Item(e.getKey(), e.getValue().size()))
+            .toList();
+        List<UUID> allTicketIds = tickets.stream().map(Ticket::getTicketId).toList();
+
+        publishTicketDone(event.refundId(), event.orderId(), allTicketIds, items);
 
         deduplicationService.markProcessed(messageId, topic);
     }
@@ -161,13 +156,14 @@ public class RefundTicketService {
 
     //---- 내부 헬퍼 ----
 
-    private void publishTicketDone(UUID refundId, UUID orderId, List<UUID> ticketIds, UUID eventId, int quantity) {
+    private void publishTicketDone(UUID refundId, UUID orderId, List<UUID> ticketIds,
+        List<RefundTicketDoneEvent.Item> items) {
         outboxService.save(
             orderId.toString(),
             orderId.toString(),
             "REFUND_TICKET_DONE",
             KafkaTopics.REFUND_TICKET_DONE,
-            new RefundTicketDoneEvent(refundId, orderId, ticketIds, eventId, quantity, Instant.now())
+            new RefundTicketDoneEvent(refundId, orderId, ticketIds, items, Instant.now())
         );
     }
 
