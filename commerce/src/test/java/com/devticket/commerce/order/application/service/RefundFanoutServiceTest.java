@@ -39,11 +39,16 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class RefundFanoutServiceTest {
 
-    @Mock private OrderRepository orderRepository;
-    @Mock private OrderItemRepository orderItemRepository;
-    @Mock private TicketRepository ticketRepository;
-    @Mock private OutboxService outboxService;
-    @Mock private MessageDeduplicationService deduplicationService;
+    @Mock
+    private OrderRepository orderRepository;
+    @Mock
+    private OrderItemRepository orderItemRepository;
+    @Mock
+    private TicketRepository ticketRepository;
+    @Mock
+    private OutboxService outboxService;
+    @Mock
+    private MessageDeduplicationService deduplicationService;
 
     private final ObjectMapper objectMapper = JsonMapper.builder()
         .addModule(new JavaTimeModule())
@@ -97,7 +102,8 @@ class RefundFanoutServiceTest {
         Ticket t1 = ticketOf(item.getOrderItemId(), eventId);
         Ticket t2 = ticketOf(item.getOrderItemId(), eventId);
 
-        EventForceCancelledEvent payload = new EventForceCancelledEvent(eventId, UUID.randomUUID(), "admin", Instant.now());
+        EventForceCancelledEvent payload = new EventForceCancelledEvent(eventId, UUID.randomUUID(), "admin",
+            Instant.now());
 
         given(deduplicationService.isDuplicate(messageId)).willReturn(false);
         given(orderRepository.findAllByEventIdAndStatus(eventId, OrderStatus.PAID))
@@ -129,7 +135,8 @@ class RefundFanoutServiceTest {
         Ticket c2 = ticketOf(cancelledItem.getOrderItemId(), cancelledEventId);
         Ticket other1 = ticketOf(otherItem.getOrderItemId(), otherEventId);
 
-        EventForceCancelledEvent payload = new EventForceCancelledEvent(cancelledEventId, UUID.randomUUID(), "admin", Instant.now());
+        EventForceCancelledEvent payload = new EventForceCancelledEvent(cancelledEventId, UUID.randomUUID(), "admin",
+            Instant.now());
 
         given(deduplicationService.isDuplicate(messageId)).willReturn(false);
         given(orderRepository.findAllByEventIdAndStatus(cancelledEventId, OrderStatus.PAID))
@@ -163,7 +170,8 @@ class RefundFanoutServiceTest {
         Order o1 = paidOrderWithPayment();
         Ticket t1 = ticketOf(otherEventId); // 다른 이벤트 티켓만
 
-        EventForceCancelledEvent payload = new EventForceCancelledEvent(eventId, UUID.randomUUID(), "admin", Instant.now());
+        EventForceCancelledEvent payload = new EventForceCancelledEvent(eventId, UUID.randomUUID(), "admin",
+            Instant.now());
 
         given(deduplicationService.isDuplicate(messageId)).willReturn(false);
         given(orderRepository.findAllByEventIdAndStatus(eventId, OrderStatus.PAID))
@@ -181,7 +189,8 @@ class RefundFanoutServiceTest {
     void PAID_주문이_없으면_fan_out_생략() {
         UUID messageId = UUID.randomUUID();
         UUID eventId = UUID.randomUUID();
-        EventForceCancelledEvent payload = new EventForceCancelledEvent(eventId, UUID.randomUUID(), "admin", Instant.now());
+        EventForceCancelledEvent payload = new EventForceCancelledEvent(eventId, UUID.randomUUID(), "admin",
+            Instant.now());
 
         given(deduplicationService.isDuplicate(messageId)).willReturn(false);
         given(orderRepository.findAllByEventIdAndStatus(eventId, OrderStatus.PAID)).willReturn(List.of());
@@ -213,7 +222,9 @@ class RefundFanoutServiceTest {
                     break;
                 } catch (NoSuchFieldException nfe) {
                     clazz = clazz.getSuperclass();
-                    if (clazz == null) throw nfe;
+                    if (clazz == null) {
+                        throw nfe;
+                    }
                 }
             }
             f.setAccessible(true);
@@ -221,5 +232,103 @@ class RefundFanoutServiceTest {
         } catch (ReflectiveOperationException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    @Test
+    void 단일이벤트주문_강제취소시_wholeOrder_true() {
+        UUID messageId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+        Order order = paidOrderWithPayment();
+
+        // 주문의 모든 티켓이 취소 이벤트 소속
+        OrderItem item = orderItemOf(order.getId(), eventId, 10_000, 2);
+        Ticket t1 = ticketOf(item.getOrderItemId(), eventId);
+        Ticket t2 = ticketOf(item.getOrderItemId(), eventId);
+
+        EventForceCancelledEvent payload = new EventForceCancelledEvent(eventId, UUID.randomUUID(), "admin",
+            Instant.now());
+
+        given(deduplicationService.isDuplicate(messageId)).willReturn(false);
+        given(orderRepository.findAllByEventIdAndStatus(eventId, OrderStatus.PAID))
+            .willReturn(List.of(order));
+        given(ticketRepository.findAllByOrderIdAndStatus(order.getId(), TicketStatus.ISSUED))
+            .willReturn(List.of(t1, t2));
+        given(orderItemRepository.findAllByOrderId(order.getId())).willReturn(List.of(item));
+
+        service.processEventForceCancelled(messageId, KafkaTopics.EVENT_FORCE_CANCELLED, toJson(payload));
+
+        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+        then(outboxService).should().save(
+            anyString(), anyString(), eq("REFUND_REQUESTED"),
+            eq(KafkaTopics.REFUND_REQUESTED), captor.capture());
+
+        RefundRequestedEvent published = (RefundRequestedEvent) captor.getValue();
+        org.assertj.core.api.Assertions.assertThat(published.wholeOrder()).isTrue();
+        org.assertj.core.api.Assertions.assertThat(published.refundAmount()).isEqualTo(20_000);
+        org.assertj.core.api.Assertions.assertThat(published.ticketIds()).hasSize(2);
+        org.assertj.core.api.Assertions.assertThat(published.refundRate()).isEqualTo(100);
+    }
+
+    @Test
+    void 같은이벤트_다중주문_각각_refund_requested_fan_out() {
+        UUID messageId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+
+        Order order1 = paidOrderWithPayment();
+        Order order2 = paidOrderWithPayment();
+        setField(order2, "id", 2L);
+        Order order3 = paidOrderWithPayment();
+        setField(order3, "id", 3L);
+
+        // 각 주문에 해당 이벤트 티켓 1장씩
+        OrderItem item1 = orderItemOf(order1.getId(), eventId, 10_000, 1);
+        OrderItem item2 = orderItemOf(order2.getId(), eventId, 10_000, 1);
+        OrderItem item3 = orderItemOf(order3.getId(), eventId, 10_000, 1);
+        Ticket tk1 = ticketOf(item1.getOrderItemId(), eventId);
+        Ticket tk2 = ticketOf(item2.getOrderItemId(), eventId);
+        Ticket tk3 = ticketOf(item3.getOrderItemId(), eventId);
+
+        EventForceCancelledEvent payload = new EventForceCancelledEvent(eventId, UUID.randomUUID(), "seller",
+            Instant.now());
+
+        given(deduplicationService.isDuplicate(messageId)).willReturn(false);
+        given(orderRepository.findAllByEventIdAndStatus(eventId, OrderStatus.PAID))
+            .willReturn(List.of(order1, order2, order3));
+        given(ticketRepository.findAllByOrderIdAndStatus(order1.getId(), TicketStatus.ISSUED))
+            .willReturn(List.of(tk1));
+        given(ticketRepository.findAllByOrderIdAndStatus(order2.getId(), TicketStatus.ISSUED))
+            .willReturn(List.of(tk2));
+        given(ticketRepository.findAllByOrderIdAndStatus(order3.getId(), TicketStatus.ISSUED))
+            .willReturn(List.of(tk3));
+        given(orderItemRepository.findAllByOrderId(order1.getId())).willReturn(List.of(item1));
+        given(orderItemRepository.findAllByOrderId(order2.getId())).willReturn(List.of(item2));
+        given(orderItemRepository.findAllByOrderId(order3.getId())).willReturn(List.of(item3));
+
+        service.processEventForceCancelled(messageId, KafkaTopics.EVENT_FORCE_CANCELLED, toJson(payload));
+
+        // 주문마다 1건씩 총 3건 발행
+        then(outboxService).should(Mockito.times(3)).save(
+            anyString(), anyString(), eq("REFUND_REQUESTED"),
+            eq(KafkaTopics.REFUND_REQUESTED), any());
+        then(deduplicationService).should().markProcessed(messageId, KafkaTopics.EVENT_FORCE_CANCELLED);
+    }
+
+    @Test
+    void REFUND_PENDING_주문은_대상이_아님() {
+        // findAllByEventIdAndStatus(eventId, PAID) 만 조회하므로 REFUND_PENDING 주문은 자동 제외됨.
+        // 리포지토리 모킹에서 PAID 필터 결과가 비어있으면 fan-out 생략되는 것을 확인.
+        UUID messageId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+        EventForceCancelledEvent payload = new EventForceCancelledEvent(eventId, UUID.randomUUID(), "admin",
+            Instant.now());
+
+        given(deduplicationService.isDuplicate(messageId)).willReturn(false);
+        // PAID 주문 없음 (전부 REFUND_PENDING 이라 가정)
+        given(orderRepository.findAllByEventIdAndStatus(eventId, OrderStatus.PAID)).willReturn(List.of());
+
+        service.processEventForceCancelled(messageId, KafkaTopics.EVENT_FORCE_CANCELLED, toJson(payload));
+
+        then(outboxService).shouldHaveNoInteractions();
+        then(deduplicationService).should().markProcessed(messageId, KafkaTopics.EVENT_FORCE_CANCELLED);
     }
 }
