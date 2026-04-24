@@ -235,6 +235,38 @@ class RefundSagaOrchestratorTest {
                 any()
             );
         }
+
+        @Test
+        @DisplayName("items 비어있으면 ticketIds 개수를 폴백 수량으로 사용")
+        void items_비어있으면_ticketIds_개수_폴백() {
+            given(sagaStateRepository.findByRefundId(refundId))
+                .willReturn(Optional.of(state(SagaStep.TICKET_CANCELLING)));
+            given(refundTicketRepository.findByRefundId(refundId)).willReturn(List.of());
+
+            RefundTicketDoneEvent event = new RefundTicketDoneEvent(
+                refundId, orderId,
+                List.of(UUID.randomUUID()),
+                List.of(),
+                Instant.now()
+            );
+
+            orchestrator.onTicketDone(event);
+
+            ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+            verify(outboxService).save(
+                eq(refundId.toString()),
+                eq(orderId.toString()),
+                eq(KafkaTopics.REFUND_STOCK_RESTORE),
+                eq(KafkaTopics.REFUND_STOCK_RESTORE),
+                captor.capture()
+            );
+
+            RefundStockRestoreEvent published = (RefundStockRestoreEvent) captor.getValue();
+            assertThat(published.items()).hasSize(1);
+            assertThat(published.items().get(0).eventId()).isNull();
+            assertThat(published.items().get(0).quantity()).isEqualTo(1);
+            verify(orderRefundRepository, never()).findByOrderId(orderId);
+        }
     }
 
     @Nested

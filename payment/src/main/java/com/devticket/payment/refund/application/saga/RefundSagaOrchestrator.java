@@ -182,9 +182,11 @@ public class RefundSagaOrchestrator {
         } else {
             int fallbackQty = !existing.isEmpty()
                 ? existing.size()
-                : orderRefundRepository.findByOrderId(event.orderId())
-                    .map(OrderRefund::getRemainingTickets)
-                    .orElse(0);
+                : (event.ticketIds() != null && !event.ticketIds().isEmpty())
+                    ? event.ticketIds().size()
+                    : orderRefundRepository.findByOrderId(event.orderId())
+                        .map(OrderRefund::getRemainingTickets)
+                        .orElse(0);
             stockItems = List.of(new RefundStockRestoreEvent.Item(null, fallbackQty));
         }
 
@@ -304,9 +306,9 @@ public class RefundSagaOrchestrator {
         );
         outboxService.save(
             event.refundId().toString(),
-            KafkaTopics.REFUND_ORDER_COMPENSATE,
-            KafkaTopics.REFUND_ORDER_COMPENSATE,
             event.orderId().toString(),
+            KafkaTopics.REFUND_ORDER_COMPENSATE,
+            KafkaTopics.REFUND_ORDER_COMPENSATE,
             orderComp
         );
 
