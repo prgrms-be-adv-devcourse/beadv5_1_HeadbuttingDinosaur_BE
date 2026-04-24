@@ -94,7 +94,7 @@ public class RecommendationServiceTest {
             .willReturn(new UserTechStackResponse("user-1", List.of()));
 
         given(eventRepository.getPopularEvents(any()))
-            .willReturn(new PopularEventListResponse(List.of()));
+            .willReturn(new PopularEventListResponse(List.of(), null, null));
 
 
 
