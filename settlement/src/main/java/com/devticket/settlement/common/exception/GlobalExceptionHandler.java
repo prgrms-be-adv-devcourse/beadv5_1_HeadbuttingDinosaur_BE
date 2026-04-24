@@ -1,11 +1,13 @@
 package com.devticket.settlement.common.exception;
 
 import com.devticket.settlement.common.exception.response.ErrorResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -29,6 +31,7 @@ public class GlobalExceptionHandler {
     // 알 수 없는 오류
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleException(Exception e) {
+        log.error("[GlobalExceptionHandler] Unhandled exception: {}", e.getMessage(), e);
         return ResponseEntity
             .internalServerError()
             .body(ErrorResponse.from(CommonErrorCode.INTERNAL_SERVER_ERROR));

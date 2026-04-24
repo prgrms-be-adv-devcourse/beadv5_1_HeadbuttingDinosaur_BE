@@ -8,7 +8,8 @@ public record RefundTicketDoneEvent(
     UUID refundId,
     UUID orderId,
     List<UUID> ticketIds,
-    UUID eventId,
-    int quantity,
+    List<Item> items,
     Instant timestamp
-) {}
+) {
+    public record Item(UUID eventId, int quantity) {}
+}

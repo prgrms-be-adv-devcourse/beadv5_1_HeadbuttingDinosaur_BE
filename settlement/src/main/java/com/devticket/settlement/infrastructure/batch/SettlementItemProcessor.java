@@ -40,18 +40,18 @@ public class SettlementItemProcessor implements ItemProcessor<InternalSettlement
                 }
 
                 return Settlement.builder()
-                    .sellerId(response.sellerId()) // 응답에서 직접 가져오기
+                    .sellerId(response.sellerId())
                     .periodStartAt(firstDayOfLastMonth.atStartOfDay())
                     .periodEndAt(lastDayOfLastMonth.atTime(23, 59, 59))
                     .totalSalesAmount(event.totalSalesAmount())
                     .totalRefundAmount(event.totalRefundAmount())
                     .totalFeeAmount(feeAmount)
                     .finalSettlementAmount(finalAmount)
-                    .status(SettlementStatus.COMPLETED)
+                    .status(SettlementStatus.CONFIRMED)
                     .settledAt(LocalDateTime.now())
                     .build();
             })
             .filter(s -> s != null)
-            .toList();
+            .collect(java.util.stream.Collectors.toList());
     }
 }

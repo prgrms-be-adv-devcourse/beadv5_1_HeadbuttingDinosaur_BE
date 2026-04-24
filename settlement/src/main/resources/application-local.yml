@@ -24,6 +24,7 @@ logging:
     com.devticket: DEBUG
 
 external:
+  payment-base-url: http://localhost:8084
   commerce-base-url: http://localhost:8083
   member-base-url: http://localhost:8081
   event-base-url: http://localhost:8082

@@ -20,7 +20,7 @@ public class EventEmbeddingRepositoryImpl implements EventEmbeddingRepository {
         try {
             // es에서 eventId로 embedding 값 단건 조회
             var response = elasticsearchClient.get(g->g
-                .index("event-index")
+                .index("event")
                 .id(eventId)
                     .sourceIncludes("embedding")
                 , java.util.Map.class

@@ -222,6 +222,11 @@ public class PgPaymentClient {
         try {
             TossPaymentCancelResponse response = restClient.post()
                 .uri(CANCEL_PATH, command.paymentKey())
+                .headers(headers -> {
+                    if (command.idempotencyKey() != null && !command.idempotencyKey().isBlank()) {
+                        headers.set("Idempotency-Key", command.idempotencyKey());
+                    }
+                })
                 .body(request)
                 .retrieve()
                 .body(TossPaymentCancelResponse.class);

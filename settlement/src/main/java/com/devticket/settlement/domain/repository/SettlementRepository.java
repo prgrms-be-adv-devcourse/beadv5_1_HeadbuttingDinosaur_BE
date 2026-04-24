@@ -19,7 +19,8 @@ public interface SettlementRepository {
 
     List<Settlement> findByStatus(SettlementStatus status);
 
-    Optional<Settlement> findBySellerIdAndPeriodStartAtBetween(UUID sellerId, LocalDateTime from, LocalDateTime to);
+    Optional<Settlement> findFirstBySellerIdAndPeriodStartAtBetweenAndStatusNotOrderByCreatedAtDesc(
+        UUID sellerId, LocalDateTime from, LocalDateTime to, SettlementStatus status);
 
     boolean existsBySellerIdAndPeriodStartAtBetweenAndStatusNot(UUID sellerId, LocalDateTime from, LocalDateTime to, SettlementStatus status);
 
@@ -28,5 +29,9 @@ public interface SettlementRepository {
     Settlement save(Settlement settlement);
 
     Page<Settlement> search(SettlementStatus status, UUID sellerId,
-        LocalDateTime startDate, LocalDateTime endDate, Pageable pageable);
+        LocalDateTime monthStart, LocalDateTime monthEnd, Pageable pageable);
+
+    List<Settlement> findByCarriedToSettlementId(UUID settlementId);
+
+    List<Settlement> findBySellerIdAndStatusAndCarriedToSettlementIdIsNull(UUID sellerId, SettlementStatus status);
 }

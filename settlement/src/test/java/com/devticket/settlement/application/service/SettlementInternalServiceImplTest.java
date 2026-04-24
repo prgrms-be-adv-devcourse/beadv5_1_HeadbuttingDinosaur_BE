@@ -1,14 +1,20 @@
 package com.devticket.settlement.application.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import com.devticket.settlement.common.exception.BusinessException;
+import com.devticket.settlement.common.exception.CommonErrorCode;
+import com.devticket.settlement.domain.exception.SettlementErrorCode;
 import com.devticket.settlement.domain.model.Settlement;
 import com.devticket.settlement.domain.model.SettlementItem;
 import com.devticket.settlement.domain.model.SettlementItemStatus;
@@ -18,9 +24,11 @@ import com.devticket.settlement.domain.repository.SettlementItemRepository;
 import com.devticket.settlement.domain.repository.SettlementRepository;
 import com.devticket.settlement.infrastructure.client.SettlementToCommerceClient;
 import com.devticket.settlement.infrastructure.client.SettlementToMemberClient;
+import com.devticket.settlement.infrastructure.client.SettlementToPaymentClient;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -33,6 +41,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class SettlementInternalServiceImplTest {
 
     @Mock private SettlementToCommerceClient settlementToCommerceClient;
+    @Mock private SettlementToPaymentClient settlementToPaymentClient;
     @Mock private SettlementToMemberClient settlementToMemberClient;
     @Mock private FeePolicyRepository feePolicyRepository;
     @Mock private SettlementRepository settlementRepository;
@@ -48,7 +57,7 @@ class SettlementInternalServiceImplTest {
     // ────────────────────────────────────────────────
 
     @Test
-    void createSettlementFromItems_최소금액충족_COMPLETED생성() {
+    void createSettlementFromItems_최소금액충족_CONFIRMED생성() {
         SettlementItem item = buildItem(sellerId, 48500L);
         givenReadyItems(List.of(item));
         givenNoPendingSettlements();
@@ -57,7 +66,7 @@ class SettlementInternalServiceImplTest {
         service.createSettlementFromItems();
 
         Settlement saved = captureNewSettlement();
-        assertThat(saved.getStatus()).isEqualTo(SettlementStatus.COMPLETED);
+        assertThat(saved.getStatus()).isEqualTo(SettlementStatus.CONFIRMED);
         assertThat(saved.getFinalSettlementAmount()).isEqualTo(48500);
         assertThat(saved.getCarriedInAmount()).isEqualTo(0);
     }
@@ -78,14 +87,14 @@ class SettlementInternalServiceImplTest {
     }
 
     @Test
-    void createSettlementFromItems_이월합산으로_최소금액충족_COMPLETED_체인해소() {
+    void createSettlementFromItems_이월합산으로_최소금액충족_CONFIRMED_이월처리() {
         SettlementItem item = buildItem(sellerId, 4850L);
         Settlement pending = buildPendingSettlement(sellerId, 5820);
 
         givenReadyItems(List.of(item));
         given(settlementRepository.findByStatus(SettlementStatus.PENDING_MIN_AMOUNT))
             .willReturn(List.of());
-        given(settlementRepository.findBySellerIdAndStatus(sellerId, SettlementStatus.PENDING_MIN_AMOUNT))
+        given(settlementRepository.findBySellerIdAndStatusAndCarriedToSettlementIdIsNull(sellerId, SettlementStatus.PENDING_MIN_AMOUNT))
             .willReturn(List.of(pending));
         givenNotAlreadySettled(sellerId);
         givenSaveReturnsArgument();
@@ -93,12 +102,13 @@ class SettlementInternalServiceImplTest {
         service.createSettlementFromItems();
 
         Settlement saved = captureNewSettlement();
-        assertThat(saved.getStatus()).isEqualTo(SettlementStatus.COMPLETED);
+        assertThat(saved.getStatus()).isEqualTo(SettlementStatus.CONFIRMED);
         assertThat(saved.getFinalSettlementAmount()).isEqualTo(10670); // 4850 + 5820
         assertThat(saved.getCarriedInAmount()).isEqualTo(5820);
-        assertThat(saved.getCarriedInSettlementId()).isEqualTo(pending.getSettlementId());
 
-        assertThat(pending.getStatus()).isEqualTo(SettlementStatus.COMPLETED);
+        // 이월된 pending 정산서에 carriedToSettlementId 설정 확인
+        assertThat(pending.getCarriedToSettlementId()).isEqualTo(saved.getSettlementId());
+        assertThat(pending.getStatus()).isEqualTo(SettlementStatus.PENDING_MIN_AMOUNT);
     }
 
     @Test
@@ -109,7 +119,7 @@ class SettlementInternalServiceImplTest {
         givenReadyItems(List.of(item));
         given(settlementRepository.findByStatus(SettlementStatus.PENDING_MIN_AMOUNT))
             .willReturn(List.of());
-        given(settlementRepository.findBySellerIdAndStatus(sellerId, SettlementStatus.PENDING_MIN_AMOUNT))
+        given(settlementRepository.findBySellerIdAndStatusAndCarriedToSettlementIdIsNull(sellerId, SettlementStatus.PENDING_MIN_AMOUNT))
             .willReturn(List.of(pending));
         givenNotAlreadySettled(sellerId);
         givenSaveReturnsArgument();
@@ -131,14 +141,15 @@ class SettlementInternalServiceImplTest {
             .willReturn(List.of());
         given(settlementRepository.findByStatus(SettlementStatus.PENDING_MIN_AMOUNT))
             .willReturn(List.of(pending));
-        given(settlementRepository.findBySellerIdAndStatus(carryOverSellerId, SettlementStatus.PENDING_MIN_AMOUNT))
+        given(settlementRepository.findBySellerIdAndStatusAndCarriedToSettlementIdIsNull(carryOverSellerId, SettlementStatus.PENDING_MIN_AMOUNT))
             .willReturn(List.of(pending));
         givenNotAlreadySettled(carryOverSellerId);
         givenSaveReturnsArgument();
 
         service.createSettlementFromItems();
 
-        verify(settlementRepository).save(any(Settlement.class));
+        // 신규 정산서 save + pending의 carriedToSettlementId 업데이트 save = 2회
+        verify(settlementRepository, atLeastOnce()).save(any(Settlement.class));
     }
 
     @Test
@@ -195,7 +206,7 @@ class SettlementInternalServiceImplTest {
             .willReturn(List.of());
         given(settlementRepository.findByStatus(SettlementStatus.PENDING_MIN_AMOUNT))
             .willReturn(List.of(pending));
-        given(settlementRepository.findBySellerIdAndStatus(carryOverSellerId, SettlementStatus.PENDING_MIN_AMOUNT))
+        given(settlementRepository.findBySellerIdAndStatusAndCarriedToSettlementIdIsNull(carryOverSellerId, SettlementStatus.PENDING_MIN_AMOUNT))
             .willReturn(List.of(pending));
         givenNotAlreadySettled(carryOverSellerId);
         givenSaveReturnsArgument();
@@ -203,6 +214,99 @@ class SettlementInternalServiceImplTest {
         service.createSettlementFromItems();
 
         verify(settlementItemRepository, never()).saveAll(anyList());
+    }
+
+    // ────────────────────────────────────────────────
+    // processPayment
+    // ────────────────────────────────────────────────
+
+    @Test
+    void processPayment_CONFIRMED_지급성공_PAID처리() {
+        Settlement settlement = buildConfirmedSettlement(sellerId, 18000);
+        given(settlementRepository.findBySettlementId(settlement.getSettlementId()))
+            .willReturn(Optional.of(settlement));
+        given(settlementRepository.findByCarriedToSettlementId(settlement.getSettlementId()))
+            .willReturn(List.of());
+
+        service.processPayment(settlement.getSettlementId());
+
+        assertThat(settlement.getStatus()).isEqualTo(SettlementStatus.PAID);
+        verify(settlementToPaymentClient).transferToDeposit(
+            settlement.getSettlementId(), settlement.getSellerId(), settlement.getFinalSettlementAmount()
+        );
+    }
+
+    @Test
+    void processPayment_지급성공_이월정산서도_PAID처리() {
+        Settlement settlement = buildConfirmedSettlement(sellerId, 18000);
+        Settlement carried = buildPendingSettlement(sellerId, 5000);
+
+        given(settlementRepository.findBySettlementId(settlement.getSettlementId()))
+            .willReturn(Optional.of(settlement));
+        given(settlementRepository.findByCarriedToSettlementId(settlement.getSettlementId()))
+            .willReturn(List.of(carried));
+
+        service.processPayment(settlement.getSettlementId());
+
+        assertThat(settlement.getStatus()).isEqualTo(SettlementStatus.PAID);
+        assertThat(carried.getStatus()).isEqualTo(SettlementStatus.PAID);
+        verify(settlementRepository).saveAll(List.of(carried));
+    }
+
+    @Test
+    void processPayment_지급실패_PAID_FAILED처리_예외전파() {
+        Settlement settlement = buildConfirmedSettlement(sellerId, 18000);
+        given(settlementRepository.findBySettlementId(settlement.getSettlementId()))
+            .willReturn(Optional.of(settlement));
+        doThrow(new BusinessException(CommonErrorCode.EXTERNAL_SERVICE_ERROR))
+            .when(settlementToPaymentClient)
+            .transferToDeposit(any(UUID.class), any(UUID.class), anyInt());
+
+        assertThatThrownBy(() -> service.processPayment(settlement.getSettlementId()))
+            .isInstanceOf(BusinessException.class)
+            .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
+                .isEqualTo(SettlementErrorCode.PAYMENT_FAILED));
+
+        assertThat(settlement.getStatus()).isEqualTo(SettlementStatus.PAID_FAILED);
+    }
+
+    @Test
+    void processPayment_PAID_FAILED_재시도_성공() {
+        Settlement settlement = buildSettlementWithStatus(sellerId, 18000, SettlementStatus.PAID_FAILED);
+        given(settlementRepository.findBySettlementId(settlement.getSettlementId()))
+            .willReturn(Optional.of(settlement));
+        given(settlementRepository.findByCarriedToSettlementId(settlement.getSettlementId()))
+            .willReturn(List.of());
+
+        service.processPayment(settlement.getSettlementId());
+
+        assertThat(settlement.getStatus()).isEqualTo(SettlementStatus.PAID);
+    }
+
+    @Test
+    void processPayment_PENDING_MIN_AMOUNT상태_BAD_REQUEST예외() {
+        Settlement settlement = buildPendingSettlement(sellerId, 5000);
+        given(settlementRepository.findBySettlementId(settlement.getSettlementId()))
+            .willReturn(Optional.of(settlement));
+
+        assertThatThrownBy(() -> service.processPayment(settlement.getSettlementId()))
+            .isInstanceOf(BusinessException.class)
+            .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
+                .isEqualTo(SettlementErrorCode.SETTLEMENT_BAD_REQUEST));
+
+        verify(settlementToPaymentClient, never()).transferToDeposit(any(), any(), anyInt());
+    }
+
+    @Test
+    void processPayment_존재하지않는_settlementId_BAD_REQUEST예외() {
+        UUID unknownId = UUID.randomUUID();
+        given(settlementRepository.findBySettlementId(unknownId))
+            .willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.processPayment(unknownId))
+            .isInstanceOf(BusinessException.class)
+            .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
+                .isEqualTo(SettlementErrorCode.SETTLEMENT_BAD_REQUEST));
     }
 
     // ────────────────────────────────────────────────
@@ -239,6 +343,36 @@ class SettlementInternalServiceImplTest {
             .build();
     }
 
+    private Settlement buildConfirmedSettlement(UUID sellerId, int finalSettlementAmount) {
+        return Settlement.builder()
+            .sellerId(sellerId)
+            .periodStartAt(LocalDateTime.now().minusMonths(1))
+            .periodEndAt(LocalDateTime.now())
+            .totalSalesAmount(finalSettlementAmount + 570)
+            .totalRefundAmount(0)
+            .totalFeeAmount(570)
+            .finalSettlementAmount(finalSettlementAmount)
+            .carriedInAmount(0)
+            .status(SettlementStatus.CONFIRMED)
+            .settledAt(LocalDateTime.now())
+            .build();
+    }
+
+    private Settlement buildSettlementWithStatus(UUID sellerId, int finalSettlementAmount, SettlementStatus status) {
+        return Settlement.builder()
+            .sellerId(sellerId)
+            .periodStartAt(LocalDateTime.now().minusMonths(1))
+            .periodEndAt(LocalDateTime.now())
+            .totalSalesAmount(finalSettlementAmount + 570)
+            .totalRefundAmount(0)
+            .totalFeeAmount(570)
+            .finalSettlementAmount(finalSettlementAmount)
+            .carriedInAmount(0)
+            .status(status)
+            .settledAt(LocalDateTime.now())
+            .build();
+    }
+
     private void givenReadyItems(List<SettlementItem> items) {
         given(settlementItemRepository.findByStatusAndEventDateTimeBetween(
             eq(SettlementItemStatus.READY), any(LocalDate.class), any(LocalDate.class)))
@@ -248,7 +382,7 @@ class SettlementInternalServiceImplTest {
     private void givenNoPendingSettlements() {
         given(settlementRepository.findByStatus(SettlementStatus.PENDING_MIN_AMOUNT))
             .willReturn(List.of());
-        given(settlementRepository.findBySellerIdAndStatus(sellerId, SettlementStatus.PENDING_MIN_AMOUNT))
+        given(settlementRepository.findBySellerIdAndStatusAndCarriedToSettlementIdIsNull(sellerId, SettlementStatus.PENDING_MIN_AMOUNT))
             .willReturn(List.of());
         givenNotAlreadySettled(sellerId);
     }

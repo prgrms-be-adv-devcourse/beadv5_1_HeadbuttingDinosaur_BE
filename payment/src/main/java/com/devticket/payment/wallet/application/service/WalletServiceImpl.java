@@ -8,6 +8,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -37,6 +38,7 @@ import com.devticket.payment.wallet.domain.repository.WalletChargeRepository;
 import com.devticket.payment.wallet.domain.repository.WalletRepository;
 import com.devticket.payment.wallet.domain.repository.WalletTransactionRepository;
 import com.devticket.payment.wallet.infrastructure.client.dto.InternalEventOrdersResponse;
+import com.devticket.payment.wallet.presentation.dto.SettlementDepositRequest;
 import com.devticket.payment.wallet.presentation.dto.WalletBalanceResponse;
 import com.devticket.payment.wallet.presentation.dto.WalletChargeConfirmRequest;
 import com.devticket.payment.wallet.presentation.dto.WalletChargeConfirmResponse;
@@ -530,6 +532,45 @@ public class WalletServiceImpl implements WalletService {
             walletCharge.fail();
             log.info("[Recovery] PG 상태 '{}' — chargeId={} → FAILED", pgStatus.status(), chargeId);
         }
+    }
+
+    // =====================================================================
+    // Settlement 요청 — 정산금을 예치금으로 전환
+    // =====================================================================
+
+    @Override
+    @Transactional
+    public void depositFromSettlement(SettlementDepositRequest request) {
+        String transactionKey = "SETTLEMENT_" + request.settlementId();
+
+        if (walletTransactionRepository.existsByTransactionKey(transactionKey)) {
+            log.info("[Settlement] 이미 처리된 정산 — settlementId={}", request.settlementId());
+            return;
+        }
+
+        // 지갑이 없으면 생성, 있으면 무시 (ON CONFLICT DO NOTHING — 동시 정산 요청 경합 흡수)
+        walletRepository.insertWalletIfAbsent(request.userId());
+
+        walletRepository.chargeBalanceAtomic(request.userId(), request.amount());
+
+        // clearAutomatically = true 로 캐시 초기화됐으므로 최신 잔액을 재조회
+        Wallet wallet = walletRepository.findByUserId(request.userId())
+            .orElseThrow(() -> new WalletException(WalletErrorCode.WALLET_NOT_FOUND));
+
+        WalletTransaction tx = WalletTransaction.createSettlement(
+            wallet.getId(), request.userId(), transactionKey,
+            request.amount(), wallet.getBalance()
+        );
+        try {
+            walletTransactionRepository.saveAndFlush(tx);
+        } catch (DataIntegrityViolationException e) {
+            // 동시 재시도가 먼저 커밋 — 이 TX의 잔액 변경은 롤백으로 보호되고 호출자엔 멱등 성공으로 응답
+            log.info("[Settlement] 동시 중복 정산 감지 — 멱등 처리. settlementId={}", request.settlementId());
+            throw new WalletException(WalletErrorCode.SETTLEMENT_ALREADY_PROCESSED);
+        }
+
+        log.info("[Settlement] 정산금 예치금 전환 완료 — settlementId={}, userId={}, amount={}, balanceAfter={}",
+            request.settlementId(), request.userId(), request.amount(), wallet.getBalance());
     }
 
     // =====================================================================

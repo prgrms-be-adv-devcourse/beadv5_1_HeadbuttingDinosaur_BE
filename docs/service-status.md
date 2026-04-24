@@ -22,6 +22,23 @@
 - `penalizeUser`: penalize user 기능을 제공.
 - `updateUserRole`: update user role 기능을 제공.
 
+## ai / RecentVectorService
+
+- `recalculateRecentVector`: recalculate recent vector 기능을 제공.
+
+## ai / RecommendationService
+
+- `recommendByUserVector`: recommend by user vector 기능을 제공.
+- `recommendByColdStart`: recommend by cold start 기능을 제공.
+- `searchKnn`: search knn 기능을 제공.
+
+## ai / VectorService
+
+- `updatePreferenceVector`: update preference vector 기능을 제공.
+- `updateRefund`: update refund 기능을 제공.
+- `updateCartVector`: update cart vector 기능을 제공.
+- `updateNegativeVector`: update negative vector 기능을 제공.
+
 ## commerce / CartService
 
 - `findByUserId`: find by user id 기능을 제공.

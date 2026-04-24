@@ -17,6 +17,13 @@
 | GET | `/api/admin/seller-applications` | `AdminSellerController#getSellerApplicationList` | 판매자 신청 리스트 조회 API |
 | PATCH | `/api/admin/seller-applications/{applicationId}` | `AdminSellerController#decideApplication` | 판매자 신청 승인/반려 API |
 
+## ai
+
+| HTTP | Path | Controller#Method | 설명 |
+|---|---|---|---|
+| POST | `/test/kafka` | `KafkaTestController#send` | send |
+| POST | `internal/ai/recommendation` | `RecommendationController#recommend` | recommend |
+
 ## apigateway
 
 | HTTP | Path | Controller#Method | 설명 |

@@ -22,7 +22,10 @@ public enum EventErrorCode implements ErrorCode {
     MAX_QUANTITY_EXCEEDED(400, "EVENT_016", "인당 최대 구매 수량은 총 수량을 초과할 수 없습니다."),
     TOTAL_QUANTITY_BELOW_SOLD(400, "EVENT_017", "총 수량은 이미 판매된 수량 이하로 줄일 수 없습니다."),
     INVALID_STOCK_QUANTITY(400, "EVENT_018", "재고 변경 수량은 1 이상이어야 합니다."),
-    PURCHASE_NOT_ALLOWED(409, "EVENT_019", "현재 구매 불가능한 이벤트입니다.");
+    PURCHASE_NOT_ALLOWED(409, "EVENT_019", "현재 구매 불가능한 이벤트입니다."),
+    IMAGE_UPLOAD_FAILED(500, "EVENT_021", "이미지 업로드에 실패했습니다."),
+    INVALID_IMAGE_TYPE(400, "EVENT_022", "허용되지 않는 이미지 형식입니다. (jpg, jpeg, png, webp만 허용)"),
+    IMAGE_SIZE_EXCEEDED(400, "EVENT_023", "이미지 크기는 최대 5MB입니다.");
 
     private final int status;
     private final String code;

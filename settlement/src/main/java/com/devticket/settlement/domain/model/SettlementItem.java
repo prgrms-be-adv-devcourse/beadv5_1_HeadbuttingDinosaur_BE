@@ -85,4 +85,9 @@ public class SettlementItem extends BaseEntity {
         this.status = SettlementItemStatus.FINALIZED;
     }
 
+    public void resetToReady() {
+        this.settlementId = null;
+        this.status = SettlementItemStatus.READY;
+    }
+
 }

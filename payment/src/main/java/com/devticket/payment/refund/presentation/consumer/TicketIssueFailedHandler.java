@@ -96,9 +96,9 @@ public class TicketIssueFailedHandler {
 
         outboxService.save(
             refund.getRefundId().toString(),
-            KafkaTopics.REFUND_REQUESTED,
-            KafkaTopics.REFUND_REQUESTED,
             event.orderId().toString(),
+            KafkaTopics.REFUND_REQUESTED,
+            KafkaTopics.REFUND_REQUESTED,
             requested
         );
 

@@ -21,7 +21,9 @@ public class EventServiceClient {
     private String eventServiceUrl;
 
     public PopularEventListResponse getPopularEvents(PopularEventListRequest request) {
-        log.info("[EventClient] 인기 이벤트 조회 - neededCount: {}", request.neededCount());
+        log.info("[EventClient] 인기 이벤트 조회 - needed: {}", request.needed());
+        log.info("[EventClient] 요청 URL: {}", eventServiceUrl + "/internal/events/popular");
+        log.info("[EventClient] 요청 body: {}", request);
 
         try {
             PopularEventListResponse response = webClient.post()
@@ -29,12 +31,14 @@ public class EventServiceClient {
                 .bodyValue(request)
                 .retrieve()
                 .bodyToMono(PopularEventListResponse.class)
+                .doOnSuccess(r -> log.info("[EventClient] 응답 성공: {}", r))
+                .doOnError(e -> log.error("[EventClient] 응답 실패", e))
                 .block();
 
-            return response != null ? response : new PopularEventListResponse(List.of());
+            return response != null ? response : new PopularEventListResponse(List.of(),null, null);
         } catch (Exception e) {
             log.error("[EventClient] 인기 이벤트 조회 실패", e);
-            return new PopularEventListResponse(List.of());
+            return new PopularEventListResponse(List.of(),null, null);
         }
     }
 
