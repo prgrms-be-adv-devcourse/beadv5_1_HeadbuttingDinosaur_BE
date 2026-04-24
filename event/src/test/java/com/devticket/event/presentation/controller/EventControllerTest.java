@@ -38,7 +38,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import tools.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 
 @WebMvcTest({EventController.class, SellerEventController.class})
 class EventControllerTest {
