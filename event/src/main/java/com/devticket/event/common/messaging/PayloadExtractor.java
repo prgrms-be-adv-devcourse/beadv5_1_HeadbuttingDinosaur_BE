@@ -1,7 +1,7 @@
 package com.devticket.event.common.messaging;
 
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 public final class PayloadExtractor {
 
@@ -16,8 +16,7 @@ public final class PayloadExtractor {
             JsonNode payloadNode = root.get("payload");
             if (payloadNode != null && !payloadNode.isNull()) {
                 // payload 가 String 값이면 asText(), 객체/배열이면 toString() 으로 JSON 직렬화
-                return payloadNode.isValueNode() ? payloadNode.asString() : payloadNode.toString();
-            }
+                return payloadNode.isTextual() ? payloadNode.asText() : payloadNode.toString();            }
         } catch (Exception ignored) {
             // wrapper 가 아니면 원본 반환
         }
