@@ -9,8 +9,6 @@ import com.devticket.payment.common.outbox.OutboxService;
 import com.devticket.payment.payment.domain.enums.PaymentMethod;
 import com.devticket.payment.payment.domain.model.Payment;
 import com.devticket.payment.payment.domain.repository.PaymentRepository;
-import com.devticket.payment.wallet.domain.model.Wallet;
-import com.devticket.payment.wallet.domain.repository.WalletRepository;
 import com.devticket.payment.refund.application.saga.event.RefundOrderDoneEvent;
 import com.devticket.payment.refund.application.saga.event.RefundRequestedEvent;
 import com.devticket.payment.refund.application.saga.event.RefundStockDoneEvent;
@@ -25,6 +23,8 @@ import com.devticket.payment.refund.domain.repository.RefundRepository;
 import com.devticket.payment.refund.domain.repository.SagaStateRepository;
 import com.devticket.payment.refund.domain.saga.SagaStatus;
 import com.devticket.payment.refund.domain.saga.SagaStep;
+import com.devticket.payment.wallet.domain.model.Wallet;
+import com.devticket.payment.wallet.domain.repository.WalletRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Duration;
@@ -48,12 +48,10 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Refund Saga E2E 통합 테스트 —
- * Payment Orchestrator + Outbox + Kafka + Mock Commerce/Event Consumer 연동 검증.
- *
- * Commerce/Event 서비스가 없으므로 같은 컨테이너 내부에서 Mock @KafkaListener 가
- * refund.order.cancel / refund.ticket.cancel / refund.stock.restore 수신 시
- * 대응하는 done / failed 이벤트를 Outbox 로 회신한다.
+ * Refund Saga E2E 통합 테스트 — Payment Orchestrator + Outbox + Kafka + Mock Commerce/Event Consumer 연동 검증.
+ * <p>
+ * Commerce/Event 서비스가 없으므로 같은 컨테이너 내부에서 Mock @KafkaListener 가 refund.order.cancel / refund.ticket.cancel /
+ * refund.stock.restore 수신 시 대응하는 done / failed 이벤트를 Outbox 로 회신한다.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -71,15 +69,24 @@ import org.springframework.transaction.annotation.Transactional;
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class RefundSagaIntegrationTest {
 
-    @Autowired PaymentRepository paymentRepository;
-    @Autowired RefundRepository refundRepository;
-    @Autowired OrderRefundRepository orderRefundRepository;
-    @Autowired SagaStateRepository sagaStateRepository;
-    @Autowired OutboxRepository outboxRepository;
-    @Autowired OutboxService outboxService;
-    @Autowired ObjectMapper objectMapper;
-    @Autowired MockSagaPartner mockPartner;
-    @Autowired WalletRepository walletRepository;
+    @Autowired
+    PaymentRepository paymentRepository;
+    @Autowired
+    RefundRepository refundRepository;
+    @Autowired
+    OrderRefundRepository orderRefundRepository;
+    @Autowired
+    SagaStateRepository sagaStateRepository;
+    @Autowired
+    OutboxRepository outboxRepository;
+    @Autowired
+    OutboxService outboxService;
+    @Autowired
+    ObjectMapper objectMapper;
+    @Autowired
+    MockSagaPartner mockPartner;
+    @Autowired
+    WalletRepository walletRepository;
 
     @BeforeEach
     void setUp() {
@@ -194,6 +201,7 @@ class RefundSagaIntegrationTest {
     // =====================================================================
     @TestConfiguration
     static class MockSagaPartnerConfig {
+
         @Bean
         MockSagaPartner mockSagaPartner(OutboxService outboxService, ObjectMapper objectMapper) {
             return new MockSagaPartner(outboxService, objectMapper);
@@ -225,9 +233,9 @@ class RefundSagaIntegrationTest {
 
             outboxService.save(
                 refundId.toString(),
-                KafkaTopics.REFUND_ORDER_DONE,
-                KafkaTopics.REFUND_ORDER_DONE,
                 orderId.toString(),
+                KafkaTopics.REFUND_ORDER_DONE,
+                KafkaTopics.REFUND_ORDER_DONE,
                 new RefundOrderDoneEvent(refundId, orderId, Instant.now())
             );
         }
@@ -242,20 +250,22 @@ class RefundSagaIntegrationTest {
             if (failOnTicketCancel.get()) {
                 outboxService.save(
                     refundId.toString(),
-                    KafkaTopics.REFUND_TICKET_FAILED,
-                    KafkaTopics.REFUND_TICKET_FAILED,
                     orderId.toString(),
+                    KafkaTopics.REFUND_TICKET_FAILED,
+                    KafkaTopics.REFUND_TICKET_FAILED,
                     new RefundTicketFailedEvent(refundId, orderId, "mock-fail", Instant.now())
                 );
                 return;
             }
             outboxService.save(
                 refundId.toString(),
-                KafkaTopics.REFUND_TICKET_DONE,
-                KafkaTopics.REFUND_TICKET_DONE,
                 orderId.toString(),
+                KafkaTopics.REFUND_TICKET_DONE,
+                KafkaTopics.REFUND_TICKET_DONE,
                 new RefundTicketDoneEvent(refundId, orderId,
-                    List.of(UUID.randomUUID()), UUID.randomUUID(), 1, Instant.now())
+                    List.of(UUID.randomUUID()),
+                    List.of(new RefundTicketDoneEvent.Item(UUID.randomUUID(), 1)),
+                    Instant.now())
             );
         }
 
@@ -267,9 +277,9 @@ class RefundSagaIntegrationTest {
             UUID orderId = UUID.fromString(payload.get("orderId").asText());
             outboxService.save(
                 refundId.toString(),
-                KafkaTopics.REFUND_STOCK_DONE,
-                KafkaTopics.REFUND_STOCK_DONE,
                 orderId.toString(),
+                KafkaTopics.REFUND_STOCK_DONE,
+                KafkaTopics.REFUND_STOCK_DONE,
                 new RefundStockDoneEvent(refundId, orderId, Instant.now())
             );
         }
