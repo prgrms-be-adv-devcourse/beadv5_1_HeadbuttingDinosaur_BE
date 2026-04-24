@@ -1,5 +1,6 @@
 package com.devticket.commerce.ticket.infrastructure.persistence;
 
+import com.devticket.commerce.ticket.domain.enums.TicketStatus;
 import com.devticket.commerce.ticket.domain.model.Ticket;
 import com.devticket.commerce.ticket.domain.repository.TicketRepository;
 import com.devticket.commerce.ticket.presentation.dto.req.SellerEventParticipantListRequest;
@@ -51,5 +52,20 @@ public class TicketRepositoryAdapter implements TicketRepository {
     @Override
     public List<Ticket> findAllByEventIdIn(List<UUID> eventIds) {
         return ticketJpaRepository.findAllByEventIdIn(eventIds);
+    }
+
+    @Override
+    public List<Ticket> findAllByTicketIdIn(List<UUID> ticketIds) {
+        return ticketJpaRepository.findAllByTicketIdIn(ticketIds);
+    }
+
+    @Override
+    public List<Ticket> findAllByOrderId(Long orderId) {
+        return ticketJpaRepository.findAllByOrderId(orderId);
+    }
+
+    @Override
+    public List<Ticket> findAllByOrderIdAndStatus(Long orderId, TicketStatus status) {
+        return ticketJpaRepository.findAllByOrderIdAndStatus(orderId, status);
     }
 }

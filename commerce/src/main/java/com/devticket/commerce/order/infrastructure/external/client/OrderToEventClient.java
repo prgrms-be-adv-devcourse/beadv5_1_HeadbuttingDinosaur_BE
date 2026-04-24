@@ -4,7 +4,6 @@ import com.devticket.commerce.cart.infrastructure.external.client.dto.EventSucce
 import com.devticket.commerce.common.exception.BusinessException;
 import com.devticket.commerce.common.exception.CommonErrorCode;
 import com.devticket.commerce.order.infrastructure.external.client.dto.InternalBulkStockAdjustmentRequest;
-import com.devticket.commerce.order.infrastructure.external.client.dto.InternalSellerEventsByPeriodRequest;
 import com.devticket.commerce.order.infrastructure.external.client.dto.InternalStockAdjustmentResponse;
 import com.devticket.commerce.order.infrastructure.external.client.dto.InternalStockAdjustmentWrapper;
 import com.devticket.commerce.ticket.infrastructure.external.client.dto.InternalBulkEventInfoRequest;
@@ -74,7 +73,8 @@ public class OrderToEventClient {
         }
     }
 
-    public List<InternalEventInfoResponse> getSellerEventsByPeriod(UUID sellerId, String periodStart, String periodEnd) {
+    public List<InternalEventInfoResponse> getSellerEventsByPeriod(UUID sellerId, String periodStart,
+        String periodEnd) {
         try {
             var response = restClient.get()
                 .uri(uriBuilder -> uriBuilder
@@ -86,7 +86,8 @@ public class OrderToEventClient {
                 .onStatus(HttpStatusCode::isError, (req, res) -> {
                     throw new BusinessException(CommonErrorCode.EXTERNAL_SERVICE_ERROR);
                 })
-                .body(new ParameterizedTypeReference<EventSuccessResponse<List<InternalEventInfoResponse>>>() {});
+                .body(new ParameterizedTypeReference<EventSuccessResponse<List<InternalEventInfoResponse>>>() {
+                });
             return response.data();
         } catch (BusinessException e) {
             throw e;

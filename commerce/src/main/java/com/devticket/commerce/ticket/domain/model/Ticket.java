@@ -1,7 +1,9 @@
 package com.devticket.commerce.ticket.domain.model;
 
 import com.devticket.commerce.common.entity.BaseEntity;
+import com.devticket.commerce.common.exception.BusinessException;
 import com.devticket.commerce.ticket.domain.enums.TicketStatus;
+import com.devticket.commerce.ticket.domain.exception.TicketErrorCode;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -10,6 +12,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.UUID;
@@ -56,6 +59,11 @@ public class Ticket extends BaseEntity {
     @Column(name = "deleted_at")
     LocalDateTime deletedAt;
 
+    // 낙관적 락 — Refund Saga 동시 전이 / 보상 롤백 충돌 방어
+    @Version
+    @Column(name = "version", nullable = false)
+    Long version;
+
     //---- 정적 팩토리 메서드 ------------------------------
 
     public static Ticket create(
@@ -83,13 +91,43 @@ public class Ticket extends BaseEntity {
 
     //---- 비즈니스 도메인 메서드 ----------------------------
 
-    //status변경 : REFUNDED
+    // refund.completed 수신 시 최종 확정 — CANCELLED → REFUNDED (Saga 1단계에서 CANCELLED 선행 필수)
+    // 단 ISSUED → REFUNDED 직접 전이도 허용 (레거시 경로 및 단건 환불 보완 시나리오)
     public void refundTicket() {
+        if (!canTransitionTo(TicketStatus.REFUNDED)) {
+            throw new BusinessException(TicketErrorCode.INVALID_TICKET_STATUS_TRANSITION);
+        }
         this.status = TicketStatus.REFUNDED;
     }
 
-    //status변경 : CANCELLED
+    // refund.ticket.cancel 수신: ISSUED → CANCELLED (Saga 2단계)
     public void cancelledTicket() {
+        if (!canTransitionTo(TicketStatus.CANCELLED)) {
+            throw new BusinessException(TicketErrorCode.INVALID_TICKET_STATUS_TRANSITION);
+        }
         this.status = TicketStatus.CANCELLED;
+    }
+
+    // refund.ticket.compensate 수신: CANCELLED → ISSUED (보상 롤백)
+    public void restoreToIssued() {
+        if (!canTransitionTo(TicketStatus.ISSUED)) {
+            throw new BusinessException(TicketErrorCode.INVALID_TICKET_STATUS_TRANSITION);
+        }
+        this.status = TicketStatus.ISSUED;
+    }
+
+    //---- 상태 전이 검증 ------------------------------
+
+    public boolean canTransitionTo(TicketStatus target) {
+        return switch (this.status) {
+            // ISSUED: 발급 완료 — 환불 Saga 진입(CANCELLED) 또는 단건 직접 환불(REFUNDED)
+            case ISSUED    -> target == TicketStatus.CANCELLED
+                           || target == TicketStatus.REFUNDED;
+            // CANCELLED: Saga 중간 상태 — 최종 확정(REFUNDED) 또는 보상 롤백(ISSUED)
+            case CANCELLED -> target == TicketStatus.REFUNDED
+                           || target == TicketStatus.ISSUED;
+            // REFUNDED: 종단 상태 — 전이 불가
+            default        -> false;
+        };
     }
 }

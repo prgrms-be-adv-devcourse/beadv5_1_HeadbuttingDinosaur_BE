@@ -9,6 +9,8 @@ public final class KafkaTopics {
     public static final String ORDER_CANCELLED     = "order.cancelled";
     public static final String STOCK_DEDUCTED      = "stock.deducted";
     public static final String STOCK_FAILED        = "stock.failed";
+
+    // 결제 흐름
     public static final String PAYMENT_COMPLETED   = "payment.completed";
     public static final String PAYMENT_FAILED      = "payment.failed";
     public static final String TICKET_ISSUE_FAILED = "ticket.issue-failed";
