@@ -8,6 +8,8 @@ public interface WalletTransactionRepository {
 
     WalletTransaction save(WalletTransaction walletTransaction);
 
+    WalletTransaction saveAndFlush(WalletTransaction walletTransaction);
+
     boolean existsByTransactionKey(String transactionKey);
 
     Page<WalletTransaction> findAllByWalletId(Long walletId, Pageable pageable);

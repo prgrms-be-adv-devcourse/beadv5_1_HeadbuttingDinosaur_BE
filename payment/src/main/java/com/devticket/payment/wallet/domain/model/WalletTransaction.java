@@ -135,6 +135,24 @@ public class WalletTransaction extends BaseEntity {
         return walletTransaction;
     }
 
+    public static WalletTransaction createSettlement(
+        Long walletId,
+        UUID userId,
+        String transactionKey,
+        Integer amount,
+        Integer balanceAfter
+    ) {
+        WalletTransaction walletTransaction = new WalletTransaction();
+        walletTransaction.walletTransactionId = UUID.randomUUID();
+        walletTransaction.walletId = walletId;
+        walletTransaction.userId = userId;
+        walletTransaction.transactionKey = transactionKey;
+        walletTransaction.type = WalletTransactionType.SETTLEMENT;
+        walletTransaction.amount = amount;
+        walletTransaction.balanceAfter = balanceAfter;
+        return walletTransaction;
+    }
+
     public void softDelete() {
         this.deletedAt = LocalDateTime.now();
     }
