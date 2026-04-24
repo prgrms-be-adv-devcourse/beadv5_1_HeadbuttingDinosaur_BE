@@ -70,6 +70,62 @@
     "source": "admin/src/main/java/com/devticket/admin/application/service/AdminUserServiceImpl.java"
   },
   {
+    "module": "ai",
+    "service": "RecentVectorService",
+    "method": "recalculateRecentVector",
+    "description": "recalculate recent vector 기능을 제공",
+    "source": "ai/src/main/java/org/example/ai/application/service/RecentVectorService.java"
+  },
+  {
+    "module": "ai",
+    "service": "RecommendationService",
+    "method": "recommendByColdStart",
+    "description": "recommend by cold start 기능을 제공",
+    "source": "ai/src/main/java/org/example/ai/application/service/RecommendationService.java"
+  },
+  {
+    "module": "ai",
+    "service": "RecommendationService",
+    "method": "recommendByUserVector",
+    "description": "recommend by user vector 기능을 제공",
+    "source": "ai/src/main/java/org/example/ai/application/service/RecommendationService.java"
+  },
+  {
+    "module": "ai",
+    "service": "RecommendationService",
+    "method": "searchKnn",
+    "description": "search knn 기능을 제공",
+    "source": "ai/src/main/java/org/example/ai/application/service/RecommendationService.java"
+  },
+  {
+    "module": "ai",
+    "service": "VectorService",
+    "method": "updateCartVector",
+    "description": "update cart vector 기능을 제공",
+    "source": "ai/src/main/java/org/example/ai/application/service/VectorService.java"
+  },
+  {
+    "module": "ai",
+    "service": "VectorService",
+    "method": "updateNegativeVector",
+    "description": "update negative vector 기능을 제공",
+    "source": "ai/src/main/java/org/example/ai/application/service/VectorService.java"
+  },
+  {
+    "module": "ai",
+    "service": "VectorService",
+    "method": "updatePreferenceVector",
+    "description": "update preference vector 기능을 제공",
+    "source": "ai/src/main/java/org/example/ai/application/service/VectorService.java"
+  },
+  {
+    "module": "ai",
+    "service": "VectorService",
+    "method": "updateRefund",
+    "description": "update refund 기능을 제공",
+    "source": "ai/src/main/java/org/example/ai/application/service/VectorService.java"
+  },
+  {
     "module": "commerce",
     "service": "CartService",
     "method": "clearCart",
