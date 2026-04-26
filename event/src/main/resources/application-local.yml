@@ -1,4 +1,6 @@
 spring:
+  config:
+    import: optional:file:.env[.properties]
   datasource:
     url: jdbc:postgresql://localhost:5433/devticket?currentSchema=event
     username: devticket
@@ -21,10 +23,24 @@ spring:
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
+  elasticsearch:
+    uris: http://localhost:9200
+    connection-timeout: 5s
+    socket-timeout: 30s
+
+openai:
+  embedding:
+    enabled: true
+    api-key: ${OPENAI_API_KEY:}
+    model: text-embedding-3-small
 
 service:
   member:
     url: http://localhost:8081
+  admin:
+    url: http://localhost:8087
+  ai:
+    url: http://localhost:8088
 
 logging:
   level:

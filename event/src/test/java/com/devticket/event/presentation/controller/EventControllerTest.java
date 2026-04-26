@@ -38,9 +38,9 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import tools.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 
-@WebMvcTest(EventController.class)
+@WebMvcTest({EventController.class, SellerEventController.class})
 class EventControllerTest {
 
     @Autowired
@@ -75,7 +75,7 @@ class EventControllerTest {
             .thenReturn(expectedResponse);
 
         // when & then
-        mockMvc.perform(post("/api/v1/events")
+        mockMvc.perform(post("/api/seller/events")
                 .header("X-User-Id", String.valueOf(sellerId))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
@@ -95,7 +95,7 @@ class EventControllerTest {
         );
 
         // when & then (헤더를 세팅하지 않음)
-        mockMvc.perform(post("/api/v1/events")
+        mockMvc.perform(post("/api/seller/events")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andDo(print())
@@ -117,7 +117,7 @@ class EventControllerTest {
         UUID sellerId = UUID.randomUUID();
 
         // when & then
-        mockMvc.perform(post("/api/v1/events")
+        mockMvc.perform(post("/api/seller/events")
                 .header("X-User-Id", sellerId.toString())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(badRequest)))
@@ -136,7 +136,7 @@ class EventControllerTest {
         when(eventService.getEvent(eventId)).thenReturn(mockResponse);
 
         // when & then
-        mockMvc.perform(get("/api/v1/events/{eventId}", eventId)
+        mockMvc.perform(get("/api/events/{eventId}", eventId)
                 .contentType(MediaType.APPLICATION_JSON))
             .andDo(print())
             .andExpect(status().isOk()) // 200 OK 검증
@@ -155,7 +155,7 @@ class EventControllerTest {
             .willReturn(mockResponse);
 
         // when (API 호출)
-        mockMvc.perform(get("/api/v1/events")
+        mockMvc.perform(get("/api/events")
                 .contentType(MediaType.APPLICATION_JSON))
             .andDo(print())
             .andExpect(status().isOk())
@@ -180,8 +180,8 @@ class EventControllerTest {
         given(eventService.getEventList(any(EventListRequest.class), eq(testUserId), any(Pageable.class)))
             .willReturn(mockResponse);
 
-        // when (API 호출: 새로 추가된 sellerId, status 파라미터와 X-User-Id 헤더까지 테스트)
-        mockMvc.perform(get("/api/v1/events")
+        // when (API 호출: sellerId, status 파라미터와 X-User-Id 헤더까지 테스트)
+        mockMvc.perform(get("/api/events")
                 .header("X-User-Id", testUserId.toString())
                 .param("keyword", "스프링")
                 .param("category", "MEETUP")
@@ -222,7 +222,7 @@ class EventControllerTest {
     @Test
     void 엣지_케이스_잘못된_카테고리_Enum값을_전달하면_400에러를_반환한다() throws Exception {
         // when & then
-        mockMvc.perform(get("/api/v1/events")
+        mockMvc.perform(get("/api/events")
                 .param("category", "INVALID_CATEGORY") // 존재하지 않는 Enum
                 .contentType(MediaType.APPLICATION_JSON))
             .andDo(print())
@@ -241,7 +241,7 @@ class EventControllerTest {
             .thenReturn(mockResponse);
 
         // when & then
-        mockMvc.perform(get("/api/v1/events")
+        mockMvc.perform(get("/api/events")
                 .param("keyword", "스프링")
                 .contentType(MediaType.APPLICATION_JSON))
             .andDo(print())
@@ -268,8 +268,8 @@ class EventControllerTest {
         when(eventService.getEventList(any(EventListRequest.class), eq(sellerId), any(Pageable.class)))
             .thenReturn(mockResponse);
 
-        // when & then (새로 추가된 sellerId, status 포함한 통합 테스트)
-        mockMvc.perform(get("/api/v1/events")
+        // when & then (sellerId, status 포함한 통합 테스트)
+        mockMvc.perform(get("/api/events")
                 .header("X-User-Id", sellerId.toString())
                 .param("sellerId", sellerId.toString())
                 .param("status", "DRAFT")
@@ -315,7 +315,7 @@ class EventControllerTest {
         when(eventService.getSellerEventDetail(eq(sellerId), eq(eventId))).thenReturn(mockResponse);
 
         // when & then
-        mockMvc.perform(get("/api/v1/events/seller/{eventId}", eventId)
+        mockMvc.perform(get("/api/seller/events/{eventId}", eventId)
                 .header("X-User-Id", sellerId.toString())
                 .contentType(MediaType.APPLICATION_JSON))
             .andDo(print())
@@ -332,7 +332,7 @@ class EventControllerTest {
         UUID eventId = UUID.randomUUID();
 
         // when & then (헤더 미포함)
-        mockMvc.perform(get("/api/v1/events/seller/{eventId}", eventId)
+        mockMvc.perform(get("/api/seller/events/{eventId}", eventId)
                 .contentType(MediaType.APPLICATION_JSON))
             .andDo(print())
             .andExpect(status().isBadRequest());
@@ -350,7 +350,7 @@ class EventControllerTest {
         when(eventService.getEventSummary(eq(sellerId), eq(eventId))).thenReturn(mockResponse);
 
         // when & then
-        mockMvc.perform(get("/api/v1/events/{eventId}/statistics", eventId)
+        mockMvc.perform(get("/api/seller/events/{eventId}/statistics", eventId)
                 .header("X-User-Id", sellerId.toString())
                 .contentType(MediaType.APPLICATION_JSON))
             .andDo(print())
@@ -367,7 +367,7 @@ class EventControllerTest {
         UUID eventId = UUID.randomUUID();
 
         // when & then (헤더 미포함)
-        mockMvc.perform(get("/api/v1/events/{eventId}/statistics", eventId)
+        mockMvc.perform(get("/api/seller/events/{eventId}/statistics", eventId)
                 .contentType(MediaType.APPLICATION_JSON))
             .andDo(print())
             .andExpect(status().isBadRequest());
@@ -389,7 +389,7 @@ class EventControllerTest {
             .thenReturn(expectedResponse);
 
         // when & then
-        mockMvc.perform(patch("/api/v1/events/{eventId}", eventId)
+        mockMvc.perform(patch("/api/seller/events/{eventId}", eventId)
                 .header("X-User-Id", sellerId.toString())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(cancelRequest)))
@@ -410,7 +410,7 @@ class EventControllerTest {
         SellerEventUpdateRequest cancelRequest = EventTestFixture.createUpdateEventRequest_Cancel();
 
         // when & then (헤더 미포함)
-        mockMvc.perform(patch("/api/v1/events/{eventId}", eventId)
+        mockMvc.perform(patch("/api/seller/events/{eventId}", eventId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(cancelRequest)))
             .andDo(print())
@@ -431,7 +431,7 @@ class EventControllerTest {
             .thenReturn(expectedResponse);
 
         // when & then
-        mockMvc.perform(patch("/api/v1/events/{eventId}", eventId)
+        mockMvc.perform(patch("/api/seller/events/{eventId}", eventId)
                 .header("X-User-Id", sellerId.toString())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(updateRequest)))
@@ -456,7 +456,7 @@ class EventControllerTest {
         SellerEventUpdateRequest updateRequest = EventTestFixture.createUpdateEventRequest();
 
         // when & then (헤더 미포함)
-        mockMvc.perform(patch("/api/v1/events/{eventId}", eventId)
+        mockMvc.perform(patch("/api/seller/events/{eventId}", eventId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(updateRequest)))
             .andDo(print())

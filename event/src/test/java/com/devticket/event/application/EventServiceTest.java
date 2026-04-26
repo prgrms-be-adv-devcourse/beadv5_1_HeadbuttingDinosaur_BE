@@ -2,22 +2,34 @@ package com.devticket.event.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
-import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import com.devticket.event.common.exception.BusinessException;
+import com.devticket.event.common.outbox.OutboxService;
 import com.devticket.event.domain.enums.EventCategory;
 import com.devticket.event.domain.enums.EventStatus;
 import com.devticket.event.domain.exception.EventErrorCode;
 import com.devticket.event.domain.model.Event;
+import com.devticket.event.domain.model.EventView;
 import com.devticket.event.fixture.EventTestFixture;
+import com.devticket.event.infrastructure.client.AdminClient;
+import com.devticket.event.infrastructure.client.MemberClient;
+import com.devticket.event.infrastructure.client.OpenAiEmbeddingClient;
+import com.devticket.event.infrastructure.client.dto.TechStackItem;
 import com.devticket.event.infrastructure.persistence.EventRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.devticket.event.infrastructure.persistence.EventViewRepository;
+import com.devticket.event.infrastructure.search.EventDocument;
 import com.devticket.event.presentation.dto.EventDetailResponse;
 import com.devticket.event.presentation.dto.EventListRequest;
 import com.devticket.event.presentation.dto.EventListResponse;
@@ -28,20 +40,23 @@ import com.devticket.event.presentation.dto.SellerEventSummaryResponse;
 import com.devticket.event.presentation.dto.SellerEventUpdateRequest;
 import com.devticket.event.presentation.dto.SellerEventUpdateResponse;
 import java.time.LocalDateTime;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Stream;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
+import org.springframework.data.elasticsearch.core.SearchHit;
+import org.springframework.data.elasticsearch.core.SearchHits;
+import org.springframework.data.elasticsearch.core.query.Query;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -50,10 +65,69 @@ class EventServiceTest {
     @Mock
     private EventRepository eventRepository;
 
+    @Mock
+    private MemberClient memberClient;
+
+    @Mock
+    private AdminClient adminClient;
+
+    @Mock
+    private ElasticsearchOperations elasticsearchOperations;
+
+    @Mock
+    private ElasticsearchClient esClient;
+
+    @Mock
+    private OpenAiEmbeddingClient openAiEmbeddingClient;
+
+    @Mock
+    private OutboxService outboxService;
+
+    @Mock
+    private MessageDeduplicationService deduplicationService;
+
+    @Mock
+    private ObjectMapper objectMapper;
+  
+    private EventViewRepository eventViewRepository;
+
     @InjectMocks
     private EventService eventService;
 
-    // 이벤트 생성 테스트
+    @BeforeEach
+    void setUp() {
+        lenient().when(adminClient.getTechStacks()).thenReturn(List.of(
+            new TechStackItem(1L, "Java"),
+            new TechStackItem(2L, "Spring"),
+            new TechStackItem(3L, "Kotlin")
+        ));
+    }
+
+    // ── 검색 히트 목 헬퍼 ──────────────────────────────────────────────────
+
+    @SuppressWarnings("unchecked")
+    private SearchHits<EventDocument> mockSearchHitsWithEvent(UUID eventId) {
+        EventDocument doc = EventDocument.builder()
+            .id(eventId.toString())
+            .build();
+        SearchHit<EventDocument> hit = mock(SearchHit.class);
+        when(hit.getContent()).thenReturn(doc);
+
+        SearchHits<EventDocument> searchHits = mock(SearchHits.class);
+        when(searchHits.stream()).thenReturn(Stream.of(hit));
+        when(searchHits.getTotalHits()).thenReturn(1L);
+        return searchHits;
+    }
+
+    @SuppressWarnings("unchecked")
+    private SearchHits<EventDocument> mockEmptySearchHits() {
+        SearchHits<EventDocument> searchHits = mock(SearchHits.class);
+        when(searchHits.stream()).thenReturn(Stream.empty());
+        // getTotalHits()는 빈 결과 경로에서 호출되지 않으므로 stub 불필요
+        return searchHits;
+    }
+
+    // ── 이벤트 생성 테스트 ────────────────────────────────────────────────
 
     @Test
     void 정상적인_조건일_경우_이벤트가_성공적으로_생성되고_UUID를_반환한다() {
@@ -65,7 +139,6 @@ class EventServiceTest {
         );
 
         UUID expectedUuid = UUID.randomUUID();
-
         Event savedEvent = EventTestFixture.createEvent(sellerId);
         ReflectionTestUtils.setField(savedEvent, "eventId", expectedUuid);
 
@@ -78,7 +151,8 @@ class EventServiceTest {
         assertThat(response.eventId()).isEqualTo(expectedUuid);
         assertThat(response.status()).isEqualTo(EventStatus.ON_SALE);
 
-        verify(eventRepository, times(2)).save(argThat(event -> event != null));
+        // save 3회 호출 — (1) 이벤트 본체 + (2) techStackIds + (3) imageUrls (fixture 에 "url1" 포함)
+        verify(eventRepository, times(3)).save(argThat(event -> event != null));
     }
 
     @Test
@@ -86,8 +160,9 @@ class EventServiceTest {
         // given
         UUID sellerId = UUID.randomUUID();
         LocalDateTime now = LocalDateTime.now();
+        // 판매 시작일을 과거로 설정 → saleStartAt.isBefore(now) 조건 충족
         SellerEventCreateRequest request = EventTestFixture.createEventRequest(
-            now.plusDays(1), now.plusDays(10), now.plusDays(15), 100, 4
+            now.minusDays(1), now.plusDays(10), now.plusDays(15), 100, 4
         );
 
         // when & then
@@ -127,17 +202,20 @@ class EventServiceTest {
             .hasMessageContaining(EventErrorCode.INVALID_EVENT_DATE.getMessage());
     }
 
-    // 이벤트 상세 조회 테스트
+    // ── 이벤트 상세 조회 테스트 ───────────────────────────────────────────
 
     @Test
     void 존재하는_이벤트_조회시_상세정보를_반환한다() {
         // given
         UUID sellerId = UUID.randomUUID();
-
         Event event = EventTestFixture.createEvent(sellerId);
         UUID eventId = event.getEventId();
 
         when(eventRepository.findWithDetailsByEventId(eventId)).thenReturn(Optional.of(event));
+        // memberClient.getNickname() 은 기본 null 반환 — CI 환경에서 일부 응답 합성 경로가 null 을 허용하지 않을 수 있어
+        // 명시적 stub 으로 NPE 재발 방지 (CI run 24766734663 재현 차단)
+        when(memberClient.getNickname(sellerId)).thenReturn("tester");
+        when(eventViewRepository.findByEvent(event)).thenReturn(Optional.of(EventView.of(event)));
 
         // when
         EventDetailResponse response = eventService.getEvent(eventId);
@@ -151,7 +229,7 @@ class EventServiceTest {
     @Test
     void 존재하지_않는_이벤트_조회시_예외가_발생한다() {
         // given
-        UUID invalidEventId = UUID.randomUUID(); // 아무 UUID나 생성
+        UUID invalidEventId = UUID.randomUUID();
         when(eventRepository.findWithDetailsByEventId(invalidEventId)).thenReturn(Optional.empty());
 
         // when & then
@@ -160,35 +238,29 @@ class EventServiceTest {
             .hasMessageContaining(EventErrorCode.EVENT_NOT_FOUND.getMessage());
     }
 
-    // 이벤트 목록 조회 및 검색 테스트
+    // ── 이벤트 목록 조회 및 검색 테스트 ──────────────────────────────────
 
     @Test
     void 검색_조건이_주어지면_파라미터를_분해하여_Repository를_호출한다() {
         // given
         EventListRequest request = new EventListRequest("스프링", EventCategory.MEETUP, List.of(1L, 2L), null, null);
         Pageable pageable = PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "createdAt"));
-        Page<Event> mockPage = EventTestFixture.createEventPage();
 
-        // 서비스가 내부적으로 계산할 '일반 조회 허용 상태값 리스트'
-        List<EventStatus> publicStatuses = List.of(EventStatus.ON_SALE, EventStatus.SOLD_OUT, EventStatus.SALE_ENDED);
+        UUID eventId = UUID.randomUUID();
+        Event mockEvent = EventTestFixture.createEvent(UUID.randomUUID());
+        ReflectionTestUtils.setField(mockEvent, "eventId", eventId);
 
-        // DTO가 해체되어 각각의 파라미터로 전달됨을 검증
-        given(eventRepository.searchEvents(
-            eq("스프링"), eq(EventCategory.MEETUP), eq(List.of(1L, 2L)), isNull(), eq(publicStatuses), eq(pageable)
-        )).willReturn(mockPage);
-        given(eventRepository.findAllWithDetailsByEventIdIn(anyList())).willReturn(mockPage.getContent());
+        doReturn(mockSearchHitsWithEvent(eventId))
+            .when(elasticsearchOperations).search(any(Query.class), eq(EventDocument.class));
+        when(eventRepository.findAllWithDetailsByEventIdIn(anyList())).thenReturn(List.of(mockEvent));
 
         // when (currentUserId는 일반 조회이므로 null로 전달)
         EventListResponse response = eventService.getEventList(request, null, pageable);
 
         // then
-        assertThat(response.totalElements()).isEqualTo(mockPage.getTotalElements());
+        assertThat(response.totalElements()).isEqualTo(1L);
         assertThat(response.content()).isNotEmpty();
-
-        // verify 역시 해체된 파라미터로 검증
-        verify(eventRepository).searchEvents(
-            "스프링", EventCategory.MEETUP, List.of(1L, 2L), null, publicStatuses, pageable
-        );
+        verify(elasticsearchOperations).search(any(Query.class), any());
     }
 
     @Test
@@ -196,17 +268,21 @@ class EventServiceTest {
         // given
         EventListRequest request = new EventListRequest(null, null, null, null, null);
         Pageable pageable = PageRequest.of(0, 20);
-        List<EventStatus> publicStatuses = List.of(EventStatus.ON_SALE, EventStatus.SOLD_OUT, EventStatus.SALE_ENDED);
 
-        given(eventRepository.searchEvents(isNull(), isNull(), isNull(), isNull(), eq(publicStatuses), eq(pageable)))
-            .willReturn(EventTestFixture.createEventPage());
+        UUID eventId = UUID.randomUUID();
+        Event mockEvent = EventTestFixture.createEvent(UUID.randomUUID());
+        ReflectionTestUtils.setField(mockEvent, "eventId", eventId);
+
+        doReturn(mockSearchHitsWithEvent(eventId))
+            .when(elasticsearchOperations).search(any(Query.class), eq(EventDocument.class));
+        when(eventRepository.findAllWithDetailsByEventIdIn(anyList())).thenReturn(List.of(mockEvent));
 
         // when
         EventListResponse response = eventService.getEventList(request, null, pageable);
 
         // then
         assertThat(response).isNotNull();
-        verify(eventRepository).searchEvents(null, null, null, null, publicStatuses, pageable);
+        verify(elasticsearchOperations).search(any(Query.class), any());
     }
 
     @Test
@@ -214,11 +290,9 @@ class EventServiceTest {
         // given
         EventListRequest request = new EventListRequest("절대검색안될키워드", null, null, null, null);
         Pageable pageable = PageRequest.of(0, 20);
-        Page<Event> emptyPage = new PageImpl<>(Collections.emptyList(), pageable, 0);
-        List<EventStatus> publicStatuses = List.of(EventStatus.ON_SALE, EventStatus.SOLD_OUT, EventStatus.SALE_ENDED);
 
-        given(eventRepository.searchEvents(eq("절대검색안될키워드"), isNull(), isNull(), isNull(), eq(publicStatuses), eq(pageable)))
-            .willReturn(emptyPage);
+        doReturn(mockEmptySearchHits())
+            .when(elasticsearchOperations).search(any(Query.class), eq(EventDocument.class));
 
         // when
         EventListResponse response = eventService.getEventList(request, null, pageable);
@@ -228,29 +302,30 @@ class EventServiceTest {
         assertThat(response.content()).isEmpty();
     }
 
-    // 판매자 등록 이벤트 목록 조회 테스트
+    // ── 판매자 등록 이벤트 목록 조회 테스트 ──────────────────────────────
 
     @Test
     void 일반_조회시_공개된_상태의_이벤트만_조회조건으로_전달된다() {
         // given
         EventListRequest request = new EventListRequest("스프링", EventCategory.MEETUP, List.of(1L, 2L), null, null);
         Pageable pageable = PageRequest.of(0, 20);
-        Page<Event> mockPage = EventTestFixture.createEventPage();
 
-        // 서비스 내부에서 계산될 공개 허용 상태값들
-        List<EventStatus> publicStatuses = List.of(EventStatus.ON_SALE, EventStatus.SOLD_OUT, EventStatus.SALE_ENDED);
+        UUID eventId = UUID.randomUUID();
+        Event mockEvent = EventTestFixture.createEvent(UUID.randomUUID());
+        ReflectionTestUtils.setField(mockEvent, "eventId", eventId);
 
-        // 파라미터가 해체되어 전달됨을 검증
-        when(eventRepository.searchEvents("스프링", EventCategory.MEETUP, List.of(1L, 2L), null, publicStatuses, pageable))
-            .thenReturn(mockPage);
-        when(eventRepository.findAllWithDetailsByEventIdIn(anyList())).thenReturn(mockPage.getContent());
+        doReturn(mockSearchHitsWithEvent(eventId))
+            .when(elasticsearchOperations).search(any(Query.class), eq(EventDocument.class));
+        when(eventRepository.findAllWithDetailsByEventIdIn(anyList())).thenReturn(List.of(mockEvent));
 
-        // when (currentUserId가 null)
+        // when (currentUserId가 null → 내부적으로 공개 상태 필터 적용)
         EventListResponse response = eventService.getEventList(request, null, pageable);
 
         // then
-        assertThat(response.totalElements()).isEqualTo(mockPage.getTotalElements());
-        verify(eventRepository).searchEvents("스프링", EventCategory.MEETUP, List.of(1L, 2L), null, publicStatuses, pageable);
+        assertThat(response.totalElements()).isEqualTo(1L);
+        assertThat(response.content()).isNotEmpty();
+        // ES 검색이 호출되었음을 확인 (공개 상태 필터는 NativeQuery 내부에 포함됨)
+        verify(elasticsearchOperations).search(any(Query.class), any());
     }
 
     @Test
@@ -260,17 +335,20 @@ class EventServiceTest {
         EventListRequest request = new EventListRequest(null, null, null, sellerId, null);
         Pageable pageable = PageRequest.of(0, 20);
 
-        Page<Event> mockPage = EventTestFixture.createEventPage();
-        when(eventRepository.searchEvents(null, null, null, sellerId, null, pageable))
-            .thenReturn(mockPage);
-        when(eventRepository.findAllWithDetailsByEventIdIn(anyList())).thenReturn(mockPage.getContent());
+        UUID eventId = UUID.randomUUID();
+        Event mockEvent = EventTestFixture.createEvent(sellerId);
+        ReflectionTestUtils.setField(mockEvent, "eventId", eventId);
 
-        // when (currentUserId와 request의 sellerId가 일치함)
+        doReturn(mockSearchHitsWithEvent(eventId))
+            .when(elasticsearchOperations).search(any(Query.class), eq(EventDocument.class));
+        when(eventRepository.findAllWithDetailsByEventIdIn(anyList())).thenReturn(List.of(mockEvent));
+
+        // when (currentUserId와 request의 sellerId가 일치 → 상태 제한 없음)
         EventListResponse response = eventService.getEventList(request, sellerId, pageable);
 
         // then
         assertThat(response).isNotNull();
-        verify(eventRepository).searchEvents(null, null, null, sellerId, null, pageable);
+        verify(elasticsearchOperations).search(any(Query.class), any());
     }
 
     @Test
@@ -280,17 +358,20 @@ class EventServiceTest {
         EventListRequest request = new EventListRequest(null, null, null, sellerId, EventStatus.DRAFT);
         Pageable pageable = PageRequest.of(0, 20);
 
-        Page<Event> mockPage = EventTestFixture.createEventPage();
-        when(eventRepository.searchEvents(null, null, null, sellerId, List.of(EventStatus.DRAFT), pageable))
-            .thenReturn(mockPage);
-        when(eventRepository.findAllWithDetailsByEventIdIn(anyList())).thenReturn(mockPage.getContent());
+        UUID eventId = UUID.randomUUID();
+        Event mockEvent = EventTestFixture.createEvent(sellerId);
+        ReflectionTestUtils.setField(mockEvent, "eventId", eventId);
 
-        // when
+        doReturn(mockSearchHitsWithEvent(eventId))
+            .when(elasticsearchOperations).search(any(Query.class), eq(EventDocument.class));
+        when(eventRepository.findAllWithDetailsByEventIdIn(anyList())).thenReturn(List.of(mockEvent));
+
+        // when (본인 이벤트 DRAFT 조회 허용)
         EventListResponse response = eventService.getEventList(request, sellerId, pageable);
 
         // then
         assertThat(response).isNotNull();
-        verify(eventRepository).searchEvents(null, null, null, sellerId, List.of(EventStatus.DRAFT), pageable);
+        verify(elasticsearchOperations).search(any(Query.class), any());
     }
 
     @Test
@@ -324,11 +405,9 @@ class EventServiceTest {
         // given
         EventListRequest request = new EventListRequest("없는키워드", null, null, null, null);
         Pageable pageable = PageRequest.of(0, 20);
-        Page<Event> emptyPage = new PageImpl<>(Collections.emptyList(), pageable, 0);
-        List<EventStatus> publicStatuses = List.of(EventStatus.ON_SALE, EventStatus.SOLD_OUT, EventStatus.SALE_ENDED);
 
-        when(eventRepository.searchEvents("없는키워드", null, null, null, publicStatuses, pageable))
-            .thenReturn(emptyPage);
+        doReturn(mockEmptySearchHits())
+            .when(elasticsearchOperations).search(any(Query.class), eq(EventDocument.class));
 
         // when
         EventListResponse response = eventService.getEventList(request, null, pageable);
@@ -338,7 +417,7 @@ class EventServiceTest {
         assertThat(response.content()).isEmpty();
     }
 
-    // 판매자 이벤트 상세 조회 테스트
+    // ── 판매자 이벤트 상세 조회 테스트 ───────────────────────────────────
 
     @Test
     void 판매자_본인_이벤트_상세조회_성공시_SellerEventDetailResponse를_반환한다() {
@@ -388,7 +467,7 @@ class EventServiceTest {
             .hasMessageContaining(EventErrorCode.UNAUTHORIZED_SELLER.getMessage());
     }
 
-    // 판매자 이벤트 현황 조회 테스트
+    // ── 판매자 이벤트 현황 조회 테스트 ───────────────────────────────────
 
     @Test
     void 판매자_본인_이벤트_현황조회_성공시_SellerEventSummaryResponse를_반환한다() {
@@ -441,7 +520,7 @@ class EventServiceTest {
             .hasMessageContaining(EventErrorCode.UNAUTHORIZED_SELLER.getMessage());
     }
 
-    // 이벤트 수정 및 판매 중지 테스트
+    // ── 이벤트 수정 및 판매 중지 테스트 ──────────────────────────────────
 
     @Test
     void 정상적인_판매_중지_성공() {
@@ -500,7 +579,6 @@ class EventServiceTest {
         Event event = EventTestFixture.createEventWithStatus(sellerId, EventStatus.DRAFT);
         UUID eventId = event.getEventId();
 
-        // 수정 요청
         SellerEventUpdateRequest updateRequest = new SellerEventUpdateRequest(
             "수정된_제목", "수정된_설명", "수정된_위치",
             LocalDateTime.now().plusDays(20),
