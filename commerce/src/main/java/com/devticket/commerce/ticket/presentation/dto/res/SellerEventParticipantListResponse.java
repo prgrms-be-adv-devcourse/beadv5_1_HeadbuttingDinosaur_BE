@@ -5,7 +5,7 @@ import org.springframework.data.domain.Page;
 
 public record SellerEventParticipantListResponse(
 
-    List<SellerEventParticipantResponse> sellerEventParticipantListResponse,
+    List<SellerEventParticipantResponse> content,
 
     int page,
 

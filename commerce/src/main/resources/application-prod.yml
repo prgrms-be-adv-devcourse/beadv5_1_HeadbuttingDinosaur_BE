@@ -16,11 +16,14 @@ spring:
     consumer:
       group-id: devticket-commerce
       auto-offset-reset: latest
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
 
 external:
-  event-base-url: http://localhost:8082
-  payment-base-url: http://localhost:8084
-  member-base-url: http://localhost:8081
+  event-base-url: http://event:8082
+  payment-base-url: http://payment:8084
+  member-base-url: http://member:8081
 
 logging:
   level:

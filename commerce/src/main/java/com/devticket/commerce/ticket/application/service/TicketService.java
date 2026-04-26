@@ -8,6 +8,7 @@ import com.devticket.commerce.order.domain.model.OrderItem;
 import com.devticket.commerce.order.domain.repository.OrderItemRepository;
 import com.devticket.commerce.order.domain.repository.OrderRepository;
 import com.devticket.commerce.ticket.application.usecase.TicketUsecase;
+import com.devticket.commerce.ticket.domain.enums.TicketStatus;
 import com.devticket.commerce.ticket.domain.exception.TicketErrorCode;
 import com.devticket.commerce.ticket.domain.model.Ticket;
 import com.devticket.commerce.ticket.domain.repository.TicketRepository;
@@ -19,11 +20,14 @@ import com.devticket.commerce.ticket.infrastructure.external.client.dto.Internal
 import com.devticket.commerce.ticket.presentation.dto.req.SellerEventParticipantListRequest;
 import com.devticket.commerce.ticket.presentation.dto.req.TicketListRequest;
 import com.devticket.commerce.ticket.presentation.dto.req.TicketRequest;
+import com.devticket.commerce.ticket.presentation.dto.res.InternalTicketSettlementDataResponse;
+import com.devticket.commerce.ticket.presentation.dto.res.InternalTicketSettlementItemResponse;
 import com.devticket.commerce.ticket.presentation.dto.res.SellerEventParticipantListResponse;
 import com.devticket.commerce.ticket.presentation.dto.res.SellerEventParticipantResponse;
 import com.devticket.commerce.ticket.presentation.dto.res.TicketDetailResponse;
 import com.devticket.commerce.ticket.presentation.dto.res.TicketListResponse;
 import com.devticket.commerce.ticket.presentation.dto.res.TicketResponse;
+import java.util.AbstractMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -63,6 +67,11 @@ public class TicketService implements TicketUsecase {
                 .distinct()
                 .toList();
             log.debug("[getTicketList] eventIds 추출 완료 - count={}, eventIds={}", eventIds.size(), eventIds);
+
+            // eventIds가 비어있으면 외부 호출 스킵
+            if (eventIds.isEmpty()) {
+                return TicketListResponse.of(ticketPage, List.of());
+            }
 
             //외부 API호출 : Event정보 조회
             InternalBulkEventInfoRequest bulkRequest = new InternalBulkEventInfoRequest(eventIds);
@@ -140,45 +149,94 @@ public class TicketService implements TicketUsecase {
         return TicketResponse.of(request.orderId(), savedTickets);
     }
 
+    /**
+     * 호출 Settlement -> Commerce
+     */
+    @Override
+    public InternalTicketSettlementDataResponse getSettlementData(List<UUID> eventIds) {
+        if (eventIds == null || eventIds.isEmpty()) {
+            return new InternalTicketSettlementDataResponse(List.of());
+        }
+
+        // eventIds로 티켓 전체 조회
+        List<Ticket> tickets = ticketRepository.findAllByEventIdIn(eventIds);
+        if (tickets.isEmpty()) {
+            return new InternalTicketSettlementDataResponse(List.of());
+        }
+
+        // eventIds로 OrderItem 조회 → orderItemId별 단가 맵
+        Map<UUID, Integer> priceByOrderItemId = orderItemRepository.findSettlementItems(eventIds).stream()
+            .collect(Collectors.toMap(
+                OrderItem::getOrderItemId,
+                OrderItem::getPrice,
+                (existing, duplicate) -> existing
+            ));
+
+        // (eventId, orderItemId) 기준으로 티켓 그룹핑 후 정산 집계
+        List<InternalTicketSettlementItemResponse> items = tickets.stream()
+            .collect(Collectors.groupingBy(
+                t -> new AbstractMap.SimpleEntry<>(t.getEventId(), t.getOrderItemId())
+            ))
+            .entrySet().stream()
+            .map(entry -> {
+                UUID eventId = entry.getKey().getKey();
+                UUID orderItemId = entry.getKey().getValue();
+                List<Ticket> group = entry.getValue();
+
+                Long price = Long.valueOf(priceByOrderItemId.getOrDefault(orderItemId, 0));
+                Long salesAmount = price * group.size();
+                Long refundAmount = price * (int) group.stream()
+                    .filter(t -> t.getStatus() == TicketStatus.REFUNDED)
+                    .count();
+
+                return new InternalTicketSettlementItemResponse(eventId, orderItemId, salesAmount, refundAmount);
+            })
+            .toList();
+
+        return new InternalTicketSettlementDataResponse(items);
+    }
+
     public SellerEventParticipantListResponse getParticipantList(UUID userId, UUID eventId,
         SellerEventParticipantListRequest request) {
-        // 0단계 : 사용자 소유권 검증
+
         InternalEventInfoResponse eventInfo = ticketToEventClient.getSingleEventInfo(eventId);
-        if (eventInfo.sellerId().equals(userId)) {
+        if (!eventInfo.sellerId().equals(userId)) {
             throw new BusinessException(TicketErrorCode.UNAUTHORIZED_EVENT_ACCESS);
         }
 
-        // 1단계: eventId로 티켓 목록 조회 (페이징)
         Page<Ticket> ticketPage = ticketRepository.findAllByEventId(eventId, request);
 
-        // 2단계: 각 티켓별로 필요한 정보 조합
-        List<SellerEventParticipantResponse> participants = ticketPage.getContent().stream()
-            .map(ticket -> {
+        // 유저별 티켓 그룹핑
+        Map<UUID, List<Ticket>> ticketsByUser = ticketPage.getContent().stream()
+            .collect(Collectors.groupingBy(Ticket::getUserId));
 
-                // orderItemId로 OrderItem 조회
-                OrderItem orderItem = orderItemRepository.findByOrderItemId(ticket.getOrderItemId())
+        List<SellerEventParticipantResponse> participants = ticketsByUser.entrySet().stream()
+            .map(entry -> {
+                UUID ticketUserId = entry.getKey();
+                List<Ticket> userTickets = entry.getValue();
+                Ticket firstTicket = userTickets.get(0);
+
+                OrderItem orderItem = orderItemRepository.findByOrderItemId(firstTicket.getOrderItemId())
                     .orElseThrow(() -> new BusinessException(OrderItemErrorCode.ORDER_ITEM_NOT_FOUND));
 
-                // orderId로 Order 조회 → orderNumber 가져오기
                 Order order = orderRepository.findById(orderItem.getOrderId())
                     .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
 
-                // userId로 Member 서비스 호출 → email 가져오기
-                InternalMemberInfoResponse memberInfo = ticketToMemberClient.getMemberInfo(ticket.getUserId());
+                InternalMemberInfoResponse memberInfo = ticketToMemberClient.getMemberInfo(ticketUserId);
 
                 return SellerEventParticipantResponse.of(
-                    ticket.getTicketId().toString(),
+                    firstTicket.getTicketId().toString(),
                     order.getOrderId().toString(),
-                    ticket.getUserId().toString(),
+                    ticketUserId.toString(),
+                    memberInfo.nickname(),
                     memberInfo.email(),
-                    ticket.getIssuedAt().toString(),
+                    userTickets.size(),
+                    firstTicket.getIssuedAt().toString(),
                     order.getOrderNumber()
                 );
             })
             .toList();
 
-        // 3단계: 응답 구성
         return SellerEventParticipantListResponse.of(ticketPage, participants);
-
     }
 }

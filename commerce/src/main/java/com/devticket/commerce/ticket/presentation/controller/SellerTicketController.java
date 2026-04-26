@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/seller/events")
+@RequestMapping("/api/seller/events")
 @Tag(name = "Seller Ticket API", description = "판매자 대상 티켓 API")
 public class SellerTicketController {
 

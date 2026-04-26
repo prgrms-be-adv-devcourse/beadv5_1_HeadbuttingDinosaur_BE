@@ -7,6 +7,7 @@ import com.devticket.commerce.order.presentation.dto.res.OrderCancelResponse;
 import com.devticket.commerce.order.presentation.dto.res.OrderDetailResponse;
 import com.devticket.commerce.order.presentation.dto.res.OrderListResponse;
 import com.devticket.commerce.order.presentation.dto.res.OrderResponse;
+import com.devticket.commerce.order.presentation.dto.res.OrderStatusResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.UUID;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -35,7 +37,7 @@ public class OrderController {
     @Operation(description = "주문하기 : 장바구니에 저장된 상품 단건,다건 주문하기")
     public ResponseEntity<OrderResponse> createOrderByCart(
         @RequestHeader("X-User-Id") UUID userId,
-        @RequestBody CartOrderRequest request
+        @Valid @RequestBody CartOrderRequest request
     ) {
         OrderResponse response = orderUsecase.createOrderByCart(userId, request);
         return ResponseEntity
@@ -50,6 +52,16 @@ public class OrderController {
         @ModelAttribute OrderListRequest request
     ) {
         OrderListResponse response = orderUsecase.getOrderList(userId, request);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/{orderId}/status")
+    @Operation(description = "주문 상태 폴링 : 재고 차감 완료 여부 확인 (CREATED → PAYMENT_PENDING)")
+    public ResponseEntity<OrderStatusResponse> getOrderStatus(
+        @RequestHeader("X-User-Id") UUID userId,
+        @PathVariable UUID orderId
+    ) {
+        OrderStatusResponse response = orderUsecase.getOrderStatus(userId, orderId);
         return ResponseEntity.ok(response);
     }
 

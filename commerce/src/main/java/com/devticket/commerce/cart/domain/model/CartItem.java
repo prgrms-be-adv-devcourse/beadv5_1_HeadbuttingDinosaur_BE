@@ -10,6 +10,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDateTime;
 import java.util.UUID;
 import lombok.AccessLevel;
@@ -22,7 +23,14 @@ import lombok.experimental.SuperBuilder;
 @Entity
 @Getter
 @SuperBuilder
-@Table(name = "cart_item", schema = "commerce")
+@Table(
+    name = "cart_item",
+    schema = "commerce",
+    uniqueConstraints = @UniqueConstraint(
+        name = "uk_cart_item_cart_event",
+        columnNames = {"cart_id", "event_id"}
+    )
+)
 // JPA 엔티티를 위한 기본생성자 필수
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 // 전체 생성자는 내부에서만 사용

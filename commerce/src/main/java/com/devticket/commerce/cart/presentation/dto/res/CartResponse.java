@@ -33,4 +33,13 @@ public record CartResponse(
             .build();
     }
 
+    // 신규 사용자 또는 Cart row가 없는 경우: 400 대신 200 빈 응답 반환 (#416)
+    public static CartResponse empty() {
+        return CartResponse.builder()
+            .cartId(null)
+            .items(List.of())
+            .totalAmount(0)
+            .build();
+    }
+
 }
