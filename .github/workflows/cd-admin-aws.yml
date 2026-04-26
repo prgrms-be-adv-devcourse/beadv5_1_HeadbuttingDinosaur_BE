@@ -9,14 +9,22 @@ on:
 
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: cd-admin-aws
+  cancel-in-progress: true
+
 jobs:
-  deploy:
+  build:
+    name: Build and Push Admin Image
     runs-on: ubuntu-latest
 
+    outputs:
+      image_sha: ${{ steps.image.outputs.image_sha }}
+
     env:
-      SERVICE_NAME: admin
-      DEPLOYMENT_NAME: admin
-      CONTAINER_NAME: admin
       DIR_NAME: admin
       IMAGE_NAME: devticket-domain-admin
 
@@ -47,6 +55,7 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and Push Docker image
+        id: image
         run: |
           IMAGE_SHA=${{ secrets.DOCKERHUB_USERNAME }}/${IMAGE_NAME}:${{ github.sha }}
           IMAGE_LATEST=${{ secrets.DOCKERHUB_USERNAME }}/${IMAGE_NAME}:latest
@@ -56,20 +65,40 @@ jobs:
           docker push "$IMAGE_SHA"
           docker push "$IMAGE_LATEST"
 
-      - name: Prepare SSH key
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.AWS_INFRA_SSH_KEY }}" > ~/.ssh/aws_infra_key
-          chmod 600 ~/.ssh/aws_infra_key
-          ssh-keyscan -H "${{ secrets.AWS_INFRA_HOST }}" >> ~/.ssh/known_hosts
+          echo "image_sha=$IMAGE_SHA" >> "$GITHUB_OUTPUT"
 
+  deploy:
+    name: Deploy Admin to AWS k3s
+    needs: build
+    runs-on: [self-hosted, aws, k3s, infra]
+
+    env:
+      SERVICE_NAME: admin
+      DEPLOYMENT_NAME: admin
+      CONTAINER_NAME: admin
+      IMAGE_SHA: ${{ needs.build.outputs.image_sha }}
+
+    steps:
       - name: Deploy to AWS k3s
         run: |
-          IMAGE_SHA=${{ secrets.DOCKERHUB_USERNAME }}/${IMAGE_NAME}:${{ github.sha }}
+          sudo /usr/local/bin/k3s kubectl -n devticket set image \
+            deployment/${DEPLOYMENT_NAME} \
+            ${CONTAINER_NAME}=${IMAGE_SHA}
 
-          ssh -i ~/.ssh/aws_infra_key \
-            "${{ secrets.AWS_INFRA_USER }}@${{ secrets.AWS_INFRA_HOST }}" \
-            "sudo /usr/local/bin/k3s kubectl -n devticket set image deployment/${DEPLOYMENT_NAME} ${CONTAINER_NAME}=${IMAGE_SHA} && \
-             sudo /usr/local/bin/k3s kubectl -n devticket scale deployment/${DEPLOYMENT_NAME} --replicas=1 && \
-             sudo /usr/local/bin/k3s kubectl -n devticket rollout status deployment/${DEPLOYMENT_NAME} --timeout=180s && \
-             sudo /usr/local/bin/k3s kubectl -n devticket get pods -l app=${SERVICE_NAME} -o wide"
+          sudo /usr/local/bin/k3s kubectl -n devticket scale \
+            deployment/${DEPLOYMENT_NAME} \
+            --replicas=1
+
+          sudo /usr/local/bin/k3s kubectl -n devticket rollout status \
+            deployment/${DEPLOYMENT_NAME} \
+            --timeout=180s
+
+          sudo /usr/local/bin/k3s kubectl -n devticket get pods \
+            -l app=${SERVICE_NAME} \
+            -o wide
+
+      - name: Print deployed image
+        run: |
+          sudo /usr/local/bin/k3s kubectl -n devticket get deployment/${DEPLOYMENT_NAME} \
+            -o jsonpath='{.spec.template.spec.containers[0].image}'
+          echo
