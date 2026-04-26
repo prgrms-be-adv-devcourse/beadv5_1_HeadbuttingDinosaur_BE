@@ -19,6 +19,11 @@ public class WalletTransactionRepositoryImpl implements WalletTransactionReposit
     }
 
     @Override
+    public WalletTransaction saveAndFlush(WalletTransaction walletTransaction) {
+        return walletTransactionJpaRepository.saveAndFlush(walletTransaction);
+    }
+
+    @Override
     public boolean existsByTransactionKey(String transactionKey) {
         return walletTransactionJpaRepository.existsByTransactionKey(transactionKey);
     }

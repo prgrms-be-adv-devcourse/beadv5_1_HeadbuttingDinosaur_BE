@@ -25,12 +25,16 @@ public class ProcessedMessage {
     @Column(name = "message_id", nullable = false, unique = true)
     private UUID messageId;
 
+    @Column(name = "topic", nullable = false, length = 128)
+    private String topic;
+
     @Column(name = "processed_at", nullable = false, updatable = false)
     private LocalDateTime processedAt;
 
-    public static ProcessedMessage of(UUID messageId) {
+    public static ProcessedMessage of(UUID messageId, String topic) {
         ProcessedMessage pm = new ProcessedMessage();
         pm.messageId = messageId;
+        pm.topic = topic;
         pm.processedAt = LocalDateTime.now();
         return pm;
     }

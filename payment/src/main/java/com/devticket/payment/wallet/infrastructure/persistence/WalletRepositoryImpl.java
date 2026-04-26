@@ -21,6 +21,11 @@ public class WalletRepositoryImpl implements WalletRepository {
     }
 
     @Override
+    public void insertWalletIfAbsent(UUID userId) {
+        walletJpaRepository.insertIfAbsent(UUID.randomUUID(), userId);
+    }
+
+    @Override
     public Optional<Wallet> findByUserIdForUpdate(UUID userId) {
         return walletJpaRepository.findByUserIdForUpdate(userId);
     }
@@ -28,5 +33,20 @@ public class WalletRepositoryImpl implements WalletRepository {
     @Override
     public Wallet save(Wallet wallet) {
         return walletJpaRepository.save(wallet);
+    }
+
+    @Override
+    public int chargeBalanceAtomic(UUID userId, int amount) {
+        return walletJpaRepository.chargeBalanceAtomic(userId, amount);
+    }
+
+    @Override
+    public int useBalanceAtomic(UUID userId, int amount) {
+        return walletJpaRepository.useBalanceAtomic(userId, amount);
+    }
+
+    @Override
+    public int refundBalanceAtomic(UUID userId, int amount) {
+        return walletJpaRepository.refundBalanceAtomic(userId, amount);
     }
 }

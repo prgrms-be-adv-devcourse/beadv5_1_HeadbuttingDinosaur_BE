@@ -62,6 +62,14 @@ public class WalletCharge extends BaseEntity {
         return charge;
     }
 
+    public void markProcessing() {
+        if (this.status != WalletChargeStatus.PENDING) {
+            throw new IllegalStateException(
+                "PROCESSING 전이는 PENDING 상태에서만 가능합니다. 현재: " + this.status);
+        }
+        this.status = WalletChargeStatus.PROCESSING;
+    }
+
     public void complete(String paymentKey) {
         this.status = WalletChargeStatus.COMPLETED;
         this.paymentKey = paymentKey;
@@ -73,5 +81,17 @@ public class WalletCharge extends BaseEntity {
 
     public boolean isPending() {
         return this.status == WalletChargeStatus.PENDING;
+    }
+
+    public boolean isProcessing() {
+        return this.status == WalletChargeStatus.PROCESSING;
+    }
+
+    public void revertToPending() {
+        if (this.status != WalletChargeStatus.PROCESSING) {
+            throw new IllegalStateException(
+                "PENDING 원복은 PROCESSING 상태에서만 가능합니다. 현재: " + this.status);
+        }
+        this.status = WalletChargeStatus.PENDING;
     }
 }
