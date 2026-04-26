@@ -13,6 +13,8 @@ import com.devticket.member.presentation.domain.model.User;
 import com.devticket.member.presentation.domain.repository.RefreshTokenRepository;
 import com.devticket.member.presentation.domain.repository.UserProfileRepository;
 import com.devticket.member.presentation.domain.repository.UserRepository;
+import com.devticket.member.presentation.dto.internal.request.InternalOAuthRequest;
+import com.devticket.member.presentation.dto.internal.response.InternalOAuthResponse;
 import com.devticket.member.presentation.dto.request.LoginRequest;
 import com.devticket.member.presentation.dto.request.SignUpRequest;
 import com.devticket.member.presentation.dto.request.SocialSignUpOrLoginRequest;
@@ -110,6 +112,47 @@ public class AuthService {
         refreshTokenRepository.deleteByToken(refreshToken);
         log.info("로그아웃 완료");
         return new LogoutResponse(true);
+    }
+
+    // API Gateway에서 OAuth 토큰 검증 후 회원가입/로그인 처리
+    @Transactional
+    public InternalOAuthResponse internalOAuthSignUpOrLogin(InternalOAuthRequest request) {
+        ProviderType providerType = parseProviderType(request.provider());
+
+        Optional<User> userByProvider = userRepository.findByProviderTypeAndProviderId(
+            providerType, request.providerId());
+
+        if (userByProvider.isPresent()) {
+            User user = userByProvider.get();
+            validateUserStatus(user);
+            boolean profileCompleted = isProfileCompleted(user.getId());
+            String accessToken = issueAccessToken(user, profileCompleted);
+            String refreshToken = saveRefreshToken(user.getId());
+            log.info("내부 OAuth 로그인 완료: provider={}, providerId={}", providerType, request.providerId());
+            return new InternalOAuthResponse(accessToken, refreshToken);
+        }
+
+        Optional<User> userByEmail = userRepository.findByEmail(request.email());
+        if (userByEmail.isPresent()) {
+            User user = userByEmail.get();
+            if (user.getProviderType() == ProviderType.LOCAL) {
+                throw new BusinessException(MemberErrorCode.SOCIAL_EMAIL_CONFLICT);
+            }
+            validateUserStatus(user);
+            boolean profileCompleted = isProfileCompleted(user.getId());
+            String accessToken = issueAccessToken(user, profileCompleted);
+            String refreshToken = saveRefreshToken(user.getId());
+            log.info("내부 OAuth 로그인 완료 (이메일 매칭): email={}", request.email());
+            return new InternalOAuthResponse(accessToken, refreshToken);
+        }
+
+        User newUser = new User(request.email(), providerType, request.providerId());
+        User savedUser = userRepository.save(newUser);
+        boolean profileCompleted = isProfileCompleted(savedUser.getId());
+        String accessToken = issueAccessToken(savedUser, profileCompleted);
+        String refreshToken = saveRefreshToken(savedUser.getId());
+        log.info("내부 OAuth 회원가입 완료: email={}, provider={}", request.email(), providerType);
+        return new InternalOAuthResponse(accessToken, refreshToken);
     }
 
     // ========== 소셜 로그인 분기 ==========

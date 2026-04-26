@@ -1,15 +1,17 @@
 package com.devticket.member.application;
 
 import com.devticket.member.common.exception.BusinessException;
+import com.devticket.member.infrastructure.external.client.AdminInternalClient;
+import com.devticket.member.presentation.dto.internal.response.InternalAdminTechStackResponse;
+import com.devticket.member.infrastructure.jwt.JwtTokenProvider;
 import com.devticket.member.presentation.domain.MemberErrorCode;
 import com.devticket.member.presentation.domain.Position;
 import com.devticket.member.presentation.domain.ProviderType;
-import com.devticket.member.presentation.domain.model.TechStack;
+import com.devticket.member.presentation.domain.model.RefreshToken;
 import com.devticket.member.presentation.domain.model.User;
 import com.devticket.member.presentation.domain.model.UserProfile;
 import com.devticket.member.presentation.domain.model.UserTechStack;
 import com.devticket.member.presentation.domain.repository.RefreshTokenRepository;
-import com.devticket.member.presentation.domain.repository.TechStackRepository;
 import com.devticket.member.presentation.domain.repository.UserProfileRepository;
 import com.devticket.member.presentation.domain.repository.UserRepository;
 import com.devticket.member.presentation.domain.repository.UserTechStackRepository;
@@ -21,6 +23,7 @@ import com.devticket.member.presentation.dto.response.GetProfileResponse;
 import com.devticket.member.presentation.dto.response.SignUpProfileResponse;
 import com.devticket.member.presentation.dto.response.UpdateProfileResponse;
 import com.devticket.member.presentation.dto.response.WithdrawResponse;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -38,9 +41,11 @@ public class UserService {
     private final UserRepository userRepository;
     private final UserProfileRepository userProfileRepository;
     private final UserTechStackRepository userTechStackRepository;
-    private final TechStackRepository techStackRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JwtTokenProvider jwtTokenProvider;
+    private final AdminInternalClient adminInternalClient;
+
 
     @Transactional
     public SignUpProfileResponse createProfile(UUID userId, SignUpProfileRequest request) {
@@ -58,8 +63,11 @@ public class UserService {
 
         saveTechStacks(user.getId(), request.techStackIds());
 
+        String accessToken = jwtTokenProvider.createAccessToken(user.getUserId(), user.getEmail(), user.getRole(), true);
+        String refreshToken = saveRefreshToken(user.getId());
+
         log.info("프로필 생성 완료: userId={}, nickname={}", userId, request.nickname());
-        return SignUpProfileResponse.from(savedProfile);
+        return SignUpProfileResponse.from(savedProfile, accessToken, refreshToken);
     }
 
     public GetProfileResponse getProfile(UUID userId) {
@@ -70,7 +78,12 @@ public class UserService {
         List<Long> techStackIds = userTechStacks.stream()
             .map(UserTechStack::getTechStackId)
             .toList();
-        List<TechStack> techStacks = techStackRepository.findByIdIn(techStackIds);
+
+        InternalAdminTechStackResponse response = adminInternalClient.getTechStacks();
+        List<InternalAdminTechStackResponse.TechStackInfo> techStacks = response.techStacks()
+            .stream()
+            .filter(ts -> techStackIds.contains(ts.id()))
+            .toList();
 
         return GetProfileResponse.from(user, profile, techStacks);
     }
@@ -164,8 +177,18 @@ public class UserService {
             .orElseThrow(() -> new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND));
     }
 
-    public List<TechStack> getAllTechStacks() {
-        return techStackRepository.findAll();
+    public InternalAdminTechStackResponse getAllTechStacks() {
+        return adminInternalClient.getTechStacks();
+    }
+
+    // ========== 토큰 ==========
+
+    private String saveRefreshToken(Long userId) {
+        String token = jwtTokenProvider.createRefreshToken();
+        long ttl = jwtTokenProvider.getRefreshTokenTtl();
+        LocalDateTime expiresAt = LocalDateTime.now().plusSeconds(ttl / 1000);
+        refreshTokenRepository.save(new RefreshToken(userId, token, expiresAt));
+        return token;
     }
 
     // ========== 유틸 ==========

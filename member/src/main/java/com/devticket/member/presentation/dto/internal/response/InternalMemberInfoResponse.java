@@ -1,6 +1,7 @@
 package com.devticket.member.presentation.dto.internal.response;
 
 import com.devticket.member.presentation.domain.model.User;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 public record InternalMemberInfoResponse(
@@ -9,9 +10,10 @@ public record InternalMemberInfoResponse(
     String nickname,
     String role,
     String status,
-    String providerType
+    String providerType,
+    LocalDateTime createdAt,
+    LocalDateTime withdrawnAt
 ) {
-
     public static InternalMemberInfoResponse from(User user, String nickname) {
         return new InternalMemberInfoResponse(
             user.getUserId(),
@@ -19,7 +21,9 @@ public record InternalMemberInfoResponse(
             nickname,
             user.getRole().name(),
             user.getStatus().name(),
-            user.getProviderType().name()
+            user.getProviderType().name(),
+            user.getCreatedAt(),
+            user.getWithdrawnAt()
         );
     }
 }

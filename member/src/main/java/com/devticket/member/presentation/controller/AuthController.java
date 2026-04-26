@@ -1,6 +1,8 @@
 package com.devticket.member.presentation.controller;
 
 import com.devticket.member.application.AuthService;
+import com.devticket.member.presentation.dto.internal.request.InternalOAuthRequest;
+import com.devticket.member.presentation.dto.internal.response.InternalOAuthResponse;
 import com.devticket.member.presentation.dto.request.LoginRequest;
 import com.devticket.member.presentation.dto.request.SignUpRequest;
 import com.devticket.member.presentation.dto.request.SocialSignUpOrLoginRequest;
@@ -41,6 +43,22 @@ public class AuthController {
     public ResponseEntity<SignUpResponse> signup(@Valid @RequestBody SignUpRequest request) {
         SignUpResponse response = authService.signup(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @Operation(
+        summary = "OAuth 회원가입/로그인",
+        description = "API Gateway에서 OAuth 토큰 검증 후 호출 — 신규 가입 또는 기존 계정 조회 후 토큰 발급"
+    )
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "토큰 발급 성공"),
+        @ApiResponse(responseCode = "409", description = "동일 이메일의 로컬 계정 존재"),
+        @ApiResponse(responseCode = "403", description = "정지 또는 탈퇴 계정")
+    })
+    @PostMapping("/google-signup")
+    public ResponseEntity<InternalOAuthResponse> oauthSignUpOrLogin(
+        @Valid @RequestBody InternalOAuthRequest request) {
+        InternalOAuthResponse response = authService.internalOAuthSignUpOrLogin(request);
+        return ResponseEntity.ok(response);
     }
 
     @Operation(summary = "일반 로그인", description = "이메일, 비밀번호로 로그인")

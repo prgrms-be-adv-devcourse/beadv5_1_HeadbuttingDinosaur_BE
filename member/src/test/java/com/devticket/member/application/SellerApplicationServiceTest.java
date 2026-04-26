@@ -146,7 +146,7 @@ class SellerApplicationServiceTest {
             // given
             User user = new User("test@test.com", "$2a$10$hashedPassword");
             SellerApplication application = new SellerApplication(
-                user.getId(), "국민은행", "123-456-789", "홍길동");
+                user.getUserId(), "국민은행", "123-456-789", "홍길동");
             given(userRepository.findByUserId(any(UUID.class))).willReturn(Optional.of(user));
             given(sellerApplicationRepository.findTopByUserIdOrderByCreatedAtDesc(any())).willReturn(
                 Optional.of(application));
