@@ -16,17 +16,17 @@ concurrency:
   group: cd-admin-aws
   cancel-in-progress: true
 
+env:
+  SERVICE_NAME: admin
+  DEPLOYMENT_NAME: admin
+  CONTAINER_NAME: admin
+  DIR_NAME: admin
+  IMAGE_NAME: devticket-domain-admin
+
 jobs:
   build:
     name: Build and Push Admin Image
     runs-on: ubuntu-latest
-
-    outputs:
-      image_sha: ${{ steps.image.outputs.image_sha }}
-
-    env:
-      DIR_NAME: admin
-      IMAGE_NAME: devticket-domain-admin
 
     steps:
       - name: Checkout
@@ -55,32 +55,30 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and Push Docker image
-        id: image
         run: |
-          IMAGE_SHA=${{ secrets.DOCKERHUB_USERNAME }}/${IMAGE_NAME}:${{ github.sha }}
-          IMAGE_LATEST=${{ secrets.DOCKERHUB_USERNAME }}/${IMAGE_NAME}:latest
+          IMAGE_SHA="${{ secrets.DOCKERHUB_USERNAME }}/${IMAGE_NAME}:${{ github.sha }}"
+          IMAGE_LATEST="${{ secrets.DOCKERHUB_USERNAME }}/${IMAGE_NAME}:latest"
 
           docker build -t "$IMAGE_SHA" -t "$IMAGE_LATEST" ./${DIR_NAME}
 
           docker push "$IMAGE_SHA"
           docker push "$IMAGE_LATEST"
 
-          echo "image_sha=$IMAGE_SHA" >> "$GITHUB_OUTPUT"
-
   deploy:
     name: Deploy Admin to AWS k3s
     needs: build
     runs-on: [self-hosted, aws, k3s, infra]
 
-    env:
-      SERVICE_NAME: admin
-      DEPLOYMENT_NAME: admin
-      CONTAINER_NAME: admin
-      IMAGE_SHA: ${{ needs.build.outputs.image_sha }}
-
     steps:
       - name: Deploy to AWS k3s
         run: |
+          IMAGE_SHA="${{ secrets.DOCKERHUB_USERNAME }}/${IMAGE_NAME}:${{ github.sha }}"
+
+          if [ -z "$IMAGE_SHA" ]; then
+            echo "ERROR: IMAGE_SHA is empty"
+            exit 1
+          fi
+
           sudo /usr/local/bin/k3s kubectl -n devticket set image \
             deployment/${DEPLOYMENT_NAME} \
             ${CONTAINER_NAME}=${IMAGE_SHA}
