@@ -1,0 +1,44 @@
+{
+  "mappings": {
+    "properties": {
+      "userId": {
+        "type": "keyword"
+      },
+      "preferenceVector": {
+        "type": "dense_vector",
+        "dims": 1536,
+        "index": false
+      },
+      "preferenceWeightSum": {
+        "type": "float"
+      },
+      "recentVector": {
+        "type": "dense_vector",
+        "dims": 1536,
+        "index": false
+      },
+      "recentWeightSum": {
+        "type": "float"
+      },
+      "cartVector": {
+        "type": "dense_vector",
+        "dims": 1536,
+        "index": false
+      },
+      "cartWeightSum": {
+        "type": "float"
+      },
+      "negativeVector": {
+        "type": "dense_vector",
+        "dims": 1536,
+        "index": false
+      },
+      "negativeWeightSum": {
+        "type": "float"
+      },
+      "updatedAt": {
+        "type": "date"
+      }
+    }
+  }
+}

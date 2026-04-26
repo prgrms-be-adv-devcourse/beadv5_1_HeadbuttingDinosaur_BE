@@ -1,0 +1,25 @@
+jwt:
+  secret-key: test-jwt-secret-key
+  access-token-ttl: 1800000
+  refresh-token-ttl: 604800000
+
+spring:
+  kafka:
+    bootstrap-servers: localhost:9093
+
+  elasticsearch:
+    uris: http://localhost:9200
+
+openai:
+  api-key: test-api-key
+  embedding:
+    url: https://api.openai.com/v1/embeddings
+    model: text-embedding-3-small
+
+internal:
+  log-service:
+    url: http://localhost:8085
+  member-service:
+    url: http://localhost:8081
+  event-service:
+    url: http://localhost:8082
