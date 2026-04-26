@@ -34,6 +34,9 @@ dependencies {
     // Security (WebFlux용은 starter-security가 webflux 자동 감지)
     implementation 'org.springframework.boot:spring-boot-starter-security'
 
+    // OAuth2 Client (소셜 로그인)
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
+
     // Swagger (WebFlux용)
     implementation 'org.springdoc:springdoc-openapi-starter-webflux-ui:3.0.2'
 
@@ -51,6 +54,10 @@ dependencies {
 
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
+
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'io.micrometer:micrometer-registry-prometheus'
+    implementation 'com.github.loki4j:loki-logback-appender:1.5.2'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-webflux-test'
