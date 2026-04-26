@@ -4,12 +4,18 @@ import com.devticket.admin.domain.model.AdminActionHistory;
 import com.devticket.admin.domain.model.AdminActionType;
 import com.devticket.admin.domain.model.AdminTargetType;
 import com.devticket.admin.domain.model.temporaryEnum.UserStatus;
+import com.devticket.admin.domain.repository.AdminActionRepository;
 import com.devticket.admin.infrastructure.external.client.MemberInternalClient;
 import com.devticket.admin.infrastructure.persistence.repository.AdminActionHistoryRepositoryImpl;
 import com.devticket.admin.presentation.dto.req.UserRoleRequest;
 import com.devticket.admin.presentation.dto.req.UserSearchCondition;
 import com.devticket.admin.presentation.dto.req.UserStatusRequest;
-import com.devticket.admin.presentation.dto.res.UserListResponse;
+import com.devticket.admin.presentation.dto.res.AdminActionHistorySummary;
+import com.devticket.admin.presentation.dto.res.AdminUserListResponse;
+import com.devticket.admin.presentation.dto.res.InternalMemberDetailResponse;
+import com.devticket.admin.presentation.dto.res.InternalMemberPageResponse;
+import com.devticket.admin.presentation.dto.res.UserDetailResponse;
+import com.devticket.admin.presentation.dto.res.UserListItem;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -23,24 +29,63 @@ public class AdminUserServiceImpl implements AdminUserService {
 
     private final MemberInternalClient memberInternalClient;
     private final AdminActionHistoryRepositoryImpl adminActionHistoryRepository;
+    private final AdminActionRepository adminActionRepository;
 
 
     @Override
-    public List<UserListResponse> getMembers(UserSearchCondition condition) {
-        return memberInternalClient.getMembers(condition).stream()
-            .map(member -> new UserListResponse(
-                member.id(),
+    public AdminUserListResponse getMembers(UserSearchCondition condition) {
+        InternalMemberPageResponse page = memberInternalClient.getMembers(condition);
+
+        List<UserListItem> content = page.content().stream()
+            .map(member -> new UserListItem(
+                member.userId(),
                 member.email(),
+                member.nickname(),
                 member.role(),
                 member.status(),
                 member.providerType(),
-                null,
-                null,
-                null
-            )).toList();
+                member.createdAt(),
+                member.withdrawnAt()
+            ))
+            .toList();
+
+        return new AdminUserListResponse(
+            content,
+            page.page(),
+            page.size(),
+            page.totalElements(),
+            page.totalPages()
+        );
     }
 
     @Override
+    public UserDetailResponse getUserDetail(UUID userId) {
+        InternalMemberDetailResponse member = memberInternalClient.getMember(userId);
+        // 존재하지 않으면 MemberInternalClient에서 4xx 터뜨리고 전역 핸들러가 MEMBER_009로 변환
+
+        List<AdminActionHistorySummary> history =
+            adminActionRepository.findByTarget(AdminTargetType.USER, userId).stream()
+                .map(h -> new AdminActionHistorySummary(
+                    h.getActionType().name(),
+                    h.getAdminId(),
+                    h.getCreatedAt()))
+                .toList();
+
+        return new UserDetailResponse(
+            member.id(),
+            member.email(),
+            member.nickname(),
+            member.role(),
+            member.status(),
+            member.providerType(),
+            member.createdAt(),
+            member.withdrawnAt(),
+            history
+        );
+    }
+
+    @Override
+    @Transactional
     public void penalizeUser(UUID adminId, UUID userId, UserStatusRequest request) {
         memberInternalClient.updateUserStatus(userId, request);
 
@@ -68,6 +113,7 @@ public class AdminUserServiceImpl implements AdminUserService {
     }
 
     @Override
+    @Transactional
     public void updateUserRole(UUID adminId, UUID userId, UserRoleRequest request) {
         memberInternalClient.updateUserRole(userId, request);
 

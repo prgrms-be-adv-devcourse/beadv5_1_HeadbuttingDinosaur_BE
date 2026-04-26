@@ -18,7 +18,7 @@ public record AdminSettelmentListResponse(
     Long totalElements,
 
     @Schema(description = "전체 페이지 수", example = "1")
-    Integer totalPage
+    Integer totalPages
 ) {
 
 }

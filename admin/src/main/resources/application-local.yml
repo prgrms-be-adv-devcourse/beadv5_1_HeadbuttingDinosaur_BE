@@ -31,6 +31,22 @@ logging:
     org.hibernate.SQL: DEBUG
     com.devticket: DEBUG
 
+elasticsearch:
+  uris: http://localhost:9200
+  connection-timeout: 5s
+  socket-timeout: 30s
+
+openai:
+  embedding:
+    enabled: true
+    api-key: ${OPENAI_API_KEY:}
+    model: text-embedding-3-small
+    url: https://api.openai.com/v1/embeddings
+
 internal:
   member-service:
     url: http://localhost:8081
+  event-service:
+    url: http://localhost:8082
+  settlement-service:
+    url: http://localhost:8085

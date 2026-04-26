@@ -2,12 +2,12 @@ package com.devticket.admin.infrastructure.external.dto.res;
 
 
 public record InternalMemberInfoResponse(
-    String id,
+    String userId,
     String email,
+    String nickname,
     String role,
     String status,
-    String providerType
-) {
-
-
-}
+    String providerType,
+    String createdAt,
+    String withdrawnAt
+) {}
