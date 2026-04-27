@@ -1,8 +1,16 @@
 # DTO 문서 요약
 
-자동 생성 기준: `presentation/dto` 하위 Java `record/class`를 기준으로 정리했습니다. 외부 계약 DTO(Kafka 이벤트 payload 등)는 해당 모듈 섹션 내에 포함합니다.
+자동 생성 기준: `presentation/dto` 하위 Java `record/class`를 기준으로 정리했습니다.
 
 ## admin
+
+### AdminActionHistorySummary (record)
+- source: `admin/src/main/java/com/devticket/admin/presentation/dto/res/AdminActionHistorySummary.java`
+| 필드명 | 타입 |
+|---|---|
+| `actionType` | `String` |
+| `adminId` | `UUID` |
+| `createdAt` | `LocalDateTime` |
 
 ### AdminDashboardResponse (record)
 - source: `admin/src/main/java/com/devticket/admin/presentation/dto/res/AdminDashboardResponse.java`
@@ -60,7 +68,7 @@
 | `page` | `Integer` |
 | `size` | `Integer` |
 | `totalElements` | `Long` |
-| `totalPage` | `Integer` |
+| `totalPages` | `Integer` |
 
 ### AdminSettlementSearchRequest (record)
 - source: `admin/src/main/java/com/devticket/admin/presentation/dto/req/AdminSettlementSearchRequest.java`
@@ -68,10 +76,45 @@
 |---|---|
 | `status` | `String` |
 | `sellerId` | `String` |
-| `stardDate` | `String` |
+| `startDate` | `String` |
 | `endDate` | `String` |
 | `page` | `Integer` |
 | `size` | `Integer` |
+
+### AdminUserListResponse (record)
+- source: `admin/src/main/java/com/devticket/admin/presentation/dto/res/AdminUserListResponse.java`
+| 필드명 | 타입 |
+|---|---|
+| `content` | `List<UserListItem>` |
+| `page` | `int` |
+| `size` | `int` |
+| `totalElements` | `long` |
+| `totalPages` | `int` |
+
+### CreateTechStackRequest (record)
+- source: `admin/src/main/java/com/devticket/admin/presentation/dto/req/CreateTechStackRequest.java`
+| 필드명 | 타입 |
+|---|---|
+| `name` | `String` |
+
+### CreateTechStackResponse (record)
+- source: `admin/src/main/java/com/devticket/admin/presentation/dto/res/CreateTechStackResponse.java`
+| 필드명 | 타입 |
+|---|---|
+| `id` | `Long` |
+| `name` | `String` |
+
+### DeleteTechStackRequest (record)
+- source: `admin/src/main/java/com/devticket/admin/presentation/dto/req/DeleteTechStackRequest.java`
+| 필드명 | 타입 |
+|---|---|
+| `id` | `Long` |
+
+### DeleteTechStackResponse (record)
+- source: `admin/src/main/java/com/devticket/admin/presentation/dto/res/DeleteTechStackResponse.java`
+| 필드명 | 타입 |
+|---|---|
+| `id` | `Long` |
 
 ### EventCancelResponse (record)
 - source: `admin/src/main/java/com/devticket/admin/presentation/dto/res/EventCancelResponse.java`
@@ -83,6 +126,36 @@
 | `reason` | `String` |
 | `affectedPaidOrderCount` | `Integer` |
 | `cancelledAt` | `String` |
+
+### GetTechStackResponse (record)
+- source: `admin/src/main/java/com/devticket/admin/presentation/dto/res/GetTechStackResponse.java`
+| 필드명 | 타입 |
+|---|---|
+| `id` | `Long` |
+| `name` | `String` |
+
+### InternalMemberDetailResponse (record)
+- source: `admin/src/main/java/com/devticket/admin/presentation/dto/res/InternalMemberDetailResponse.java`
+| 필드명 | 타입 |
+|---|---|
+| `id` | `String` |
+| `email` | `String` |
+| `nickname` | `String` |
+| `role` | `String` |
+| `status` | `String` |
+| `providerType` | `String` |
+| `createdAt` | `String` |
+| `withdrawnAt` | `String` |
+
+### InternalMemberPageResponse (record)
+- source: `admin/src/main/java/com/devticket/admin/presentation/dto/res/InternalMemberPageResponse.java`
+| 필드명 | 타입 |
+|---|---|
+| `content` | `List<InternalMemberInfoResponse>` |
+| `page` | `int` |
+| `size` | `int` |
+| `totalElements` | `long` |
+| `totalPages` | `int` |
 
 ### SellerApplicationListResponse (record)
 - source: `admin/src/main/java/com/devticket/admin/presentation/dto/res/SellerApplicationListResponse.java`
@@ -100,15 +173,56 @@
 - source: `admin/src/main/java/com/devticket/admin/presentation/dto/res/SettlementResponse.java`
 | 필드명 | 타입 |
 |---|---|
-| `settlementId` | `String` |
-| `periodStart` | `String` |
-| `periodEnd` | `String` |
-| `totalSalesAmount` | `Integer` |
-| `totalRefundAmount` | `Integer` |
-| `totalFeeAmount` | `Integer` |
-| `finalSettlementAmount` | `Integer` |
+| `settlementId` | `Long` |
+| `periodStart` | `LocalDateTime` |
+| `periodEnd` | `LocalDateTime` |
+| `totalSalesAmount` | `Long` |
+| `totalRefundAmount` | `Long` |
+| `totalFeeAmount` | `Long` |
+| `finalSettlementAmount` | `Long` |
 | `status` | `String` |
-| `settledAt` | `String` |
+| `settledAt` | `LocalDateTime` |
+
+### UpdateTechStackRequest (record)
+- source: `admin/src/main/java/com/devticket/admin/presentation/dto/req/UpdateTechStackRequest.java`
+| 필드명 | 타입 |
+|---|---|
+| `id` | `Long` |
+| `name` | `String` |
+
+### UpdateTechStackResponse (record)
+- source: `admin/src/main/java/com/devticket/admin/presentation/dto/res/UpdateTechStackResponse.java`
+| 필드명 | 타입 |
+|---|---|
+| `id` | `Long` |
+| `name` | `String` |
+
+### UserDetailResponse (record)
+- source: `admin/src/main/java/com/devticket/admin/presentation/dto/res/UserDetailResponse.java`
+| 필드명 | 타입 |
+|---|---|
+| `userId` | `String` |
+| `email` | `String` |
+| `nickname` | `String` |
+| `role` | `String` |
+| `status` | `String` |
+| `providerType` | `String` |
+| `createdAt` | `String` |
+| `withdrawnAt` | `String` |
+| `penaltyHistory` | `List<AdminActionHistorySummary>` |
+
+### UserListItem (record)
+- source: `admin/src/main/java/com/devticket/admin/presentation/dto/res/UserListItem.java`
+| 필드명 | 타입 |
+|---|---|
+| `userId` | `String` |
+| `email` | `String` |
+| `nickname` | `String` |
+| `role` | `String` |
+| `status` | `String` |
+| `providerType` | `String` |
+| `createdAt` | `String` |
+| `withdrawnAt` | `String` |
 
 ### UserListResponse (record)
 - source: `admin/src/main/java/com/devticket/admin/presentation/dto/res/UserListResponse.java`
@@ -136,42 +250,14 @@
 | `role` | `String` |
 | `status` | `String` |
 | `keyword` | `String` |
+| `page` | `Integer` |
+| `size` | `Integer` |
 
 ### UserStatusRequest (record)
 - source: `admin/src/main/java/com/devticket/admin/presentation/dto/req/UserStatusRequest.java`
 | 필드명 | 타입 |
 |---|---|
 | `status` | `String` |
-
-## ai
-
-### ActionLogMessage (record)
-- source: `ai/src/main/java/org/example/ai/presentation/dto/req/ActionLogMessage.java`
-| 필드명 | 타입 |
-|---|---|
-| `userId` | `String` |
-| `eventId` | `String` |
-| `eventIds` | `List<String>` |
-| `actionType` | `String` |
-| `searchKeyword` | `String` |
-| `stackFilter` | `String` |
-| `dwellTimeSeconds` | `Integer` |
-| `quantity` | `Integer` |
-| `totalAmount` | `Long` |
-| `timestamp` | `String` |
-
-### RecommendationRequest (record)
-- source: `ai/src/main/java/org/example/ai/presentation/dto/req/RecommendationRequest.java`
-| 필드명 | 타입 |
-|---|---|
-| `userId` | `String` |
-
-### RecommendationResponse (record)
-- source: `ai/src/main/java/org/example/ai/presentation/dto/res/RecommendationResponse.java`
-| 필드명 | 타입 |
-|---|---|
-| `userId` | `String` |
-| `eventIdList` | `List<String>` |
 
 ## commerce
 
@@ -250,21 +336,17 @@
 | `totalAmount` | `Integer` |
 | `status` | `String` |
 | `orderedAt` | `String` |
+| `orderItems` | `List<OrderItem>` |
 
 ### InternalOrderItemResponse (record)
 - source: `commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/InternalOrderItemResponse.java`
 | 필드명 | 타입 |
 |---|---|
-| `id` | `Long` |
 | `orderItemId` | `UUID` |
-| `orderId` | `Long` |
+| `orderId` | `UUID` |
 | `userId` | `UUID` |
 | `eventId` | `UUID` |
-| `price` | `int` |
-| `quantity` | `int` |
-| `subtotalAmount` | `int` |
-| `createdAt` | `LocalDateTime` |
-| `updatedAt` | `LocalDateTime` |
+| `amount` | `Integer` |
 
 ### InternalOrderItemsResponse (record)
 - source: `commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/InternalOrderItemsResponse.java`
@@ -272,6 +354,17 @@
 |---|---|
 | `eventId` | `Long` |
 | `orders` | `List<InternalOrderItemsResponse.OrderItems>` |
+
+### InternalOrderTicketsResponse (record)
+- source: `commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/InternalOrderTicketsResponse.java`
+| 필드명 | 타입 |
+|---|---|
+| `orderId` | `UUID` |
+| `userId` | `UUID` |
+| `paymentId` | `UUID` |
+| `totalAmount` | `int` |
+| `remainingAmount` | `int` |
+| `tickets` | `List<TicketItem>` |
 
 ### InternalSettlementDataResponse (record)
 - source: `commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/InternalSettlementDataResponse.java`
@@ -281,6 +374,21 @@
 | `periodStart` | `String` |
 | `periodEnd` | `String` |
 | `eventSettlements` | `List<EventSettlements>` |
+
+### InternalTicketSettlementDataResponse (record)
+- source: `commerce/src/main/java/com/devticket/commerce/ticket/presentation/dto/res/InternalTicketSettlementDataResponse.java`
+| 필드명 | 타입 |
+|---|---|
+| `items` | `List<InternalTicketSettlementItemResponse>` |
+
+### InternalTicketSettlementItemResponse (record)
+- source: `commerce/src/main/java/com/devticket/commerce/ticket/presentation/dto/res/InternalTicketSettlementItemResponse.java`
+| 필드명 | 타입 |
+|---|---|
+| `eventId` | `UUID` |
+| `orderItemId` | `UUID` |
+| `salesAmount` | `Long` |
+| `refundAmount` | `Long` |
 
 ### OrderCancelResponse (record)
 - source: `commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/OrderCancelResponse.java`
@@ -351,6 +459,14 @@
 | `orderItems` | `List<OrderItemsResponse>` |
 | `createdAt` | `LocalDateTime` |
 
+### OrderStatusResponse (record)
+- source: `commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/OrderStatusResponse.java`
+| 필드명 | 타입 |
+|---|---|
+| `orderId` | `UUID` |
+| `status` | `OrderStatus` |
+| `updatedAt` | `LocalDateTime` |
+
 ### OrderSummary (record)
 - source: `commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/OrderSummary.java`
 | 필드명 | 타입 |
@@ -372,7 +488,7 @@
 - source: `commerce/src/main/java/com/devticket/commerce/ticket/presentation/dto/res/SellerEventParticipantListResponse.java`
 | 필드명 | 타입 |
 |---|---|
-| `sellerEventParticipantListResponse` | `List<SellerEventParticipantResponse>` |
+| `content` | `List<SellerEventParticipantResponse>` |
 | `page` | `int` |
 | `size` | `int` |
 | `totalElements` | `long` |
@@ -385,7 +501,9 @@
 | `ticketId` | `String` |
 | `orderId` | `String` |
 | `userId` | `String` |
+| `userName` | `String` |
 | `email` | `String` |
+| `quantity` | `int` |
 | `purchasedAt` | `String` |
 | `orderNumber` | `String` |
 
@@ -431,26 +549,11 @@
 
 ## event
 
-### ActionLogEvent (record, Kafka payload)
-- source: `event/src/main/java/com/devticket/event/common/messaging/event/ActionLogEvent.java`
-- topic: `action.log` (Event Producer: VIEW / DETAIL_VIEW / DWELL_TIME)
-| 필드명 | 타입 |
-|---|---|
-| `userId` | `String` |
-| `eventId` | `String` |
-| `actionType` | `String` |
-| `searchKeyword` | `String` |
-| `stackFilter` | `String` |
-| `dwellTimeSeconds` | `Integer` |
-| `quantity` | `Integer` |
-| `totalAmount` | `Long` |
-| `timestamp` | `Instant` |
-
 ### DwellRequest (record)
 - source: `event/src/main/java/com/devticket/event/presentation/dto/DwellRequest.java`
 | 필드명 | 타입 |
 |---|---|
-| `dwellTimeSeconds` | `Integer` (`@NotNull @Positive`) |
+| `dwellTimeSeconds` | `Integer` |
 
 ### EventDetailResponse (record)
 - source: `event/src/main/java/com/devticket/event/presentation/dto/EventDetailResponse.java`
@@ -487,6 +590,8 @@
 | `status` | `EventStatus` |
 | `techStacks` | `List<String>` |
 | `saleEndAt` | `LocalDateTime` |
+| `totalQuantity` | `Integer` |
+| `remainingQuantity` | `Integer` |
 
 ### EventListRequest (record)
 - source: `event/src/main/java/com/devticket/event/presentation/dto/EventListRequest.java`
@@ -508,6 +613,24 @@
 | `totalElements` | `long` |
 | `totalPages` | `int` |
 
+### ImageUploadResponse (record)
+- source: `event/src/main/java/com/devticket/event/presentation/dto/ImageUploadResponse.java`
+| 필드명 | 타입 |
+|---|---|
+| `imageUrl` | `String` |
+
+### InternalAdminEventResponse (record)
+- source: `event/src/main/java/com/devticket/event/presentation/dto/internal/InternalAdminEventResponse.java`
+| 필드명 | 타입 |
+|---|---|
+| `eventId` | `UUID` |
+| `title` | `String` |
+| `sellerNickname` | `String` |
+| `status` | `String` |
+| `eventDateTime` | `LocalDateTime` |
+| `totalQuantity` | `Integer` |
+| `remainingQuantity` | `Integer` |
+
 ### InternalBulkEventInfoRequest (record)
 - source: `event/src/main/java/com/devticket/event/presentation/dto/internal/InternalBulkEventInfoRequest.java`
 | 필드명 | 타입 |
@@ -526,6 +649,18 @@
 |---|---|
 | `items` | `List<StockAdjustmentItem>` |
 
+### InternalEndedEventsResponse (record)
+- source: `event/src/main/java/com/devticket/event/presentation/dto/internal/InternalEndedEventsResponse.java`
+| 필드명 | 타입 |
+|---|---|
+| `events` | `List<EndedEventItem>` |
+
+### InternalEventForceCancelRequest (record)
+- source: `event/src/main/java/com/devticket/event/presentation/dto/internal/InternalEventForceCancelRequest.java`
+| 필드명 | 타입 |
+|---|---|
+| `reason` | `String` |
+
 ### InternalEventInfoResponse (record)
 - source: `event/src/main/java/com/devticket/event/presentation/dto/internal/InternalEventInfoResponse.java`
 | 필드명 | 타입 |
@@ -542,6 +677,28 @@
 | `eventDateTime` | `LocalDateTime` |
 | `saleStartAt` | `LocalDateTime` |
 | `saleEndAt` | `LocalDateTime` |
+
+### InternalPagedEventResponse (record)
+- source: `event/src/main/java/com/devticket/event/presentation/dto/internal/InternalPagedEventResponse.java`
+| 필드명 | 타입 |
+|---|---|
+| `content` | `List<InternalAdminEventResponse>` |
+| `page` | `int` |
+| `size` | `int` |
+| `totalElements` | `long` |
+| `totalPages` | `int` |
+
+### InternalPopularEventRequest (record)
+- source: `event/src/main/java/com/devticket/event/presentation/dto/internal/InternalPopularEventRequest.java`
+| 필드명 | 타입 |
+|---|---|
+| `needed` | `int` |
+
+### InternalPopularEventResponse (record)
+- source: `event/src/main/java/com/devticket/event/presentation/dto/internal/InternalPopularEventResponse.java`
+| 필드명 | 타입 |
+|---|---|
+| `id` | `String` |
 
 ### InternalPurchaseValidationResponse (record)
 - source: `event/src/main/java/com/devticket/event/presentation/dto/internal/InternalPurchaseValidationResponse.java`
@@ -587,6 +744,12 @@
 | 필드명 | 타입 |
 |---|---|
 | `quantity` | `Integer` |
+
+### RecommendationResponse (record)
+- source: `event/src/main/java/com/devticket/event/presentation/dto/RecommendationResponse.java`
+| 필드명 | 타입 |
+|---|---|
+| `events` | `List<EventListContentResponse>` |
 
 ### SellerEventCreateRequest (record)
 - source: `event/src/main/java/com/devticket/event/presentation/dto/SellerEventCreateRequest.java`
@@ -707,6 +870,12 @@
 | `role` | `String` |
 | `providerType` | `String` |
 
+### InternalAdminTechStackResponse (record)
+- source: `member/src/main/java/com/devticket/member/presentation/dto/internal/response/InternalAdminTechStackResponse.java`
+| 필드명 | 타입 |
+|---|---|
+| `techStacks` | `List<TechStackInfo>` |
+
 ### InternalDecideSellerApplicationRequest (record)
 - source: `member/src/main/java/com/devticket/member/presentation/dto/internal/request/InternalDecideSellerApplicationRequest.java`
 | 필드명 | 타입 |
@@ -730,6 +899,8 @@
 | `role` | `String` |
 | `status` | `String` |
 | `providerType` | `String` |
+| `createdAt` | `LocalDateTime` |
+| `withdrawnAt` | `LocalDateTime` |
 
 ### InternalMemberRoleResponse (record)
 - source: `member/src/main/java/com/devticket/member/presentation/dto/internal/response/InternalMemberRoleResponse.java`
@@ -744,6 +915,32 @@
 |---|---|
 | `userId` | `java.util.UUID` |
 | `status` | `String` |
+
+### InternalOAuthRequest (record)
+- source: `member/src/main/java/com/devticket/member/presentation/dto/internal/request/InternalOAuthRequest.java`
+| 필드명 | 타입 |
+|---|---|
+| `provider` | `String` |
+| `providerId` | `String` |
+| `email` | `String` |
+| `name` | `String` |
+
+### InternalOAuthResponse (record)
+- source: `member/src/main/java/com/devticket/member/presentation/dto/internal/response/InternalOAuthResponse.java`
+| 필드명 | 타입 |
+|---|---|
+| `accessToken` | `String` |
+| `refreshToken` | `String` |
+
+### InternalPagedMemberResponse (record)
+- source: `member/src/main/java/com/devticket/member/presentation/dto/internal/response/InternalPagedMemberResponse.java`
+| 필드명 | 타입 |
+|---|---|
+| `content` | `List<InternalMemberInfoResponse>` |
+| `page` | `int` |
+| `size` | `int` |
+| `totalElements` | `long` |
+| `totalPages` | `int` |
 
 ### InternalSellerApplicationResponse (record)
 - source: `member/src/main/java/com/devticket/member/presentation/dto/internal/response/InternalSellerApplicationResponse.java`
@@ -779,6 +976,25 @@
 |---|---|
 | `userId` | `String` |
 | `status` | `String` |
+
+### InternalUpdateUserRoleRequest (record)
+- source: `member/src/main/java/com/devticket/member/presentation/dto/internal/request/InternalUpdateUserRoleRequest.java`
+| 필드명 | 타입 |
+|---|---|
+| `role` | `UserRole` |
+
+### InternalUpdateUserStatusRequest (record)
+- source: `member/src/main/java/com/devticket/member/presentation/dto/internal/request/InternalUpdateUserStatusRequest.java`
+| 필드명 | 타입 |
+|---|---|
+| `status` | `UserStatus` |
+
+### InternalUserTechStackResponse (record)
+- source: `member/src/main/java/com/devticket/member/presentation/dto/internal/response/InternalUserTechStackResponse.java`
+| 필드명 | 타입 |
+|---|---|
+| `userId` | `String` |
+| `techStacks` | `List<TechStackInfo>` |
 
 ### LoginRequest (record)
 - source: `member/src/main/java/com/devticket/member/presentation/dto/request/LoginRequest.java`
@@ -873,6 +1089,8 @@
 | 필드명 | 타입 |
 |---|---|
 | `profileId` | `UUID` |
+| `accessToken` | `String` |
+| `refreshToken` | `String` |
 
 ### SignUpRequest (record)
 - source: `member/src/main/java/com/devticket/member/presentation/dto/request/SignUpRequest.java`
@@ -911,12 +1129,6 @@
 | `expiresIn` | `Long` |
 | `isNewUser` | `boolean` |
 | `isProfileCompleted` | `boolean` |
-
-### TechStackListResponse (record)
-- source: `member/src/main/java/com/devticket/member/presentation/dto/response/TechStackListResponse.java`
-| 필드명 | 타입 |
-|---|---|
-| `techStacks` | `List<TechStackItem>` |
 
 ### TokenRefreshRequest (record)
 - source: `member/src/main/java/com/devticket/member/presentation/dto/request/TokenRefreshRequest.java`
@@ -960,6 +1172,12 @@
 
 ## payment
 
+### AdminEventCancelRequest (record)
+- source: `payment/src/main/java/com/devticket/payment/refund/presentation/dto/AdminEventCancelRequest.java`
+| 필드명 | 타입 |
+|---|---|
+| `reason` | `String` |
+
 ### InternalPaymentInfoResponse (record)
 - source: `payment/src/main/java/com/devticket/payment/payment/presentation/dto/InternalPaymentInfoResponse.java`
 | 필드명 | 타입 |
@@ -972,6 +1190,18 @@
 | `status` | `String` |
 | `approvedAt` | `LocalDateTime` |
 | `failureReason` | `String` |
+
+### OrderRefundResponse (record)
+- source: `payment/src/main/java/com/devticket/payment/refund/presentation/dto/OrderRefundResponse.java`
+| 필드명 | 타입 |
+|---|---|
+| `refundId` | `UUID` |
+| `orderRefundId` | `UUID` |
+| `orderId` | `UUID` |
+| `refundAmount` | `int` |
+| `refundRate` | `int` |
+| `paymentMethod` | `String` |
+| `refundStatus` | `String` |
 
 ### PaymentConfirmRequest (record)
 - source: `payment/src/main/java/com/devticket/payment/payment/presentation/dto/PaymentConfirmRequest.java`
@@ -1093,6 +1323,12 @@
 | `requestedAt` | `LocalDateTime` |
 | `completedAt` | `LocalDateTime` |
 
+### SellerEventCancelRequest (record)
+- source: `payment/src/main/java/com/devticket/payment/refund/presentation/dto/SellerEventCancelRequest.java`
+| 필드명 | 타입 |
+|---|---|
+| `reason` | `String` |
+
 ### SellerRefundListItemResponse (record)
 - source: `payment/src/main/java/com/devticket/payment/refund/presentation/dto/SellerRefundListItemResponse.java`
 | 필드명 | 타입 |
@@ -1106,6 +1342,14 @@
 | `paymentMethod` | `String` |
 | `requestedAt` | `LocalDateTime` |
 | `completedAt` | `LocalDateTime` |
+
+### SettlementDepositRequest (record)
+- source: `payment/src/main/java/com/devticket/payment/wallet/presentation/dto/SettlementDepositRequest.java`
+| 필드명 | 타입 |
+|---|---|
+| `settlementId` | `UUID` |
+| `userId` | `UUID` |
+| `amount` | `int` |
 
 ### WalletBalanceResponse (record)
 - source: `payment/src/main/java/com/devticket/payment/wallet/presentation/dto/WalletBalanceResponse.java`
@@ -1182,10 +1426,10 @@
 |---|---|
 | `eventId` | `String` |
 | `eventTitle` | `String` |
-| `salesAmount` | `Integer` |
-| `refundAmount` | `Integer` |
-| `feeAmount` | `Integer` |
-| `settlementAmount` | `Integer` |
+| `salesAmount` | `Long` |
+| `refundAmount` | `Long` |
+| `feeAmount` | `Long` |
+| `settlementAmount` | `Long` |
 
 ### SellerSettlementDetailResponse (record)
 - source: `settlement/src/main/java/com/devticket/settlement/presentation/dto/SellerSettlementDetailResponse.java`
@@ -1202,6 +1446,16 @@
 | `settledAt` | `String` |
 | `eventItems` | `List<EventItemResponse>` |
 
+### SettlementPeriodResponse (record)
+- source: `settlement/src/main/java/com/devticket/settlement/presentation/dto/SettlementPeriodResponse.java`
+| 필드명 | 타입 |
+|---|---|
+| `finalSettlementAmount` | `Integer` |
+| `totalFeeAmount` | `Integer` |
+| `totalSalesAmount` | `Integer` |
+| `carriedInAmount` | `Integer` |
+| `settlementItems` | `List<EventItemResponse>` |
+
 ### SettlementResponse (record)
 - source: `settlement/src/main/java/com/devticket/settlement/presentation/dto/SettlementResponse.java`
 | 필드명 | 타입 |
@@ -1215,4 +1469,16 @@
 | `finalSettlementAmount` | `Integer` |
 | `status` | `SettlementStatus` |
 | `settledAt` | `String` |
+
+### SettlementTargetPreviewResponse (record)
+- source: `settlement/src/main/java/com/devticket/settlement/presentation/dto/SettlementTargetPreviewResponse.java`
+| 필드명 | 타입 |
+|---|---|
+| `targetDate` | `String` |
+| `totalEventCount` | `int` |
+| `savedCount` | `int` |
+| `skippedCount` | `int` |
+| `feePolicyName` | `String` |
+| `feeValue` | `String` |
+| `items` | `List<EventSettlementPreview>` |
 

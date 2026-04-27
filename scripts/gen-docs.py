@@ -136,15 +136,70 @@ def _extract_annotation_value(anno_body: str) -> str | None:
     return m.group(1) if m else None
 
 
+def _neutralize_string_literals(src: str) -> str:
+    """문자열 리터럴 내부의 모든 문자를 공백으로 치환 (길이 보존).
+
+    `@Tag(name = "SELLER(판매자)")` 처럼 문자열 안의 ')' 가 annotation 본문
+    파싱을 깨뜨리는 문제를 차단하면서, `mask_strings` 와 달리 raw 와의 위치
+    인덱스 1:1 대응을 유지한다."""
+    out = []
+    i = 0
+    while i < len(src):
+        c = src[i]
+        if c == '"':
+            out.append('"')
+            i += 1
+            while i < len(src):
+                ch = src[i]
+                if ch == '\\' and i + 1 < len(src):
+                    out.append(' ')
+                    out.append(' ')
+                    i += 2
+                    continue
+                if ch == '"':
+                    out.append('"')
+                    i += 1
+                    break
+                out.append(' ' if ch != '\n' else '\n')
+                i += 1
+        else:
+            out.append(c)
+            i += 1
+    return ''.join(out)
+
+
 def _find_class_base_path(content: str) -> str:
-    m = re.search(
-        r'@RequestMapping\s*\(([^)]*)\)\s*(?:@\w+(?:\([^)]*\))?\s*)*\s*public\s+(?:class|interface)',
-        content,
-        re.DOTALL,
-    )
-    if not m:
+    # 위치 기반 탐색:
+    #   1) 클래스/인터페이스 선언 직전(가장 가까운) `@RequestMapping(...)` 찾기.
+    #   2) 그 annotation body 의 raw 문자열에서 path 리터럴 추출.
+    # 정규식만으로 처리하면 `@Tag(name = "SELLER(판매자)")` 처럼 string literal
+    # 안에 ')' 가 포함된 다른 annotation 이 사이에 끼어 있을 때 매칭이 실패한다.
+    neutral = _neutralize_string_literals(content)
+    cls_match = re.search(r'public\s+(?:class|interface)\s+\w+', neutral)
+    if not cls_match:
         return ""
-    path = _extract_annotation_value(m.group(1))
+    cls_pos = cls_match.start()
+    rm_iter = [m for m in re.finditer(r'@RequestMapping\s*\(', neutral)
+               if m.start() < cls_pos]
+    if not rm_iter:
+        return ""
+    last = rm_iter[-1]
+    open_paren = last.end() - 1
+    depth = 0
+    end = -1
+    for i in range(open_paren, len(neutral)):
+        c = neutral[i]
+        if c == '(':
+            depth += 1
+        elif c == ')':
+            depth -= 1
+            if depth == 0:
+                end = i
+                break
+    if end < 0:
+        return ""
+    body = content[open_paren + 1:end]
+    path = _extract_annotation_value(body)
     return path or ""
 
 

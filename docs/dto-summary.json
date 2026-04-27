@@ -56,7 +56,7 @@
         "type": "String"
       },
       {
-        "name": "stardDate",
+        "name": "startDate",
         "type": "String"
       },
       {
@@ -76,6 +76,49 @@
   },
   {
     "module": "admin",
+    "name": "CreateTechStackRequest",
+    "kind": "record",
+    "fieldCount": 1,
+    "fields": [
+      {
+        "name": "name",
+        "type": "String"
+      }
+    ],
+    "source": "admin/src/main/java/com/devticket/admin/presentation/dto/req/CreateTechStackRequest.java"
+  },
+  {
+    "module": "admin",
+    "name": "DeleteTechStackRequest",
+    "kind": "record",
+    "fieldCount": 1,
+    "fields": [
+      {
+        "name": "id",
+        "type": "Long"
+      }
+    ],
+    "source": "admin/src/main/java/com/devticket/admin/presentation/dto/req/DeleteTechStackRequest.java"
+  },
+  {
+    "module": "admin",
+    "name": "UpdateTechStackRequest",
+    "kind": "record",
+    "fieldCount": 2,
+    "fields": [
+      {
+        "name": "id",
+        "type": "Long"
+      },
+      {
+        "name": "name",
+        "type": "String"
+      }
+    ],
+    "source": "admin/src/main/java/com/devticket/admin/presentation/dto/req/UpdateTechStackRequest.java"
+  },
+  {
+    "module": "admin",
     "name": "UserRoleRequest",
     "kind": "record",
     "fieldCount": 1,
@@ -91,7 +134,7 @@
     "module": "admin",
     "name": "UserSearchCondition",
     "kind": "record",
-    "fieldCount": 3,
+    "fieldCount": 5,
     "fields": [
       {
         "name": "role",
@@ -104,6 +147,14 @@
       {
         "name": "keyword",
         "type": "String"
+      },
+      {
+        "name": "page",
+        "type": "Integer"
+      },
+      {
+        "name": "size",
+        "type": "Integer"
       }
     ],
     "source": "admin/src/main/java/com/devticket/admin/presentation/dto/req/UserSearchCondition.java"
@@ -120,6 +171,27 @@
       }
     ],
     "source": "admin/src/main/java/com/devticket/admin/presentation/dto/req/UserStatusRequest.java"
+  },
+  {
+    "module": "admin",
+    "name": "AdminActionHistorySummary",
+    "kind": "record",
+    "fieldCount": 3,
+    "fields": [
+      {
+        "name": "actionType",
+        "type": "String"
+      },
+      {
+        "name": "adminId",
+        "type": "UUID"
+      },
+      {
+        "name": "createdAt",
+        "type": "LocalDateTime"
+      }
+    ],
+    "source": "admin/src/main/java/com/devticket/admin/presentation/dto/res/AdminActionHistorySummary.java"
   },
   {
     "module": "admin",
@@ -239,11 +311,70 @@
         "type": "Long"
       },
       {
-        "name": "totalPage",
+        "name": "totalPages",
         "type": "Integer"
       }
     ],
     "source": "admin/src/main/java/com/devticket/admin/presentation/dto/res/AdminSettelmentListResponse.java"
+  },
+  {
+    "module": "admin",
+    "name": "AdminUserListResponse",
+    "kind": "record",
+    "fieldCount": 5,
+    "fields": [
+      {
+        "name": "content",
+        "type": "List<UserListItem>"
+      },
+      {
+        "name": "page",
+        "type": "int"
+      },
+      {
+        "name": "size",
+        "type": "int"
+      },
+      {
+        "name": "totalElements",
+        "type": "long"
+      },
+      {
+        "name": "totalPages",
+        "type": "int"
+      }
+    ],
+    "source": "admin/src/main/java/com/devticket/admin/presentation/dto/res/AdminUserListResponse.java"
+  },
+  {
+    "module": "admin",
+    "name": "CreateTechStackResponse",
+    "kind": "record",
+    "fieldCount": 2,
+    "fields": [
+      {
+        "name": "id",
+        "type": "Long"
+      },
+      {
+        "name": "name",
+        "type": "String"
+      }
+    ],
+    "source": "admin/src/main/java/com/devticket/admin/presentation/dto/res/CreateTechStackResponse.java"
+  },
+  {
+    "module": "admin",
+    "name": "DeleteTechStackResponse",
+    "kind": "record",
+    "fieldCount": 1,
+    "fields": [
+      {
+        "name": "id",
+        "type": "Long"
+      }
+    ],
+    "source": "admin/src/main/java/com/devticket/admin/presentation/dto/res/DeleteTechStackResponse.java"
   },
   {
     "module": "admin",
@@ -277,6 +408,93 @@
       }
     ],
     "source": "admin/src/main/java/com/devticket/admin/presentation/dto/res/EventCancelResponse.java"
+  },
+  {
+    "module": "admin",
+    "name": "GetTechStackResponse",
+    "kind": "record",
+    "fieldCount": 2,
+    "fields": [
+      {
+        "name": "id",
+        "type": "Long"
+      },
+      {
+        "name": "name",
+        "type": "String"
+      }
+    ],
+    "source": "admin/src/main/java/com/devticket/admin/presentation/dto/res/GetTechStackResponse.java"
+  },
+  {
+    "module": "admin",
+    "name": "InternalMemberDetailResponse",
+    "kind": "record",
+    "fieldCount": 8,
+    "fields": [
+      {
+        "name": "id",
+        "type": "String"
+      },
+      {
+        "name": "email",
+        "type": "String"
+      },
+      {
+        "name": "nickname",
+        "type": "String"
+      },
+      {
+        "name": "role",
+        "type": "String"
+      },
+      {
+        "name": "status",
+        "type": "String"
+      },
+      {
+        "name": "providerType",
+        "type": "String"
+      },
+      {
+        "name": "createdAt",
+        "type": "String"
+      },
+      {
+        "name": "withdrawnAt",
+        "type": "String"
+      }
+    ],
+    "source": "admin/src/main/java/com/devticket/admin/presentation/dto/res/InternalMemberDetailResponse.java"
+  },
+  {
+    "module": "admin",
+    "name": "InternalMemberPageResponse",
+    "kind": "record",
+    "fieldCount": 5,
+    "fields": [
+      {
+        "name": "content",
+        "type": "List<InternalMemberInfoResponse>"
+      },
+      {
+        "name": "page",
+        "type": "int"
+      },
+      {
+        "name": "size",
+        "type": "int"
+      },
+      {
+        "name": "totalElements",
+        "type": "long"
+      },
+      {
+        "name": "totalPages",
+        "type": "int"
+      }
+    ],
+    "source": "admin/src/main/java/com/devticket/admin/presentation/dto/res/InternalMemberPageResponse.java"
   },
   {
     "module": "admin",
@@ -323,31 +541,31 @@
     "fields": [
       {
         "name": "settlementId",
-        "type": "String"
+        "type": "Long"
       },
       {
         "name": "periodStart",
-        "type": "String"
+        "type": "LocalDateTime"
       },
       {
         "name": "periodEnd",
-        "type": "String"
+        "type": "LocalDateTime"
       },
       {
         "name": "totalSalesAmount",
-        "type": "Integer"
+        "type": "Long"
       },
       {
         "name": "totalRefundAmount",
-        "type": "Integer"
+        "type": "Long"
       },
       {
         "name": "totalFeeAmount",
-        "type": "Integer"
+        "type": "Long"
       },
       {
         "name": "finalSettlementAmount",
-        "type": "Integer"
+        "type": "Long"
       },
       {
         "name": "status",
@@ -355,10 +573,113 @@
       },
       {
         "name": "settledAt",
-        "type": "String"
+        "type": "LocalDateTime"
       }
     ],
     "source": "admin/src/main/java/com/devticket/admin/presentation/dto/res/SettlementResponse.java"
+  },
+  {
+    "module": "admin",
+    "name": "UpdateTechStackResponse",
+    "kind": "record",
+    "fieldCount": 2,
+    "fields": [
+      {
+        "name": "id",
+        "type": "Long"
+      },
+      {
+        "name": "name",
+        "type": "String"
+      }
+    ],
+    "source": "admin/src/main/java/com/devticket/admin/presentation/dto/res/UpdateTechStackResponse.java"
+  },
+  {
+    "module": "admin",
+    "name": "UserDetailResponse",
+    "kind": "record",
+    "fieldCount": 9,
+    "fields": [
+      {
+        "name": "userId",
+        "type": "String"
+      },
+      {
+        "name": "email",
+        "type": "String"
+      },
+      {
+        "name": "nickname",
+        "type": "String"
+      },
+      {
+        "name": "role",
+        "type": "String"
+      },
+      {
+        "name": "status",
+        "type": "String"
+      },
+      {
+        "name": "providerType",
+        "type": "String"
+      },
+      {
+        "name": "createdAt",
+        "type": "String"
+      },
+      {
+        "name": "withdrawnAt",
+        "type": "String"
+      },
+      {
+        "name": "penaltyHistory",
+        "type": "List<AdminActionHistorySummary>"
+      }
+    ],
+    "source": "admin/src/main/java/com/devticket/admin/presentation/dto/res/UserDetailResponse.java"
+  },
+  {
+    "module": "admin",
+    "name": "UserListItem",
+    "kind": "record",
+    "fieldCount": 8,
+    "fields": [
+      {
+        "name": "userId",
+        "type": "String"
+      },
+      {
+        "name": "email",
+        "type": "String"
+      },
+      {
+        "name": "nickname",
+        "type": "String"
+      },
+      {
+        "name": "role",
+        "type": "String"
+      },
+      {
+        "name": "status",
+        "type": "String"
+      },
+      {
+        "name": "providerType",
+        "type": "String"
+      },
+      {
+        "name": "createdAt",
+        "type": "String"
+      },
+      {
+        "name": "withdrawnAt",
+        "type": "String"
+      }
+    ],
+    "source": "admin/src/main/java/com/devticket/admin/presentation/dto/res/UserListItem.java"
   },
   {
     "module": "admin",
@@ -400,85 +721,6 @@
       }
     ],
     "source": "admin/src/main/java/com/devticket/admin/presentation/dto/res/UserListResponse.java"
-  },
-  {
-    "module": "ai",
-    "name": "ActionLogMessage",
-    "kind": "record",
-    "fieldCount": 10,
-    "fields": [
-      {
-        "name": "userId",
-        "type": "String"
-      },
-      {
-        "name": "eventId",
-        "type": "String"
-      },
-      {
-        "name": "eventIds",
-        "type": "List<String>"
-      },
-      {
-        "name": "actionType",
-        "type": "String"
-      },
-      {
-        "name": "searchKeyword",
-        "type": "String"
-      },
-      {
-        "name": "stackFilter",
-        "type": "String"
-      },
-      {
-        "name": "dwellTimeSeconds",
-        "type": "Integer"
-      },
-      {
-        "name": "quantity",
-        "type": "Integer"
-      },
-      {
-        "name": "totalAmount",
-        "type": "Long"
-      },
-      {
-        "name": "timestamp",
-        "type": "String"
-      }
-    ],
-    "source": "ai/src/main/java/org/example/ai/presentation/dto/req/ActionLogMessage.java"
-  },
-  {
-    "module": "ai",
-    "name": "RecommendationRequest",
-    "kind": "record",
-    "fieldCount": 1,
-    "fields": [
-      {
-        "name": "userId",
-        "type": "String"
-      }
-    ],
-    "source": "ai/src/main/java/org/example/ai/presentation/dto/req/RecommendationRequest.java"
-  },
-  {
-    "module": "ai",
-    "name": "RecommendationResponse",
-    "kind": "record",
-    "fieldCount": 2,
-    "fields": [
-      {
-        "name": "userId",
-        "type": "String"
-      },
-      {
-        "name": "eventIdList",
-        "type": "List<String>"
-      }
-    ],
-    "source": "ai/src/main/java/org/example/ai/presentation/dto/res/RecommendationResponse.java"
   },
   {
     "module": "commerce",
@@ -675,7 +917,7 @@
     "module": "commerce",
     "name": "InternalOrderInfoResponse",
     "kind": "record",
-    "fieldCount": 7,
+    "fieldCount": 8,
     "fields": [
       {
         "name": "id",
@@ -704,6 +946,10 @@
       {
         "name": "orderedAt",
         "type": "String"
+      },
+      {
+        "name": "orderItems",
+        "type": "List<OrderItem>"
       }
     ],
     "source": "commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/InternalOrderInfoResponse.java"
@@ -712,19 +958,15 @@
     "module": "commerce",
     "name": "InternalOrderItemResponse",
     "kind": "record",
-    "fieldCount": 10,
+    "fieldCount": 5,
     "fields": [
-      {
-        "name": "id",
-        "type": "Long"
-      },
       {
         "name": "orderItemId",
         "type": "UUID"
       },
       {
         "name": "orderId",
-        "type": "Long"
+        "type": "UUID"
       },
       {
         "name": "userId",
@@ -735,24 +977,8 @@
         "type": "UUID"
       },
       {
-        "name": "price",
-        "type": "int"
-      },
-      {
-        "name": "quantity",
-        "type": "int"
-      },
-      {
-        "name": "subtotalAmount",
-        "type": "int"
-      },
-      {
-        "name": "createdAt",
-        "type": "LocalDateTime"
-      },
-      {
-        "name": "updatedAt",
-        "type": "LocalDateTime"
+        "name": "amount",
+        "type": "Integer"
       }
     ],
     "source": "commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/InternalOrderItemResponse.java"
@@ -773,6 +999,39 @@
       }
     ],
     "source": "commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/InternalOrderItemsResponse.java"
+  },
+  {
+    "module": "commerce",
+    "name": "InternalOrderTicketsResponse",
+    "kind": "record",
+    "fieldCount": 6,
+    "fields": [
+      {
+        "name": "orderId",
+        "type": "UUID"
+      },
+      {
+        "name": "userId",
+        "type": "UUID"
+      },
+      {
+        "name": "paymentId",
+        "type": "UUID"
+      },
+      {
+        "name": "totalAmount",
+        "type": "int"
+      },
+      {
+        "name": "remainingAmount",
+        "type": "int"
+      },
+      {
+        "name": "tickets",
+        "type": "List<TicketItem>"
+      }
+    ],
+    "source": "commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/InternalOrderTicketsResponse.java"
   },
   {
     "module": "commerce",
@@ -955,6 +1214,27 @@
   },
   {
     "module": "commerce",
+    "name": "OrderStatusResponse",
+    "kind": "record",
+    "fieldCount": 3,
+    "fields": [
+      {
+        "name": "orderId",
+        "type": "UUID"
+      },
+      {
+        "name": "status",
+        "type": "OrderStatus"
+      },
+      {
+        "name": "updatedAt",
+        "type": "LocalDateTime"
+      }
+    ],
+    "source": "commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/OrderStatusResponse.java"
+  },
+  {
+    "module": "commerce",
     "name": "OrderSummary",
     "kind": "record",
     "fieldCount": 4,
@@ -1031,12 +1311,50 @@
   },
   {
     "module": "commerce",
+    "name": "InternalTicketSettlementDataResponse",
+    "kind": "record",
+    "fieldCount": 1,
+    "fields": [
+      {
+        "name": "items",
+        "type": "List<InternalTicketSettlementItemResponse>"
+      }
+    ],
+    "source": "commerce/src/main/java/com/devticket/commerce/ticket/presentation/dto/res/InternalTicketSettlementDataResponse.java"
+  },
+  {
+    "module": "commerce",
+    "name": "InternalTicketSettlementItemResponse",
+    "kind": "record",
+    "fieldCount": 4,
+    "fields": [
+      {
+        "name": "eventId",
+        "type": "UUID"
+      },
+      {
+        "name": "orderItemId",
+        "type": "UUID"
+      },
+      {
+        "name": "salesAmount",
+        "type": "Long"
+      },
+      {
+        "name": "refundAmount",
+        "type": "Long"
+      }
+    ],
+    "source": "commerce/src/main/java/com/devticket/commerce/ticket/presentation/dto/res/InternalTicketSettlementItemResponse.java"
+  },
+  {
+    "module": "commerce",
     "name": "SellerEventParticipantListResponse",
     "kind": "record",
     "fieldCount": 5,
     "fields": [
       {
-        "name": "sellerEventParticipantListResponse",
+        "name": "content",
         "type": "List<SellerEventParticipantResponse>"
       },
       {
@@ -1062,7 +1380,7 @@
     "module": "commerce",
     "name": "SellerEventParticipantResponse",
     "kind": "record",
-    "fieldCount": 6,
+    "fieldCount": 8,
     "fields": [
       {
         "name": "ticketId",
@@ -1077,8 +1395,16 @@
         "type": "String"
       },
       {
+        "name": "userName",
+        "type": "String"
+      },
+      {
         "name": "email",
         "type": "String"
+      },
+      {
+        "name": "quantity",
+        "type": "int"
       },
       {
         "name": "purchasedAt",
@@ -1168,60 +1494,13 @@
   },
   {
     "module": "event",
-    "name": "ActionLogEvent",
-    "kind": "record",
-    "kafkaTopic": "action.log",
-    "fieldCount": 9,
-    "fields": [
-      {
-        "name": "userId",
-        "type": "String"
-      },
-      {
-        "name": "eventId",
-        "type": "String"
-      },
-      {
-        "name": "actionType",
-        "type": "String"
-      },
-      {
-        "name": "searchKeyword",
-        "type": "String"
-      },
-      {
-        "name": "stackFilter",
-        "type": "String"
-      },
-      {
-        "name": "dwellTimeSeconds",
-        "type": "Integer"
-      },
-      {
-        "name": "quantity",
-        "type": "Integer"
-      },
-      {
-        "name": "totalAmount",
-        "type": "Long"
-      },
-      {
-        "name": "timestamp",
-        "type": "Instant"
-      }
-    ],
-    "source": "event/src/main/java/com/devticket/event/common/messaging/event/ActionLogEvent.java"
-  },
-  {
-    "module": "event",
     "name": "DwellRequest",
     "kind": "record",
     "fieldCount": 1,
     "fields": [
       {
         "name": "dwellTimeSeconds",
-        "type": "Integer",
-        "validation": "@NotNull @Positive"
+        "type": "Integer"
       }
     ],
     "source": "event/src/main/java/com/devticket/event/presentation/dto/DwellRequest.java"
@@ -1307,7 +1586,7 @@
     "module": "event",
     "name": "EventListContentResponse",
     "kind": "record",
-    "fieldCount": 9,
+    "fieldCount": 11,
     "fields": [
       {
         "name": "eventId",
@@ -1344,6 +1623,14 @@
       {
         "name": "saleEndAt",
         "type": "LocalDateTime"
+      },
+      {
+        "name": "totalQuantity",
+        "type": "Integer"
+      },
+      {
+        "name": "remainingQuantity",
+        "type": "Integer"
       }
     ],
     "source": "event/src/main/java/com/devticket/event/presentation/dto/EventListContentResponse.java"
@@ -1405,6 +1692,32 @@
       }
     ],
     "source": "event/src/main/java/com/devticket/event/presentation/dto/EventListResponse.java"
+  },
+  {
+    "module": "event",
+    "name": "ImageUploadResponse",
+    "kind": "record",
+    "fieldCount": 1,
+    "fields": [
+      {
+        "name": "imageUrl",
+        "type": "String"
+      }
+    ],
+    "source": "event/src/main/java/com/devticket/event/presentation/dto/ImageUploadResponse.java"
+  },
+  {
+    "module": "event",
+    "name": "RecommendationResponse",
+    "kind": "record",
+    "fieldCount": 1,
+    "fields": [
+      {
+        "name": "events",
+        "type": "List<EventListContentResponse>"
+      }
+    ],
+    "source": "event/src/main/java/com/devticket/event/presentation/dto/RecommendationResponse.java"
   },
   {
     "module": "event",
@@ -1698,6 +2011,43 @@
   },
   {
     "module": "event",
+    "name": "InternalAdminEventResponse",
+    "kind": "record",
+    "fieldCount": 7,
+    "fields": [
+      {
+        "name": "eventId",
+        "type": "UUID"
+      },
+      {
+        "name": "title",
+        "type": "String"
+      },
+      {
+        "name": "sellerNickname",
+        "type": "String"
+      },
+      {
+        "name": "status",
+        "type": "String"
+      },
+      {
+        "name": "eventDateTime",
+        "type": "LocalDateTime"
+      },
+      {
+        "name": "totalQuantity",
+        "type": "Integer"
+      },
+      {
+        "name": "remainingQuantity",
+        "type": "Integer"
+      }
+    ],
+    "source": "event/src/main/java/com/devticket/event/presentation/dto/internal/InternalAdminEventResponse.java"
+  },
+  {
+    "module": "event",
     "name": "InternalBulkEventInfoRequest",
     "kind": "record",
     "fieldCount": 1,
@@ -1734,6 +2084,32 @@
       }
     ],
     "source": "event/src/main/java/com/devticket/event/presentation/dto/internal/InternalBulkStockAdjustmentRequest.java"
+  },
+  {
+    "module": "event",
+    "name": "InternalEndedEventsResponse",
+    "kind": "record",
+    "fieldCount": 1,
+    "fields": [
+      {
+        "name": "events",
+        "type": "List<EndedEventItem>"
+      }
+    ],
+    "source": "event/src/main/java/com/devticket/event/presentation/dto/internal/InternalEndedEventsResponse.java"
+  },
+  {
+    "module": "event",
+    "name": "InternalEventForceCancelRequest",
+    "kind": "record",
+    "fieldCount": 1,
+    "fields": [
+      {
+        "name": "reason",
+        "type": "String"
+      }
+    ],
+    "source": "event/src/main/java/com/devticket/event/presentation/dto/internal/InternalEventForceCancelRequest.java"
   },
   {
     "module": "event",
@@ -1791,6 +2167,61 @@
       }
     ],
     "source": "event/src/main/java/com/devticket/event/presentation/dto/internal/InternalEventInfoResponse.java"
+  },
+  {
+    "module": "event",
+    "name": "InternalPagedEventResponse",
+    "kind": "record",
+    "fieldCount": 5,
+    "fields": [
+      {
+        "name": "content",
+        "type": "List<InternalAdminEventResponse>"
+      },
+      {
+        "name": "page",
+        "type": "int"
+      },
+      {
+        "name": "size",
+        "type": "int"
+      },
+      {
+        "name": "totalElements",
+        "type": "long"
+      },
+      {
+        "name": "totalPages",
+        "type": "int"
+      }
+    ],
+    "source": "event/src/main/java/com/devticket/event/presentation/dto/internal/InternalPagedEventResponse.java"
+  },
+  {
+    "module": "event",
+    "name": "InternalPopularEventRequest",
+    "kind": "record",
+    "fieldCount": 1,
+    "fields": [
+      {
+        "name": "needed",
+        "type": "int"
+      }
+    ],
+    "source": "event/src/main/java/com/devticket/event/presentation/dto/internal/InternalPopularEventRequest.java"
+  },
+  {
+    "module": "event",
+    "name": "InternalPopularEventResponse",
+    "kind": "record",
+    "fieldCount": 1,
+    "fields": [
+      {
+        "name": "id",
+        "type": "String"
+      }
+    ],
+    "source": "event/src/main/java/com/devticket/event/presentation/dto/internal/InternalPopularEventResponse.java"
   },
   {
     "module": "event",
@@ -1921,6 +2352,70 @@
   },
   {
     "module": "member",
+    "name": "InternalOAuthRequest",
+    "kind": "record",
+    "fieldCount": 4,
+    "fields": [
+      {
+        "name": "provider",
+        "type": "String"
+      },
+      {
+        "name": "providerId",
+        "type": "String"
+      },
+      {
+        "name": "email",
+        "type": "String"
+      },
+      {
+        "name": "name",
+        "type": "String"
+      }
+    ],
+    "source": "member/src/main/java/com/devticket/member/presentation/dto/internal/request/InternalOAuthRequest.java"
+  },
+  {
+    "module": "member",
+    "name": "InternalUpdateUserRoleRequest",
+    "kind": "record",
+    "fieldCount": 1,
+    "fields": [
+      {
+        "name": "role",
+        "type": "UserRole"
+      }
+    ],
+    "source": "member/src/main/java/com/devticket/member/presentation/dto/internal/request/InternalUpdateUserRoleRequest.java"
+  },
+  {
+    "module": "member",
+    "name": "InternalUpdateUserStatusRequest",
+    "kind": "record",
+    "fieldCount": 1,
+    "fields": [
+      {
+        "name": "status",
+        "type": "UserStatus"
+      }
+    ],
+    "source": "member/src/main/java/com/devticket/member/presentation/dto/internal/request/InternalUpdateUserStatusRequest.java"
+  },
+  {
+    "module": "member",
+    "name": "InternalAdminTechStackResponse",
+    "kind": "record",
+    "fieldCount": 1,
+    "fields": [
+      {
+        "name": "techStacks",
+        "type": "List<TechStackInfo>"
+      }
+    ],
+    "source": "member/src/main/java/com/devticket/member/presentation/dto/internal/response/InternalAdminTechStackResponse.java"
+  },
+  {
+    "module": "member",
     "name": "InternalDecideSellerApplicationResponse",
     "kind": "record",
     "fieldCount": 2,
@@ -1940,7 +2435,7 @@
     "module": "member",
     "name": "InternalMemberInfoResponse",
     "kind": "record",
-    "fieldCount": 6,
+    "fieldCount": 8,
     "fields": [
       {
         "name": "userId",
@@ -1965,6 +2460,14 @@
       {
         "name": "providerType",
         "type": "String"
+      },
+      {
+        "name": "createdAt",
+        "type": "LocalDateTime"
+      },
+      {
+        "name": "withdrawnAt",
+        "type": "LocalDateTime"
       }
     ],
     "source": "member/src/main/java/com/devticket/member/presentation/dto/internal/response/InternalMemberInfoResponse.java"
@@ -2002,6 +2505,52 @@
       }
     ],
     "source": "member/src/main/java/com/devticket/member/presentation/dto/internal/response/InternalMemberStatusResponse.java"
+  },
+  {
+    "module": "member",
+    "name": "InternalOAuthResponse",
+    "kind": "record",
+    "fieldCount": 2,
+    "fields": [
+      {
+        "name": "accessToken",
+        "type": "String"
+      },
+      {
+        "name": "refreshToken",
+        "type": "String"
+      }
+    ],
+    "source": "member/src/main/java/com/devticket/member/presentation/dto/internal/response/InternalOAuthResponse.java"
+  },
+  {
+    "module": "member",
+    "name": "InternalPagedMemberResponse",
+    "kind": "record",
+    "fieldCount": 5,
+    "fields": [
+      {
+        "name": "content",
+        "type": "List<InternalMemberInfoResponse>"
+      },
+      {
+        "name": "page",
+        "type": "int"
+      },
+      {
+        "name": "size",
+        "type": "int"
+      },
+      {
+        "name": "totalElements",
+        "type": "long"
+      },
+      {
+        "name": "totalPages",
+        "type": "int"
+      }
+    ],
+    "source": "member/src/main/java/com/devticket/member/presentation/dto/internal/response/InternalPagedMemberResponse.java"
   },
   {
     "module": "member",
@@ -2098,6 +2647,23 @@
       }
     ],
     "source": "member/src/main/java/com/devticket/member/presentation/dto/internal/response/InternalUpdateStatusResponse.java"
+  },
+  {
+    "module": "member",
+    "name": "InternalUserTechStackResponse",
+    "kind": "record",
+    "fieldCount": 2,
+    "fields": [
+      {
+        "name": "userId",
+        "type": "String"
+      },
+      {
+        "name": "techStacks",
+        "type": "List<TechStackInfo>"
+      }
+    ],
+    "source": "member/src/main/java/com/devticket/member/presentation/dto/internal/response/InternalUserTechStackResponse.java"
   },
   {
     "module": "member",
@@ -2493,11 +3059,19 @@
     "module": "member",
     "name": "SignUpProfileResponse",
     "kind": "record",
-    "fieldCount": 1,
+    "fieldCount": 3,
     "fields": [
       {
         "name": "profileId",
         "type": "UUID"
+      },
+      {
+        "name": "accessToken",
+        "type": "String"
+      },
+      {
+        "name": "refreshToken",
+        "type": "String"
       }
     ],
     "source": "member/src/main/java/com/devticket/member/presentation/dto/response/SignUpProfileResponse.java"
@@ -2571,19 +3145,6 @@
       }
     ],
     "source": "member/src/main/java/com/devticket/member/presentation/dto/response/SocialSignUpOrLoginResponse.java"
-  },
-  {
-    "module": "member",
-    "name": "TechStackListResponse",
-    "kind": "record",
-    "fieldCount": 1,
-    "fields": [
-      {
-        "name": "techStacks",
-        "type": "List<TechStackItem>"
-      }
-    ],
-    "source": "member/src/main/java/com/devticket/member/presentation/dto/response/TechStackListResponse.java"
   },
   {
     "module": "member",
@@ -2865,6 +3426,56 @@
   },
   {
     "module": "payment",
+    "name": "AdminEventCancelRequest",
+    "kind": "record",
+    "fieldCount": 1,
+    "fields": [
+      {
+        "name": "reason",
+        "type": "String"
+      }
+    ],
+    "source": "payment/src/main/java/com/devticket/payment/refund/presentation/dto/AdminEventCancelRequest.java"
+  },
+  {
+    "module": "payment",
+    "name": "OrderRefundResponse",
+    "kind": "record",
+    "fieldCount": 7,
+    "fields": [
+      {
+        "name": "refundId",
+        "type": "UUID"
+      },
+      {
+        "name": "orderRefundId",
+        "type": "UUID"
+      },
+      {
+        "name": "orderId",
+        "type": "UUID"
+      },
+      {
+        "name": "refundAmount",
+        "type": "int"
+      },
+      {
+        "name": "refundRate",
+        "type": "int"
+      },
+      {
+        "name": "paymentMethod",
+        "type": "String"
+      },
+      {
+        "name": "refundStatus",
+        "type": "String"
+      }
+    ],
+    "source": "payment/src/main/java/com/devticket/payment/refund/presentation/dto/OrderRefundResponse.java"
+  },
+  {
+    "module": "payment",
     "name": "PgRefundRequest",
     "kind": "record",
     "fieldCount": 1,
@@ -3050,6 +3661,19 @@
   },
   {
     "module": "payment",
+    "name": "SellerEventCancelRequest",
+    "kind": "record",
+    "fieldCount": 1,
+    "fields": [
+      {
+        "name": "reason",
+        "type": "String"
+      }
+    ],
+    "source": "payment/src/main/java/com/devticket/payment/refund/presentation/dto/SellerEventCancelRequest.java"
+  },
+  {
+    "module": "payment",
     "name": "SellerRefundListItemResponse",
     "kind": "record",
     "fieldCount": 9,
@@ -3092,6 +3716,27 @@
       }
     ],
     "source": "payment/src/main/java/com/devticket/payment/refund/presentation/dto/SellerRefundListItemResponse.java"
+  },
+  {
+    "module": "payment",
+    "name": "SettlementDepositRequest",
+    "kind": "record",
+    "fieldCount": 3,
+    "fields": [
+      {
+        "name": "settlementId",
+        "type": "UUID"
+      },
+      {
+        "name": "userId",
+        "type": "UUID"
+      },
+      {
+        "name": "amount",
+        "type": "int"
+      }
+    ],
+    "source": "payment/src/main/java/com/devticket/payment/wallet/presentation/dto/SettlementDepositRequest.java"
   },
   {
     "module": "payment",
@@ -3289,19 +3934,19 @@
       },
       {
         "name": "salesAmount",
-        "type": "Integer"
+        "type": "Long"
       },
       {
         "name": "refundAmount",
-        "type": "Integer"
+        "type": "Long"
       },
       {
         "name": "feeAmount",
-        "type": "Integer"
+        "type": "Long"
       },
       {
         "name": "settlementAmount",
-        "type": "Integer"
+        "type": "Long"
       }
     ],
     "source": "settlement/src/main/java/com/devticket/settlement/presentation/dto/EventItemResponse.java"
@@ -3357,6 +4002,35 @@
   },
   {
     "module": "settlement",
+    "name": "SettlementPeriodResponse",
+    "kind": "record",
+    "fieldCount": 5,
+    "fields": [
+      {
+        "name": "finalSettlementAmount",
+        "type": "Integer"
+      },
+      {
+        "name": "totalFeeAmount",
+        "type": "Integer"
+      },
+      {
+        "name": "totalSalesAmount",
+        "type": "Integer"
+      },
+      {
+        "name": "carriedInAmount",
+        "type": "Integer"
+      },
+      {
+        "name": "settlementItems",
+        "type": "List<EventItemResponse>"
+      }
+    ],
+    "source": "settlement/src/main/java/com/devticket/settlement/presentation/dto/SettlementPeriodResponse.java"
+  },
+  {
+    "module": "settlement",
     "name": "SettlementResponse",
     "kind": "record",
     "fieldCount": 9,
@@ -3399,5 +4073,42 @@
       }
     ],
     "source": "settlement/src/main/java/com/devticket/settlement/presentation/dto/SettlementResponse.java"
+  },
+  {
+    "module": "settlement",
+    "name": "SettlementTargetPreviewResponse",
+    "kind": "record",
+    "fieldCount": 7,
+    "fields": [
+      {
+        "name": "targetDate",
+        "type": "String"
+      },
+      {
+        "name": "totalEventCount",
+        "type": "int"
+      },
+      {
+        "name": "savedCount",
+        "type": "int"
+      },
+      {
+        "name": "skippedCount",
+        "type": "int"
+      },
+      {
+        "name": "feePolicyName",
+        "type": "String"
+      },
+      {
+        "name": "feeValue",
+        "type": "String"
+      },
+      {
+        "name": "items",
+        "type": "List<EventSettlementPreview>"
+      }
+    ],
+    "source": "settlement/src/main/java/com/devticket/settlement/presentation/dto/SettlementTargetPreviewResponse.java"
   }
 ]
