@@ -52,7 +52,7 @@ Kafka를 통해 서비스 간에 오가는 모든 이벤트를 한 눈에 확인
 | `refund.stock.done` / `refund.stock.failed` | Event | Payment (Orchestrator) | Stock 복구 처리 결과 | — | ⬜ 미구현 |
 | `refund.order.compensate` | Payment (Orchestrator) | Commerce | Order 취소 보상 (롤백) | — | ⬜ 미구현 |
 | `refund.ticket.compensate` | Payment (Orchestrator) | Commerce | Ticket 취소 보상 (롤백) | — | ⬜ 미구현 |
-| `action.log` (analytics) | Event (VIEW/DETAIL_VIEW/DWELL_TIME), Commerce (CART_ADD/CART_REMOVE), **Log 자체 consume**(PURCHASE) | **Log 서비스** (Fastify, 별도 스택) | 각 API 호출 시 (`acks=0`, Outbox 미사용). PURCHASE는 Log 서비스가 `payment.completed` 수신 → `log.action_log` 직접 INSERT | **없음** (at-most-once — 손실 허용) | ✅ Log Consumer 확장 완료 / ✅ Event Producer 완료 (2026-04-23) / ⬜ Commerce Producer 미확인 (상세: [actionLog.md](actionLog.md)) |
+| `action.log` (analytics) | Event (VIEW/DETAIL_VIEW/DWELL_TIME), Commerce (CART_ADD/CART_REMOVE), **Log 자체 consume**(PURCHASE) | **Log 서비스** (Fastify, 별도 스택) | 각 API 호출 시 (`acks=0`, Outbox 미사용). PURCHASE는 Log 서비스가 `payment.completed` 수신 → `log.action_log` 직접 INSERT | **없음** (at-most-once — 손실 허용) | ✅ Log Consumer 확장 완료 / ✅ Event Producer 완료 (2026-04-23) / ✅ Commerce Producer 완료 (`CartService.publishCartActionLog` — `addToCart` / `clearCart` N회 / `updateTicket` 양·음수 분기) (상세: [actionLog.md](actionLog.md)) |
 
 **구현 상태 범례**
 
