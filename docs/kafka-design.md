@@ -74,11 +74,14 @@ Kafka 관련 코드의 **계층 배치·네이밍·Lombok·테스트·보안·PR
 
 ### Producer 발행 시점
 
+> **`order.created` / `stock.deducted` / `stock.failed` — 활성 흐름 외 (REST 전환됨)**
+> 본 표는 초기 Kafka choreography 설계 기준. 현재 주문 생성 → 재고 차감 흐름은 **`OrderService.createOrderByCart` 내부의 동기 REST(`OrderToEventClient.adjustStocks` → `PATCH /internal/events/stock-adjustments`)** 로 동작합니다 (`OrderService.java:116-117`, `Order.createPending` 으로 곧장 `PAYMENT_PENDING` 진입). 따라서 아래 3개 토픽은 `KafkaTopics` 상수와 빈 Producer/Consumer 코드는 잔존하나 활성 발행 호출자 없음. 토픽 폐지 vs 부활 여부는 별도 트랙. 이하 다른 토픽들은 정상 활성.
+
 | 토픽 | Producer 서비스 | 발행 위치 (메서드) | 트리거 조건 |
 |------|----------------|-------------------|-----------|
-| `order.created` | Commerce | `OrderService.createOrder()` | 주문 생성 + Outbox INSERT 커밋 시 |
-| `stock.deducted` | Event | `StockService.deductStock()` | `order.created` 수신 → 재고 차감 성공 시 |
-| `stock.failed` | Event | `StockService.deductStock()` | `order.created` 수신 → 재고 부족 판정 시 |
+| ~~`order.created`~~ ⚠️ 비활성 | ~~Commerce~~ | ~~`OrderService.createOrder()`~~ | REST 동기 차감으로 전환 — 발행 호출자 없음 |
+| ~~`stock.deducted`~~ ⚠️ 비활성 | ~~Event~~ | ~~`StockService.deductStock()`~~ | `order.created` 미수신 — 동기 REST 응답으로 대체 |
+| ~~`stock.failed`~~ ⚠️ 비활성 | ~~Event~~ | ~~`StockService.deductStock()`~~ | 동일 |
 | `payment.completed` | Payment | `PaymentService.confirmPayment()` | PG 승인 성공 + 내부 상태 반영 커밋 시 |
 | `payment.failed` | Payment | `PaymentService.confirmPayment()` | PG 승인 실패 또는 내부 검증 실패 시 |
 | `ticket.issue-failed` | Commerce | `TicketService.issueTicket()` | 결제 성공 후 티켓 발급 실패 감지 시 |

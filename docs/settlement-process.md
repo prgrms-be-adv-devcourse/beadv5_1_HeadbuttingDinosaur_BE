@@ -18,16 +18,24 @@
 
 | 문서 개념 | 엔티티 / 컬럼 (`Settlement.java`) | 산출 방식 |
 |---|---|---|
-| `settlementAmount` (당월 순수 정산금) | **단일 컬럼 없음 — 계산값** | `total_sales_amount` − `total_fee_amount` − `total_refund_amount` |
-| `carriedInAmount` (이월 합산액) | `carried_in_amount` : `Integer` | 정산서 생성 batch 시 동일 판매자의 `PENDING_MIN_AMOUNT` 정산서 `settlementAmount` 합산. 이후 변경 없음 |
-| `finalSettlementAmount` (실제 지급금) | `final_settlement_amount` : `Integer` | 개념상 `settlementAmount + carriedInAmount`. 단, 현재 `SettlementItemProcessor.java:35`는 **이월 미반영 식** `totalSalesAmount − feeAmount − totalRefundAmount`로 우선 채움 — 이월 합산 단계 미구현 |
+| `settlementAmount` (당월 순수 정산금) | **단일 컬럼 없음 — 계산값** | `total_sales_amount` − `total_fee_amount` − `total_refund_amount`. 활성 path는 `SettlementInternalServiceImpl.aggregateAmounts(...)` 가 산출 |
+| `carriedInAmount` (이월 합산액) | `carried_in_amount` : `Integer` | 정산서 생성 시 동일 판매자의 `PENDING_MIN_AMOUNT` 정산서 `final_settlement_amount` 값을 채택 (`SettlementInternalServiceImpl.resolveLatestPending` 결과). 이후 변경 없음 |
+| `finalSettlementAmount` (실제 지급금) | `final_settlement_amount` : `Integer` | 활성 path: `(settlementAmount + carriedInAmount)` (`SettlementInternalServiceImpl.processSellerSettlement:319`). 1만원 미달이면 같은 값을 그대로 가지고 `PENDING_MIN_AMOUNT` 상태로 저장되어 다음 달로 이월됨 |
 | `carriedToSettlementId` | `carried_to_settlement_id` : `UUID` | 이 정산서 금액이 이월된 대상 정산서 ID (`PENDING_MIN_AMOUNT`인 경우 채워짐) |
 | (계산 입력) | `total_sales_amount` : `Integer` | 당월 매출합 |
 | (계산 입력) | `total_refund_amount` : `Integer` | 당월 환불합 |
-| (계산 입력) | `total_fee_amount` : `Integer` | `total_sales_amount × FEE_RATE`. 현재 `FEE_RATE = 0.05` 상수 (`SettlementItemProcessor.java:19`) — 향후 `feePolicy` 테이블 도입 예정 |
+| (계산 입력) | `total_fee_amount` : `Integer` | `total_sales_amount × FEE_RATE`. 현재 `FEE_RATE = 0.05` 상수 (`SettlementItemProcessor.java:19` — 향후 `feePolicy` 테이블 도입 예정) |
 
-> **의미 차이 — 코드와 문서 (이월 처리 미구현)**
-> 본 문서 §"정산서 생성"은 `finalSettlementAmount < 1만원` 시 `PENDING_MIN_AMOUNT` 상태로 **저장 후 이월** 흐름을 규정하나, 현재 `SettlementItemProcessor.java:37-40`은 1만원 미달이면 **`null` 반환으로 Settlement row 자체를 생성하지 않음**. 이월 처리 단계는 미구현이며, 별도 트랙 진행 시 본 매핑을 재정합 필요.
+> **두 개의 정산 생성 경로 — Scheduler path가 활성**
+>
+> 코드에는 정산서 생성 로직이 **두 곳**에 존재합니다. 운영에서 호출되는 것은 `SettlementInternalServiceImpl` 만입니다.
+>
+> | 경로 | 위치 | 호출자 | 1만원 미달 처리 | 이월 처리 |
+> |------|------|--------|----------------|----------|
+> | **활성** | `SettlementInternalServiceImpl.createSettlementFromItems` → `processSellerSettlement` (L146, L307) | `SettlementScheduler.createMonthlySettlement` (`@Scheduled(cron="0 10 0 1 * *")`) + `InternalSettlementController.runSettlement` (관리자 수동 트리거) | `PENDING_MIN_AMOUNT` 상태로 저장 + 다음 달 이월 후보 | `resolveLatestPending` + `carriedInAmount` 합산 + `carriedToSettlementId` 갱신 — 완전 구현 |
+> | **레거시** | `SettlementItemProcessor` (Spring Batch ItemProcessor — `settlementJobConfig.java`) | 현재 Scheduler 미연결, Batch Job 자체 트리거가 별도 등록되지 않음 | `null` 반환 → Settlement row 미생성 | 미반영 (`carriedInAmount = 0` 상태로 저장) |
+>
+> 본 문서의 §"정산서 생성"·§"정산서 취소"·§"지급처리" 흐름은 **활성 path** 기준으로 기술합니다. 레거시 Processor는 추후 정리 대상.
 
 ## 정산대상 데이터 수집 (SettlementItem)
 - 매일 00:01시간에 SettlementItem 생성 Batch작업
@@ -37,20 +45,12 @@
 - 매월 1일 00:10시간에 정산서 생성 Batch작업
 - 정산대상 :
    - SettlementItem의 status=READY이고 event_date_time(이벤트개최일)이 전전월 26일 ~ 전월 25일에 해당하는 것.
-- 이월 처리 *(설계 — 미구현, 별도 트랙)* :
-   - 동일 판매자의 Settlement.status=PENDING_MIN_AMOUNT 건을 조회
-   - SUM(settlementAmount)를 당월 정산서의 carriedInAmount로 저장
-   - 이월된 각 Settlement.carriedToSettlementId = 당월 정산서 ID로 설정
-- finalSettlementAmount(= settlementAmount + carriedInAmount) < 1만원이면 PENDING_MIN_AMOUNT, 이상이면 CONFIRMED *(설계 — 미구현)*
-
-> **현재 코드 동작 (`settlement/.../SettlementItemProcessor.java:34-50`, `SettlementStatus`)**
->
-> 1. `feeAmount = totalSalesAmount × 0.05` 계산 (`FEE_RATE` 상수, 향후 `feePolicy` 테이블 도입 예정)
-> 2. `finalAmount = totalSalesAmount − feeAmount − totalRefundAmount` 계산 (이월 미반영)
-> 3. **`finalAmount < 10000`** 이면 `null` 반환 → **Settlement row 자체가 생성되지 않음** — `PENDING_MIN_AMOUNT` 저장·이월 분기는 미구현
-> 4. 1만원 이상이면 `status = CONFIRMED` 로 저장 (이월 합산 로직 미적용 시점이라 `finalSettlementAmount = finalAmount` 상태로 들어감)
->
-> 즉, 위 §"정산서 생성"의 **이월 처리 / `PENDING_MIN_AMOUNT` 보류 흐름은 설계만 명시된 미구현 상태**이며, 현 시점에는 1만원 미달 row는 단순 skip 됩니다. 본 흐름이 구현되면 `finalSettlementAmount`가 `settlementAmount + carriedInAmount`로 갱신되고 `SettlementStatus.PENDING_MIN_AMOUNT` 가 실제 사용됩니다.
+- 이월 처리 (`SettlementInternalServiceImpl.processSellerSettlement` 활성 path):
+   - 동일 판매자의 `PENDING_MIN_AMOUNT` 정산서를 `resolveLatestPending`으로 조회
+   - 그 정산서의 `final_settlement_amount`를 당월 정산서의 `carried_in_amount`로 채택
+   - 이월된 정산서의 `carried_to_settlement_id` = 당월 정산서 ID로 설정
+   - 보조: `includeCarryOverSellers` 가 당월 SettlementItem이 없는 PENDING 판매자도 후보에 포함
+- `finalAmount = settlementAmount + carriedInAmount` 계산 후, **`finalAmount >= 1만원`**(`MIN_SETTLEMENT_AMOUNT` 상수) 이면 `CONFIRMED`, 미만이면 `PENDING_MIN_AMOUNT` 상태로 저장
 
 ## 정산서 취소 처리
 - 관리자페이지에서 월별 정산서목록보기, 정산서 세부내용 보기 지원
