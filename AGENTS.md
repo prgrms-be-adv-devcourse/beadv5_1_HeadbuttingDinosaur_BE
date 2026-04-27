@@ -26,7 +26,7 @@
 | Settlement | 8085 | Spring Boot | 정산 |
 | **Log** | **8086** | **Node.js + Fastify** | **행동 로그 수집 + 추천용 행동 조회** |
 | Admin | 8087 | Spring Boot | 운영 관리 |
-| AI | — | FastAPI (Python) | 임베딩, 추천 |
+| AI | 8088 | Spring Boot | 임베딩, 추천 (`ai/` 모듈 — Java/Spring. 게이트웨이 외부 라우팅 없음, 내부 호출 전용) |
 
 ---
 

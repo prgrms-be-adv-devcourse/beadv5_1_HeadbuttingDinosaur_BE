@@ -41,6 +41,7 @@ DOCS_DIR = REPO_ROOT / "docs"
 
 MODULES: list[str] = [
     "admin",
+    "ai",
     "apigateway",
     "commerce",
     "event",
