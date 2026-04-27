@@ -36,7 +36,7 @@ public class RefundSagaConsumer {
         containerFactory = "kafkaListenerContainerFactory"
     )
     public void consumeRefundRequested(ConsumerRecord<String, String> record, Acknowledgment ack) {
-        UUID messageId = extractMessageId(record);
+        String messageId = extractMessageId(record);
         if (deduplicationService.isDuplicate(messageId)) {
             ack.acknowledge();
             return;
@@ -57,7 +57,7 @@ public class RefundSagaConsumer {
         containerFactory = "kafkaListenerContainerFactory"
     )
     public void consumeOrderDone(ConsumerRecord<String, String> record, Acknowledgment ack) {
-        UUID messageId = extractMessageId(record);
+        String messageId = extractMessageId(record);
         if (deduplicationService.isDuplicate(messageId)) {
             ack.acknowledge();
             return;
@@ -78,7 +78,7 @@ public class RefundSagaConsumer {
         containerFactory = "kafkaListenerContainerFactory"
     )
     public void consumeOrderFailed(ConsumerRecord<String, String> record, Acknowledgment ack) {
-        UUID messageId = extractMessageId(record);
+        String messageId = extractMessageId(record);
         if (deduplicationService.isDuplicate(messageId)) {
             ack.acknowledge();
             return;
@@ -99,7 +99,7 @@ public class RefundSagaConsumer {
         containerFactory = "kafkaListenerContainerFactory"
     )
     public void consumeTicketDone(ConsumerRecord<String, String> record, Acknowledgment ack) {
-        UUID messageId = extractMessageId(record);
+        String messageId = extractMessageId(record);
         if (deduplicationService.isDuplicate(messageId)) {
             ack.acknowledge();
             return;
@@ -120,7 +120,7 @@ public class RefundSagaConsumer {
         containerFactory = "kafkaListenerContainerFactory"
     )
     public void consumeTicketFailed(ConsumerRecord<String, String> record, Acknowledgment ack) {
-        UUID messageId = extractMessageId(record);
+        String messageId = extractMessageId(record);
         if (deduplicationService.isDuplicate(messageId)) {
             ack.acknowledge();
             return;
@@ -141,7 +141,7 @@ public class RefundSagaConsumer {
         containerFactory = "kafkaListenerContainerFactory"
     )
     public void consumeStockDone(ConsumerRecord<String, String> record, Acknowledgment ack) {
-        UUID messageId = extractMessageId(record);
+        String messageId = extractMessageId(record);
         if (deduplicationService.isDuplicate(messageId)) {
             ack.acknowledge();
             return;
@@ -162,7 +162,7 @@ public class RefundSagaConsumer {
         containerFactory = "kafkaListenerContainerFactory"
     )
     public void consumeStockFailed(ConsumerRecord<String, String> record, Acknowledgment ack) {
-        UUID messageId = extractMessageId(record);
+        String messageId = extractMessageId(record);
         if (deduplicationService.isDuplicate(messageId)) {
             ack.acknowledge();
             return;
@@ -177,17 +177,17 @@ public class RefundSagaConsumer {
         }
     }
 
-    private UUID extractMessageId(ConsumerRecord<String, String> record) {
+    private String extractMessageId(ConsumerRecord<String, String> record) {
         Header header = record.headers().lastHeader("X-Message-Id");
         if (header != null) {
             try {
-                return UUID.fromString(new String(header.value(), StandardCharsets.UTF_8));
+                return UUID.fromString(new String(header.value(), StandardCharsets.UTF_8)).toString();
             } catch (IllegalArgumentException e) {
                 log.warn("[Saga.Consumer] X-Message-Id 파싱 실패 — topic={}, offset={}",
                     record.topic(), record.offset());
             }
         }
         String fallback = record.topic() + ":" + record.partition() + ":" + record.offset();
-        return UUID.nameUUIDFromBytes(fallback.getBytes(StandardCharsets.UTF_8));
+        return UUID.nameUUIDFromBytes(fallback.getBytes(StandardCharsets.UTF_8)).toString();
     }
 }
