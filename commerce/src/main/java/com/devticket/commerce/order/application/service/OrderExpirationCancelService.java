@@ -2,7 +2,7 @@ package com.devticket.commerce.order.application.service;
 
 import com.devticket.commerce.common.enums.OrderStatus;
 import com.devticket.commerce.common.messaging.KafkaTopics;
-import com.devticket.commerce.common.messaging.event.PaymentFailedEvent;
+import com.devticket.commerce.common.messaging.event.OrderCancelledEvent;
 import com.devticket.commerce.common.outbox.OutboxService;
 import com.devticket.commerce.order.domain.model.Order;
 import com.devticket.commerce.order.domain.model.OrderItem;
@@ -45,24 +45,21 @@ public class OrderExpirationCancelService {
             order.cancel();
             orderRepository.save(order);
 
-            // 재고 복구 트리거 — Event 모듈 PaymentFailedConsumer가 수신하여 DEDUCTED → RESTORED 전이
-            // 근거: docs/kafka-impl-plan.md §주문 만료 스케줄러, docs/kafka-idempotency-guide.md §10
             List<OrderItem> orderItems = orderItemRepository.findAllByOrderId(order.getId());
-            PaymentFailedEvent event = new PaymentFailedEvent(
-                    order.getOrderId(),
-                    order.getUserId(),
-                    orderItems.stream()
-                            .map(item -> new PaymentFailedEvent.OrderItem(item.getEventId(), item.getQuantity()))
-                            .toList(),
-                    "ORDER_TIMEOUT",
-                    Instant.now()
-            );
             outboxService.save(
                     order.getOrderId().toString(),
                     order.getOrderId().toString(),
-                    "PaymentFailed",
-                    KafkaTopics.PAYMENT_FAILED,
-                    event
+                    "OrderCancelled",
+                    KafkaTopics.ORDER_CANCELLED,
+                    new OrderCancelledEvent(
+                            order.getOrderId(),
+                            order.getUserId(),
+                            orderItems.stream()
+                                    .map(item -> new OrderCancelledEvent.OrderItem(item.getEventId(), item.getQuantity()))
+                                    .toList(),
+                            "ORDER_TIMEOUT",
+                            Instant.now()
+                    )
             );
 
             log.info("[OrderExpiration] 만료 처리 완료 — orderId={}, itemCount={}",

@@ -1,11 +1,11 @@
-name: CD - commerce (AWS k3s)
+name: CD - Commerce (AWS k3s)
 
 on:
   push:
     branches: ["devticket-commerce"]
     paths:
       - "commerce/**"
-      - ".github/workflows/ci-commerce.yml"
+      - ".github/workflows/cd-commerce-aws.yml"
 
   workflow_dispatch:
 
