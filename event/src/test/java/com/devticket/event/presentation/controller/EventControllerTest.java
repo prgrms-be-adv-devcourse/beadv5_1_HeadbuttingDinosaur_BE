@@ -47,7 +47,7 @@ class EventControllerTest {
     private MockMvc mockMvc;
 
     @Autowired
-    private ObjectMapper  objectMapper;
+    private ObjectMapper objectMapper;
 
     @MockitoBean
     private EventService eventService;
