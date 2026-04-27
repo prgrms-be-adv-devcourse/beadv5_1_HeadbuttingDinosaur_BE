@@ -16,6 +16,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.devticket.event.application.EventRecommendationService;
 import com.devticket.event.application.EventService;
+import com.devticket.event.common.config.JacksonConfig;
 import com.devticket.event.domain.enums.EventCategory;
 import com.devticket.event.domain.enums.EventStatus;
 import com.devticket.event.fixture.EventTestFixture;
@@ -42,7 +43,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-@WebMvcTest({EventController.class, SellerEventController.class})
+@WebMvcTest({EventController.class, SellerEventController.class, JacksonConfig.class})
 class EventControllerTest {
 
     @Autowired
