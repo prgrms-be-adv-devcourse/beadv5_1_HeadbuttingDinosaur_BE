@@ -167,15 +167,13 @@ Consumer 처리 흐름은 "조회 후 INSERT" 구조입니다.
 
 ### 3-5. messageId 생성 및 전달 방식
 
-Consumer의 dedup 키는 **Outbox가 생성한 `UUID.randomUUID()` 값** 입니다. wire 표현(Kafka `X-Message-Id` 헤더)과 DB 컬럼 표현은 모듈별로 다음과 같이 분기됩니다 — 컬럼 타입은 다르지만 값(UUID 문자열)은 동일하므로 cross-module dedup은 깨지지 않습니다.
+Consumer의 dedup 키는 **Outbox가 생성한 `UUID.randomUUID().toString()`** 입니다. **3모듈 통일: `String` / `VARCHAR(36)`** (PR #584 머지 완료 — 2026-04-27, Payment 측 컬럼·필드를 UUID → String 정렬 + 운영 ALTER 함께 실행).
 
 | 모듈 | `processed_message.message_id` 컬럼 / JPA 필드 |
 |------|------------------------------------------|
-| Commerce | `VARCHAR(36)` / `String` (`commerce/.../ProcessedMessage.java:35-36`) |
+| Commerce | `VARCHAR(36)` / `String` |
 | Event | `VARCHAR(36)` / `String` |
-| Payment | `UUID` (DB 네이티브 UUID) / `UUID` (`payment/.../ProcessedMessage.java:25-26`) — Consumer 측에서 `UUID.fromString()` 변환하여 사용 |
-
-> **TODO (별도 트랙):** Payment의 `ProcessedMessage` 컬럼·필드를 String/`VARCHAR(36)`로 통일하여 3모듈 동일 스키마로 정렬할지 결정 필요. 현재는 wire 호환됨 (`X-Message-Id` 헤더는 모든 모듈에서 UTF-8 문자열).
+| Payment | `VARCHAR(36)` / `String` |
 
 Producer(Outbox 스케줄러)가 Kafka 헤더에 UUID 문자열을 실어 보내고, Consumer가 이를 추출하여 사용합니다.
 
