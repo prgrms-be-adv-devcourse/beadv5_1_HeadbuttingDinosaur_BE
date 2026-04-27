@@ -7,7 +7,6 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
-import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -22,8 +21,8 @@ public class ProcessedMessage {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "message_id", nullable = false, unique = true)
-    private UUID messageId;
+    @Column(name = "message_id", nullable = false, unique = true, length = 36)
+    private String messageId;
 
     @Column(name = "topic", nullable = false, length = 128)
     private String topic;
@@ -31,7 +30,7 @@ public class ProcessedMessage {
     @Column(name = "processed_at", nullable = false, updatable = false)
     private LocalDateTime processedAt;
 
-    public static ProcessedMessage of(UUID messageId, String topic) {
+    public static ProcessedMessage of(String messageId, String topic) {
         ProcessedMessage pm = new ProcessedMessage();
         pm.messageId = messageId;
         pm.topic = topic;
