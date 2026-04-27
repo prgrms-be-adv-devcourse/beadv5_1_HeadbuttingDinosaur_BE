@@ -70,4 +70,5 @@ test {
 //            excludeTags 'elasticsearch'
 //        }
 //    }
+    useJUnitPlatform()
 }
