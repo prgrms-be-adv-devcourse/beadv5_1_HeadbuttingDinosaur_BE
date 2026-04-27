@@ -60,6 +60,23 @@
 - `deleteTechStack`: delete tech stack 기능을 제공.
 - `reindexEmptyEmbeddings`: reindex empty embeddings 기능을 제공.
 
+## ai / RecentVectorService
+
+- `recalculateRecentVector`: recalculate recent vector 기능을 제공.
+
+## ai / RecommendationService
+
+- `recommendByUserVector`: recommend by user vector 기능을 제공.
+- `recommendByColdStart`: recommend by cold start 기능을 제공.
+- `searchKnn`: search knn 기능을 제공.
+
+## ai / VectorService
+
+- `updatePreferenceVector`: update preference vector 기능을 제공.
+- `updateRefund`: update refund 기능을 제공.
+- `updateCartVector`: update cart vector 기능을 제공.
+- `updateNegativeVector`: update negative vector 기능을 제공.
+
 ## commerce / CartService
 
 - `findByUserId`: find by user id 기능을 제공.
@@ -83,7 +100,7 @@
 - `getOrderListForSettlement`: get order list for settlement 기능을 제공.
 - `failOrder`: fail order 기능을 제공.
 - `completeOrder`: complete order 기능을 제공.
-- `getSettelmentData`: get settelment data 기능을 제공.
+- `getSettlementData`: get settlement data 기능을 제공.
 - `cancelOrder`: cancel order 기능을 제공.
 - `processPaymentCompleted`: process payment completed 기능을 제공.
 - `processPaymentFailed`: process payment failed 기능을 제공.

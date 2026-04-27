@@ -23,6 +23,13 @@
 | PATCH | `/api/admin/users/{userId}/role` | `AdminUsersController#updateUserRole` | 회원 권한 변경 api |
 | PATCH | `/api/admin/users/{userId}/status` | `AdminUsersController#penalizeUser` | 회원 제재 api |
 
+## ai
+
+| HTTP | Path | Controller#Method | 설명 |
+|---|---|---|---|
+| POST | `/test/kafka` | `KafkaTestController#send` | send |
+| POST | `internal/ai/recommendation` | `RecommendationController#recommend` | recommend |
+
 ## apigateway
 
 | HTTP | Path | Controller#Method | 설명 |

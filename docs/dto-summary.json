@@ -290,7 +290,7 @@
   },
   {
     "module": "admin",
-    "name": "AdminSettelmentListResponse",
+    "name": "AdminSettlementListResponse",
     "kind": "record",
     "fieldCount": 5,
     "fields": [
@@ -315,7 +315,66 @@
         "type": "Integer"
       }
     ],
-    "source": "admin/src/main/java/com/devticket/admin/presentation/dto/res/AdminSettelmentListResponse.java"
+    "source": "admin/src/main/java/com/devticket/admin/presentation/dto/res/AdminSettlementListResponse.java"
+  },
+  {
+    "module": "admin",
+    "name": "AdminUserListResponse",
+    "kind": "record",
+    "fieldCount": 5,
+    "fields": [
+      {
+        "name": "content",
+        "type": "List<UserListItem>"
+      },
+      {
+        "name": "page",
+        "type": "int"
+      },
+      {
+        "name": "size",
+        "type": "int"
+      },
+      {
+        "name": "totalElements",
+        "type": "long"
+      },
+      {
+        "name": "totalPages",
+        "type": "int"
+      }
+    ],
+    "source": "admin/src/main/java/com/devticket/admin/presentation/dto/res/AdminUserListResponse.java"
+  },
+  {
+    "module": "admin",
+    "name": "CreateTechStackResponse",
+    "kind": "record",
+    "fieldCount": 2,
+    "fields": [
+      {
+        "name": "id",
+        "type": "Long"
+      },
+      {
+        "name": "name",
+        "type": "String"
+      }
+    ],
+    "source": "admin/src/main/java/com/devticket/admin/presentation/dto/res/CreateTechStackResponse.java"
+  },
+  {
+    "module": "admin",
+    "name": "DeleteTechStackResponse",
+    "kind": "record",
+    "fieldCount": 1,
+    "fields": [
+      {
+        "name": "id",
+        "type": "Long"
+      }
+    ],
+    "source": "admin/src/main/java/com/devticket/admin/presentation/dto/res/DeleteTechStackResponse.java"
   },
   {
     "module": "admin",

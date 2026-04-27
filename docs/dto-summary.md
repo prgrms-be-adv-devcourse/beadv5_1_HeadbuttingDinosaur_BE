@@ -60,8 +60,8 @@
 | `page` | `Integer` |
 | `size` | `Integer` |
 
-### AdminSettelmentListResponse (record)
-- source: `admin/src/main/java/com/devticket/admin/presentation/dto/res/AdminSettelmentListResponse.java`
+### AdminSettlementListResponse (record)
+- source: `admin/src/main/java/com/devticket/admin/presentation/dto/res/AdminSettlementListResponse.java`
 | 필드명 | 타입 |
 |---|---|
 | `content` | `List<SettlementResponse>` |

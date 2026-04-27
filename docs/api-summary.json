@@ -144,6 +144,24 @@
     "source": "admin/src/main/java/com/devticket/admin/presentation/controller/TechStackController.java"
   },
   {
+    "module": "ai",
+    "controller": "KafkaTestController",
+    "method": "send",
+    "httpMethod": "POST",
+    "path": "/test/kafka",
+    "summary": "send",
+    "source": "ai/src/main/java/org/example/ai/presentation/controller/KafkaTestController.java"
+  },
+  {
+    "module": "ai",
+    "controller": "RecommendationController",
+    "method": "recommend",
+    "httpMethod": "POST",
+    "path": "internal/ai/recommendation",
+    "summary": "recommend",
+    "source": "ai/src/main/java/org/example/ai/presentation/controller/RecommendationController.java"
+  },
+  {
     "module": "apigateway",
     "controller": "GatewayHealthController",
     "method": "health",
