@@ -3,6 +3,7 @@ package com.devticket.commerce.ticket.application.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
@@ -12,6 +13,7 @@ import com.devticket.commerce.common.messaging.KafkaTopics;
 import com.devticket.commerce.common.messaging.MessageDeduplicationService;
 import com.devticket.commerce.common.messaging.event.refund.RefundTicketCancelEvent;
 import com.devticket.commerce.common.messaging.event.refund.RefundTicketCompensateEvent;
+import com.devticket.commerce.common.messaging.event.refund.RefundTicketDoneEvent;
 import com.devticket.commerce.common.outbox.OutboxService;
 import com.devticket.commerce.order.domain.repository.OrderRepository;
 import com.devticket.commerce.ticket.domain.enums.TicketStatus;
@@ -98,7 +100,7 @@ class RefundTicketServiceTest {
     }
 
     @Test
-    void processTicketRefundCancel_다중_이벤트면_이벤트별로_done_분할_발행() {
+    void processTicketRefundCancel_다중_이벤트면_items로_묶어_done_1건_발행() {
         UUID messageId = UUID.randomUUID();
         UUID orderId = UUID.randomUUID();
         UUID eventA = UUID.randomUUID();
@@ -116,9 +118,12 @@ class RefundTicketServiceTest {
         refundTicketService.processTicketRefundCancel(
             messageId, KafkaTopics.REFUND_TICKET_CANCEL, toJson(event));
 
-        then(outboxService).should(Mockito.times(2)).save(
+        then(outboxService).should(Mockito.times(1)).save(
             anyString(), anyString(), eq("REFUND_TICKET_DONE"),
-            eq(KafkaTopics.REFUND_TICKET_DONE), any());
+            eq(KafkaTopics.REFUND_TICKET_DONE),
+            argThat(payload -> payload instanceof RefundTicketDoneEvent done
+                && done.items().size() == 2
+                && done.ticketIds().size() == 3));
     }
 
     @Test
