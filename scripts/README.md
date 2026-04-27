@@ -2,8 +2,8 @@
 
 ## gen-docs.py
 
-`docs/api-summary.*`, `docs/dto-summary.*`, `docs/service-status.*` 6개 파일을
-레포 소스(Controller / DTO / Service)로부터 자동 재생성합니다.
+`docs/api/api-summary.*`, `docs/dto/dto-summary.*`, `docs/service/service-status.*` 6개 파일을
+레포 소스(Controller / DTO / Service)로부터 자동 재생성합니다 (CLAUDE.md §2 문서 구조 기준).
 
 ### 사용법
 
@@ -23,8 +23,8 @@ Python 3.9+ 표준 라이브러리만 사용 (외부 패키지 없음).
 | DTO | `{module}/src/main/java/**/presentation/dto/**/*.java` | `public record` / `public class` 의 필드 (annotation 제거 후 `타입 이름` 쌍) |
 | Service | `{module}/src/main/java/**/application/service/*.java` | `public` 메서드 + `interface` 의 추상 메서드 |
 
-대상 모듈: `admin`, `apigateway`, `commerce`, `event`, `member`, `payment`, `settlement`
-(frontend 는 TS/React 라 범위 외)
+대상 모듈: `admin`, `ai`, `apigateway`, `commerce`, `event`, `member`, `payment`, `settlement`
+(frontend / fastify-log 는 TS/React 라 범위 외)
 
 ### 원본과의 차이
 

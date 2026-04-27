@@ -6,8 +6,8 @@
 - **작성일**: 2026-04-27
 - **연결 문서**:
   - [requirements-check.md](requirements-check.md) — 요구사항 검증 결과 (12 / 12 🟢, ⚠ 마커 4건)
-  - [kafka-design.md](kafka-design.md) — 이벤트 계약
-  - [kafka-idempotency-guide.md](kafka-idempotency-guide.md) — Consumer 멱등성 3중 방어선
+  - [kafka-design.md](kafka/kafka-design.md) — 이벤트 계약
+  - [kafka-idempotency-guide.md](kafka/kafka-idempotency-guide.md) — Consumer 멱등성 3중 방어선
   - [settlement-process.md](settlement-process.md) — 정산 / 환불 이월 로직
 
 ---
