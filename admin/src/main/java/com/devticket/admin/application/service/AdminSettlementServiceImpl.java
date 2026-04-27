@@ -7,7 +7,7 @@ import com.devticket.admin.domain.repository.AdminActionRepository;
 import com.devticket.admin.infrastructure.external.client.SettlementInternalClient;
 import com.devticket.admin.infrastructure.external.dto.res.InternalSettlementPageResponse;
 import com.devticket.admin.presentation.dto.req.AdminSettlementSearchRequest;
-import com.devticket.admin.presentation.dto.res.AdminSettelmentListResponse;
+import com.devticket.admin.presentation.dto.res.AdminSettlementListResponse;
 import com.devticket.admin.presentation.dto.res.SettlementResponse;
 import java.util.List;
 import java.util.UUID;
@@ -24,7 +24,7 @@ public class AdminSettlementServiceImpl implements AdminSettlementService {
     private final AdminActionRepository adminActionRepository;
 
     @Override
-    public AdminSettelmentListResponse getSettlementList(AdminSettlementSearchRequest condition) {
+    public AdminSettlementListResponse getSettlementList(AdminSettlementSearchRequest condition) {
         InternalSettlementPageResponse page = settlementInternalClient.getSettlements(condition);
         List<SettlementResponse> content = page.content().stream()
             .map(s -> new SettlementResponse(
@@ -32,7 +32,7 @@ public class AdminSettlementServiceImpl implements AdminSettlementService {
                 s.totalSalesAmount(), s.totalRefundAmount(), s.totalFeeAmount(),
                 s.finalSettlementAmount(), s.status(), s.settledAt()))
             .toList();
-        return new AdminSettelmentListResponse(content, page.page(), page.size(), page.totalElements(), page.totalPages());
+        return new AdminSettlementListResponse(content, page.page(), page.size(), page.totalElements(), page.totalPages());
     }
 
     @Transactional
