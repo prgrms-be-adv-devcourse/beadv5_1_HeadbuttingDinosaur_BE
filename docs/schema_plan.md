@@ -121,6 +121,13 @@ ALTER TABLE commerce.order
 -- 추후 스코프(환불) 사전 준비 — IF NOT EXISTS + DEFAULT 0
 ALTER TABLE commerce.ticket
     ADD COLUMN IF NOT EXISTS version BIGINT NOT NULL DEFAULT 0;
+
+-- ⑪ Payment: refund_ticket ticket_id UNIQUE 제약 추가
+-- 동일 ticketId 동시 환불 요청 race condition 방어
+-- 적용 전 중복 row 존재 여부 확인 필수:
+--   SELECT ticket_id, COUNT(*) FROM payment.refund_ticket GROUP BY ticket_id HAVING COUNT(*) > 1;
+ALTER TABLE payment.refund_ticket
+    ADD CONSTRAINT uk_refund_ticket_ticket_id UNIQUE (ticket_id);
 ```
 
 ---
