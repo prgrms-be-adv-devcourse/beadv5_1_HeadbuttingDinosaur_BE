@@ -7,6 +7,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -15,10 +16,15 @@ import lombok.NoArgsConstructor;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(name = "refund_ticket", schema = "payment", indexes = {
-    @Index(name = "idx_refund_ticket_refund_id", columnList = "refund_id"),
-    @Index(name = "idx_refund_ticket_ticket_id", columnList = "ticket_id")
-})
+@Table(name = "refund_ticket", schema = "payment",
+    indexes = {
+        @Index(name = "idx_refund_ticket_refund_id", columnList = "refund_id"),
+        @Index(name = "idx_refund_ticket_ticket_id", columnList = "ticket_id")
+    },
+    uniqueConstraints = {
+        @UniqueConstraint(name = "uk_refund_ticket_ticket_id", columnNames = "ticket_id")
+    }
+)
 public class RefundTicket {
 
     @Id

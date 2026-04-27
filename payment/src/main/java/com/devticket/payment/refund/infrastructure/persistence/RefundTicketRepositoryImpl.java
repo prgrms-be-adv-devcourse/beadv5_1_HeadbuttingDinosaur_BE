@@ -27,4 +27,9 @@ public class RefundTicketRepositoryImpl implements RefundTicketRepository {
     public List<RefundTicket> findByRefundId(UUID refundId) {
         return jpa.findByRefundId(refundId);
     }
+
+    @Override
+    public boolean existsByTicketId(UUID ticketId) {
+        return jpa.existsByTicketId(ticketId);
+    }
 }
