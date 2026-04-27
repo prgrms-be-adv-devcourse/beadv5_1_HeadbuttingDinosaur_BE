@@ -122,8 +122,10 @@ ALTER TABLE commerce.order
 ALTER TABLE commerce.ticket
     ADD COLUMN IF NOT EXISTS version BIGINT NOT NULL DEFAULT 0;
 
--- ⑪ Payment: refund_ticket ticket_id UNIQUE 제약 추가
--- 동일 ticketId 동시 환불 요청 race condition 방어
+-- ⑪ Payment: refund_ticket ticket_id UNIQUE 제약 추가 — ✅ PR #582 머지 (커밋 e88294c)
+-- 동일 ticketId 동시 환불 요청 race condition 방어 (RefundServiceImpl.refundPgTicket)
+-- 코드 측: @UniqueConstraint(name="uk_refund_ticket_ticket_id") 추가됨 (RefundTicket.java) +
+-- existsByTicketId 사전 체크 + DataIntegrityViolationException catch → REFUND_ALREADY_IN_PROGRESS
 -- 적용 전 중복 row 존재 여부 확인 필수:
 --   SELECT ticket_id, COUNT(*) FROM payment.refund_ticket GROUP BY ticket_id HAVING COUNT(*) > 1;
 ALTER TABLE payment.refund_ticket
