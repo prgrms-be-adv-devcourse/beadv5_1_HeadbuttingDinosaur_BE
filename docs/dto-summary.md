@@ -259,6 +259,36 @@
 |---|---|
 | `status` | `String` |
 
+## ai
+
+### ActionLogMessage (record)
+- source: `ai/src/main/java/org/example/ai/presentation/dto/req/ActionLogMessage.java`
+| 필드명 | 타입 |
+|---|---|
+| `userId` | `String` |
+| `eventId` | `String` |
+| `eventIds` | `List<String>` |
+| `actionType` | `String` |
+| `searchKeyword` | `String` |
+| `stackFilter` | `String` |
+| `dwellTimeSeconds` | `Integer` |
+| `quantity` | `Integer` |
+| `totalAmount` | `Long` |
+| `timestamp` | `String` |
+
+### RecommendationRequest (record)
+- source: `ai/src/main/java/org/example/ai/presentation/dto/req/RecommendationRequest.java`
+| 필드명 | 타입 |
+|---|---|
+| `userId` | `String` |
+
+### RecommendationResponse (record)
+- source: `ai/src/main/java/org/example/ai/presentation/dto/res/RecommendationResponse.java`
+| 필드명 | 타입 |
+|---|---|
+| `userId` | `String` |
+| `eventIdList` | `List<String>` |
+
 ## commerce
 
 ### CartClearResponse (record)

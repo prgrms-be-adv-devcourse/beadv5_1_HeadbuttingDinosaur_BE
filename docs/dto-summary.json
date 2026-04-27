@@ -378,65 +378,6 @@
   },
   {
     "module": "admin",
-    "name": "AdminUserListResponse",
-    "kind": "record",
-    "fieldCount": 5,
-    "fields": [
-      {
-        "name": "content",
-        "type": "List<UserListItem>"
-      },
-      {
-        "name": "page",
-        "type": "int"
-      },
-      {
-        "name": "size",
-        "type": "int"
-      },
-      {
-        "name": "totalElements",
-        "type": "long"
-      },
-      {
-        "name": "totalPages",
-        "type": "int"
-      }
-    ],
-    "source": "admin/src/main/java/com/devticket/admin/presentation/dto/res/AdminUserListResponse.java"
-  },
-  {
-    "module": "admin",
-    "name": "CreateTechStackResponse",
-    "kind": "record",
-    "fieldCount": 2,
-    "fields": [
-      {
-        "name": "id",
-        "type": "Long"
-      },
-      {
-        "name": "name",
-        "type": "String"
-      }
-    ],
-    "source": "admin/src/main/java/com/devticket/admin/presentation/dto/res/CreateTechStackResponse.java"
-  },
-  {
-    "module": "admin",
-    "name": "DeleteTechStackResponse",
-    "kind": "record",
-    "fieldCount": 1,
-    "fields": [
-      {
-        "name": "id",
-        "type": "Long"
-      }
-    ],
-    "source": "admin/src/main/java/com/devticket/admin/presentation/dto/res/DeleteTechStackResponse.java"
-  },
-  {
-    "module": "admin",
     "name": "EventCancelResponse",
     "kind": "record",
     "fieldCount": 6,
@@ -780,6 +721,85 @@
       }
     ],
     "source": "admin/src/main/java/com/devticket/admin/presentation/dto/res/UserListResponse.java"
+  },
+  {
+    "module": "ai",
+    "name": "ActionLogMessage",
+    "kind": "record",
+    "fieldCount": 10,
+    "fields": [
+      {
+        "name": "userId",
+        "type": "String"
+      },
+      {
+        "name": "eventId",
+        "type": "String"
+      },
+      {
+        "name": "eventIds",
+        "type": "List<String>"
+      },
+      {
+        "name": "actionType",
+        "type": "String"
+      },
+      {
+        "name": "searchKeyword",
+        "type": "String"
+      },
+      {
+        "name": "stackFilter",
+        "type": "String"
+      },
+      {
+        "name": "dwellTimeSeconds",
+        "type": "Integer"
+      },
+      {
+        "name": "quantity",
+        "type": "Integer"
+      },
+      {
+        "name": "totalAmount",
+        "type": "Long"
+      },
+      {
+        "name": "timestamp",
+        "type": "String"
+      }
+    ],
+    "source": "ai/src/main/java/org/example/ai/presentation/dto/req/ActionLogMessage.java"
+  },
+  {
+    "module": "ai",
+    "name": "RecommendationRequest",
+    "kind": "record",
+    "fieldCount": 1,
+    "fields": [
+      {
+        "name": "userId",
+        "type": "String"
+      }
+    ],
+    "source": "ai/src/main/java/org/example/ai/presentation/dto/req/RecommendationRequest.java"
+  },
+  {
+    "module": "ai",
+    "name": "RecommendationResponse",
+    "kind": "record",
+    "fieldCount": 2,
+    "fields": [
+      {
+        "name": "userId",
+        "type": "String"
+      },
+      {
+        "name": "eventIdList",
+        "type": "List<String>"
+      }
+    ],
+    "source": "ai/src/main/java/org/example/ai/presentation/dto/res/RecommendationResponse.java"
   },
   {
     "module": "commerce",
