@@ -14,10 +14,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.devticket.event.application.EventRecommendationService;
 import com.devticket.event.application.EventService;
+import com.devticket.event.common.config.JacksonConfig;
 import com.devticket.event.domain.enums.EventCategory;
 import com.devticket.event.domain.enums.EventStatus;
 import com.devticket.event.fixture.EventTestFixture;
+import com.devticket.event.infrastructure.client.AiClient;
 import com.devticket.event.presentation.dto.EventDetailResponse;
 import com.devticket.event.presentation.dto.EventListRequest;
 import com.devticket.event.presentation.dto.EventListResponse;
@@ -38,19 +41,25 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
-@WebMvcTest({EventController.class, SellerEventController.class})
+@WebMvcTest({EventController.class, SellerEventController.class, JacksonConfig.class})
 class EventControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
 
     @Autowired
-    private JsonMapper objectMapper;
+    private ObjectMapper objectMapper;
 
     @MockitoBean
     private EventService eventService;
+
+    @MockitoBean
+    private EventRecommendationService eventRecommendationService;
+
+    @MockitoBean
+    private AiClient aiClient;
 
     // 이벤트 생성 테스트
 
