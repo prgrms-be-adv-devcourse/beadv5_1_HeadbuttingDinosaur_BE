@@ -19,6 +19,7 @@ import com.devticket.event.application.EventService;
 import com.devticket.event.domain.enums.EventCategory;
 import com.devticket.event.domain.enums.EventStatus;
 import com.devticket.event.fixture.EventTestFixture;
+import com.devticket.event.infrastructure.client.AiClient;
 import com.devticket.event.presentation.dto.EventDetailResponse;
 import com.devticket.event.presentation.dto.EventListRequest;
 import com.devticket.event.presentation.dto.EventListResponse;
@@ -55,6 +56,9 @@ class EventControllerTest {
 
     @MockitoBean
     private EventRecommendationService eventRecommendationService;
+
+    @MockitoBean
+    private AiClient aiClient;
 
     // 이벤트 생성 테스트
 
