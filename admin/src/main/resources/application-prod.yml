@@ -23,7 +23,7 @@ jwt:
   refresh-token-ttl: 604800000
 
 elasticsearch:
-  uris: http://localhost:9200
+  uris: http://elasticsearch:9200
   connection-timeout: 5s
   socket-timeout: 30s
 
