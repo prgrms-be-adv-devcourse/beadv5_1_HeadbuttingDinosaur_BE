@@ -114,7 +114,7 @@
 > | 4-1 | `POST /api/orders` | ⚠️ **부분 구현** | `userId + cartHash` 기반 비즈니스 가드는 적용됨 (`Order.cart_hash` 컬럼 + UNIQUE 인덱스 — `schema_plan.md` 참조). HTTP `Idempotency-Key` 헤더 처리 미구현 — `OrderController.createOrderByCart`는 `X-User-Id`만 수신 |
 > | 4-2 | `POST /api/payments/ready` | ❌ **미구현** | `PaymentController.readyPayment(L44)`는 `X-User-Id`만 수신, `Idempotency-Key` 미처리 |
 > | 4-3 | `POST /api/payments/confirm` | ❌ **미구현** | `PaymentController.confirm(L73)` 동일 — `@Version` 낙관적 락은 일부 적용되었으나 클라이언트 키 처리 부재 |
-> | 4-4 | `POST /api/refunds/...` | ❌ **미구현** | `RefundController` 모든 PostMapping (`/pg/{ticketId}`, `/orders/{orderId}` 등)이 `X-User-Id`만 수신 |
+> | 4-4 | `POST /api/refunds/...` | ✅ **dedup 가드 구현 완료** (PR #582 / 커밋 `e88294c`) | `refundPgTicket` 에 ticket 단위 동시성 가드 적용: `RefundTicket.ticket_id` UNIQUE 제약(`uk_refund_ticket_ticket_id`) + `existsByTicketId` 사전 체크 + `DataIntegrityViolationException` catch → `REFUND_ALREADY_IN_PROGRESS`(409). 운영 DB ⑪번 ALTER 함께 실행. HTTP `Idempotency-Key` 헤더 자체는 미수신 (비즈니스 가드로 멱등 보장) |
 > | 4-5 | `POST /api/wallet/charge` | ✅ **구현 완료 (시작 단계)** | `WalletController.charge(L42-45)`가 `@RequestHeader("Idempotency-Key")` 수신. 단 `/charge/confirm`(L72), `/withdraw`(L109)는 미구현 |
 >
 > 본 §4 의 각 절은 **목표 설계** 를 기술합니다. 위 표에서 ✅ 완료 표시 외 항목은 "구현 시 따를 지침"으로 읽어 주세요. 본격 적용은 별도 트랙으로 진행 예정.
@@ -363,6 +363,11 @@ Orders 테이블에 cart_hash 컬럼 추가 필요
 ---
 
 ### 4-4. 환불 요청 (POST /api/refunds)
+
+> **현행 구현 — `refundPgTicket` 동시성 dedup 가드 적용** (PR #582 / 커밋 `e88294c`, 2026-04-27)
+> `RefundServiceImpl.refundPgTicket` 진입 시 `existsByTicketId(ticketId)` 사전 체크 → 진행 중이면 `REFUND_ALREADY_IN_PROGRESS`(409). 사전 체크 통과 후에도 동시 INSERT race 시에는 `RefundTicket.ticket_id` **UNIQUE 제약(`uk_refund_ticket_ticket_id`)** 으로 DB 레벨 차단, `DataIntegrityViolationException` catch 하여 동일 에러 변환. 운영 DB ⑪번 ALTER 함께 실행.
+>
+> 정책: **한 ticket 환불 1회만 허용**. 부분/재환불 정책 도입 시 본 UNIQUE 제약과 가드를 재검토 (현재 정책은 ticket UNIQUE).
 
 환불은 **진행 중 환불이 이미 있는지**를 기준으로 멱등 처리한다.
 
