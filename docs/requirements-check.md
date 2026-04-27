@@ -4,7 +4,7 @@
 
 - **검증일**: 2026-04-27
 - **검증 방법**: 모듈별 controller / service / repository / 매니페스트 직접 확인 (placeholder 인용 금지)
-- **참고 문서**: [api-overview.md](api-overview.md), [kafka-design.md](kafka-design.md), [kafka-sync-async-policy.md](kafka-sync-async-policy.md), [settlement-process.md](settlement-process.md)
+- **참고 문서**: [api-overview.md](api/api-overview.md), [kafka-design.md](kafka/kafka-design.md), [kafka-sync-async-policy.md](kafka/kafka-sync-async-policy.md), [settlement-process.md](settlement-process.md)
 
 ## 0. 표기 의미
 

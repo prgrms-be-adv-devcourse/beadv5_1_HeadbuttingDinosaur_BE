@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """
-docs/api-summary.*, docs/dto-summary.*, docs/service-status.* 자동 재생성 스크립트.
+docs/api/api-summary.*, docs/dto/dto-summary.*, docs/service/service-status.* 자동 재생성 스크립트.
+
+CLAUDE.md §2 문서 구조 기준 — `api/`, `dto/`, `service/` 하위 폴더에 출력.
 
 원 저자: HyWChoi (PR #323, Codex task — ephemeral)
 본 스크립트는 PR #323의 출력 포맷을 재현하여 커밋 가능한 형태로 복원한 재작성본입니다.
@@ -660,13 +662,14 @@ def gather() -> tuple[list[ApiEntry], list[DtoEntry], list[ServiceEntry]]:
     return apis, dtos, services
 
 
+# CLAUDE.md §2 문서 구조 — api/dto/service 하위 폴더 배치
 OUTPUTS = [
-    ("api-summary.md", render_api_md, "apis"),
-    ("api-summary.json", render_api_json, "apis"),
-    ("dto-summary.md", render_dto_md, "dtos"),
-    ("dto-summary.json", render_dto_json, "dtos"),
-    ("service-status.md", render_service_md, "services"),
-    ("service-status.json", render_service_json, "services"),
+    ("api/api-summary.md", render_api_md, "apis"),
+    ("api/api-summary.json", render_api_json, "apis"),
+    ("dto/dto-summary.md", render_dto_md, "dtos"),
+    ("dto/dto-summary.json", render_dto_json, "dtos"),
+    ("service/service-status.md", render_service_md, "services"),
+    ("service/service-status.json", render_service_json, "services"),
 ]
 
 
