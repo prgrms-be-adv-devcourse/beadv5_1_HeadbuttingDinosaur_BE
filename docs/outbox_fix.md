@@ -470,8 +470,8 @@ config.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, 500);
 ### 5-C. `messageId` 타입 전환 영향 — Payment **완료** (B4-2)
 
 - [x] 엔티티 필드 / Kafka 헤더 / 호출부 전부 `String` 일관 — 코드 검증 완료
-- [ ] **운영 DB 컬럼 UUID→VARCHAR(36) 마이그레이션** — 별건 이슈로 분리 (PostgreSQL `USING message_id::text` 명시 필요)
-- [ ] `processed_message.message_id` 타입 정합 확인 — Consumer 스코프 (별건)
+- [ ] **운영 DB 컬럼 UUID→VARCHAR(36) 마이그레이션 — outbox 측** — `schema_plan.md` ⑦번 SQL, 운영 DB 적용 별도 확인 (PostgreSQL `USING message_id::text` 명시 필요)
+- [x] **`processed_message.message_id` 타입 정합** — ✅ PR #584 머지 (2026-04-27): Consumer 측 엔티티 필드 `UUID → String` + 운영 DB ⑧번 ALTER 함께 실행. 3모듈 통일 완료
 
 ### 5-D. 재시도 정책 전환 영향 — Payment **완료** (B1)
 
