@@ -7,6 +7,7 @@ import com.devticket.event.domain.model.Event;
 import com.devticket.event.infrastructure.persistence.EventRepository;
 import com.devticket.event.infrastructure.search.EventDocument;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -105,21 +106,36 @@ public class ElasticsearchIndexInitializer {
 
     @SuppressWarnings("unchecked")
     private Set<String> getAllEsDocumentIds() {
-        try {
-            var response = esClient.search(s -> s
-                    .index("event")
-                    .size(1000)
-                    .source(src -> src.fetch(false))
-                    .query(q -> q.matchAll(m -> m)),
-                java.util.Map.class);
+        Set<String> ids = new HashSet<>();
+        int from = 0;
+        final int pageSize = 1000;
 
-            return response.hits().hits().stream()
-                .map(hit -> hit.id())
-                .collect(Collectors.toSet());
+        try {
+            while (true) {
+                final int currentFrom = from;
+                var response = esClient.search(s -> s
+                        .index("event")
+                        .from(currentFrom)
+                        .size(pageSize)
+                        .source(src -> src.fetch(false))
+                        .query(q -> q.matchAll(m -> m)),
+                    java.util.Map.class);
+
+                var hits = response.hits().hits();
+                if (hits.isEmpty()) {
+                    break;
+                }
+                hits.forEach(hit -> ids.add(hit.id()));
+                if (hits.size() < pageSize) {
+                    break;
+                }
+                from += pageSize;
+            }
         } catch (Exception e) {
             log.warn("[ES] 전체 ID 조회 실패 - 동기화 스킵", e);
             return Set.of();
         }
+        return ids;
     }
 
     private void reindexAllEvents() {
