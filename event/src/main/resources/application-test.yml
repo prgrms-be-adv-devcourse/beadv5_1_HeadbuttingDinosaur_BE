@@ -27,9 +27,10 @@ spring:
 
   openai:
     embedding:
-      enabled: false
-      api-key: test-key
+      enabled: true
+      api-key: ${OPENAI_API_KEY:}
       model: text-embedding-3-small
+      url: https://api.openai.com/v1/embeddings
 
   kafka:
     bootstrap-servers: localhost:9093
