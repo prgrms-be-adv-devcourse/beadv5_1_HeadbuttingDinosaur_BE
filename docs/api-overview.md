@@ -17,7 +17,7 @@
 | Ticket | GET | `/api/tickets` | `getTicketList` | `TicketListRequest`(query) | `TicketListResponse` | 내 티켓 목록 조회 |
 | Ticket | GET | `/api/tickets/{ticketId}` | `getTicketDetail` | - | `TicketDetailResponse` | 티켓 상세 조회 |
 | Ticket | POST | `/api/tickets` | `createTickets` | `TicketRequest` | `TicketResponse` | 티켓 발급(내부성격 API) |
-| Seller Ticket | GET | `/seller/events/{eventId}/participants` | `getParticipantList` | `SellerEventParticipantListRequest`(query) | `SellerEventParticipantListResponse` | 이벤트 참여자 목록 조회 |
+| Seller Ticket | GET | `/api/seller/events/{eventId}/participants` | `getParticipantList` | `SellerEventParticipantListRequest`(query) | `SellerEventParticipantListResponse` | 이벤트 참여자 목록 조회 |
 
 ## 2) Internal API
 
@@ -29,6 +29,9 @@
 | Order Internal | POST | `/internal/orders/{orderId}/payment-completed` | `completeOrder` | `Void` | 결제 성공 처리 + 티켓 발급 |
 | Order Internal | PATCH | `/internal/orders/{orderId}/payment-failed` | `failOrder` | `Void` | 결제 실패 처리 |
 | Order Internal | GET | `/internal/order-items/by-ticket/{ticketId}` | `getOrderItemByTicketId` | `InternalOrderItemResponse` | 티켓 기준 주문항목 조회 |
-| Order Internal | PATCH | `/internal/tickets/{ticketId}/refund-completed` | `completeRefund` | `Void` | 환불 완료 처리 |
+| Order Internal | GET | `/internal/orders/{orderId}/tickets` | `getOrderTickets` | `InternalOrderTicketsResponse` | 주문에 속한 티켓 목록 조회 |
+| Ticket Internal | POST | `/internal/tickets/settlement-data` | `getSettlementData` (`InternalTicketController`) | `InternalTicketSettlementDataResponse` | 티켓 정산 데이터 일괄 조회 |
 
-> 참고: `/internal/orders/by-event/{eventId}`는 주석 처리되어 현재 미구현 상태입니다.
+> 참고:
+> - `/internal/orders/by-event/{eventId}`는 주석 처리되어 현재 미구현 상태입니다.
+> - 환불 완료 처리(`completeRefund`)는 HTTP 엔드포인트가 아닌 **Refund Saga의 Kafka 이벤트 처리(`RefundOrderService.completeRefund`, `commerce/.../RefundOrderService.java:170`)** 로 이행되어 Internal API에서 제거되었습니다.

@@ -706,7 +706,7 @@ LIMIT 5000;
 |---|---|---|
 | 2026-04-24 | §5 신설 — AI 조회 엔드포인트 계약 명문화 | PO 컨펌 대기 |
 | 2026-04-24 | AI팀 교차검증 완료 — `LogServiceClient` 스펙 / `ActionLogEntry.eventId` 암묵 nullable / 스케줄러 cron / fallback(`getOrEmpty`) 확인 | ✅ |
-| 2026-04-24 | 포트 방향 결정 — Log 8086 유지 vs 8085 전환 (AI 3개 yml 하드코딩 상태) | 결정 대기 |
+| 2026-04-24 | 포트 방향 결정 — Log 8086 유지 (gateway `application.yml:57` `log-service` 라우팅이 8086, fastify-log `env.ts:35` PORT 기본값 8086 — 코드·라우팅 일치) | ✅ 확정 |
 | — | AI 측 `ActionLogResponse`에 `@JsonIgnoreProperties(ignoreUnknown=true)` 선행 추가 권장 — 응답 필드 향후 확장 시 역직렬화 안정성 확보 | AI팀 작업 (별개 PR) |
 | — | AI 측 `eventId null skip` 방어 로직 추가 권장 — 서버 필터와 이중 방어 | AI팀 작업 (별개 PR) |
 
