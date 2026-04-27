@@ -7,4 +7,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface RefundTicketJpaRepository extends JpaRepository<RefundTicket, Long> {
     List<RefundTicket> findByRefundId(UUID refundId);
+    boolean existsByTicketId(UUID ticketId);
 }

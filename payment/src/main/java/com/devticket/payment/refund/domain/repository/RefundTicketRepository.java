@@ -8,4 +8,5 @@ public interface RefundTicketRepository {
     RefundTicket save(RefundTicket refundTicket);
     List<RefundTicket> saveAll(List<RefundTicket> refundTickets);
     List<RefundTicket> findByRefundId(UUID refundId);
+    boolean existsByTicketId(UUID ticketId);
 }
