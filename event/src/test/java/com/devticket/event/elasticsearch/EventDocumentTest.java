@@ -40,6 +40,8 @@ class EventDocumentTest {
 
         // then
         assertThat(doc.getId()).isEqualTo(eventId.toString());
+        // AI 추천 서비스 계약 (PR #540) — EventInternalService 재색인 경로에서도 body 에 eventId 포함되어야 함
+        assertThat(doc.getEventId()).isEqualTo(eventId.toString());
         assertThat(doc.getTitle()).isEqualTo("스프링 부트 밋업");
         assertThat(doc.getCategory()).isEqualTo(EventCategory.MEETUP.name());
         assertThat(doc.getStatus()).isEqualTo(EventStatus.ON_SALE.name());

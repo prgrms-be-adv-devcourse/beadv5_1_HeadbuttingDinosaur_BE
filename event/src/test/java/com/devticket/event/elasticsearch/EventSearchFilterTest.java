@@ -251,6 +251,7 @@ class EventSearchFilterTest extends ElasticsearchIntegrationTestBase {
 
         Map<String, Object> doc = new HashMap<>();
         doc.put("id", embeddedId);
+        doc.put("eventId", embeddedId);
         doc.put("title", "벡터 검색 이벤트");
         doc.put("category", "MEETUP");
         doc.put("status", "ON_SALE");

@@ -21,6 +21,13 @@ public class EventDocument {
     @Id
     private String id;
 
+    /**
+     * AI 추천 서비스는 _source.eventId 로 필드를 추출 (PR #540 계약).
+     * ES _id 는 hit._source 에 포함되지 않으므로 body 에 명시 저장.
+     */
+    @Field(type = FieldType.Keyword)
+    private String eventId;
+
     @Field(type = FieldType.Text)
     private String title;
 
@@ -47,9 +54,10 @@ public class EventDocument {
     private LocalDateTime indexedAt;
 
     @Builder
-    private EventDocument(String id, String title, String category, List<String> techStacks,
+    private EventDocument(String id, String eventId, String title, String category, List<String> techStacks,
         String status, String sellerId, LocalDateTime indexedAt) {
         this.id = id;
+        this.eventId = eventId;
         this.title = title;
         this.category = category;
         this.techStacks = techStacks;
@@ -65,6 +73,7 @@ public class EventDocument {
 
         return EventDocument.builder()
             .id(event.getEventId().toString())
+            .eventId(event.getEventId().toString())
             .title(event.getTitle())
             .category(event.getCategory().name())
             .techStacks(techStackNames)
