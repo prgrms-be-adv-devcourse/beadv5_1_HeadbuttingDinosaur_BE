@@ -33,8 +33,8 @@ public interface EventRepository extends JpaRepository<Event, Long> {
         Pageable pageable
     );
 
-    @Query("SELECT e.eventId FROM Event e")
-    List<UUID> findAllEventIds();
+    @Query("SELECT e.eventId FROM Event e WHERE e.status IN :statuses")
+    List<UUID> findAllEventIdsByStatusIn(@Param("statuses") List<EventStatus> statuses);
 
     // 외부 API
     List<Event> findAllByEventIdIn(List<UUID> eventIds);
