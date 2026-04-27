@@ -407,9 +407,9 @@ public class ActionLogKafkaPublisher {
 
 **작업 순서 팁**: VIEW → DETAIL_VIEW → DWELL_TIME (트래픽 큰 순)
 
-**DWELL_TIME 전용 신규 API 엔드포인트 구현 필수**
+**DWELL_TIME 전용 신규 API 엔드포인트 — ✅ 구현 완료**
 
-> Event 모듈에 현재 DWELL_TIME 수집용 엔드포인트 **부재 확인됨** (grep `dwell` / `DWELL` 0건). action.log Producer 단일 PR 범위에 **함께 포함 구현**.
+> 구현 완료 — `event/.../presentation/controller/DwellController.java` (`POST /api/events/{eventId}/dwell`) + `event/.../presentation/dto/DwellRequest.java` (record + `@NotNull @Positive`). Controller 가 `ApplicationEventPublisher.publishEvent(ActionLogDomainEvent)` 만 호출, 비로그인 시 skip + `204 No Content` 반환.
 >
 > **AI팀 수집 필요성 컨펌 완료 (2026-04-21)** — DWELL_TIME은 단순 조회(`VIEW`/`DETAIL_VIEW`)로 측정 불가능한 관심도·이탈 예측·전환 가능성 추정의 핵심 신호. 구현 확정.
 
