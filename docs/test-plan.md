@@ -15,7 +15,7 @@
 ## 0. 우선순위 표기
 
 - **P0** — ★ 핵심 플로우 + 현재 테스트 0건 (`⚠ 마커`로 명시). 발표 전 1개라도 필수.
-- **P1** — ★ 핵심 플로우 + 매출/정합성 직격 위험. 가능하면 1개씩 추가.
+- **P1** — ★ 핵심 플로우 + 매출/정합성 직격 위험 또는 핵심 셀링 포인트. 가능하면 1개씩 추가.
 - **P2** — 계약·분기 (무성 실패 방어). 시간 남으면.
 
 ---
@@ -35,14 +35,26 @@
 
 ## 2. P1 — 가능하면 추가
 
-### #2. 재고 차감 후 Order 저장 실패 → 보상 ★
+### #2. AI 일반 추천 정상 동작 ★
+
+- **모듈**: `ai`
+- **타깃**: `RecommendationService.recommendByUserVector()` 라인 48-89
+- **시나리오**:
+  1. UserVector 4종(preference / cart / recent / negative)이 충분히 채워진 사용자 fixture (`logWeightSum >= 20`)
+  2. `recommendByUserVector(request)` 호출
+  3. 응답 검증: 정확히 5개 eventId 반환 + cosine 점수 내림차순 정렬
+  4. 가중합(0.5 / 0.3 / 0.2) → 정규화 → kNN 30개 → cosine 재정렬(0.45 / 0.25 / 0.25 / -0.15) → top 5 흐름 통과
+- **이유**: 요구사항 #9 "사용자 맞춤 AI 추천"의 직접 입증. 분기 테스트(P2 #7)는 우회 검증이라, 발표에서 "AI 추천이 동작한다"를 주장하려면 happy path 자동 테스트가 핵심.
+- **소요**: 30분 ~ 1시간
+
+### #3. 재고 차감 후 Order 저장 실패 → 보상 ★
 
 - **모듈**: `commerce`
 - **타깃**: `OrderService.java:651-657` `compensateStock()`
 - **시나리오**: 재고 차감 성공 → DB 장애 등으로 Order 저장 실패 → `compensateStock()` 호출되어 재고 복원
 - **이유**: TX1(검증) — HTTP 차감 — TX2(저장) 사이 분산 트랜잭션 누수 가능 지점. ★ #11과 함께 결제 성공 후 가장 위험한 구간.
 
-### #3. 환불 멱등성 (`refund.completed` 중복 처리) ★
+### #4. 환불 멱등성 (`refund.completed` 중복 처리) ★
 
 - **모듈**: `payment`
 - **타깃**: `WalletEventConsumer.consumeEventCancelled` (kafka-design.md 라인 698 참조)
@@ -50,7 +62,7 @@
 - **검증**: kafka-idempotency-guide.md의 3중 방어선(Inbox + DB unique + state guard)이 실제 동작
 - **이유**: 환불은 매출 직격, 중복 처리 시 예치금 부풀리기 가능
 
-### #4. 정산 환불 이월 체인 ★
+### #5. 정산 환불 이월 체인 ★
 
 - **모듈**: `settlement`
 - **타깃**: `SettlementInternalServiceImpl.processSellerSettlement()` 라인 307-352
@@ -60,7 +72,7 @@
   3. 지급 시 원본 + 이월 정산서 양쪽 모두 PAID 상태 전환
 - **이유**: settlement-process.md 핵심 로직, 환불 → 정산 정합성 직접 영향
 
-### #5. `payment.failed` Consumer 멱등성
+### #6. `payment.failed` Consumer 멱등성
 
 - **모듈**: `event`
 - **타깃**: `StockRestoreService.java`
@@ -71,16 +83,16 @@
 
 ## 3. P2 — 시간 남으면
 
-### #6. AI 콜드스타트 분기 + searchKnn 폴백
+### #7. AI 콜드스타트 분기 + searchKnn 폴백
 
 - **모듈**: `ai`
 - **타깃**: `RecommendationService.java:48-89` (일반) / `:94-155` (콜드스타트)
 - **시나리오**:
   - `logWeightSum < 20` → 콜드스타트 진입
   - kNN 결과 5개 미만 → 인기 이벤트 보충 폴백
-- **이유**: 분기 검증, 단위 테스트로 충분
+- **이유**: 분기 검증, 단위 테스트로 충분. P1 #2(happy path)와 묶으면 AI 추천 전 시나리오 커버
 
-### #7. ES `EventDocument` ↔ AI kNN 계약
+### #8. ES `EventDocument` ↔ AI kNN 계약
 
 - **모듈**: 통합 (event ↔ ai)
 - **타깃**:
@@ -89,7 +101,7 @@
 - **시나리오**: event가 색인 → ai가 `eventId` 추출 + status=ON_SALE 필터 동작
 - **이유**: 필드명 변경 시 무성 실패 가장 위험한 지점 (Kafka 외 ES도 모듈 간 공유 채널)
 
-### #8. JWT 발급-검증 왕복
+### #9. JWT 발급-검증 왕복
 
 - **모듈**: `member` + `apigateway`
 - **타깃**: `JwtTokenProvider` (발급) + `JwtAuthenticationFilter.java:1-149` (검증)
@@ -98,7 +110,7 @@
   - 만료 토큰 → 401
   - 변조 토큰 → 401
 
-### #9. `event.force-cancelled` 발행 시 ES 상태 동기화
+### #10. `event.force-cancelled` 발행 시 ES 상태 동기화
 
 - **모듈**: `event`
 - **타깃**: `EventService.forceCancel()` + `syncToElasticsearch()` (라인 402-445)
@@ -110,13 +122,13 @@
 
 | 모듈 | P0 | P1 | P2 |
 |---|---|---|---|
-| event | #1 | #5 | #9 |
-| commerce | - | #2 | - |
-| payment | - | #3 | - |
-| settlement | - | #4 | - |
-| ai | - | - | #6 |
-| event ↔ ai | - | - | #7 |
-| member + apigateway | - | - | #8 |
+| event | #1 | #6 | #10 |
+| ai | - | #2 | #7 |
+| commerce | - | #3 | - |
+| payment | - | #4 | - |
+| settlement | - | #5 | - |
+| event ↔ ai | - | - | #8 |
+| member + apigateway | - | - | #9 |
 
 ---
 
@@ -127,14 +139,15 @@
 - 발표 효과: "★ #11 동시성 보장 → 테스트로 입증" 명시 가능
 - requirements-check.md `⚠3` 마커 해소
 
-### B. 3~4시간 (균형)
-- P0 #1 + P1 #3 + P1 #4
-- 발표 효과: 매출 직격 3축(재고 / 환불 / 정산) 모두 자동 검증
-- 발표 시 "핵심 플로우 = 상품선택 → 결제완료 → 환불완료 → 정산완료 → 모두 테스트로 보장" 메시지 강화
+### B. 4~5시간 (균형, 발표 핵심 메시지 커버)
+- P0 #1 + P1 #2 (AI) + P1 #4 (환불) + P1 #5 (정산)
+- 발표 효과:
+  - 재고 동시성(★ #11) + AI 추천(★ #9) + 환불 멱등성 + 정산 이월(★ #7)
+  - 핵심 플로우 + 핵심 셀링 포인트(AI) 모두 자동 검증
 
 ### C. 1일 (이상적)
-- B + P1 #2 + P1 #5
-- 발표 효과: 핵심 플로우 전 구간 + 보상 트랜잭션 + Consumer 멱등성 모두 자동 검증
+- B + P1 #3 (보상) + P1 #6 (Consumer 멱등성)
+- 발표 효과: 핵심 플로우 전 구간 + 보상 트랜잭션 + Consumer 멱등성까지 모두 커버
 
 ---
 
