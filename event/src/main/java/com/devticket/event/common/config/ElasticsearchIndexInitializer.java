@@ -1,11 +1,16 @@
 package com.devticket.event.common.config;
 
+import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import com.devticket.event.application.EventService;
 import com.devticket.event.domain.model.Event;
 import com.devticket.event.infrastructure.persistence.EventRepository;
 import com.devticket.event.infrastructure.search.EventDocument;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -21,6 +26,7 @@ import org.springframework.stereotype.Component;
 public class ElasticsearchIndexInitializer {
 
     private final ElasticsearchOperations elasticsearchOperations;
+    private final ElasticsearchClient esClient;
     private final EventRepository eventRepository;
     private final EventService eventService;
 
@@ -34,16 +40,7 @@ public class ElasticsearchIndexInitializer {
                 log.info("[ES Index] 'event' 인덱스 생성 완료");
                 reindexAllEvents();
             } else {
-                long count = elasticsearchOperations.count(
-                    org.springframework.data.elasticsearch.client.elc.NativeQuery.builder().build(),
-                    EventDocument.class
-                );
-                if (count == 0) {
-                    log.info("[ES Index] 인덱스는 있지만 비어있음 → 재색인 시작");
-                    reindexAllEvents();
-                } else {
-                    log.info("[ES Index] 기존 'event' 인덱스 유지 ({}건)", count);
-                }
+                syncMissingEvents();
             }
 
         } catch (Exception e) {
@@ -52,21 +49,70 @@ public class ElasticsearchIndexInitializer {
         }
     }
 
-    /**
-     * DB의 모든 이벤트를 ES에 재색인.
-     * embedding 포함 저장 (syncToElasticsearch 재사용)
-     */
+    private void syncMissingEvents() {
+        Set<String> dbEventIds = eventRepository.findAllEventIds().stream()
+            .map(UUID::toString)
+            .collect(Collectors.toSet());
+
+        if (dbEventIds.isEmpty()) {
+            log.info("[ES] DB에 이벤트 없음, 동기화 스킵");
+            return;
+        }
+
+        Set<String> esEventIds = getAllEsDocumentIds();
+
+        Set<UUID> missingIds = dbEventIds.stream()
+            .filter(id -> !esEventIds.contains(id))
+            .map(UUID::fromString)
+            .collect(Collectors.toSet());
+
+        if (missingIds.isEmpty()) {
+            log.info("[ES] 모든 이벤트 색인 완료 ({}/{}건)", dbEventIds.size(), dbEventIds.size());
+            return;
+        }
+
+        log.info("[ES] 누락 이벤트 {}건 색인 시작", missingIds.size());
+        List<Event> events = eventRepository.findAllWithDetailsByEventIdIn(new ArrayList<>(missingIds));
+
+        int count = 0;
+        for (Event event : events) {
+            try {
+                eventService.syncToElasticsearch(event);
+                count++;
+            } catch (Exception e) {
+                log.warn("[ES 색인 실패] eventId: {}", event.getEventId(), e);
+            }
+        }
+        log.info("[ES] 누락 색인 완료. {}건", count);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Set<String> getAllEsDocumentIds() {
+        try {
+            var response = esClient.search(s -> s
+                    .index("event")
+                    .size(10000)
+                    .source(src -> src.fetch(false))
+                    .query(q -> q.matchAll(m -> m)),
+                Map.class);
+
+            return response.hits().hits().stream()
+                .map(hit -> hit.id())
+                .collect(Collectors.toSet());
+        } catch (Exception e) {
+            log.warn("[ES] 전체 ID 조회 실패 - 전체 재색인으로 폴백", e);
+            return Set.of();
+        }
+    }
+
     private void reindexAllEvents() {
-        List<UUID> allEventIds = eventRepository.findAll().stream()
-            .map(Event::getEventId)
-            .toList();
+        List<UUID> allEventIds = eventRepository.findAllEventIds();
 
         if (allEventIds.isEmpty()) {
             log.info("[ES 재색인] 재색인할 이벤트 없음");
             return;
         }
 
-        // techStacks Fetch Join (LazyInitializationException 방지)
         List<Event> events = eventRepository.findAllWithDetailsByEventIdIn(allEventIds);
 
         int count = 0;

@@ -33,6 +33,9 @@ public interface EventRepository extends JpaRepository<Event, Long> {
         Pageable pageable
     );
 
+    @Query("SELECT e.eventId FROM Event e")
+    List<UUID> findAllEventIds();
+
     // 외부 API
     List<Event> findAllByEventIdIn(List<UUID> eventIds);
 
