@@ -21,7 +21,7 @@
 | outbox 수정 | `next_retry_at` | TIMESTAMP 컬럼 추가 | 엔티티 필드 추가 → 자동 |
 | outbox 수정 | `sent_at` | TIMESTAMP 컬럼 추가 | 엔티티 필드 추가 → 자동 |
 | processed_message 수정 | `topic` | VARCHAR(128) 컬럼 추가 | 엔티티 필드 추가 → 자동 |
-| processed_message 수정 | `message_id` | UUID → VARCHAR(36) 타입 변경 (⚠️ Outbox B4-2 정합 — 별건 이슈 분리 권고, 엔티티 필드는 현재 `UUID` 잔존) | 수동 ALTER (PostgreSQL `USING message_id::text` 명시 필요) |
+| processed_message 수정 | `message_id` | UUID → VARCHAR(36) 타입 변경 — ✅ **PR #584 머지 완료** (2026-04-27, 엔티티 필드도 `String` 으로 통일) | 수동 ALTER (PostgreSQL `USING message_id::text` 명시 필요) |
 | shedlock 생성 | 신규 테이블 | Outbox 스케줄러 분산 락 | 수동 CREATE TABLE |
 | payment 엔티티 | `version` | BIGINT 컬럼 추가 (@Version) | 엔티티 필드 추가 → 자동 |
 
@@ -107,8 +107,8 @@ CREATE TABLE event.shedlock (
 ALTER TABLE payment.outbox
     ALTER COLUMN message_id TYPE VARCHAR(36) USING message_id::text;
 
--- ⑧ Payment: processed_message message_id 타입 변경 (B4-2 정합)
--- Outbox message_id String 전환과 정합 유지 — 엔티티 필드도 함께 UUID→String 전환 필요
+-- ⑧ Payment: processed_message message_id 타입 변경 (B4-2 정합) — ✅ PR #584 머지 (2026-04-27)
+-- 엔티티 필드도 함께 UUID→String 전환 완료. 운영 DB ALTER 함께 실행됨.
 ALTER TABLE payment.processed_message
     ALTER COLUMN message_id TYPE VARCHAR(36) USING message_id::text;
 
