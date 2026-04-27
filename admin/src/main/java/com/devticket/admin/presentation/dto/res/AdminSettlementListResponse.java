@@ -3,7 +3,7 @@ package com.devticket.admin.presentation.dto.res;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 
-public record AdminSettelmentListResponse(
+public record AdminSettlementListResponse(
 
     @Schema(description = "정산 목록 (SettlementResponse 재사용)", example = "json List 형태")
     List<SettlementResponse> content,
