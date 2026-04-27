@@ -42,7 +42,7 @@ public class TicketIssueFailedHandler {
     private final MessageDeduplicationService deduplicationService;
 
     @Transactional
-    public void handleAndMark(TicketIssueFailedEvent event, UUID messageId, String topic) {
+    public void handleAndMark(TicketIssueFailedEvent event, String messageId, String topic) {
         Payment payment = paymentRepository.findByPaymentId(event.paymentId())
             .orElseThrow(() -> new RefundException(RefundErrorCode.PAYMENT_NOT_FOUND));
 
