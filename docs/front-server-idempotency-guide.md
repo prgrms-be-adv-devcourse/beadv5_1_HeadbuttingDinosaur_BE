@@ -121,6 +121,11 @@
 
 ### 4-1. 주문 생성 (POST /api/orders)
 
+> **현행 흐름 — Kafka choreography → 동기 REST 차감으로 전환됨**
+> 본 문서가 처음 설계됐을 때는 `order.created` Kafka 발행 → Event 모듈이 `stock.deducted` 응답으로 `PAYMENT_PENDING` 전이하는 choreography 였습니다. 현재 코드는 **`OrderService.createOrderByCart` 내부에서 동기 REST(`PATCH /internal/events/stock-adjustments` via `OrderToEventClient`) 로 재고를 차감**하고, 성공 시 `Order.createPending(...)` 으로 곧장 `PAYMENT_PENDING` 상태 row를 저장합니다 (`OrderService.java:116-117`, `Order.java:123-141`).
+>
+> 이에 따라 `CREATED` 상태와 만료 스케줄러는 **활성 흐름에서 사용되지 않음** (`Order.create()` 와 `expires_at` 컬럼은 레거시). 본 §4-1 의 멱등 가드 원칙(`userId + cartId + cartHash`) 은 그대로 유효하나, 절차 표현은 REST 동기 차감 기준으로 읽어 주세요.
+
 주문 생성은 클라이언트 키가 아니라 **userId + cartId + cartHash**를 기준으로 멱등 처리한다.
 
 같은 계정의 여러 세션(브라우저 탭, 기기 등)이 동시에 같은 장바구니를 주문하려는 경우,
@@ -161,7 +166,7 @@
 | 장바구니 내용 변경 후 재주문 | 같음 | 같음 | 다름 | 새 주문 생성 허용 |
 | 다른 유저가 동일 cartId 사용 | 다름 | 같음 | — | 각각 독립 주문으로 처리 |
 
-**팀원이 구현해야 하는 순서:**
+**현재 코드 구현 흐름 (REST 동기 차감 기준):**
 
 ```
 0. 장바구니 내용 해시 생성 (서버 사이드)
@@ -169,30 +174,31 @@
    → (eventId, quantity) 리스트를 eventId 기준 정렬 — unitPrice 미포함 (팀 합의)
    → 문자열 직렬화 (`eventId:quantity`, `,` 구분) 후 SHA-256 해시 생성 → cartHash 확보
    → 이후 모든 중복 판단에 cartHash 포함
- 
-1. cart 기준으로 먼저 직렬화 대상 확보
-   → userId + cartId 단위로 동시에 주문 생성이 일어나지 않도록 한다
-   → cart_id + user_id 기준 SELECT ... FOR UPDATE로 직렬화
 
-2. 활성 주문 존재 여부 조회
-   → 새 주문 생성 전에 반드시 조회
-   → 같은 userId + 같은 cartId + 같은 cartHash 기준
-   → cartHash가 다르면 내용이 바뀐 것 → 2단계를 "없음"으로 취급
+1. tx1 검증·dedup (`OrderService.prepareAndValidate`)
+   → SELECT ... FOR UPDATE 로 user/cart 단위 직렬화
+   → 같은 userId + cartId + cartHash + 활성(PAYMENT_PENDING) 주문 존재 시 → 즉시 기존 주문 반환
+   → cartHash 불일치 = 장바구니 내용 변경 → "없음"으로 취급, 새 주문 진행
+   → 검증 통과 시 totalAmount/eventInfos 등 prepare 데이터 확보 후 tx1 커밋
 
-3. 활성 주문이 있으면 → 새로 생성하지 않음
-   → 기존 주문을 그대로 반환
-   → "중복 요청"으로 실패 처리하지 않음 — 멱등 성공으로 간주
+2. REST 동기 재고 차감 (`OrderService.adjustStocksOrThrow` → `PATCH /internal/events/stock-adjustments`)
+   → 트랜잭션 경계 밖 (커밋된 prepare 결과 사용)
+   → All-or-Nothing: 단 한 건이라도 실패 시 BusinessException → 전체 차단, 부분 차감 잔존 없음
+   → 성공 시 Event 모듈이 모든 대상 이벤트의 `quantity` 컬럼을 즉시 감산
 
-4. 활성 주문이 없을 때만 새 주문 생성
-   → cart_version 일치 확인
-   → Order 생성 (CREATED, expires_at = now + 30분, cart_hash 저장)
-   → 재고 선점 Outbox 저장 (같은 트랜잭션)
-   → 트랜잭션 커밋 → 락 해제
+3. tx2 Order/OrderItem 저장 (`OrderService.persistOrder` → `Order.createPending`)
+   → 곧바로 status=PAYMENT_PENDING 으로 row 저장 (CREATED 거치지 않음)
+   → cart_hash 저장
+   → DB UNIQUE 제약 (`uk_active_order` 등) 위반 시: 동시 요청이 먼저 커밋한 케이스 → 재고 보상 없이 기존 주문 반환
+   → 그 외 RuntimeException 시: compensateStock 호출로 REST 재고 보상 후 예외 전파
 
-5. 주문 만료는 별도 스케줄러가 정리
-   → expires_at 지난 CREATED 주문 → CANCELLED + 재고 복구 Outbox 저장
-   → 이 보상 처리도 멱등해야 함 (이미 CANCELLED면 스킵)
+4. PAYMENT_PENDING 만료 스케줄러 (`OrderExpirationScheduler`)
+   → BaseEntity.updated_at 기준 30분 경과 시 → CANCELLED + 재고 복구 Outbox(payment.failed reason="ORDER_TIMEOUT") 발행
+   → 이 보상은 멱등 (이미 CANCELLED 면 스킵)
 ```
+
+> **레거시 — `CREATED` 상태와 `Order.create()` 팩토리**
+> Kafka choreography 시절 `CREATED → stock.deducted 수신 → PAYMENT_PENDING` 흐름을 위한 코드(`Order.create()`, `processStockDeducted` 등)는 클래스에 남아 있으나 현재 활성 호출자가 없습니다 (테스트·레거시 path 정리 별도 트랙).
 
 **DB 설계 주의사항:**
 
@@ -207,13 +213,15 @@ Orders 테이블에 cart_hash 컬럼 추가 필요
 
 ```
 차단 — 새 주문 생성 거부, 기존 주문 반환:
-  CREATED, PAYMENT_PENDING, PAID
+  PAYMENT_PENDING, PAID
   REFUND_PENDING, REFUNDED  ← 사용 여부 미결 (kafka-impl-plan.md §4-1 참조)
 
 허용 — 새 주문 생성 가능:
   FAILED    (재고 부족 등 실패 → 재시도 가능)
   CANCELLED (만료/직접 취소 → 재시도 가능)
 ```
+
+> 레거시 `CREATED` 상태는 현재 활성 흐름에서 진입하지 않습니다 (REST 동기 차감으로 곧장 `PAYMENT_PENDING` 진입).
 
 > 이 목록은 구현마다 다르게 해석하면 안 된다. 전원 동일 기준 적용.
 
