@@ -19,10 +19,18 @@ spring:
     properties:
       hibernate:
         default_schema: event
+
   elasticsearch:
     uris: http://localhost:9200
     connection-timeout: 1s
     socket-timeout: 1s
+
+  openai:
+    embedding:
+      enabled: false
+      api-key: test-key
+      model: text-embedding-3-small
+
   kafka:
     bootstrap-servers: localhost:9093
     consumer:
