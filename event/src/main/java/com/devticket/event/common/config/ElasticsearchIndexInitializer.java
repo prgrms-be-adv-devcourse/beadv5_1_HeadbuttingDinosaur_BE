@@ -17,6 +17,7 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.annotation.Profile;
 import org.springframework.context.event.EventListener;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
 @Slf4j
@@ -31,11 +32,14 @@ public class ElasticsearchIndexInitializer {
     private static final List<EventStatus> TERMINATED_STATUSES =
         List.of(EventStatus.SALE_ENDED, EventStatus.CANCELLED, EventStatus.FORCE_CANCELLED);
 
+    private static final int BATCH_SIZE = 50;
+
     private final ElasticsearchOperations elasticsearchOperations;
     private final ElasticsearchClient esClient;
     private final EventRepository eventRepository;
     private final EventService eventService;
 
+    @Async
     @EventListener(ApplicationReadyEvent.class)
     public void initializeIndex() {
         try {
@@ -51,7 +55,6 @@ public class ElasticsearchIndexInitializer {
 
         } catch (Exception e) {
             log.error("[ES Index 초기화 실패]", e);
-            throw new RuntimeException("ElasticSearch 인덱스 초기화 실패", e);
         }
     }
 
@@ -74,16 +77,7 @@ public class ElasticsearchIndexInitializer {
 
         if (!missingIds.isEmpty()) {
             log.info("[ES] 누락 이벤트 {}건 색인 시작", missingIds.size());
-            List<Event> events = eventRepository.findAllWithDetailsByEventIdIn(new ArrayList<>(missingIds));
-            int count = 0;
-            for (Event event : events) {
-                try {
-                    eventService.syncToElasticsearch(event);
-                    count++;
-                } catch (Exception e) {
-                    log.warn("[ES 색인 실패] eventId: {}", event.getEventId(), e);
-                }
-            }
+            int count = indexInBatches(new ArrayList<>(missingIds), "[ES 색인 실패]");
             log.info("[ES] 누락 색인 완료. {}건", count);
         } else {
             log.info("[ES] 활성 이벤트 모두 색인됨 ({}건)", activeDbIds.size());
@@ -114,7 +108,7 @@ public class ElasticsearchIndexInitializer {
         try {
             var response = esClient.search(s -> s
                     .index("event")
-                    .size(10000)
+                    .size(1000)
                     .source(src -> src.fetch(false))
                     .query(q -> q.matchAll(m -> m)),
                 java.util.Map.class);
@@ -136,17 +130,24 @@ public class ElasticsearchIndexInitializer {
             return;
         }
 
-        List<Event> events = eventRepository.findAllWithDetailsByEventIdIn(allEventIds);
+        int count = indexInBatches(allEventIds, "[ES 재색인 실패]");
+        log.info("[ES 재색인] 완료. 총 {}건", count);
+    }
 
+    private int indexInBatches(List<UUID> eventIds, String errorLogPrefix) {
         int count = 0;
-        for (Event event : events) {
-            try {
-                eventService.syncToElasticsearch(event);
-                count++;
-            } catch (Exception e) {
-                log.warn("[ES 재색인 실패] eventId: {}", event.getEventId(), e);
+        for (int i = 0; i < eventIds.size(); i += BATCH_SIZE) {
+            List<UUID> batch = eventIds.subList(i, Math.min(i + BATCH_SIZE, eventIds.size()));
+            List<Event> events = eventRepository.findAllWithDetailsByEventIdIn(batch);
+            for (Event event : events) {
+                try {
+                    eventService.syncToElasticsearch(event);
+                    count++;
+                } catch (Exception e) {
+                    log.warn("{} eventId: {}", errorLogPrefix, event.getEventId(), e);
+                }
             }
         }
-        log.info("[ES 재색인] 완료. 총 {}건", count);
+        return count;
     }
 }
