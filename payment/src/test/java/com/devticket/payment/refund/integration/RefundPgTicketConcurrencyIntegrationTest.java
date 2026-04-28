@@ -13,6 +13,7 @@ import com.devticket.payment.refund.application.service.RefundService;
 import com.devticket.payment.refund.domain.exception.RefundErrorCode;
 import com.devticket.payment.refund.domain.exception.RefundException;
 import com.devticket.payment.refund.domain.model.OrderRefund;
+import com.devticket.payment.refund.domain.enums.RefundTicketStatus;
 import com.devticket.payment.refund.domain.repository.OrderRefundRepository;
 import com.devticket.payment.refund.domain.repository.RefundRepository;
 import com.devticket.payment.refund.domain.repository.RefundTicketRepository;
@@ -20,6 +21,7 @@ import com.devticket.payment.refund.infrastructure.client.EventInternalClient;
 import com.devticket.payment.refund.infrastructure.client.dto.InternalEventInfoResponse;
 import com.devticket.payment.refund.presentation.dto.PgRefundRequest;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -31,18 +33,88 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * refundPgTicket 동시성 통합 테스트
  *
- * 실제 DB(H2) UNIQUE 제약 + dedup 가드 검증.
+ * 실제 PostgreSQL(Testcontainers) + partial unique index 검증.
+ * H2는 partial unique index 미지원으로 PostgreSQL 컨테이너 사용.
  * CommerceInternalClient / EventInternalClient 만 Mock (외부 HTTP 호출 차단).
  */
 @SpringBootTest
-@ActiveProfiles("test")
+@Testcontainers
 class RefundPgTicketConcurrencyIntegrationTest {
+
+    @Container
+    @SuppressWarnings("resource")
+    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16");
+
+    @DynamicPropertySource
+    static void configureProperties(DynamicPropertyRegistry registry) {
+        // 컨테이너 시작 후, Spring 컨텍스트 초기화 전에 스키마 생성 (withInitScript가 TC 2.x에서 깨짐)
+        try (java.sql.Connection conn = java.sql.DriverManager.getConnection(
+                postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword());
+             java.sql.Statement stmt = conn.createStatement()) {
+            stmt.execute("CREATE SCHEMA IF NOT EXISTS payment");
+            stmt.execute("CREATE SCHEMA IF NOT EXISTS refund");
+            stmt.execute("""
+                CREATE TABLE IF NOT EXISTS payment.shedlock (
+                    name       VARCHAR(64)  NOT NULL PRIMARY KEY,
+                    lock_until TIMESTAMP    NOT NULL,
+                    locked_at  TIMESTAMP    NOT NULL,
+                    locked_by  VARCHAR(255) NOT NULL
+                )""");
+        } catch (Exception e) {
+            throw new RuntimeException("PostgreSQL 스키마 초기화 실패", e);
+        }
+
+        // URL에 이미 ?loggerLevel=OFF 가 붙어 있으므로 currentSchema는 & 로 연결
+        registry.add("spring.datasource.url",
+            () -> postgres.getJdbcUrl() + "&currentSchema=payment");
+        registry.add("spring.datasource.username", postgres::getUsername);
+        registry.add("spring.datasource.password", postgres::getPassword);
+        registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
+        registry.add("spring.datasource.hikari.maximum-pool-size", () -> "30");
+        registry.add("spring.datasource.hikari.connection-init-sql",
+            () -> "SET search_path TO payment");
+        registry.add("spring.jpa.database-platform",
+            () -> "org.hibernate.dialect.PostgreSQLDialect");
+        registry.add("spring.jpa.properties.hibernate.dialect",
+            () -> "org.hibernate.dialect.PostgreSQLDialect");
+        registry.add("spring.jpa.properties.hibernate.default_schema", () -> "payment");
+        registry.add("spring.jpa.hibernate.ddl-auto", () -> "create-drop");
+        registry.add("spring.jpa.show-sql", () -> "false");
+        registry.add("spring.main.allow-bean-definition-overriding", () -> "true");
+        registry.add("spring.kafka.bootstrap-servers", () -> "localhost:9093");
+        registry.add("spring.kafka.consumer.group-id", () -> "devticket-payment");
+        registry.add("spring.kafka.consumer.auto-offset-reset", () -> "earliest");
+        registry.add("spring.kafka.consumer.key-deserializer",
+            () -> "org.apache.kafka.common.serialization.StringDeserializer");
+        registry.add("spring.kafka.consumer.value-deserializer",
+            () -> "org.apache.kafka.common.serialization.StringDeserializer");
+        registry.add("spring.kafka.producer.key-serializer",
+            () -> "org.apache.kafka.common.serialization.StringSerializer");
+        registry.add("spring.kafka.producer.value-serializer",
+            () -> "org.apache.kafka.common.serialization.StringSerializer");
+        registry.add("kafka-producer.max-block-ms", () -> "3000");
+        registry.add("kafka-producer.request-timeout-ms", () -> "5000");
+        registry.add("kafka-producer.delivery-timeout-ms", () -> "8000");
+        registry.add("kafka-producer.send-timeout-ms", () -> "10000");
+        registry.add("jwt.secret-key", () -> "test-jwt-secret-key");
+        registry.add("jwt.access-token-ttl", () -> "1800000");
+        registry.add("jwt.refresh-token-ttl", () -> "604800000");
+        registry.add("internal.commerce.base-url", () -> "http://localhost:8085");
+        registry.add("internal.event.base-url", () -> "http://localhost:8085");
+        registry.add("pg.toss.base-url", () -> "https://api.tosspayments.com");
+        registry.add("pg.toss.secret-key", () -> "secret-key-dummy");
+        registry.add("server.port", () -> "8085");
+    }
 
     @Autowired private RefundService refundService;
     @Autowired private PaymentRepository paymentRepository;
@@ -66,7 +138,6 @@ class RefundPgTicketConcurrencyIntegrationTest {
         payment.approve("payment-key-test");
         paymentRepository.save(payment);
 
-        // upsertOrderRefund 내부 INSERT 경합 제거를 위해 OrderRefund 선행 생성
         orderRefundRepository.save(OrderRefund.create(
             payment.getOrderId(), userId, payment.getPaymentId(),
             PaymentMethod.PG, 50_000, 1
@@ -92,8 +163,8 @@ class RefundPgTicketConcurrencyIntegrationTest {
     // 테스트 1: 동일 ticketId 동시 10건 — RefundTicket 1건만 생성
     //
     // 공격: 환불 버튼 연타 / 네트워크 재전송 시뮬레이션
-    // 방어 1차: existsByTicketId 선행 체크 → REFUND_ALREADY_IN_PROGRESS(409)
-    // 방어 2차: refund_ticket.ticket_id UNIQUE 제약 + DataIntegrityViolationException catch
+    // 방어 1차: existsByTicketIdAndStatusIn(ACTIVE, COMPLETED) 선행 체크 → REFUND_ALREADY_IN_PROGRESS(409)
+    // 방어 2차: uk_refund_ticket_active partial unique index + DataIntegrityViolationException catch
     // 검증: 성공 1건, 나머지 REFUND_ALREADY_IN_PROGRESS, DB Refund·RefundTicket 각 1건
     // =========================================================
     @Test
@@ -142,7 +213,9 @@ class RefundPgTicketConcurrencyIntegrationTest {
         long refundCount = refundRepository
             .findByUserId(userId, PageRequest.of(0, 100))
             .getTotalElements();
-        boolean ticketExists = refundTicketRepository.existsByTicketId(UUID.fromString(ticketId));
+        boolean ticketExists = refundTicketRepository.existsByTicketIdAndStatusIn(
+            UUID.fromString(ticketId),
+            List.of(RefundTicketStatus.ACTIVE, RefundTicketStatus.COMPLETED));
 
         System.out.println("========== refundPgTicket 동시성 테스트 결과 ==========");
         System.out.println("성공: " + successCount.get() + "건");

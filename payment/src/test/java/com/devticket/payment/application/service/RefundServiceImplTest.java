@@ -50,7 +50,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.transaction.annotation.Transactional;
 
 @ExtendWith(MockitoExtension.class)
 class RefundServiceImplTest {
@@ -287,10 +286,11 @@ class RefundServiceImplTest {
         }
 
         @Test
-        @DisplayName("이미 진행 중인 환불 — existsByTicketId=true → REFUND_ALREADY_IN_PROGRESS(409)")
+        @DisplayName("이미 진행 중인 환불 — ACTIVE/COMPLETED RefundTicket 존재 시 REFUND_ALREADY_IN_PROGRESS(409)")
         void 이미_진행중인_환불() {
             givenCommonStubs();
-            given(refundTicketRepository.existsByTicketId(TICKET_UUID)).willReturn(true);
+            given(refundTicketRepository.existsByTicketIdAndStatusIn(eq(TICKET_UUID), any()))
+                .willReturn(true);
 
             assertThatThrownBy(() -> refundService.refundPgTicket(USER_ID, TICKET_ID, request))
                 .isInstanceOf(RefundException.class)
@@ -302,10 +302,11 @@ class RefundServiceImplTest {
         }
 
         @Test
-        @DisplayName("Race condition — ticket_id UNIQUE 위반 시 → REFUND_ALREADY_IN_PROGRESS(409)")
+        @DisplayName("Race condition — uk_refund_ticket_active partial unique 위반 시 → REFUND_ALREADY_IN_PROGRESS(409)")
         void race_condition_ticket_unique_위반() {
             givenCommonStubs();
-            given(refundTicketRepository.existsByTicketId(TICKET_UUID)).willReturn(false);
+            given(refundTicketRepository.existsByTicketIdAndStatusIn(eq(TICKET_UUID), any()))
+                .willReturn(false);
             given(orderRefundRepository.findByOrderId(ORDER_ID)).willReturn(Optional.empty());
             given(orderRefundRepository.save(any())).willAnswer(inv -> inv.getArgument(0));
             given(refundRepository.save(any())).willAnswer(inv -> inv.getArgument(0));
@@ -321,7 +322,8 @@ class RefundServiceImplTest {
         @DisplayName("Race condition — ticket_id 외 다른 제약 위반 시 → DataIntegrityViolationException 그대로 전파")
         void race_condition_다른_제약_위반_원래_예외_전파() {
             givenCommonStubs();
-            given(refundTicketRepository.existsByTicketId(TICKET_UUID)).willReturn(false);
+            given(refundTicketRepository.existsByTicketIdAndStatusIn(eq(TICKET_UUID), any()))
+                .willReturn(false);
             given(orderRefundRepository.findByOrderId(ORDER_ID)).willReturn(Optional.empty());
             given(orderRefundRepository.save(any())).willAnswer(inv -> inv.getArgument(0));
             given(refundRepository.save(any())).willAnswer(inv -> inv.getArgument(0));
@@ -333,7 +335,7 @@ class RefundServiceImplTest {
 
         private DataIntegrityViolationException ticketUniqueViolation() {
             ConstraintViolationException cause = new ConstraintViolationException(
-                "duplicate key", new SQLException(), "uk_refund_ticket_ticket_id"
+                "duplicate key", new SQLException(), "uk_refund_ticket_active"
             );
             return new DataIntegrityViolationException("constraint violation", cause);
         }
@@ -349,7 +351,8 @@ class RefundServiceImplTest {
         @DisplayName("성공 — 정상 환불 요청 처리")
         void 성공() {
             givenCommonStubs();
-            given(refundTicketRepository.existsByTicketId(TICKET_UUID)).willReturn(false);
+            given(refundTicketRepository.existsByTicketIdAndStatusIn(eq(TICKET_UUID), any()))
+                .willReturn(false);
             given(orderRefundRepository.findByOrderId(ORDER_ID)).willReturn(Optional.empty());
             given(orderRefundRepository.save(any())).willAnswer(inv -> inv.getArgument(0));
             given(refundRepository.save(any())).willAnswer(inv -> inv.getArgument(0));
