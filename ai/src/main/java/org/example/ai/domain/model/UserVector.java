@@ -14,7 +14,6 @@ import org.springframework.data.elasticsearch.annotations.FieldType;
 @NoArgsConstructor
 @AllArgsConstructor
 @Getter
-@Setter
 @Builder
 @Document(indexName = "user-index", createIndex = false)
 public class UserVector {
