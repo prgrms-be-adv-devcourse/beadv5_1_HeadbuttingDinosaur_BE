@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+  <!-- Lombok 생성 코드 제외 -->
+  <Match>
+    <Class name="~.*\$Builder" />
+  </Match>
+  <!-- 테스트 코드 제외 -->
+  <Match>
+    <Class name="~.*Test" />
+  </Match>
+</FindBugsFilter>
