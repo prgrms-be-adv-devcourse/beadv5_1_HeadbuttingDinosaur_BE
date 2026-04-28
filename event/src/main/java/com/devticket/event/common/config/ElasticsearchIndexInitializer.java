@@ -1,12 +1,15 @@
 package com.devticket.event.common.config;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
+import co.elastic.clients.elasticsearch._types.FieldValue;
+import co.elastic.clients.elasticsearch._types.SortOrder;
 import com.devticket.event.application.EventService;
 import com.devticket.event.domain.enums.EventStatus;
 import com.devticket.event.domain.model.Event;
 import com.devticket.event.infrastructure.persistence.EventRepository;
 import com.devticket.event.infrastructure.search.EventDocument;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -17,6 +20,7 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.annotation.Profile;
 import org.springframework.context.event.EventListener;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
 @Slf4j
@@ -29,13 +33,16 @@ public class ElasticsearchIndexInitializer {
         List.of(EventStatus.DRAFT, EventStatus.ON_SALE, EventStatus.SOLD_OUT);
 
     private static final List<EventStatus> TERMINATED_STATUSES =
-        List.of(EventStatus.SALE_ENDED, EventStatus.CANCELLED, EventStatus.FORCE_CANCELLED);
+        List.of(EventStatus.CANCELLED, EventStatus.FORCE_CANCELLED);
+
+    private static final int BATCH_SIZE = 50;
 
     private final ElasticsearchOperations elasticsearchOperations;
     private final ElasticsearchClient esClient;
     private final EventRepository eventRepository;
     private final EventService eventService;
 
+    @Async
     @EventListener(ApplicationReadyEvent.class)
     public void initializeIndex() {
         try {
@@ -51,7 +58,6 @@ public class ElasticsearchIndexInitializer {
 
         } catch (Exception e) {
             log.error("[ES Index 초기화 실패]", e);
-            throw new RuntimeException("ElasticSearch 인덱스 초기화 실패", e);
         }
     }
 
@@ -74,16 +80,7 @@ public class ElasticsearchIndexInitializer {
 
         if (!missingIds.isEmpty()) {
             log.info("[ES] 누락 이벤트 {}건 색인 시작", missingIds.size());
-            List<Event> events = eventRepository.findAllWithDetailsByEventIdIn(new ArrayList<>(missingIds));
-            int count = 0;
-            for (Event event : events) {
-                try {
-                    eventService.syncToElasticsearch(event);
-                    count++;
-                } catch (Exception e) {
-                    log.warn("[ES 색인 실패] eventId: {}", event.getEventId(), e);
-                }
-            }
+            int count = indexInBatches(new ArrayList<>(missingIds), "[ES 색인 실패]");
             log.info("[ES] 누락 색인 완료. {}건", count);
         } else {
             log.info("[ES] 활성 이벤트 모두 색인됨 ({}건)", activeDbIds.size());
@@ -111,21 +108,40 @@ public class ElasticsearchIndexInitializer {
 
     @SuppressWarnings("unchecked")
     private Set<String> getAllEsDocumentIds() {
-        try {
-            var response = esClient.search(s -> s
-                    .index("event")
-                    .size(10000)
-                    .source(src -> src.fetch(false))
-                    .query(q -> q.matchAll(m -> m)),
-                java.util.Map.class);
+        Set<String> ids = new HashSet<>();
+        final int pageSize = 1000;
+        List<FieldValue> searchAfter = null;
 
-            return response.hits().hits().stream()
-                .map(hit -> hit.id())
-                .collect(Collectors.toSet());
+        try {
+            while (true) {
+                final List<FieldValue> cursor = searchAfter;
+                var response = esClient.search(s -> {
+                    var req = s.index("event")
+                        .size(pageSize)
+                        .source(src -> src.fetch(false))
+                        .sort(sort -> sort.field(f -> f.field("_id").order(SortOrder.Asc)))
+                        .query(q -> q.matchAll(m -> m));
+                    if (cursor != null) {
+                        req = req.searchAfter(cursor);
+                    }
+                    return req;
+                }, java.util.Map.class);
+
+                var hits = response.hits().hits();
+                if (hits.isEmpty()) {
+                    break;
+                }
+                hits.forEach(hit -> ids.add(hit.id()));
+                if (hits.size() < pageSize) {
+                    break;
+                }
+                searchAfter = hits.get(hits.size() - 1).sort();
+            }
         } catch (Exception e) {
             log.warn("[ES] 전체 ID 조회 실패 - 동기화 스킵", e);
             return Set.of();
         }
+        return ids;
     }
 
     private void reindexAllEvents() {
@@ -136,17 +152,24 @@ public class ElasticsearchIndexInitializer {
             return;
         }
 
-        List<Event> events = eventRepository.findAllWithDetailsByEventIdIn(allEventIds);
+        int count = indexInBatches(allEventIds, "[ES 재색인 실패]");
+        log.info("[ES 재색인] 완료. 총 {}건", count);
+    }
 
+    private int indexInBatches(List<UUID> eventIds, String errorLogPrefix) {
         int count = 0;
-        for (Event event : events) {
-            try {
-                eventService.syncToElasticsearch(event);
-                count++;
-            } catch (Exception e) {
-                log.warn("[ES 재색인 실패] eventId: {}", event.getEventId(), e);
+        for (int i = 0; i < eventIds.size(); i += BATCH_SIZE) {
+            List<UUID> batch = eventIds.subList(i, Math.min(i + BATCH_SIZE, eventIds.size()));
+            List<Event> events = eventRepository.findAllWithDetailsByEventIdIn(batch);
+            for (Event event : events) {
+                try {
+                    eventService.syncToElasticsearch(event);
+                    count++;
+                } catch (Exception e) {
+                    log.warn("{} eventId: {}", errorLogPrefix, event.getEventId(), e);
+                }
             }
         }
-        log.info("[ES 재색인] 완료. 총 {}건", count);
+        return count;
     }
 }
