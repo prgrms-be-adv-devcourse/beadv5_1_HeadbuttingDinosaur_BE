@@ -5,7 +5,7 @@ on:
     branches: ["devticket-event"]
     paths:
       - "event/**"
-      - ".github/workflows/cd-event-aws.yml"
+      - ".github/workflows/ci-event.yml"
 
   workflow_dispatch:
 

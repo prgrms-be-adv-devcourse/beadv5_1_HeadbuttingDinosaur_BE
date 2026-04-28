@@ -74,6 +74,7 @@ class EventServiceTest {
     @Mock
     private ElasticsearchOperations elasticsearchOperations;
 
+
     @Mock
     private ElasticsearchClient esClient;
 
@@ -88,7 +89,8 @@ class EventServiceTest {
 
     @Mock
     private ObjectMapper objectMapper;
-  
+
+    @Mock
     private EventViewRepository eventViewRepository;
 
     @InjectMocks

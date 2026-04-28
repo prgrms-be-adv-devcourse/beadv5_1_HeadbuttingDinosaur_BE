@@ -412,6 +412,8 @@ public class EventService {
 
             Map<String, Object> doc = new HashMap<>();
             doc.put("id", event.getEventId().toString());
+            // AI 추천 서비스는 _source.eventId 로 추출 (PR #540 계약). _id 는 hit._source 에 포함되지 않으므로 body 에 명시.
+            doc.put("eventId", event.getEventId().toString());
             doc.put("title", event.getTitle());
             doc.put("category", event.getCategory().name());
             doc.put("techStacks", techStackNames);
