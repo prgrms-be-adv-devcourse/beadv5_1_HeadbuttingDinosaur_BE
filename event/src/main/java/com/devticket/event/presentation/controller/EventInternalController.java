@@ -16,9 +16,6 @@ import com.devticket.event.presentation.dto.internal.InternalStockAdjustmentResp
 import com.devticket.event.presentation.dto.internal.InternalEventInfoResponse;
 import com.devticket.event.presentation.dto.internal.InternalPurchaseValidationResponse;
 import com.devticket.event.presentation.dto.internal.InternalSellerEventsResponse;
-import com.devticket.event.presentation.dto.internal.InternalStockDeductRequest;
-import com.devticket.event.presentation.dto.internal.InternalStockOperationResponse;
-import com.devticket.event.presentation.dto.internal.InternalStockRestoreRequest;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
@@ -104,32 +101,6 @@ public class EventInternalController {
         @RequestBody @Valid InternalBulkStockAdjustmentRequest request) {
         return ResponseEntity.ok(SuccessResponse.success(
             eventInternalService.adjustStockBulk(request)
-        ));
-    }
-
-    /**
-     * API 5: 단건 재고 차감
-     * Pessimistic Lock 적용 — 동시 요청 직렬화
-     */
-    @PostMapping("/{eventId}/deduct-stock")
-    public ResponseEntity<SuccessResponse<InternalStockOperationResponse>> deductStock(
-        @PathVariable UUID eventId,
-        @RequestBody @Valid InternalStockDeductRequest request) {
-        return ResponseEntity.ok(SuccessResponse.success(
-            eventInternalService.deductStock(eventId, request.quantity())
-        ));
-    }
-
-    /**
-     * API 6: 단건 재고 복원
-     * Pessimistic Lock 적용 — 동시 요청 직렬화
-     */
-    @PostMapping("/{eventId}/restore-stock")
-    public ResponseEntity<SuccessResponse<InternalStockOperationResponse>> restoreStock(
-        @PathVariable UUID eventId,
-        @RequestBody @Valid InternalStockRestoreRequest request) {
-        return ResponseEntity.ok(SuccessResponse.success(
-            eventInternalService.restoreStock(eventId, request.quantity())
         ));
     }
 
