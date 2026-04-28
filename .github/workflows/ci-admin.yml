@@ -33,7 +33,7 @@ jobs:
           SPRING_PROFILES_ACTIVE: test
 
       - name: 5. Gradle Build & SpotBugs
-        run: cd {서비스명} && ./gradlew build spotbugsMain -x test
+        run: cd admin && ./gradlew build spotbugsMain -x test
 
       - name: 6. Upload SpotBugs Report
         if: always()
