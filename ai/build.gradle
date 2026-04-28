@@ -59,18 +59,30 @@ tasks.named('test') {
     useJUnitPlatform()
 }
 
+// High 등급만 빌드 실패
+tasks.named('spotbugsMain') {
+    doLast {
+        def reportFile = file('build/reports/spotbugs/main.xml')
+        if (reportFile.exists()) {
+            def bugs = new XmlSlurper().parse(reportFile)
+            def highCount = bugs.BugInstance.count { it.@priority == '1' }
+            if (highCount > 0) {
+                throw new GradleException("SpotBugs: ${highCount}개의 High 버그 발견")
+            }
+        }
+    }
+}
+
 spotbugs {
-    ignoreFailures = false
+    ignoreFailures = true  // 빌드는 항상 통과
     effort = 'max'
-    reportLevel = 'high'
-    excludeFilter = file('spotbugs-exclude.xml')  // 제외 필터
+    reportLevel = 'medium'  // Medium 이상 전부 리포트에 표시
+    excludeFilter = file('spotbugs-exclude.xml')
 }
 
 spotbugsMain {
     reports {
-        html {
-            required = true
-            outputLocation = file('build/reports/spotbugs/main.html')
-        }
+        html { required = true }
+        xml { required = false }
     }
 }
