@@ -130,6 +130,26 @@ ALTER TABLE commerce.ticket
 --   SELECT ticket_id, COUNT(*) FROM payment.refund_ticket GROUP BY ticket_id HAVING COUNT(*) > 1;
 ALTER TABLE payment.refund_ticket
     ADD CONSTRAINT uk_refund_ticket_ticket_id UNIQUE (ticket_id);
+
+
+-- ⑫ Payment: refund_ticket status 컬럼 추가 (기존 데이터 있는 환경)
+-- ddl-auto:update는 NOT NULL 컬럼을 기존 row가 있을 때 DEFAULT 없이 추가 불가 → 수동 실행 필요
+-- 1) 일단 COMPLETED로 채운 뒤 2) refund 테이블 기준으로 실패 건 보정
+ALTER TABLE payment.refund_ticket
+    ADD COLUMN IF NOT EXISTS status VARCHAR(16) NOT NULL DEFAULT 'COMPLETED';
+ALTER TABLE payment.refund_ticket
+    ALTER COLUMN status DROP DEFAULT;
+
+-- refund 테이블에서 FAILED 상태인 건은 FAILED로 보정 (재시도 허용)
+UPDATE payment.refund_ticket rt
+SET status = 'FAILED'
+WHERE EXISTS (
+    SELECT 1 FROM payment.refund r
+    WHERE r.refund_id = rt.refund_id
+      AND r.status = 'FAILED'
+);
+
+
 ```
 
 ---
