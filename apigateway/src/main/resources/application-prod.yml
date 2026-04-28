@@ -12,6 +12,14 @@ spring:
               uri: http://commerce:8083
               predicates:
                 - Path=/api/cart, /api/cart/**, /api/orders, /api/orders/**, /api/tickets, /api/tickets/**, /api/seller/events/{eventId}/participants
+            - id: payment-seller-event-cancel
+              uri: http://payment:8084
+              predicates:
+                - Path=/api/seller/events/{eventId}/cancel
+            - id: payment-admin-event-cancel
+              uri: http://payment:8084
+              predicates:
+                - Path=/api/admin/events/{eventId}/cancel
             - id: event-service
               uri: http://event:8082
               predicates:
