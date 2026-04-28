@@ -1,6 +1,8 @@
 package com.devticket.event.common.config;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
+import co.elastic.clients.elasticsearch._types.FieldValue;
+import co.elastic.clients.elasticsearch._types.SortOrder;
 import com.devticket.event.application.EventService;
 import com.devticket.event.domain.enums.EventStatus;
 import com.devticket.event.domain.model.Event;
@@ -107,19 +109,23 @@ public class ElasticsearchIndexInitializer {
     @SuppressWarnings("unchecked")
     private Set<String> getAllEsDocumentIds() {
         Set<String> ids = new HashSet<>();
-        int from = 0;
         final int pageSize = 1000;
+        List<FieldValue> searchAfter = null;
 
         try {
             while (true) {
-                final int currentFrom = from;
-                var response = esClient.search(s -> s
-                        .index("event")
-                        .from(currentFrom)
+                final List<FieldValue> cursor = searchAfter;
+                var response = esClient.search(s -> {
+                    var req = s.index("event")
                         .size(pageSize)
                         .source(src -> src.fetch(false))
-                        .query(q -> q.matchAll(m -> m)),
-                    java.util.Map.class);
+                        .sort(sort -> sort.field(f -> f.field("_id").order(SortOrder.Asc)))
+                        .query(q -> q.matchAll(m -> m));
+                    if (cursor != null) {
+                        req = req.searchAfter(cursor);
+                    }
+                    return req;
+                }, java.util.Map.class);
 
                 var hits = response.hits().hits();
                 if (hits.isEmpty()) {
@@ -129,7 +135,7 @@ public class ElasticsearchIndexInitializer {
                 if (hits.size() < pageSize) {
                     break;
                 }
-                from += pageSize;
+                searchAfter = hits.get(hits.size() - 1).sort();
             }
         } catch (Exception e) {
             log.warn("[ES] 전체 ID 조회 실패 - 동기화 스킵", e);
