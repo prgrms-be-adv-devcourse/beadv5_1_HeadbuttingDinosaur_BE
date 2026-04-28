@@ -74,15 +74,14 @@ tasks.named('spotbugsMain') {
 }
 
 spotbugs {
-    ignoreFailures = true  // 빌드는 항상 통과
+    ignoreFailures = true
     effort = 'max'
-    reportLevel = 'medium'  // Medium 이상 전부 리포트에 표시
+    reportLevel = 'medium'
     excludeFilter = file('spotbugs-exclude.xml')
 }
 
 spotbugsMain {
     reports {
         html { required = true }
-        xml { required = false }
     }
 }
