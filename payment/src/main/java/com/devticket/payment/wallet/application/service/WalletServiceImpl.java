@@ -358,6 +358,12 @@ public class WalletServiceImpl implements WalletService {
         );
         walletTransactionRepository.save(tx);
 
+        // 기존 USE_<orderId> 키 무효화 — readyPayment 재시도(예: WALLET_PG 2000→3000)에서
+        // 새 deductForWalletPg 가 동일 키 충돌로 멱등 skip 되며 차감 누락되는 문제 방지.
+        String useKey = "USE_" + orderId;
+        walletTransactionRepository.findByTransactionKey(useKey)
+            .ifPresent(WalletTransaction::revoke);
+
         log.info("[WalletPG] 예치금 복구 완료 — orderId={}, walletAmount={}, balanceAfter={}",
             orderId, walletAmount, wallet.getBalance());
     }
