@@ -183,8 +183,294 @@ public class PaymentServiceImplTest {
             assertThat(response.paymentStatus()).isEqualTo(PaymentStatus.SUCCESS);
         }
 
+        // =====================================================================
+        // 재시도 시나리오 — 기존 READY Payment 가 있을 때
+        // =====================================================================
+
+        @Test
+        @DisplayName("재시도 #1 — READY+PG 동일 PG 재요청: 기존 그대로 반환, save 호출 0회")
+        void 재시도_PG_동일요청_멱등재사용() {
+            // given
+            PaymentReadyRequest request = new PaymentReadyRequest(EXTERNAL_ORDER_ID, PaymentMethod.PG, null);
+            Payment existing = Payment.create(orderInfo.id(), USER_ID, PaymentMethod.PG, orderInfo.totalAmount());
+
+            given(commerceInternalClient.getOrderInfo(EXTERNAL_ORDER_ID)).willReturn(orderInfo);
+            given(paymentRepository.findByOrderId(orderInfo.id())).willReturn(Optional.of(existing));
+
+            // when
+            PaymentReadyResponse response = paymentService.readyPayment(USER_ID, request);
+
+            // then
+            assertThat(response.paymentMethod()).isEqualTo(PaymentMethod.PG.name());
+            assertThat(response.paymentStatus()).isEqualTo(PaymentStatus.READY);
+            verify(paymentRepository, never()).save(any());
+            verify(walletService, never()).deductForWalletPg(any(), any(), org.mockito.ArgumentMatchers.anyInt());
+            verify(walletService, never()).restoreForWalletPgFail(any(), org.mockito.ArgumentMatchers.anyInt(), any());
+        }
+
+        @Test
+        @DisplayName("재시도 #2 — READY+WALLET_PG(2000) 동일 WALLET_PG(2000): 기존 그대로 반환, deductForWalletPg 호출 0회")
+        void 재시도_WALLET_PG_동일금액_멱등재사용() {
+            // given
+            int totalAmount = orderInfo.totalAmount();
+            int walletAmount = 2000;
+            int pgAmount = totalAmount - walletAmount;
+            Payment existing = Payment.create(
+                orderInfo.id(), USER_ID, PaymentMethod.WALLET_PG, totalAmount, walletAmount, pgAmount);
+            PaymentReadyRequest request = new PaymentReadyRequest(EXTERNAL_ORDER_ID, PaymentMethod.WALLET_PG, walletAmount);
+
+            given(commerceInternalClient.getOrderInfo(EXTERNAL_ORDER_ID)).willReturn(orderInfo);
+            given(paymentRepository.findByOrderId(orderInfo.id())).willReturn(Optional.of(existing));
+
+            // when
+            PaymentReadyResponse response = paymentService.readyPayment(USER_ID, request);
+
+            // then
+            assertThat(response.paymentMethod()).isEqualTo(PaymentMethod.WALLET_PG.name());
+            assertThat(response.walletAmount()).isEqualTo(walletAmount);
+            assertThat(response.pgAmount()).isEqualTo(pgAmount);
+            verify(paymentRepository, never()).save(any());
+            verify(walletService, never()).deductForWalletPg(any(), any(), org.mockito.ArgumentMatchers.anyInt());
+            verify(walletService, never()).restoreForWalletPgFail(any(), org.mockito.ArgumentMatchers.anyInt(), any());
+        }
+
+        @Test
+        @DisplayName("재시도 #3 — READY+PG → WALLET 변경: in-place 갱신, processWalletPayment 호출")
+        void 재시도_PG에서_WALLET으로_변경() {
+            // given
+            Payment existing = Payment.create(orderInfo.id(), USER_ID, PaymentMethod.PG, orderInfo.totalAmount());
+            UUID preservedPaymentId = existing.getPaymentId();
+            PaymentReadyRequest request = new PaymentReadyRequest(EXTERNAL_ORDER_ID, PaymentMethod.WALLET, null);
+
+            // 변경 후 WALLET 결제가 SUCCESS로 처리되는 흐름 시뮬레이션
+            given(commerceInternalClient.getOrderInfo(EXTERNAL_ORDER_ID)).willReturn(orderInfo);
+            given(paymentRepository.findByOrderId(orderInfo.id())).willReturn(Optional.of(existing));
+            given(paymentRepository.save(any(Payment.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
+
+            // when
+            PaymentReadyResponse response = paymentService.readyPayment(USER_ID, request);
+
+            // then
+            assertThat(existing.getPaymentMethod()).isEqualTo(PaymentMethod.WALLET);
+            assertThat(existing.getPaymentId()).isEqualTo(preservedPaymentId);
+            verify(walletService).processWalletPayment(eq(USER_ID), eq(EXTERNAL_ORDER_ID), eq(orderInfo.totalAmount()), any());
+            verify(walletService, never()).restoreForWalletPgFail(any(), org.mockito.ArgumentMatchers.anyInt(), any());
+            assertThat(response.paymentMethod()).isEqualTo(PaymentMethod.WALLET.name());
+        }
+
+        @Test
+        @DisplayName("재시도 #4 — READY+PG → WALLET_PG 변경: deductForWalletPg 호출, restoreForWalletPgFail 호출 0회")
+        void 재시도_PG에서_WALLET_PG로_변경() {
+            // given
+            int totalAmount = orderInfo.totalAmount();
+            int walletAmount = 2000;
+            int pgAmount = totalAmount - walletAmount;
+            Payment existing = Payment.create(orderInfo.id(), USER_ID, PaymentMethod.PG, totalAmount);
+            UUID preservedPaymentId = existing.getPaymentId();
+            PaymentReadyRequest request = new PaymentReadyRequest(EXTERNAL_ORDER_ID, PaymentMethod.WALLET_PG, walletAmount);
+
+            given(commerceInternalClient.getOrderInfo(EXTERNAL_ORDER_ID)).willReturn(orderInfo);
+            given(paymentRepository.findByOrderId(orderInfo.id())).willReturn(Optional.of(existing));
+            given(paymentRepository.save(any(Payment.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
+
+            // when
+            PaymentReadyResponse response = paymentService.readyPayment(USER_ID, request);
+
+            // then
+            assertThat(existing.getPaymentMethod()).isEqualTo(PaymentMethod.WALLET_PG);
+            assertThat(existing.getWalletAmount()).isEqualTo(walletAmount);
+            assertThat(existing.getPgAmount()).isEqualTo(pgAmount);
+            assertThat(existing.getPaymentId()).isEqualTo(preservedPaymentId);
+            verify(walletService).deductForWalletPg(USER_ID, orderInfo.id(), walletAmount);
+            verify(walletService, never()).restoreForWalletPgFail(any(), org.mockito.ArgumentMatchers.anyInt(), any());
+            assertThat(response.paymentMethod()).isEqualTo(PaymentMethod.WALLET_PG.name());
+            assertThat(response.walletAmount()).isEqualTo(walletAmount);
+        }
+
+        @Test
+        @DisplayName("재시도 #5 — READY+WALLET_PG(2000) → WALLET_PG(3000): 기존 환원 + 새 차감")
+        void 재시도_WALLET_PG_금액변경() {
+            // given
+            int totalAmount = orderInfo.totalAmount();
+            int oldWalletAmount = 2000;
+            int oldPgAmount = totalAmount - oldWalletAmount;
+            int newWalletAmount = 3000;
+            int newPgAmount = totalAmount - newWalletAmount;
+            Payment existing = Payment.create(
+                orderInfo.id(), USER_ID, PaymentMethod.WALLET_PG, totalAmount, oldWalletAmount, oldPgAmount);
+            UUID preservedPaymentId = existing.getPaymentId();
+            PaymentReadyRequest request = new PaymentReadyRequest(EXTERNAL_ORDER_ID, PaymentMethod.WALLET_PG, newWalletAmount);
+
+            given(commerceInternalClient.getOrderInfo(EXTERNAL_ORDER_ID)).willReturn(orderInfo);
+            given(paymentRepository.findByOrderId(orderInfo.id())).willReturn(Optional.of(existing));
+            given(paymentRepository.save(any(Payment.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
+
+            // when
+            PaymentReadyResponse response = paymentService.readyPayment(USER_ID, request);
+
+            // then
+            verify(walletService).restoreForWalletPgFail(USER_ID, oldWalletAmount, orderInfo.id());
+            verify(walletService).deductForWalletPg(USER_ID, orderInfo.id(), newWalletAmount);
+            assertThat(existing.getWalletAmount()).isEqualTo(newWalletAmount);
+            assertThat(existing.getPgAmount()).isEqualTo(newPgAmount);
+            assertThat(existing.getPaymentId()).isEqualTo(preservedPaymentId);
+            assertThat(response.walletAmount()).isEqualTo(newWalletAmount);
+        }
+
+        @Test
+        @DisplayName("재시도 #6 — READY+WALLET_PG(2000) → WALLET 단독: restoreForWalletPgFail + processWalletPayment 호출")
+        void 재시도_WALLET_PG에서_WALLET으로_변경() {
+            // given
+            int totalAmount = orderInfo.totalAmount();
+            int oldWalletAmount = 2000;
+            int oldPgAmount = totalAmount - oldWalletAmount;
+            Payment existing = Payment.create(
+                orderInfo.id(), USER_ID, PaymentMethod.WALLET_PG, totalAmount, oldWalletAmount, oldPgAmount);
+            PaymentReadyRequest request = new PaymentReadyRequest(EXTERNAL_ORDER_ID, PaymentMethod.WALLET, null);
+
+            given(commerceInternalClient.getOrderInfo(EXTERNAL_ORDER_ID)).willReturn(orderInfo);
+            given(paymentRepository.findByOrderId(orderInfo.id())).willReturn(Optional.of(existing));
+            given(paymentRepository.save(any(Payment.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
+
+            // when
+            paymentService.readyPayment(USER_ID, request);
+
+            // then
+            verify(walletService).restoreForWalletPgFail(USER_ID, oldWalletAmount, orderInfo.id());
+            verify(walletService).processWalletPayment(eq(USER_ID), eq(EXTERNAL_ORDER_ID), eq(totalAmount), any());
+            assertThat(existing.getPaymentMethod()).isEqualTo(PaymentMethod.WALLET);
+            assertThat(existing.getWalletAmount()).isEqualTo(0);
+            assertThat(existing.getPgAmount()).isEqualTo(0);
+        }
+
+        @Test
+        @DisplayName("재시도 #7 — READY+WALLET_PG(2000) → PG 단독: restoreForWalletPgFail 호출, walletAmount/pgAmount=0")
+        void 재시도_WALLET_PG에서_PG로_변경() {
+            // given
+            int totalAmount = orderInfo.totalAmount();
+            int oldWalletAmount = 2000;
+            int oldPgAmount = totalAmount - oldWalletAmount;
+            Payment existing = Payment.create(
+                orderInfo.id(), USER_ID, PaymentMethod.WALLET_PG, totalAmount, oldWalletAmount, oldPgAmount);
+            UUID preservedPaymentId = existing.getPaymentId();
+            PaymentReadyRequest request = new PaymentReadyRequest(EXTERNAL_ORDER_ID, PaymentMethod.PG, null);
+
+            given(commerceInternalClient.getOrderInfo(EXTERNAL_ORDER_ID)).willReturn(orderInfo);
+            given(paymentRepository.findByOrderId(orderInfo.id())).willReturn(Optional.of(existing));
+            given(paymentRepository.save(any(Payment.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
+
+            // when
+            PaymentReadyResponse response = paymentService.readyPayment(USER_ID, request);
+
+            // then
+            verify(walletService).restoreForWalletPgFail(USER_ID, oldWalletAmount, orderInfo.id());
+            verify(walletService, never()).deductForWalletPg(any(), any(), org.mockito.ArgumentMatchers.anyInt());
+            verify(walletService, never()).processWalletPayment(any(), any(), org.mockito.ArgumentMatchers.anyInt(), any());
+            assertThat(existing.getPaymentMethod()).isEqualTo(PaymentMethod.PG);
+            assertThat(existing.getAmount()).isEqualTo(totalAmount);
+            assertThat(existing.getWalletAmount()).isEqualTo(0);
+            assertThat(existing.getPgAmount()).isEqualTo(0);
+            assertThat(existing.getPaymentId()).isEqualTo(preservedPaymentId);
+            assertThat(response.paymentMethod()).isEqualTo(PaymentMethod.PG.name());
+        }
+
+        @Test
+        @DisplayName("재시도 #8 — SUCCESS Payment 재요청: ALREADY_PROCESSED_PAYMENT 예외 (회귀)")
+        void 재시도_종단상태_거부() {
+            // given
+            Payment existing = createReadyPayment();
+            existing.approve(PAYMENT_KEY);
+            PaymentReadyRequest request = new PaymentReadyRequest(EXTERNAL_ORDER_ID, PaymentMethod.PG, null);
+
+            given(commerceInternalClient.getOrderInfo(EXTERNAL_ORDER_ID)).willReturn(orderInfo);
+            given(paymentRepository.findByOrderId(orderInfo.id())).willReturn(Optional.of(existing));
+
+            // when & then
+            assertThatThrownBy(() -> paymentService.readyPayment(USER_ID, request))
+                .isInstanceOf(PaymentException.class)
+                .extracting(e -> ((PaymentException) e).getErrorCode())
+                .isEqualTo(PaymentErrorCode.ALREADY_PROCESSED_PAYMENT);
+
+            verify(paymentRepository, never()).save(any());
+            verify(walletService, never()).restoreForWalletPgFail(any(), org.mockito.ArgumentMatchers.anyInt(), any());
+            verify(walletService, never()).deductForWalletPg(any(), any(), org.mockito.ArgumentMatchers.anyInt());
+        }
+
         private Payment createWalletReadyPayment() {
             return Payment.create(orderInfo.id(), USER_ID, PaymentMethod.WALLET, orderInfo.totalAmount());
+        }
+    }
+
+    // =========================================================
+    // Payment.resetForRetry — 도메인 단위 테스트
+    // =========================================================
+
+    @Nested
+    @DisplayName("Payment.resetForRetry")
+    class ResetForRetryTest {
+
+        @Test
+        @DisplayName("READY 상태에서 결제수단/금액 재초기화 — 정상")
+        void READY에서_재초기화_성공() {
+            // given
+            Payment payment = Payment.create(ORDER_ID, USER_ID, PaymentMethod.PG, 130000);
+
+            // when
+            payment.resetForRetry(PaymentMethod.WALLET_PG, 130000, 30000, 100000);
+
+            // then
+            assertThat(payment.getStatus()).isEqualTo(PaymentStatus.READY);
+            assertThat(payment.getPaymentMethod()).isEqualTo(PaymentMethod.WALLET_PG);
+            assertThat(payment.getAmount()).isEqualTo(130000);
+            assertThat(payment.getWalletAmount()).isEqualTo(30000);
+            assertThat(payment.getPgAmount()).isEqualTo(100000);
+        }
+
+        @Test
+        @DisplayName("walletAmount/pgAmount null 입력 — 0으로 정규화")
+        void null_금액_0으로_정규화() {
+            // given
+            Payment payment = Payment.create(ORDER_ID, USER_ID, PaymentMethod.WALLET_PG, 100000, 30000, 70000);
+
+            // when
+            payment.resetForRetry(PaymentMethod.PG, 100000, null, null);
+
+            // then
+            assertThat(payment.getWalletAmount()).isEqualTo(0);
+            assertThat(payment.getPgAmount()).isEqualTo(0);
+        }
+
+        @Test
+        @DisplayName("SUCCESS 상태 — INVALID_STATUS_TRANSITION 예외")
+        void SUCCESS_상태에서_재초기화_거부() {
+            // given
+            Payment payment = Payment.create(ORDER_ID, USER_ID, PaymentMethod.PG, 130000);
+            payment.approve(PAYMENT_KEY);
+
+            // when & then
+            assertThatThrownBy(() -> payment.resetForRetry(PaymentMethod.WALLET, 130000, 0, 0))
+                .isInstanceOf(PaymentException.class)
+                .extracting(e -> ((PaymentException) e).getErrorCode())
+                .isEqualTo(PaymentErrorCode.INVALID_STATUS_TRANSITION);
+        }
+
+        @Test
+        @DisplayName("FAILED 상태 — INVALID_STATUS_TRANSITION 예외")
+        void FAILED_상태에서_재초기화_거부() {
+            // given
+            Payment payment = Payment.create(ORDER_ID, USER_ID, PaymentMethod.PG, 130000);
+            payment.fail("test failure");
+
+            // when & then
+            assertThatThrownBy(() -> payment.resetForRetry(PaymentMethod.WALLET, 130000, 0, 0))
+                .isInstanceOf(PaymentException.class)
+                .extracting(e -> ((PaymentException) e).getErrorCode())
+                .isEqualTo(PaymentErrorCode.INVALID_STATUS_TRANSITION);
         }
     }
 
