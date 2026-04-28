@@ -9,6 +9,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -216,7 +218,9 @@ class RecommendationServiceTest {
         return IntStream.range(0, count)
             .mapToObj(i -> {
                 Map<String, Object> m = new HashMap<>();
-                m.put("eventId", "knn-event-" + i);
+                m.put("id", "knn-event-" + i);
+                List<Double> embedding = new ArrayList<>(Collections.nCopies(1536, 0.0));
+                m.put("embedding", embedding);
                 return m;
             })
             .toList();
