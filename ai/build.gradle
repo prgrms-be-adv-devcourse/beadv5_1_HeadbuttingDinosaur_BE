@@ -72,5 +72,8 @@ spotbugsMain {
             required = true
             outputLocation = file('build/reports/spotbugs/main.html')
         }
+        xml {
+            required = true
+        }
     }
 }
