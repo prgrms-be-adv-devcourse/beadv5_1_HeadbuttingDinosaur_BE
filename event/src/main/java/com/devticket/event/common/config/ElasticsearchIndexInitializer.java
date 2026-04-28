@@ -31,7 +31,7 @@ public class ElasticsearchIndexInitializer {
         List.of(EventStatus.DRAFT, EventStatus.ON_SALE, EventStatus.SOLD_OUT);
 
     private static final List<EventStatus> TERMINATED_STATUSES =
-        List.of(EventStatus.SALE_ENDED, EventStatus.CANCELLED, EventStatus.FORCE_CANCELLED);
+        List.of(EventStatus.CANCELLED, EventStatus.FORCE_CANCELLED);
 
     private static final int BATCH_SIZE = 50;
 
