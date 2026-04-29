@@ -18,7 +18,8 @@ import org.springframework.test.util.ReflectionTestUtils;
 /**
  * Outbox Repository JPA 쿼리 회귀 방지.
  *
- * <p>핵심 가드: `nextRetryAt < :now` 경계 배제 (kafka-design.md §4).
+ * <p>핵심 가드: `nextRetryAt < :now` 경계 배제 (kafka-design.md §4),
+ * 그리고 `createdAt < :graceCutoff` 의 grace period 차단(직접 발행 경로 동작 시간 확보).
  * {@code <=} 으로의 조용한 회귀는 운영에서 즉시 감지되지 않으므로 본 테스트가 유일한 차단선.
  */
 @DataJpaTest
@@ -28,6 +29,9 @@ import org.springframework.test.util.ReflectionTestUtils;
 @ActiveProfiles("test")
 class OutboxRepositoryTest {
 
+    /** grace period 비활성 효과 — 모든 row 의 createdAt 보다 충분히 미래. */
+    private static final Instant FAR_FUTURE_GRACE = Instant.now().plusSeconds(3600);
+
     @Autowired
     private OutboxRepository outboxRepository;
 
@@ -35,7 +39,8 @@ class OutboxRepositoryTest {
     void nextRetryAt_null이면_즉시_발행_대상으로_포함된다() {
         Outbox immediate = save(outbox(), null);
 
-        List<Outbox> result = outboxRepository.findPendingToPublish(OutboxStatus.PENDING, Instant.now());
+        List<Outbox> result = outboxRepository.findPendingToPublish(
+                OutboxStatus.PENDING, Instant.now(), FAR_FUTURE_GRACE);
 
         assertThat(result).extracting(Outbox::getId).contains(immediate.getId());
     }
@@ -45,7 +50,8 @@ class OutboxRepositoryTest {
         Instant now = Instant.now();
         Outbox past = save(outbox(), now.minusSeconds(1));
 
-        List<Outbox> result = outboxRepository.findPendingToPublish(OutboxStatus.PENDING, now);
+        List<Outbox> result = outboxRepository.findPendingToPublish(
+                OutboxStatus.PENDING, now, FAR_FUTURE_GRACE);
 
         assertThat(result).extracting(Outbox::getId).contains(past.getId());
     }
@@ -59,7 +65,8 @@ class OutboxRepositoryTest {
         Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
         Outbox boundary = save(outbox(), now);
 
-        List<Outbox> result = outboxRepository.findPendingToPublish(OutboxStatus.PENDING, now);
+        List<Outbox> result = outboxRepository.findPendingToPublish(
+                OutboxStatus.PENDING, now, FAR_FUTURE_GRACE);
 
         assertThat(result).extracting(Outbox::getId).doesNotContain(boundary.getId());
     }
@@ -69,7 +76,8 @@ class OutboxRepositoryTest {
         Instant now = Instant.now();
         Outbox future = save(outbox(), now.plusSeconds(1));
 
-        List<Outbox> result = outboxRepository.findPendingToPublish(OutboxStatus.PENDING, now);
+        List<Outbox> result = outboxRepository.findPendingToPublish(
+                OutboxStatus.PENDING, now, FAR_FUTURE_GRACE);
 
         assertThat(result).extracting(Outbox::getId).doesNotContain(future.getId());
     }
@@ -84,11 +92,40 @@ class OutboxRepositoryTest {
         ReflectionTestUtils.setField(failed, "status", OutboxStatus.FAILED);
         outboxRepository.save(failed);
 
-        List<Outbox> result = outboxRepository.findPendingToPublish(OutboxStatus.PENDING, Instant.now());
+        List<Outbox> result = outboxRepository.findPendingToPublish(
+                OutboxStatus.PENDING, Instant.now(), FAR_FUTURE_GRACE);
 
         assertThat(result)
                 .extracting(Outbox::getId)
                 .doesNotContain(sent.getId(), failed.getId());
+    }
+
+    @Test
+    @DisplayName("createdAt >= graceCutoff row 는 fallback 대상에서 제외된다")
+    void graceCutoff_경과전_row는_제외된다() {
+        Outbox fresh = outboxRepository.save(outbox());
+
+        // graceCutoff = 방금 row 의 createdAt 직후 시각 — fresh.createdAt < cutoff 가 거짓.
+        Instant graceCutoff = fresh.getCreatedAt().minusMillis(1);
+
+        List<Outbox> result = outboxRepository.findPendingToPublish(
+                OutboxStatus.PENDING, Instant.now(), graceCutoff);
+
+        assertThat(result).extracting(Outbox::getId).doesNotContain(fresh.getId());
+    }
+
+    @Test
+    @DisplayName("createdAt < graceCutoff row 는 fallback 대상으로 포함된다")
+    void graceCutoff_경과후_row는_포함된다() {
+        Outbox aged = outboxRepository.save(outbox());
+
+        // graceCutoff = createdAt 보다 1ms 미래 → createdAt < cutoff 성립.
+        Instant graceCutoff = aged.getCreatedAt().plusMillis(1);
+
+        List<Outbox> result = outboxRepository.findPendingToPublish(
+                OutboxStatus.PENDING, Instant.now(), graceCutoff);
+
+        assertThat(result).extracting(Outbox::getId).contains(aged.getId());
     }
 
     private Outbox outbox() {

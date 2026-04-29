@@ -36,6 +36,7 @@ class OutboxServicePropagationTest {
     @Autowired private OutboxRepository outboxRepository;
 
     @MockitoBean private OutboxEventProducer outboxEventProducer;
+    @MockitoBean private OutboxAfterCommitPublisher outboxAfterCommitPublisher;
 
     @Test
     @Transactional(propagation = Propagation.NEVER)
