@@ -28,6 +28,9 @@ class OutboxServiceTest {
     private OutboxEventProducer outboxEventProducer;
 
     @Mock
+    private OutboxAfterCommitPublisher outboxAfterCommitPublisher;
+
+    @Mock
     private ObjectMapper objectMapper;
 
     @InjectMocks
