@@ -1,6 +1,9 @@
 # Kafka 구현용 DB 스키마 변경 계획
 
-> 최종 업데이트: 2026-04-22
+> 최종 업데이트: 2026-04-27
+
+> **마이그레이션 운영 정책**
+> 본 저장소는 Flyway/Liquibase 같은 SQL 마이그레이션 도구를 **사용하지 않습니다**. 컬럼·테이블 추가는 JPA `ddl-auto: update`가 자동 처리하고, 타입 변경·테이블 삭제·`shedlock`처럼 자동화 불가 항목은 아래 "수동 실행 필요 항목 전체 모음" SQL을 운영자가 직접 실행합니다. 따라서 본 문서가 곧 **마이그레이션 대장(ledger)** 역할을 겸합니다 (`db/migration/V*.sql` 파일은 존재하지 않습니다).
 
 ---
 
@@ -18,7 +21,7 @@
 | outbox 수정 | `next_retry_at` | TIMESTAMP 컬럼 추가 | 엔티티 필드 추가 → 자동 |
 | outbox 수정 | `sent_at` | TIMESTAMP 컬럼 추가 | 엔티티 필드 추가 → 자동 |
 | processed_message 수정 | `topic` | VARCHAR(128) 컬럼 추가 | 엔티티 필드 추가 → 자동 |
-| processed_message 수정 | `message_id` | UUID → VARCHAR(36) 타입 변경 (⚠️ Outbox B4-2 정합 — 별건 이슈 분리 권고, 엔티티 필드는 현재 `UUID` 잔존) | 수동 ALTER (PostgreSQL `USING message_id::text` 명시 필요) |
+| processed_message 수정 | `message_id` | UUID → VARCHAR(36) 타입 변경 — ✅ **PR #584 머지 완료** (2026-04-27, 엔티티 필드도 `String` 으로 통일) | 수동 ALTER (PostgreSQL `USING message_id::text` 명시 필요) |
 | shedlock 생성 | 신규 테이블 | Outbox 스케줄러 분산 락 | 수동 CREATE TABLE |
 | payment 엔티티 | `version` | BIGINT 컬럼 추가 (@Version) | 엔티티 필드 추가 → 자동 |
 
@@ -104,8 +107,8 @@ CREATE TABLE event.shedlock (
 ALTER TABLE payment.outbox
     ALTER COLUMN message_id TYPE VARCHAR(36) USING message_id::text;
 
--- ⑧ Payment: processed_message message_id 타입 변경 (B4-2 정합)
--- Outbox message_id String 전환과 정합 유지 — 엔티티 필드도 함께 UUID→String 전환 필요
+-- ⑧ Payment: processed_message message_id 타입 변경 (B4-2 정합) — ✅ PR #584 머지 (2026-04-27)
+-- 엔티티 필드도 함께 UUID→String 전환 완료. 운영 DB ALTER 함께 실행됨.
 ALTER TABLE payment.processed_message
     ALTER COLUMN message_id TYPE VARCHAR(36) USING message_id::text;
 
@@ -118,6 +121,35 @@ ALTER TABLE commerce.order
 -- 추후 스코프(환불) 사전 준비 — IF NOT EXISTS + DEFAULT 0
 ALTER TABLE commerce.ticket
     ADD COLUMN IF NOT EXISTS version BIGINT NOT NULL DEFAULT 0;
+
+-- ⑪ Payment: refund_ticket ticket_id UNIQUE 제약 추가 — ✅ PR #582 머지 (커밋 e88294c)
+-- 동일 ticketId 동시 환불 요청 race condition 방어 (RefundServiceImpl.refundPgTicket)
+-- 코드 측: @UniqueConstraint(name="uk_refund_ticket_ticket_id") 추가됨 (RefundTicket.java) +
+-- existsByTicketId 사전 체크 + DataIntegrityViolationException catch → REFUND_ALREADY_IN_PROGRESS
+-- 적용 전 중복 row 존재 여부 확인 필수:
+--   SELECT ticket_id, COUNT(*) FROM payment.refund_ticket GROUP BY ticket_id HAVING COUNT(*) > 1;
+ALTER TABLE payment.refund_ticket
+    ADD CONSTRAINT uk_refund_ticket_ticket_id UNIQUE (ticket_id);
+
+
+-- ⑫ Payment: refund_ticket status 컬럼 추가 (기존 데이터 있는 환경)
+-- ddl-auto:update는 NOT NULL 컬럼을 기존 row가 있을 때 DEFAULT 없이 추가 불가 → 수동 실행 필요
+-- 1) 일단 COMPLETED로 채운 뒤 2) refund 테이블 기준으로 실패 건 보정
+ALTER TABLE payment.refund_ticket
+    ADD COLUMN IF NOT EXISTS status VARCHAR(16) NOT NULL DEFAULT 'COMPLETED';
+ALTER TABLE payment.refund_ticket
+    ALTER COLUMN status DROP DEFAULT;
+
+-- refund 테이블에서 FAILED 상태인 건은 FAILED로 보정 (재시도 허용)
+UPDATE payment.refund_ticket rt
+SET status = 'FAILED'
+WHERE EXISTS (
+    SELECT 1 FROM payment.refund r
+    WHERE r.refund_id = rt.refund_id
+      AND r.status = 'FAILED'
+);
+
+
 ```
 
 ---

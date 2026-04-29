@@ -34,9 +34,9 @@ Kafka를 통해 서비스 간에 오가는 모든 이벤트를 한 눈에 확인
 
 | 이벤트 토픽 | Producer 서비스 | Consumer 서비스 | 트리거 조건 | DLT 여부 | 구현 상태 |
 |------------|----------------|----------------|-----------|---------|---------|
-| `order.created` | Commerce | Event | 주문 생성 + Outbox INSERT 커밋 시 | `order.created.DLT` | ✅ Commerce Producer / ✅ Event Consumer |
-| `stock.deducted` | Event | Commerce | `order.created` 수신 후 재고 차감 성공 시 | `stock.deducted.DLT` | ✅ Event Producer / ✅ Commerce Consumer |
-| `stock.failed` | Event | Commerce | `order.created` 수신 후 재고 부족 판정 시 | `stock.failed.DLT` | ✅ Event Producer / ✅ Commerce Consumer |
+| ~~`order.created`~~ | ~~Commerce~~ | ~~Event~~ | ~~주문 생성 + Outbox INSERT 커밋 시~~ | ~~`order.created.DLT`~~ | ⚠️ **비활성** — `OrderService.createOrderByCart`가 동기 REST(`PATCH /internal/events/stock-adjustments`)로 재고 차감 (`OrderService.java:116-117`). 발행 호출자 없음 |
+| ~~`stock.deducted`~~ | ~~Event~~ | ~~Commerce~~ | ~~`order.created` 수신 후 재고 차감 성공 시~~ | ~~`stock.deducted.DLT`~~ | ⚠️ **비활성** — Event는 REST 응답으로 즉시 결과 반환. Producer 호출자 없음 |
+| ~~`stock.failed`~~ | ~~Event~~ | ~~Commerce~~ | ~~`order.created` 수신 후 재고 부족 판정 시~~ | ~~`stock.failed.DLT`~~ | ⚠️ **비활성** — REST 4xx/예외로 동기 보고. Producer 호출자 없음 |
 | `payment.completed` | Payment | Commerce | PG 승인 성공 + 내부 상태 반영 커밋 시 | `payment.completed.DLT` | ✅ Payment Producer (WALLET_PG 머지 완료) / ✅ Commerce Consumer |
 | `payment.failed` | Payment | Commerce, Event | PG 승인 실패 또는 내부 검증 실패 시 | `payment.failed.DLT` | ✅ Payment Producer / ✅ Commerce Consumer / ✅ Event Consumer |
 | `ticket.issue-failed` | Commerce | Commerce, Payment | 결제 성공 후 티켓 발급 실패 감지 시 | `ticket.issue-failed.DLT` | ✅ Commerce Producer (Outbox) / ⬜ Commerce 자체 소비 / ⬜ Payment Consumer |
@@ -52,7 +52,7 @@ Kafka를 통해 서비스 간에 오가는 모든 이벤트를 한 눈에 확인
 | `refund.stock.done` / `refund.stock.failed` | Event | Payment (Orchestrator) | Stock 복구 처리 결과 | — | ⬜ 미구현 |
 | `refund.order.compensate` | Payment (Orchestrator) | Commerce | Order 취소 보상 (롤백) | — | ⬜ 미구현 |
 | `refund.ticket.compensate` | Payment (Orchestrator) | Commerce | Ticket 취소 보상 (롤백) | — | ⬜ 미구현 |
-| `action.log` (analytics) | Event (VIEW/DETAIL_VIEW/DWELL_TIME), Commerce (CART_ADD/CART_REMOVE), **Log 자체 consume**(PURCHASE) | **Log 서비스** (Fastify, 별도 스택) | 각 API 호출 시 (`acks=0`, Outbox 미사용). PURCHASE는 Log 서비스가 `payment.completed` 수신 → `log.action_log` 직접 INSERT | **없음** (at-most-once — 손실 허용) | ✅ Log Consumer 확장 완료 / ✅ Event Producer 완료 (2026-04-23) / ⬜ Commerce Producer 미확인 (상세: [actionLog.md](actionLog.md)) |
+| `action.log` (analytics) | Event (VIEW/DETAIL_VIEW/DWELL_TIME), Commerce (CART_ADD/CART_REMOVE), **Log 자체 consume**(PURCHASE) | **Log 서비스** (Fastify, 별도 스택) | 각 API 호출 시 (`acks=0`, Outbox 미사용). PURCHASE는 Log 서비스가 `payment.completed` 수신 → `log.action_log` 직접 INSERT | **없음** (at-most-once — 손실 허용) | ✅ Log Consumer 확장 완료 / ✅ Event Producer 완료 (2026-04-23) / ✅ Commerce Producer 완료 (`CartService.publishCartActionLog` — `addToCart` / `clearCart` N회 / `updateTicket` 양·음수 분기) (상세: [actionLog.md](actionLog.md)) |
 
 **구현 상태 범례**
 
@@ -397,7 +397,7 @@ sequenceDiagram
 - [x] ✅ `OutboxScheduler` ShedLock 적용 (`lockAtMostFor=5m`, `lockAtLeastFor=5s`) — 2026-04-21 `30s → 5m` 확장 결정 반영 (최악 100s 대비 안전계수 3배)
 - [x] ✅ Outbox 발행 시 Partition Key 설정 — `ticket.issue-failed` → `orderId` 적용 완료 *(`order.created` / `refund.*` 는 해당 Producer 스코프에서 적용)*
 - [x] ✅ `OutboxEventProducer`: Kafka 발행 시 `X-Message-Id` 헤더 세팅 (Outbox messageId 그대로 전달)
-- [x] ✅ `OrderService.createOrderByCart()` 내 동기 HTTP 재고 차감 코드(`orderToEventClient.adjustStocks()`) 제거 완료 — `order.created` Outbox 발행으로 전환 (`OrderService.java:153-159`)
+- ⚠️ **이력 정정**: 이전 doc에서 "REST → `order.created` Outbox 전환 완료"로 기록됐으나 현재 코드는 다시 **동기 REST** 로 되돌아간 상태입니다. `OrderService.createOrderByCart()` 가 `OrderToEventClient.adjustStocks()` 로 `PATCH /internal/events/stock-adjustments` 동기 호출 (`OrderService.java:116-117`, `Order.createPending` 으로 곧장 `PAYMENT_PENDING` 진입). `order.created` Outbox 발행 경로는 비활성. 토픽 폐지 vs 부활 여부는 별도 트랙
 
 **Consumer 멱등성**
 - [x] ✅ `MessageDeduplicationService` 구현 + `processed_message` 테이블 생성 (`ProcessedMessage`, `ProcessedMessageRepository`)

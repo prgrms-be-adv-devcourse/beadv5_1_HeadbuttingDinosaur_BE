@@ -167,8 +167,15 @@ Consumer 처리 흐름은 "조회 후 INSERT" 구조입니다.
 
 ### 3-5. messageId 생성 및 전달 방식
 
-Consumer의 dedup 키는 **Outbox가 생성한 `UUID.randomUUID().toString()`** (3모듈 통일: `String` / `VARCHAR(36)`) 입니다.
-Producer(Outbox 스케줄러)가 Kafka 헤더에 실어 보내고, Consumer가 이를 추출하여 사용합니다.
+Consumer의 dedup 키는 **Outbox가 생성한 `UUID.randomUUID().toString()`** 입니다. **3모듈 통일: `String` / `VARCHAR(36)`** (PR #584 머지 완료 — 2026-04-27, Payment 측 컬럼·필드를 UUID → String 정렬 + 운영 ALTER 함께 실행).
+
+| 모듈 | `processed_message.message_id` 컬럼 / JPA 필드 |
+|------|------------------------------------------|
+| Commerce | `VARCHAR(36)` / `String` |
+| Event | `VARCHAR(36)` / `String` |
+| Payment | `VARCHAR(36)` / `String` |
+
+Producer(Outbox 스케줄러)가 Kafka 헤더에 UUID 문자열을 실어 보내고, Consumer가 이를 추출하여 사용합니다.
 
 **Producer 측 — Outbox 스케줄러:**
 

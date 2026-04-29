@@ -137,6 +137,19 @@
   - `eventId`: `Long`
   - `orders`: `List<InternalOrderItemsResponse.OrderItems>`
 
+### InternalOrderTicketsResponse
+- 파일: `commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/InternalOrderTicketsResponse.java`
+- 타입: `record`
+- 필드:
+  - `orderId`: `UUID`
+  - `userId`: `UUID`
+  - `paymentId`: `UUID`
+  - `totalAmount`: `int`
+  - `remainingAmount`: `int`
+  - `tickets`: `List<TicketItem>`
+- 중첩 record `TicketItem`: `ticketId: UUID`, `eventId: UUID`, `amount: int`, `status: TicketStatus`
+- 용도: Payment → Commerce 환불 산정용. `remainingAmount`는 status 필터가 `ISSUED`일 때 환불 대상 합계.
+
 ### InternalSettlementDataResponse
 - 파일: `commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/InternalSettlementDataResponse.java`
 - 타입: `record`
@@ -145,6 +158,21 @@
   - `periodStart`: `String`
   - `periodEnd`: `String`
   - `eventSettlements`: `List<EventSettlements>`
+
+### InternalTicketSettlementDataResponse
+- 파일: `commerce/src/main/java/com/devticket/commerce/ticket/presentation/dto/res/InternalTicketSettlementDataResponse.java`
+- 타입: `record`
+- 필드:
+  - `items`: `List<InternalTicketSettlementItemResponse>`
+
+### InternalTicketSettlementItemResponse
+- 파일: `commerce/src/main/java/com/devticket/commerce/ticket/presentation/dto/res/InternalTicketSettlementItemResponse.java`
+- 타입: `record`
+- 필드:
+  - `eventId`: `UUID`
+  - `orderItemId`: `UUID`
+  - `salesAmount`: `Long`
+  - `refundAmount`: `Long`
 
 ### OrderCancelResponse
 - 파일: `commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/OrderCancelResponse.java`

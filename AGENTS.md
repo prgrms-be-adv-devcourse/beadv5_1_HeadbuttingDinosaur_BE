@@ -11,8 +11,8 @@
 - **모듈명:** devticket-log
 - **역할:** Kafka `action.log` 토픽을 consume하여 PostgreSQL `log.action_log` 테이블에 저장하는 경량 로그 수집기
 - **기술 스택:** Node.js 21+, Fastify, TypeScript (strict), KafkaJS, pg (node-postgres), pino
-- **포트:** 8085
-- **특성:** API 노출 최소 (health check만), Gateway 라우팅 대상 아님, 인증 불필요
+- **포트:** 8086
+- **특성:** 외부 API는 health check + 내부 조회용 `/internal/logs/*`만 노출. Gateway는 `/api/logs/**`를 본 모듈로 라우팅하나 현재 매핑된 외부 엔드포인트는 없음. `/internal/*`는 `X-Internal-Service` 헤더 기반 서비스 간 호출 (allowlist: `ai`).
 
 ### 프로젝트 전체 서비스 맥락
 
@@ -23,10 +23,10 @@
 | Event | 8082 | Spring Boot | 이벤트 CRUD, 재고 |
 | Commerce | 8083 | Spring Boot | 장바구니, 주문, 티켓 |
 | Payment | 8084 | Spring Boot | PG/예치금 결제, 환불 |
-| **Log** | **8085** | **Node.js + Fastify** | **행동 로그 수집** |
-| Settlement | 8086 | Spring Boot | 정산 |
+| Settlement | 8085 | Spring Boot | 정산 |
+| **Log** | **8086** | **Node.js + Fastify** | **행동 로그 수집 + 추천용 행동 조회** |
 | Admin | 8087 | Spring Boot | 운영 관리 |
-| AI | — | FastAPI (Python) | 임베딩, 추천 |
+| AI | 8088 | Spring Boot | 임베딩, 추천 (`ai/` 모듈 — Java/Spring. 게이트웨이 외부 라우팅 없음, 내부 호출 전용) |
 
 ---
 
@@ -41,16 +41,19 @@ devticket-log/
 │   │   ├── database.ts              # PostgreSQL 커넥션 풀
 │   │   └── kafka.ts                 # KafkaJS consumer 설정
 │   ├── consumer/
-│   │   └── action-log.consumer.ts   # action.log 토픽 consume
+│   │   └── action-log.consumer.ts   # action.log + payment.completed 토픽 consume (topic 분기)
 │   ├── service/
-│   │   └── action-log.service.ts    # 검증, 변환, 저장 위임
+│   │   ├── action-log.service.ts        # 검증/변환/저장 + 최근 로그 조회
+│   │   └── payment-completed.service.ts # payment.completed → PURCHASE 로그 변환·저장
 │   ├── repository/
-│   │   └── action-log.repository.ts # PostgreSQL INSERT
+│   │   └── action-log.repository.ts # PostgreSQL INSERT / SELECT
 │   ├── model/
-│   │   ├── action-log.model.ts      # ActionLog 인터페이스
-│   │   └── action-type.enum.ts      # ActionType enum
+│   │   ├── action-log.model.ts          # ActionLog 인터페이스
+│   │   ├── action-type.enum.ts          # ActionType enum
+│   │   └── payment-completed.model.ts   # payment.completed 메시지 스키마
 │   ├── route/
-│   │   └── health.route.ts          # GET /health, GET /ready
+│   │   ├── health.route.ts          # GET /health, GET /ready
+│   │   └── internal-log.route.ts    # GET /internal/logs/actions (X-Internal-Service 인증)
 │   └── util/
 │       └── logger.ts                # pino 로거
 ├── test/
@@ -316,8 +319,9 @@ export async function insertActionLog(log: ActionLog): Promise<void> {
 
 ### 5.5 Route (route/)
 
-- health check 엔드포인트만 존재
-- 비즈니스 로직 금지
+- 외부 노출은 health check 만, 그 외 `/internal/*` 는 서비스 간 호출 전용
+- `/internal/*` 는 `X-Internal-Service` 헤더 필수 + allowlist 검증 (`internal-log.route.ts:6` `INTERNAL_SERVICE_ALLOWLIST` 참고)
+- 비즈니스 로직 금지 — 검증·조회는 service 위임
 
 ### 5.6 Config (config/)
 
@@ -397,12 +401,12 @@ Kafka message 수신
 
 | 토픽명 | Producer | Consumer(s) | 설명 |
 |--------|----------|-------------|------|
-| `payment.completed` | Payment | Commerce, Event | 결제 완료 후속 처리 |
+| `payment.completed` | Payment | Commerce, Event, **Log** | 결제 완료 후속 처리. Log 모듈은 PURCHASE 행동 로그로 변환 저장 |
 | `refund.completed` | Payment | Commerce, Event, Payment(Wallet) | 환불 후속 처리 |
 | `event.force-cancelled` | Event | Payment | 강제 취소 → 일괄 환불 |
 | `event.sale-stopped` | Event | Payment | 판매 중지 → 일괄 환불 |
 | `member.suspended` | Member | Commerce, Member(Token) | 회원 제재 후속 처리 |
-| **`action.log`** | **Event, Commerce, Payment** | **Log Module, AI Module** | **행동 로그 수집** |
+| **`action.log`** | **Event, Commerce, Payment** *(Producer 미구현 — 설계상 발행 주체)* | **Log Module** | **행동 로그 수집. AI 모듈은 직접 구독 대신 `/internal/logs/actions`로 조회** |
 
 ### 7.4 action.log 메시지 스키마
 
@@ -491,12 +495,13 @@ DB_NAME          # 데이터베이스명
 DB_USER          # DB 사용자
 DB_PASSWORD      # DB 비밀번호
 DB_SCHEMA=log    # 스키마명
-KAFKA_BROKERS    # Kafka 브로커 (쉼표 구분)
+KAFKA_BROKERS                   # Kafka 브로커 (쉼표 구분)
 KAFKA_GROUP_ID=log-group
-KAFKA_TOPIC=action.log
-PORT=8085
-NODE_ENV         # development | production
-LOG_LEVEL=info   # pino 로그 레벨
+KAFKA_TOPIC_ACTION_LOG=action.log              # VIEW/DETAIL_VIEW/CART_*/DWELL_TIME/REFUND
+KAFKA_TOPIC_PAYMENT_COMPLETED=payment.completed # PURCHASE 로그 변환용
+PORT=8086
+NODE_ENV                        # development | production
+LOG_LEVEL=info                  # pino 로그 레벨
 ```
 
 **리뷰 체크리스트:**
@@ -569,7 +574,7 @@ describe('ActionLogService', () => {
 - 베이스: `node:21-alpine`
 - 멀티스테이지 빌드 (build → production)
 - 프로덕션 의존성만 포함 (`npm ci --omit=dev`)
-- HEALTHCHECK: `curl -f http://localhost:8085/health || exit 1`
+- HEALTHCHECK: `curl -f http://localhost:8086/health || exit 1`
 
 ### 11.2 k8s 리소스 제한
 

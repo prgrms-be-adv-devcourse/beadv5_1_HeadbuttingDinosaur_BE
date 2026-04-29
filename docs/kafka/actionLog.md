@@ -178,7 +178,7 @@ export interface ActionLogMessage {
 ## 4. 구현 지시서 (Phase 5 — 본 스코프 잔여)
 
 > 선행 조건: **Phase 3(7-A/7-B 결제 Producer) + Phase 4(8/9 결제 결과 Consumer) 완료** — `payment.completed` payload 스펙이 확정된 상태에서 착수.
-> DB/DTO 신규 변경 없음 — V2 마이그레이션 불필요.
+> DB/DTO 신규 변경 없음 — **Producer 트랙 한정** V2 마이그레이션 불필요 (§5 AI 조회 엔드포인트는 별도 V2 인덱스 추가 — §5.5 참조).
 
 ### ① Log 서비스 확장 (최우선) — ✅ 구현 완료 (2026-04-21)
 
@@ -192,8 +192,6 @@ export interface ActionLogMessage {
 ### ② 전용 `ActionLogKafkaProducerConfig` Bean 분리 — Event/Commerce 공통 선행
 
 > Producer 코드 작성의 **필수 선행 조건**. Event·Commerce가 각자 자기 모듈에서 독립 구현 (`common` 공유 모듈 없음).
->
-> **Event 모듈 구현 완료 (2026-04-23)** — `event/src/main/java/com/devticket/event/common/config/ActionLogKafkaProducerConfig.java` (`acks=0` / `retries=0` / `enable.idempotence=false` / `linger.ms=10` / `max.in.flight=5` / `compression=none`) + `actionLogKafkaTemplate` Bean 등록 + 기존 `kafkaTemplate` · `producerFactory` `@Primary` 부여 + `JacksonConfig @Primary ObjectMapper` 준수. Commerce 모듈은 별도 조사 필요.
 
 **설정값** (상세 표: `docs/kafka-design.md §6` action.log Producer 예외 설정)
 
@@ -269,16 +267,7 @@ public class ActionLogKafkaProducerConfig {
 
 ---
 
-### ③ Event Producer 구현 (Commerce와 병렬 가능) — ✅ 구현 완료 (2026-04-23)
-
-> **구현 위치**
-> - Spring 도메인 이벤트: `event/src/main/java/com/devticket/event/application/event/ActionLogDomainEvent.java`
-> - Kafka DTO: `event/src/main/java/com/devticket/event/common/messaging/event/ActionLogEvent.java`, `ActionType.java`
-> - Publisher(`@TransactionalEventListener(AFTER_COMMIT, fallbackExecution=true)` + `@Async`): `event/src/main/java/com/devticket/event/application/event/ActionLogKafkaPublisher.java`
-> - 발행 트리거: `EventService#logEventListView` (VIEW), `EventService#logDetailView` (DETAIL_VIEW), `DwellController#reportDwell` (DWELL_TIME)
-> - Bean Validation: `event/src/main/java/com/devticket/event/presentation/dto/DwellRequest.java` (`@NotNull @Positive Integer dwellTimeSeconds`) + Controller `@Valid` 적용 완료
-> - 비로그인 처리: `DwellController`에서 `X-User-Id` 미전달 시 publishEvent 미호출 + `204 No Content` 반환 (`get*` 비로그인 정책 일관)
-
+### ③ Event Producer 구현 (Commerce와 병렬 가능)
 
 | actionType | 발행 시점 | 필수 필드 | 선택 필드 |
 |---|---|---|---|
@@ -418,23 +407,26 @@ public class ActionLogKafkaPublisher {
 
 **작업 순서 팁**: VIEW → DETAIL_VIEW → DWELL_TIME (트래픽 큰 순)
 
-**DWELL_TIME 전용 신규 API 엔드포인트 — ✅ 구현 완료 (2026-04-23)**
+**DWELL_TIME 전용 신규 API 엔드포인트 — ✅ 구현 완료**
 
-> **AI팀 수집 필요성 컨펌 완료 (2026-04-21)** — DWELL_TIME은 단순 조회(`VIEW`/`DETAIL_VIEW`)로 측정 불가능한 관심도·이탈 예측·전환 가능성 추정의 핵심 신호.
-> **구현 완료** — `event/src/main/java/com/devticket/event/presentation/controller/DwellController.java`.
+> 구현 완료 — `event/.../presentation/controller/DwellController.java` (`POST /api/events/{eventId}/dwell`) + `event/.../presentation/dto/DwellRequest.java` (record + `@NotNull @Positive`). Controller 가 `ApplicationEventPublisher.publishEvent(ActionLogDomainEvent)` 만 호출, 비로그인 시 skip + `204 No Content` 반환.
+>
+> **AI팀 수집 필요성 컨펌 완료 (2026-04-21)** — DWELL_TIME은 단순 조회(`VIEW`/`DETAIL_VIEW`)로 측정 불가능한 관심도·이탈 예측·전환 가능성 추정의 핵심 신호. 구현 확정.
 
-- **경로**: `POST /api/events/{eventId}/dwell` ✅
-- **Request Body**: `DwellRequest { dwellTimeSeconds: Integer }` (eventId는 Path Variable, userId는 `X-User-Id` 헤더)
-  - **Bean Validation 적용 완료** ✅ — `DwellRequest.dwellTimeSeconds`에 `@NotNull @Positive`, Controller 파라미터에 `@Valid`
+- **경로 예시**: `POST /api/events/{eventId}/dwell` (프론트 스펙 합의 결과 우선)
+- **Request Body**: `{ dwellTimeSeconds: Integer }` (eventId는 Path Variable, userId는 인증 추출)
+  - **Bean Validation 필수**: `DwellRequest` record의 `dwellTimeSeconds` 필드에 `@NotNull @Positive` 적용, Controller 파라미터에 `@Valid` 부여
   - 근거: `acks=0` + Consumer dedup 미적용 정책상 Producer validation이 `log.action_log.dwell_time_seconds` 오염 방지의 **최종 방어선** (null·음수 요청 선 차단)
-- **응답**: `204 No Content` ✅
-- **Controller 구조**: 얇은 Controller → `ApplicationEventPublisher.publishEvent(ActionLogDomainEvent)` 호출. 트랜잭션 없음 (DB 접근 없음 — `fallbackExecution=true`로 리스너 실행 보장)
-- **비로그인 처리**: `X-User-Id` 미전달 시 publishEvent 미호출 + `204 No Content` 반환 ✅ (`get*` 비로그인 정책 일관)
+- **응답**: `204 No Content` (로그성 — body 불필요)
+- **Controller 구조**: 얇은 Controller → `ApplicationEventPublisher.publishEvent(ActionLogDomainEvent)` 호출만. **트랜잭션 불요, 기존 Publisher 재사용**
+- **비로그인 처리**: `X-User-Id` 미전달 시 → **발행 skip + `204 No Content` 반환** (`getEventList` / `getEvent` 등 `get*` 비로그인 정책과 일관. `userId` 필수 필드 누락 방지 + AI팀 수집 정책 일관성)
 - **프론트 트리거 규약** (참고): `visibilitychange` → hidden 전환 시 `navigator.sendBeacon()` 전송 권장 — 백엔드 구현과 독립, 프론트 합의 영역
+- **선결 합의 사항** (프론트 한정, PO·AI팀 의도는 확정): 경로 / body / 트리거 이벤트 / 최소 체류 시간 필터 / 수집 대상 페이지 범위
+- **스펙 합의 지연 대응**: 스펙만 먼저 확정되면 백엔드 구현·배포는 선행 가능 (호출자 없어도 무해)
 
 ---
 
-### ④ Commerce Producer 구현 (Event와 병렬 가능) — ⬜ 상태 미확인 (Commerce 모듈 조사 필요)
+### ④ Commerce Producer 구현 (Event와 병렬 가능)
 
 | actionType | 발행 시점 | 필수 필드 | 권장 필드 |
 |---|---|---|---|
@@ -486,11 +478,11 @@ public class ActionLogKafkaPublisher {
       ↓
   ① Log 서비스 확장 ✅ (payment.completed 구독 + PURCHASE INSERT)
       ↓
-  ② Event/Commerce 전용 Bean 분리 (각 모듈 내)   ← Event ✅ / Commerce 미확인
+  ② Event/Commerce 전용 Bean 분리 (각 모듈 내)
       ↓
   ┌───┴───┐
-  ③ Event ✅   ④ Commerce ⬜    ← Event 완료(2026-04-23) / Commerce 미확인
-  (3종)        (2종)
+  ③ Event    ④ Commerce    ← 병렬 가능
+  (3종)      (2종)
   └───┬───┘
       ↓
   ⑤ 통합 검증 (Bean 격리 / Outbox 미개입 / E2E / 부하)
@@ -548,11 +540,186 @@ public class ActionLogKafkaPublisher {
 
 ---
 
+## 5. AI 조회 엔드포인트 (`GET /internal/logs/actions`)
+
+> 대상: AI 서비스 `RecentVectorScheduler` / `LogServiceClient`
+> 배경: AI 측 recentVector 갱신 배치가 Log 서비스에 최근 N일 행동 로그를 조회 — §1~§4 수집 파이프라인의 **소비 측 계약** 절.
+>
+> **상위 원칙:** 본 엔드포인트는 통신 경계 3분류 중 **1-A Sync HTTP** (내부 서비스 간 조회). `kafka-sync-async-policy.md §1-A` 참조.
+>
+> 교차검증: AI팀 답변 수신 완료 (2026-04-24) — `LogServiceClient.java:21-34` / `ActionLogResponse.java:10-14` / `RecentVectorScheduler` / `RecommendationService.java:L165, L258` 근거
+
+---
+
+### 5.1 통신 경계 분류
+
+- **분류**: 1-A Sync HTTP (내부 서비스 간 조회)
+- **근거**: 사용자 트리거 아님, 상태 전파 아님, 즉시 응답 필요 — Kafka 비대상
+- **멱등성**: 조회 전용 (GET) — `Idempotency-Key` 불필요
+
+### 5.2 엔드포인트 계약
+
+**Request**
+
+| 항목 | 값 |
+|---|---|
+| Method | `GET` |
+| Path | `/internal/logs/actions` |
+| Query params | `userId` (UUID, 필수) · `days` (integer, 선택, 기본 7, 최대 30) · `actionTypes` (CSV, 필수) |
+| Headers | `X-Internal-Service: <caller-id>` (필수) |
+
+**Response 200 (JSON)**
+
+```json
+{
+  "userId": "uuid-string",
+  "logs": [
+    { "eventId": "uuid-string", "actionType": "VIEW", "dwellTimeSeconds": null }
+  ]
+}
+```
+
+- `logs[].eventId`: UUID, **non-null 보장** (§5.5 null 필터링 근거)
+- `logs[].actionType`: ActionType enum 값
+- `logs[].dwellTimeSeconds`: integer \| null (DWELL_TIME 외 null)
+- 로그 없음 시 `logs: []` 반환 — **200** (404 아님)
+- 결과 상한: **LIMIT 5000 / ORDER BY `created_at DESC`**
+
+**호출자 스펙 (AI팀 확인 2026-04-24)**
+
+- `LogServiceClient` — `WebClient` 기반, 타임아웃 5s, 재시도 없음
+- 실패 시 null 반환 → `RecentVectorJobConfig` per-user try/catch가 잡음 → 해당 유저만 skip
+
+**Response 4xx**
+
+| 코드 | 상황 |
+|---|---|
+| 400 | `userId` 미UUID / `days` 1~30 벗어남 / `actionTypes` 누락 또는 enum 외 값 포함 |
+| 401 | `X-Internal-Service` 헤더 누락 |
+| 403 | `X-Internal-Service` 값이 allowlist 외 |
+
+**Response 4xx Body** — Fastify 기본 포맷 준수
+
+```json
+{ "statusCode": 400, "error": "Bad Request", "message": "days must be between 1 and 30" }
+```
+
+- `statusCode`: HTTP 코드 (400/401/403)
+- `error`: Fastify 표준 사유 (`"Bad Request"` / `"Unauthorized"` / `"Forbidden"`)
+- `message`: 위반 사유 (운영 배포 시 `NODE_ENV=production` 설정 필수 — stack trace 노출 방지)
+
+### 5.3 Validation 규칙
+
+| 파라미터 | 규칙 | 위반 시 |
+|---|---|---|
+| `userId` | UUID v4 포맷 | 400 |
+| `days` | 정수, `1 ≤ days ≤ 30` | 400 (누락 시 기본 7 적용) |
+| `actionTypes` | CSV, 공백·빈 토큰 무시 후 enum 7종(`VIEW`/`DETAIL_VIEW`/`CART_ADD`/`CART_REMOVE`/`PURCHASE`/`DWELL_TIME`/`REFUND`) 내 전원 유효 | 400 (단 1개라도 무효 시) |
+| URL 인코딩 | `actionTypes=VIEW%2CDETAIL_VIEW` 수신 → Fastify `request.query` 자동 디코딩 동작 확인 필수 | 테스트로 보장 |
+| `X-Internal-Service` | 사전 allowlist 일치 | 401/403 |
+
+### 5.4 보안 (Internal API 접근 제어)
+
+- **Gateway 차단 전제 — 실존 확인 완료 (2026-04-24)**
+  - `origin/develop/gateway` · `apigateway/.../RoutePolicy.java`에 `INTERNAL_PATTERNS = /internal/**` 정의
+  - Gateway Route 라우팅 테이블에 `/internal/**` 항목 없음 → 외부 진입 차단 상태
+- **Fastify 이중 방어**: `onRequest` hook에서 `X-Internal-Service` 헤더 검증 — AGENTS.md §7.2 준수
+- **allowlist (초기)**: `ai`
+- **향후 강화 여지**: mTLS / HMAC 서명 / 토큰 회전 (필요 시 별도 트랙)
+
+### 5.5 성능·쿼리 전략
+
+**쿼리**
+
+```sql
+SELECT event_id AS "eventId",
+       action_type AS "actionType",
+       dwell_time_seconds AS "dwellTimeSeconds"
+FROM log.action_log
+WHERE user_id = $1
+  AND action_type = ANY($2::text[])
+  AND created_at >= NOW() - ($3::int || ' days')::INTERVAL
+  AND event_id IS NOT NULL
+ORDER BY created_at DESC
+LIMIT 5000;
+```
+
+**`WHERE event_id IS NOT NULL` 근거 (이중 방어 — 2026-04-24 확정)**
+
+- AI `ActionLogEntry.eventId: String` 암묵 nullable (`@NotNull` 없음)
+- AI `RecentVectorService`는 `eventId`를 키로 ES embedding GET 호출 → null 전달 시 예외
+- `RecentVectorJobConfig.java:53-58` per-user try/catch가 잡음 → **해당 유저 recentVector 전체 갱신 실패**
+- VIEW 중 "이벤트 목록 조회" 성격(`event_id=null`) row는 eventId 기반 분석 대상 외 → **서버 측 선제 제외가 API 계약상 깨끗**
+- **병행 권장 (별개 트랙)**: AI 측 `null eventId skip` 로직 추가 — 향후 다른 호출자 대비
+
+**인덱스 (V2 마이그레이션 — 본 PR 포함)**
+
+- `fastify-log/sql/V2__add_user_created_index.sql`
+- `CREATE INDEX CONCURRENTLY idx_action_log_user_created ON log.action_log (user_id, created_at DESC)`
+- 기존 단일 인덱스(`user_id` / `action_type` / `created_at`)는 **유지** (타 쿼리 패턴 대비)
+- 실행 주체: 수동 DDL — 배포 후 DB 접속하여 실행
+  ```bash
+  psql -h <host> -p <port> -U <user> -d <database> -f fastify-log/sql/V2__add_user_created_index.sql
+  ```
+  - `CONCURRENTLY` 사용으로 운영 중 테이블 쓰기 락 없음
+  - 트랜잭션 블록 내 실행 금지 (`CONCURRENTLY` 제약)
+  - 재실행 안전 (`IF NOT EXISTS`)
+
+**예상 성능 (보수적 목표)**
+
+- 활성 유저 1명 × 7일 × 평균 500 row 가정 → p95 < 50ms
+- 실제 수치는 운영 데이터 확보 후 갱신
+
+**부하 예측 (AI팀 스케줄러 스펙)**
+
+- 운영 계획: `cron = "0 0 3 * * MON"` (주 1회 월 03:00 KST)
+- 타겟: 전체 유저(`userVectorRepository.findAll()`)
+- 예시: 10만 유저 / 30분 실행창 → **~55 RPS** 수준 (급격 스파이크 없음)
+- 현 커밋 상태(`initialDelay=10s`, `fixedDelay=Long.MAX_VALUE`)는 개발용 1회 실행 — 운영 배포 전 cron 활성화 필요 (AI팀 소관)
+
+### 5.6 PR 전략 — 단일 PR (Log 서비스)
+
+> Producer 트랙(§4 Phase 5, Event·Commerce)과 **독립** — 병렬 진행 가능.
+
+**커밋 분할 권장 순서**
+
+| # | 구현 항목 | 범위 |
+|---|---|---|
+| 1 | Validation schema + Internal 헤더 가드 | `onRequest` hook, `X-Internal-Service` allowlist, Fastify JSON Schema (`userId` UUID / `days` 1~30 / `actionTypes` enum 멤버십) |
+| 2 | Repository 쿼리 + V2 인덱스 마이그레이션 | `getRecentLogs()` 쿼리 (`WHERE event_id IS NOT NULL` / `ORDER BY created_at DESC` / `LIMIT 5000`), `V2__add_user_created_index.sql` 추가 |
+| 3 | Service 계층 + null 필터링 로직 | `action-log.service.ts`에 `getRecentLogs(userId, days, actionTypes)` 추가, 응답 DTO 매핑 |
+| 4 | Route 등록 + index.ts | `route/internal-log.route.ts` 신규, `index.ts`에 `await app.register(internalLogRoutes)` 추가 |
+| 5 | 단위·통합 테스트 + .env 포트 정합 | Fastify inject 기반 테스트, `.env`·`.env.example` 포트 정정 |
+
+**완료 조건**
+
+- [ ] Validation 400 케이스 전수 테스트 (미UUID / days 범위 / actionTypes 무효·누락 / URL 인코딩)
+- [ ] 401/403 Internal 가드 테스트 (헤더 누락 / allowlist 외 값)
+- [ ] null `event_id` 선제 제외 회귀 테스트 (VIEW row 중 `event_id=null` 삽입 → 응답 제외 확인)
+- [ ] 기존 `insertActionLogs` 테스트와 데이터 격리 확인 (`beforeEach` TRUNCATE 또는 트랜잭션 롤백 패턴)
+- [ ] V2 인덱스 수동 DDL 실행 절차 — §5.5 실행 명령 블록 참조
+- [ ] AI팀 교차 확인 완료 후 이슈 본문 최종안 합의
+
+### 5.7 변경 이력·컨펌
+
+| 일자 | 내용 | 상태 |
+|---|---|---|
+| 2026-04-24 | §5 신설 — AI 조회 엔드포인트 계약 명문화 | PO 컨펌 대기 |
+| 2026-04-24 | AI팀 교차검증 완료 — `LogServiceClient` 스펙 / `ActionLogEntry.eventId` 암묵 nullable / 스케줄러 cron / fallback(`getOrEmpty`) 확인 | ✅ |
+| 2026-04-24 | 포트 방향 결정 — Log 8086 유지 (gateway `application.yml:57` `log-service` 라우팅이 8086, fastify-log `env.ts:35` PORT 기본값 8086 — 코드·라우팅 일치) | ✅ 확정 |
+| — | AI 측 `ActionLogResponse`에 `@JsonIgnoreProperties(ignoreUnknown=true)` 선행 추가 권장 — 응답 필드 향후 확장 시 역직렬화 안정성 확보 | AI팀 작업 (별개 PR) |
+| — | AI 측 `eventId null skip` 방어 로직 추가 권장 — 서버 필터와 이중 방어 | AI팀 작업 (별개 PR) |
+
+---
+
 ## 🔑 요약
 
 - **확정 12개** (§2 표 참조) — 구현 반영 / 사용자 지시 / 아키텍트 결정 / **PO 결정** 구분
 - **PO 결정**: Q1 `actorType` = **(A) 미추가** / Q2 `sessionId` = **(C) 제외**
 - **아키텍트 결정**: PURCHASE = **Kafka 재발행 없이 Consumer가 `log.action_log` 직접 INSERT**
-- **DB 스키마·DTO 변경 없음** → V2 마이그레이션 불필요
-- Log 서비스는 이미 **Fastify 스택으로 구현 완료** → 신규 구축 아닌 **확장** (`payment.completed` 추가 구독만 신규)
-- 진행 시점: **본 스코프(Phase 3~4) 완료 후**
+- **DB 스키마·DTO 변경 없음** — 단, AI 조회 엔드포인트(§5)용 **V2 복합 인덱스 추가** (`(user_id, created_at DESC)`)
+- Log 서비스는 이미 **Fastify 스택으로 구현 완료** → 신규 구축 아닌 **확장** (`payment.completed` 추가 구독 ✅ + §5 AI 조회 엔드포인트 신설 예정)
+- 진행 시점: **본 스코프(Phase 3~4) 완료 후** — 현재 Phase 3~4 코어 완료
+- 이후 **두 트랙 병렬 가능** (공유 선행 조건 없음):
+  - (a) §5 AI 조회 엔드포인트 — Log 서비스 단독 PR
+  - (b) §4 Phase 5 Producer — Event·Commerce 각 모듈 PR (병렬 머지 가능)
