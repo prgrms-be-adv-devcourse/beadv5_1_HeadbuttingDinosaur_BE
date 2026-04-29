@@ -193,6 +193,31 @@ class EventSyncElasticsearchTest extends ElasticsearchIntegrationTestBase {
         assertThat(techStacks).isEmpty();
     }
 
+    // ── AI 계약 (eventId 필드) ────────────────────────────────────────────
+
+    /**
+     * AI 추천 서비스는 _source.eventId 로 필드를 추출 (PR #540 계약).
+     * ES _id 는 hit._source 에 포함되지 않으므로 body 에 eventId 키가 존재해야 함.
+     * 회귀 시 AI reRank 루프에서 NPE 발생.
+     */
+    @Test
+    void sync하면_body_source에_eventId_필드가_저장된다() throws Exception {
+        // given
+        when(openAiEmbeddingClient.embed(anyString())).thenReturn(null);
+        Event event = createEvent(UUID.randomUUID(), "AI 계약 확인 이벤트", EventStatus.ON_SALE);
+
+        // when
+        eventService.syncToElasticsearch(event);
+        elasticsearchOperations.indexOps(EventDocument.class).refresh();
+
+        // then
+        GetResponse<Map> response = esClient.get(g -> g
+            .index("event").id(event.getEventId().toString()), Map.class);
+        assertThat(response.found()).isTrue();
+        assertThat(response.source()).containsKey("eventId");
+        assertThat(response.source().get("eventId")).isEqualTo(event.getEventId().toString());
+    }
+
     // ── indexedAt 형식 ────────────────────────────────────────────────────
 
     @Test
