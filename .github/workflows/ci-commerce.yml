@@ -1,13 +1,10 @@
 name: CI - Commerce Service
 
-# 트리거: 명시된 브랜치로 PR이 생성되거나 업데이트될 때 실행
 on:
   pull_request:
     branches:
       - 'develop/commerce'
       - 'devticket-commerce'
-    # paths:
-    #   - 'devticket-commerce/**' # (선택) 해당 서비스 디렉토리의 코드가 변경될 때만 트리거되도록 제한
 
 jobs:
   build-and-test:
@@ -22,7 +19,7 @@ jobs:
         with:
           java-version: '21'
           distribution: 'temurin'
-          cache: 'gradle' # 의존성 다운로드 캐싱 (빌드 속도 최적화)
+          cache: 'gradle'
 
       - name: 3. Grant execute permission for gradlew
         run: chmod +x commerce/gradlew
@@ -31,6 +28,17 @@ jobs:
         run: cd commerce && ./gradlew test
         env:
           SPRING_PROFILES_ACTIVE: test
+          AWS_S3_BUCKET_NAME: ${{ secrets.AWS_S3_BUCKET_NAME }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-      - name: 5. Gradle Build
-        run: cd commerce && ./gradlew build -x test
+      - name: 5. Gradle Build & SpotBugs
+        run: cd commerce && ./gradlew build spotbugsMain -x test
+
+      - name: 6. Upload SpotBugs Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spotbugs-report-commerce
+          path: commerce/build/reports/spotbugs/
