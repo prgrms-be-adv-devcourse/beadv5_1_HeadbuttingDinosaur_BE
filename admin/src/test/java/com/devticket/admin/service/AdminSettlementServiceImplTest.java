@@ -13,7 +13,7 @@ import com.devticket.admin.infrastructure.external.client.SettlementInternalClie
 import com.devticket.admin.infrastructure.external.dto.res.InternalSettlementPageResponse;
 import com.devticket.admin.infrastructure.external.dto.res.InternalSettlementResponse;
 import com.devticket.admin.presentation.dto.req.AdminSettlementSearchRequest;
-import com.devticket.admin.presentation.dto.res.AdminSettelmentListResponse;
+import com.devticket.admin.presentation.dto.res.AdminSettlementListResponse;
 import com.devticket.admin.presentation.dto.res.SettlementResponse;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -62,7 +62,7 @@ class AdminSettlementServiceImplTest {
             given(settlementInternalClient.getSettlements(condition)).willReturn(page);
 
             // when
-            AdminSettelmentListResponse response = adminSettlementService.getSettlementList(condition);
+            AdminSettlementListResponse response = adminSettlementService.getSettlementList(condition);
 
             // then
             assertThat(response.page()).isEqualTo(0);
@@ -95,7 +95,7 @@ class AdminSettlementServiceImplTest {
                 .willReturn(new InternalSettlementPageResponse(List.of(), 0, 20, 0L, 0));
 
             // when
-            AdminSettelmentListResponse response = adminSettlementService.getSettlementList(condition);
+            AdminSettlementListResponse response = adminSettlementService.getSettlementList(condition);
 
             // then
             assertThat(response.content()).isEmpty();
