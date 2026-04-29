@@ -130,11 +130,11 @@ public class CartService implements CartUseCase, CartItemUseCase {
     // 장바구니 아이템 갯수 증감
     @Override
     @Transactional
-    public CartItemQuantityResponse updateTicket(UUID userId, Long cartItemId, CartItemQuantityRequest request) {
+    public CartItemQuantityResponse updateTicket(UUID userId, UUID cartItemId, CartItemQuantityRequest request) {
         // 장바구니 가져오기 — Cart 없으면 ITEM_NOT_FOUND (#416)
         Cart cart = getCartOrThrowItemNotFound(userId);
         // 장바구니 아이템 가져오기
-        CartItem cartItem = getCartItemById(cartItemId);
+        CartItem cartItem = getCartItemByCartItemId(cartItemId);
 
         // 변경 후 수량
         int newQuantity = cartItem.getQuantity() + request.quantity();
@@ -175,11 +175,11 @@ public class CartService implements CartUseCase, CartItemUseCase {
     // 장바구니 아이템 삭제
     @Override
     @Transactional
-    public CartItemDeleteResponse deleteTicket(UUID userId, Long cartItemId) {
+    public CartItemDeleteResponse deleteTicket(UUID userId, UUID cartItemId) {
         // 장바구니 가져오기 — Cart 없으면 ITEM_NOT_FOUND (#416)
         Cart cart = getCartOrThrowItemNotFound(userId);
         // 장바구니 아이템 가져오기
-        CartItem cartItem = getCartItemById(cartItemId);
+        CartItem cartItem = getCartItemByCartItemId(cartItemId);
 
         // 장바구니 아이템이 유저의 장바구니 아이템인가 확인 예외
         if (!cartItem.getCartId().equals(cart.getId())) {
@@ -295,9 +295,9 @@ public class CartService implements CartUseCase, CartItemUseCase {
             .orElseThrow(() -> new BusinessException(CartErrorCode.ITEM_NOT_FOUND));
     }
 
-    // 장바구니 아이템 존재 유무 확인
-    private CartItem getCartItemById(Long cartItemId) {
-        return cartItemRepository.findById(cartItemId)
+    // 장바구니 아이템 존재 유무 확인 — 외부 노출 식별자(UUID) 기준 조회
+    private CartItem getCartItemByCartItemId(UUID cartItemId) {
+        return cartItemRepository.findByCartItemId(cartItemId)
             .orElseThrow(() -> new BusinessException(CartErrorCode.ITEM_NOT_FOUND));
     }
 

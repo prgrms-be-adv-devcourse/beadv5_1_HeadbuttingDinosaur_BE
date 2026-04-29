@@ -204,11 +204,11 @@ class CartServiceTest {
         void 변경_후_장바구니_수량과_구매_이력_합산이_한도_이내면_성공한다() {
             UUID userId = UUID.randomUUID();
             UUID eventId = UUID.randomUUID();
-            Long cartItemId = 10L;
             CartItem existing = cartItem(eventId, 1); // 기존 1개
+            UUID cartItemId = existing.getCartItemId();
 
             given(cartRepository.findByUserId(userId)).willReturn(Optional.of(cart(userId)));
-            given(cartItemRepository.findById(cartItemId)).willReturn(Optional.of(existing));
+            given(cartItemRepository.findByCartItemId(cartItemId)).willReturn(Optional.of(existing));
             // newQuantity = 1(기존) + 1(delta) = 2
             given(eventClient.getValidateEventStatus(eventId, userId, 2))
                 .willReturn(purchasableEvent(eventId, 3));
@@ -226,11 +226,11 @@ class CartServiceTest {
         void 변경_후_장바구니_수량과_구매_이력_합산이_한도_초과면_예외를_던진다() {
             UUID userId = UUID.randomUUID();
             UUID eventId = UUID.randomUUID();
-            Long cartItemId = 10L;
             CartItem existing = cartItem(eventId, 1); // 기존 1개
+            UUID cartItemId = existing.getCartItemId();
 
             given(cartRepository.findByUserId(userId)).willReturn(Optional.of(cart(userId)));
-            given(cartItemRepository.findById(cartItemId)).willReturn(Optional.of(existing));
+            given(cartItemRepository.findByCartItemId(cartItemId)).willReturn(Optional.of(existing));
             // newQuantity = 1(기존) + 1(delta) = 2
             given(eventClient.getValidateEventStatus(eventId, userId, 2))
                 .willReturn(purchasableEvent(eventId, 2));
@@ -248,11 +248,11 @@ class CartServiceTest {
         void 구매_이력_집계는_ISSUED_상태만_조회한다() {
             UUID userId = UUID.randomUUID();
             UUID eventId = UUID.randomUUID();
-            Long cartItemId = 10L;
             CartItem existing = cartItem(eventId, 1);
+            UUID cartItemId = existing.getCartItemId();
 
             given(cartRepository.findByUserId(userId)).willReturn(Optional.of(cart(userId)));
-            given(cartItemRepository.findById(cartItemId)).willReturn(Optional.of(existing));
+            given(cartItemRepository.findByCartItemId(cartItemId)).willReturn(Optional.of(existing));
             given(eventClient.getValidateEventStatus(eventId, userId, 2))
                 .willReturn(purchasableEvent(eventId, 3));
             given(ticketRepository.countByUserIdAndEventIdAndStatus(userId, eventId, TicketStatus.ISSUED)).willReturn(0);
