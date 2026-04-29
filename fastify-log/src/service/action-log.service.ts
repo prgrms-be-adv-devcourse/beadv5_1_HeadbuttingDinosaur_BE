@@ -1,6 +1,13 @@
 import { ActionLog, ActionLogMessage } from '../model/action-log.model';
 import { ActionType, isValidActionType } from '../model/action-type.enum';
-import { actionLogRepository } from '../repository/action-log.repository';
+import {
+  actionLogRepository,
+  RecentActionRow,
+} from '../repository/action-log.repository';
+
+// AI recentVector 배치 응답 상한 — docs/actionLog.md §5.5
+// 폭증 방지 + AI 측 파싱 부담 관리. 튜닝은 실측 후 조정.
+const RECENT_LOGS_LIMIT = 5000;
 
 export async function save(raw: unknown): Promise<void> {
   const message = validateAndParse(raw);
@@ -48,6 +55,15 @@ function toActionLog(message: ActionLogMessage): ActionLog {
   };
 }
 
+export async function getRecentLogs(
+  userId: string,
+  days: number,
+  actionTypes: ActionType[],
+): Promise<RecentActionRow[]> {
+  return actionLogRepository.findRecentActions(userId, actionTypes, days, RECENT_LOGS_LIMIT);
+}
+
 export const actionLogService = {
   save,
+  getRecentLogs,
 };
