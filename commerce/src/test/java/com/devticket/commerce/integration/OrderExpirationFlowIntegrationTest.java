@@ -141,18 +141,19 @@ class OrderExpirationFlowIntegrationTest {
                         new TestItemSpec(eventId2, 1)));
         forceUpdatedAtToPast(savedOrder.getId(), 31);
 
-        // when — 스케줄러 호출 (Outbox INSERT) + Outbox 발행 (Kafka 전송)
-        scheduler.cancelExpiredOrders();
-        Outbox outbox = outboxRepository.findAll().stream()
-                .filter(o -> KafkaTopics.ORDER_CANCELLED.equals(o.getTopic()))
-                .filter(o -> savedOrder.getOrderId().toString().equals(o.getAggregateId()))
-                .findFirst()
-                .orElseThrow();
-
+        // when — 스케줄러 호출 시 OutboxService.save 의 afterCommit 훅이 비동기 발행을 트리거
         try (Consumer<String, String> testConsumer = createTestConsumer(KafkaTopics.ORDER_CANCELLED)) {
-            outboxService.processOne(outbox);
+            // 직전 테스트에서 동일 토픽으로 발행된 레코드를 드레인 — 본 테스트의 단건 검증 격리
+            KafkaTestUtils.getRecords(testConsumer, Duration.ofMillis(500));
 
-            // then — Kafka payload 검증
+            scheduler.cancelExpiredOrders();
+            Outbox outbox = outboxRepository.findAll().stream()
+                    .filter(o -> KafkaTopics.ORDER_CANCELLED.equals(o.getTopic()))
+                    .filter(o -> savedOrder.getOrderId().toString().equals(o.getAggregateId()))
+                    .findFirst()
+                    .orElseThrow();
+
+            // then — Kafka payload 검증 (afterCommit 비동기 발행 대기)
             ConsumerRecord<String, String> record = KafkaTestUtils.getSingleRecord(
                     testConsumer, KafkaTopics.ORDER_CANCELLED, Duration.ofSeconds(10));
 
