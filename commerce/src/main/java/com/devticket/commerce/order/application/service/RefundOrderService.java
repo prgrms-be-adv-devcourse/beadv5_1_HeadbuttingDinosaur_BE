@@ -167,14 +167,25 @@ public class RefundOrderService {
                 order.getStatus(), event.orderId()));
         }
 
-        order.completeRefund();
-        order.adjustAmountForRefund(event.refundAmount());
-
-        // CANCELLED 티켓 일괄 REFUNDED 전이 — 전액 환불 경로 가정 (REFUND_PENDING 도달 = 전액 환불)
+        // CANCELLED 티켓 → REFUNDED 전이
         List<Ticket> cancelledTickets = ticketRepository
             .findAllByOrderIdAndStatus(order.getId(), TicketStatus.CANCELLED);
         for (Ticket ticket : cancelledTickets) {
             ticket.refundTicket();
+        }
+
+        order.adjustAmountForRefund(event.refundAmount());
+
+        // 잔여 ISSUED 티켓이 있으면 부분환불 — PAID로 복귀해 다음 티켓 환불 허용
+        // 모두 환불됐으면 REFUNDED로 확정
+        List<Ticket> remainingTickets = ticketRepository
+            .findAllByOrderIdAndStatus(order.getId(), TicketStatus.ISSUED);
+        if (remainingTickets.isEmpty()) {
+            order.completeRefund();
+        } else {
+            order.rollbackRefund();
+            log.info("[refund.completed] 부분환불 완료, 잔여 티켓={}매 — orderId={}",
+                remainingTickets.size(), event.orderId());
         }
 
         deduplicationService.markProcessed(messageId, topic);
