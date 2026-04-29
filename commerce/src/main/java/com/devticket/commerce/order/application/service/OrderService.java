@@ -213,27 +213,6 @@ public class OrderService implements OrderUsecase {
     }
 
     @Override
-    @Transactional
-    public void failOrder(UUID orderId) {
-        Order order = orderRepository.findByOrderId(orderId)
-            .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
-        order.failPayment();
-    }
-
-    @Override
-    @Transactional
-    public void completeOrder(UUID orderId) {
-        //order조회
-        Order order = orderRepository.findByOrderId(orderId)
-            .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
-        //order상태값 변경
-        order.completePayment();
-        //Ticket발행
-        TicketRequest request = new TicketRequest(order.getId());
-        ticketUsecase.createTicket(request);
-    }
-
-    @Override
     public InternalSettlementDataResponse getSettlementData(UUID sellerId, String periodStart, String periodEnd) {
         try {
             log.info("[Settlement Debug] 시작 - sellerId: {}, period: {} ~ {}", sellerId, periodStart, periodEnd);
