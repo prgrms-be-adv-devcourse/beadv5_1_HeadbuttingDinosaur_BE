@@ -19,7 +19,6 @@ import com.devticket.event.presentation.dto.internal.InternalPopularEventRespons
 import com.devticket.event.presentation.dto.internal.InternalPurchaseValidationResponse;
 import com.devticket.event.presentation.dto.internal.InternalSellerEventsResponse;
 import com.devticket.event.presentation.dto.internal.InternalStockAdjustmentResponse;
-import com.devticket.event.presentation.dto.internal.InternalStockOperationResponse;
 import com.devticket.event.presentation.dto.internal.PurchaseUnavailableReason;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -144,42 +143,6 @@ public class EventInternalService {
 
 
     /**
-     * API 5: 단건 재고 차감
-     * Pessimistic Lock으로 동시성 제어
-     */
-    @Transactional
-    public InternalStockOperationResponse deductStock(UUID id, int quantity) {
-        Event event = eventRepository.findByEventIdWithLock(id)
-            .orElseThrow(() -> new BusinessException(EventErrorCode.EVENT_NOT_FOUND));
-
-        EventStatus statusBefore = event.getStatus();  // deductStock 호출 전으로 이동
-        event.deductStock(quantity);
-
-        if (!event.getStatus().equals(statusBefore)) {
-            syncToElasticsearch(id);
-        }
-        return new InternalStockOperationResponse(event.getEventId(), true, event.getRemainingQuantity(), event.getTitle());
-    }
-
-    /**
-     * API 6: 단건 재고 복원
-     * Pessimistic Lock으로 동시성 제어
-     */
-    @Transactional
-    public InternalStockOperationResponse restoreStock(UUID id, int quantity) {
-        Event event = eventRepository.findByEventIdWithLock(id)
-            .orElseThrow(() -> new BusinessException(EventErrorCode.EVENT_NOT_FOUND));
-
-        EventStatus statusBefore = event.getStatus();  // restoreStock 호출 전으로 이동
-        event.restoreStock(quantity);
-
-        if (!event.getStatus().equals(statusBefore)) {
-            syncToElasticsearch(id);
-        }
-        return new InternalStockOperationResponse(event.getEventId(), true, event.getRemainingQuantity(), event.getTitle());
-    }
-
-    /**
      * API 4: 벌크 재고 조정 — 원자적 처리 (All or Nothing)
      *
      * 설계 원칙:
@@ -278,6 +241,9 @@ public class EventInternalService {
 
         if (status == EventStatus.CANCELLED || status == EventStatus.FORCE_CANCELLED) {
             return PurchaseUnavailableReason.EVENT_CANCELLED;
+        }
+        if (status == EventStatus.ENDED) {
+            return PurchaseUnavailableReason.SALE_ENDED;
         }
         if (status == EventStatus.SOLD_OUT) {
             return PurchaseUnavailableReason.SOLD_OUT;

@@ -6,6 +6,7 @@ import com.devticket.event.application.RefundStockRestoreService.EventNotFoundFo
 import com.devticket.event.common.config.JacksonConfig;
 import com.devticket.event.common.messaging.KafkaTopics;
 import com.devticket.event.common.outbox.Outbox;
+import com.devticket.event.common.outbox.OutboxAfterCommitPublisher;
 import com.devticket.event.common.outbox.OutboxEventProducer;
 import com.devticket.event.common.outbox.OutboxRepository;
 import com.devticket.event.common.outbox.OutboxService;
@@ -43,6 +44,9 @@ class RefundStockRestoreServiceTest {
 
     @MockitoBean
     private OutboxEventProducer outboxEventProducer;
+
+    @MockitoBean
+    private OutboxAfterCommitPublisher outboxAfterCommitPublisher;
 
     @Autowired
     private RefundStockRestoreService refundStockRestoreService;
