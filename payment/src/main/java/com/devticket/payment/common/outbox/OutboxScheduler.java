@@ -26,7 +26,7 @@ public class OutboxScheduler {
         this.graceSeconds = graceSeconds;
     }
 
-    @Scheduled(fixedDelay = 3000)
+    @Scheduled(fixedDelayString = "${outbox.poll-interval-ms:60000}")
     @SchedulerLock(name = "outbox-scheduler", lockAtMostFor = "5m", lockAtLeastFor = "5s")
     public void publishPendingEvents() {
         Instant now = Instant.now();
