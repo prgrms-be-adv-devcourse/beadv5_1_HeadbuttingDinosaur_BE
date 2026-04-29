@@ -117,7 +117,7 @@ public class Event extends BaseEntity {
             .totalQuantity(totalQuantity)
             .maxQuantity(maxQuantity)
             .remainingQuantity(totalQuantity)
-            .status(EventStatus.ON_SALE)
+            .status(LocalDateTime.now().isBefore(saleStartAt) ? EventStatus.DRAFT : EventStatus.ON_SALE)
             .category(category)
             .build();
     }

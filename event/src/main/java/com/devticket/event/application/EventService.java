@@ -194,7 +194,7 @@ public class EventService {
         if (request.status() != null) {
             allowedStatuses = List.of(request.status());
         } else if (!isOwnEventRequest) {
-            allowedStatuses = List.of(EventStatus.ON_SALE, EventStatus.SOLD_OUT, EventStatus.SALE_ENDED);
+            allowedStatuses = List.of(EventStatus.DRAFT, EventStatus.ON_SALE, EventStatus.SOLD_OUT, EventStatus.SALE_ENDED);
         }
 
         // ES 검색
