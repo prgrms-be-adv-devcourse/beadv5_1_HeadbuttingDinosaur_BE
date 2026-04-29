@@ -19,8 +19,6 @@ import org.example.ai.domain.repository.EventRepository;
 import org.example.ai.domain.repository.MemberRepository;
 import org.example.ai.domain.repository.TechStackEmbeddingRepository;
 import org.example.ai.domain.repository.UserVectorRepository;
-import org.example.ai.infrastructure.external.client.EventServiceClient;
-import org.example.ai.infrastructure.external.client.MemberServiceClient;
 import org.example.ai.infrastructure.external.dto.req.PopularEventListRequest;
 import org.example.ai.infrastructure.external.dto.res.PopularEventListResponse;
 import org.example.ai.infrastructure.external.dto.res.UserTechStackResponse;
@@ -127,7 +125,7 @@ public class RecommendationService {
 
         // 4. event_id 담기
         List<String> eventIds = events.stream()
-            .map(event -> event.get("eventId").toString())
+            .map(event -> event.get("id").toString())
             .toList();
 
         // 5. 추천 event가 5 개 이하일 경우, 부족한 추천 갯수 채우기
@@ -215,7 +213,7 @@ public class RecommendationService {
                                 .value("ON_SALE"))))
                     .source(src -> src
                         .filter(f -> f
-                            .includes("eventId", "embedding")
+                            .includes("id", "embedding")
                         )
                     ),
                 Map.class);
@@ -226,6 +224,7 @@ public class RecommendationService {
                     result.add(hit.source());
                 }
             }
+            log.info("[kNN] 검색 결과: {}개", result.size());
             return result;
         }
         catch(Exception e){
@@ -242,7 +241,7 @@ public class RecommendationService {
         List<ScoredEvent> scoreList = new ArrayList<>();
 
         for(Map<String, Object> candidate : candidates){
-            String eventId = candidate.get("eventId").toString();
+            String eventId = candidate.get("id").toString();
 
             List<Double> embeddingRaw = (List<Double>) candidate.get("embedding");
             if (embeddingRaw == null) continue;
