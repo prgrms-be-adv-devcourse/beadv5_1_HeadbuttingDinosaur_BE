@@ -30,4 +30,6 @@ public interface TicketRepository {
     List<Ticket> findAllByOrderId(Long orderId);
 
     List<Ticket> findAllByOrderIdAndStatus(Long orderId, TicketStatus status);
+
+    int countByUserIdAndEventIdAndStatus(UUID userId, UUID eventId, TicketStatus status);
 }
