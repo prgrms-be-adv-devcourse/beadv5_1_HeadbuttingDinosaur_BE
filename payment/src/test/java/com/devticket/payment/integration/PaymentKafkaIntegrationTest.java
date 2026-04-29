@@ -274,7 +274,9 @@ class PaymentKafkaIntegrationTest {
 
             // Outbox INSERT 확인
             List<Outbox> outboxes = outboxRepository.findPendingToPublish(
-                OutboxStatus.PENDING, java.time.Instant.now().plusSeconds(60));
+                OutboxStatus.PENDING,
+                java.time.Instant.now().plusSeconds(60),
+                java.time.LocalDateTime.now().plusSeconds(60));
             assertThat(outboxes).anyMatch(o ->
                 "payment.completed".equals(o.getEventType())
                 && o.getPartitionKey().equals(orderId.toString())
