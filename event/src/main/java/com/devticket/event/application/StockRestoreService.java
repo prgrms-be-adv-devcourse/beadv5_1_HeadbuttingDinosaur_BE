@@ -59,7 +59,8 @@ public class StockRestoreService {
 
             // Step 2. EventStatus 검증 — CANCELLED/FORCE_CANCELLED면 정책적 스킵
             if (targetEvent.getStatus() == EventStatus.CANCELLED
-                || targetEvent.getStatus() == EventStatus.FORCE_CANCELLED) {
+                || targetEvent.getStatus() == EventStatus.FORCE_CANCELLED
+                || targetEvent.getStatus() == EventStatus.ENDED) {
                 log.warn("[정책적 스킵] payment.failed 재고 복구 생략 — eventId={}, status={}, orderId={}",
                     item.eventId(), targetEvent.getStatus(), event.orderId());
                 continue;

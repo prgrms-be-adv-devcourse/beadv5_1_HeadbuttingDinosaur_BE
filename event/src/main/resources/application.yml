@@ -35,6 +35,12 @@ management:
       export:
         enabled: true
 
+outbox:
+  # Scheduler fallback 폴링 주기 (ms). 정상 발행은 afterCommit 직접 발행 경로가 담당하므로 보수적으로 설정.
+  poll-interval-ms: 60000
+  # 직접 발행 경로 동작 시간 확보용 grace period (s). 이 시간 안에 SENT 처리되지 못한 row 만 fallback 대상.
+  publish-grace-seconds: 5
+
 logging:
   file:
     name: ./spring-logs/event/event.log

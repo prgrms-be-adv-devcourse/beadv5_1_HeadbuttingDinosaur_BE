@@ -7,6 +7,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * Outbox 저장·건별 발행 서비스
@@ -25,6 +27,7 @@ public class OutboxService {
 
     private final OutboxRepository outboxRepository;
     private final OutboxEventProducer outboxEventProducer;
+    private final OutboxAfterCommitPublisher outboxAfterCommitPublisher;
     private final ObjectMapper objectMapper;
 
     /**
@@ -43,6 +46,25 @@ public class OutboxService {
         String payload = serialize(event);
         Outbox outbox = Outbox.create(aggregateId, partitionKey, eventType, topic, payload);
         outboxRepository.save(outbox);
+        // IDENTITY 전략 — save() 직후 outbox.getId() 가 채워진다.
+        registerAfterCommitPublish(outbox.getId());
+    }
+
+    /**
+     * 비즈니스 트랜잭션 커밋 직후 비동기 직접 발행을 예약한다.
+     * 실패/누락 시에는 OutboxScheduler 가 grace period 경과 후 fallback 으로 발행한다.
+     */
+    private void registerAfterCommitPublish(Long outboxId) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            // MANDATORY 라 도달 불가지만 방어적으로 처리.
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                outboxAfterCommitPublisher.scheduleAfterCommit(outboxId);
+            }
+        });
     }
 
     /**

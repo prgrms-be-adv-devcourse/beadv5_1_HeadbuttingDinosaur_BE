@@ -73,7 +73,8 @@ public class RefundStockRestoreService {
             }
 
             if (target.getStatus() == EventStatus.CANCELLED
-                || target.getStatus() == EventStatus.FORCE_CANCELLED) {
+                || target.getStatus() == EventStatus.FORCE_CANCELLED
+                || target.getStatus() == EventStatus.ENDED) {
                 log.warn("[정책적 스킵] refund 재고 복구 — eventId={}, status={}, refundId={}",
                     item.eventId(), target.getStatus(), event.refundId());
                 continue;
