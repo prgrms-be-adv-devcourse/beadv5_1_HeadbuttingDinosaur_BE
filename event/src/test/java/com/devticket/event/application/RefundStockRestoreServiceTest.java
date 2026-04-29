@@ -6,6 +6,7 @@ import com.devticket.event.application.RefundStockRestoreService.EventNotFoundFo
 import com.devticket.event.common.config.JacksonConfig;
 import com.devticket.event.common.messaging.KafkaTopics;
 import com.devticket.event.common.outbox.Outbox;
+import com.devticket.event.common.outbox.OutboxEventProducer;
 import com.devticket.event.common.outbox.OutboxRepository;
 import com.devticket.event.common.outbox.OutboxService;
 import com.devticket.event.domain.enums.EventCategory;
@@ -26,6 +27,7 @@ import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @DataJpaTest
@@ -38,6 +40,9 @@ import org.springframework.test.util.ReflectionTestUtils;
     JacksonConfig.class
 })
 class RefundStockRestoreServiceTest {
+
+    @MockitoBean
+    private OutboxEventProducer outboxEventProducer;
 
     @Autowired
     private RefundStockRestoreService refundStockRestoreService;

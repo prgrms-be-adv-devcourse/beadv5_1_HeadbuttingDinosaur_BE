@@ -1,0 +1,1073 @@
+[
+  {
+    "module": "admin",
+    "controller": "AdminDashboardController",
+    "method": "getAdminDashboard",
+    "httpMethod": "GET",
+    "path": "/api/admin/dashboard",
+    "summary": "관리자 대시보드 통계 API",
+    "source": "admin/src/main/java/com/devticket/admin/presentation/controller/AdminDashboardController.java"
+  },
+  {
+    "module": "admin",
+    "controller": "AdminEventController",
+    "method": "getEventList",
+    "httpMethod": "GET",
+    "path": "/api/admin/events",
+    "summary": "관리자 Event 리스트 조회",
+    "source": "admin/src/main/java/com/devticket/admin/presentation/controller/AdminEventController.java"
+  },
+  {
+    "module": "admin",
+    "controller": "AdminEventController",
+    "method": "cancelEvent",
+    "httpMethod": "PATCH",
+    "path": "/api/admin/events/{eventId}/force-cancel",
+    "summary": "관리자 Event 삭제 API",
+    "source": "admin/src/main/java/com/devticket/admin/presentation/controller/AdminEventController.java"
+  },
+  {
+    "module": "admin",
+    "controller": "AdminSellerController",
+    "method": "getSellerApplicationList",
+    "httpMethod": "GET",
+    "path": "/api/admin/seller-applications",
+    "summary": "판매자 신청 리스트 조회 API",
+    "source": "admin/src/main/java/com/devticket/admin/presentation/controller/AdminSellerController.java"
+  },
+  {
+    "module": "admin",
+    "controller": "AdminSellerController",
+    "method": "decideApplication",
+    "httpMethod": "PATCH",
+    "path": "/api/admin/seller-applications/{applicationId}",
+    "summary": "판매자 신청 승인/반려 API",
+    "source": "admin/src/main/java/com/devticket/admin/presentation/controller/AdminSellerController.java"
+  },
+  {
+    "module": "admin",
+    "controller": "AdminSettlementController",
+    "method": "getAdminSettlementList",
+    "httpMethod": "GET",
+    "path": "/api/admin/settlements",
+    "summary": "관리자 정산 내역 조회 API",
+    "source": "admin/src/main/java/com/devticket/admin/presentation/controller/AdminSettlementController.java"
+  },
+  {
+    "module": "admin",
+    "controller": "AdminSettlementController",
+    "method": "runSettlement",
+    "httpMethod": "POST",
+    "path": "/api/admin/settlements/run",
+    "summary": "관리자 정산 프로세스 실행",
+    "source": "admin/src/main/java/com/devticket/admin/presentation/controller/AdminSettlementController.java"
+  },
+  {
+    "module": "admin",
+    "controller": "AdminUsersController",
+    "method": "getUsers",
+    "httpMethod": "GET",
+    "path": "/api/admin/users",
+    "summary": "회원 목록 조회",
+    "source": "admin/src/main/java/com/devticket/admin/presentation/controller/AdminUsersController.java"
+  },
+  {
+    "module": "admin",
+    "controller": "AdminUsersController",
+    "method": "getUserDetail",
+    "httpMethod": "GET",
+    "path": "/api/admin/users/{userId}",
+    "summary": "get user detail",
+    "source": "admin/src/main/java/com/devticket/admin/presentation/controller/AdminUsersController.java"
+  },
+  {
+    "module": "admin",
+    "controller": "AdminUsersController",
+    "method": "penalizeUser",
+    "httpMethod": "PATCH",
+    "path": "/api/admin/users/{userId}/status",
+    "summary": "회원 제재 api",
+    "source": "admin/src/main/java/com/devticket/admin/presentation/controller/AdminUsersController.java"
+  },
+  {
+    "module": "admin",
+    "controller": "AdminUsersController",
+    "method": "updateUserRole",
+    "httpMethod": "PATCH",
+    "path": "/api/admin/users/{userId}/role",
+    "summary": "회원 권한 변경 api",
+    "source": "admin/src/main/java/com/devticket/admin/presentation/controller/AdminUsersController.java"
+  },
+  {
+    "module": "admin",
+    "controller": "TechStackController",
+    "method": "createTechStack",
+    "httpMethod": "POST",
+    "path": "/api/admin/techstacks",
+    "summary": "TechStack 생성",
+    "source": "admin/src/main/java/com/devticket/admin/presentation/controller/TechStackController.java"
+  },
+  {
+    "module": "admin",
+    "controller": "TechStackController",
+    "method": "updateTechStack",
+    "httpMethod": "PUT",
+    "path": "/api/admin/techstacks/{id}",
+    "summary": "TechStack 수정",
+    "source": "admin/src/main/java/com/devticket/admin/presentation/controller/TechStackController.java"
+  },
+  {
+    "module": "admin",
+    "controller": "TechStackController",
+    "method": "deleteTechStack",
+    "httpMethod": "DELETE",
+    "path": "/api/admin/techstacks/{id}",
+    "summary": "TechStack 삭제",
+    "source": "admin/src/main/java/com/devticket/admin/presentation/controller/TechStackController.java"
+  },
+  {
+    "module": "admin",
+    "controller": "TechStackController",
+    "method": "getTechStacks",
+    "httpMethod": "GET",
+    "path": "/api/admin/techstacks",
+    "summary": "TechStack 전체 조회",
+    "source": "admin/src/main/java/com/devticket/admin/presentation/controller/TechStackController.java"
+  },
+  {
+    "module": "admin",
+    "controller": "TechStackController",
+    "method": "reindexEmptyEmbeddings",
+    "httpMethod": "POST",
+    "path": "/api/admin/techstacks/reindex",
+    "summary": "reindex empty embeddings",
+    "source": "admin/src/main/java/com/devticket/admin/presentation/controller/TechStackController.java"
+  },
+  {
+    "module": "ai",
+    "controller": "KafkaTestController",
+    "method": "send",
+    "httpMethod": "POST",
+    "path": "/test/kafka",
+    "summary": "send",
+    "source": "ai/src/main/java/org/example/ai/presentation/controller/KafkaTestController.java"
+  },
+  {
+    "module": "ai",
+    "controller": "RecommendationController",
+    "method": "recommend",
+    "httpMethod": "POST",
+    "path": "internal/ai/recommendation",
+    "summary": "recommend",
+    "source": "ai/src/main/java/org/example/ai/presentation/controller/RecommendationController.java"
+  },
+  {
+    "module": "apigateway",
+    "controller": "GatewayHealthController",
+    "method": "health",
+    "httpMethod": "GET",
+    "path": "/health",
+    "summary": "health",
+    "source": "apigateway/src/main/java/com/devticket/apigateway/presentation/GatewayHealthController.java"
+  },
+  {
+    "module": "commerce",
+    "controller": "CartController",
+    "method": "addToCart",
+    "httpMethod": "POST",
+    "path": "/api/cart/items",
+    "summary": "add to cart",
+    "source": "commerce/src/main/java/com/devticket/commerce/cart/presentation/controller/CartController.java"
+  },
+  {
+    "module": "commerce",
+    "controller": "CartController",
+    "method": "getCart",
+    "httpMethod": "GET",
+    "path": "/api/cart",
+    "summary": "get cart",
+    "source": "commerce/src/main/java/com/devticket/commerce/cart/presentation/controller/CartController.java"
+  },
+  {
+    "module": "commerce",
+    "controller": "CartController",
+    "method": "updateCartItemQuantity",
+    "httpMethod": "PATCH",
+    "path": "/api/cart/items/{cartItemId}",
+    "summary": "update cart item quantity",
+    "source": "commerce/src/main/java/com/devticket/commerce/cart/presentation/controller/CartController.java"
+  },
+  {
+    "module": "commerce",
+    "controller": "CartController",
+    "method": "deleteCartItem",
+    "httpMethod": "DELETE",
+    "path": "/api/cart/items/{cartItemId}",
+    "summary": "delete cart item",
+    "source": "commerce/src/main/java/com/devticket/commerce/cart/presentation/controller/CartController.java"
+  },
+  {
+    "module": "commerce",
+    "controller": "CartController",
+    "method": "deleteCartItemAll",
+    "httpMethod": "DELETE",
+    "path": "/api/cart",
+    "summary": "delete cart item all",
+    "source": "commerce/src/main/java/com/devticket/commerce/cart/presentation/controller/CartController.java"
+  },
+  {
+    "module": "commerce",
+    "controller": "InternalOrderController",
+    "method": "getOrderInfo",
+    "httpMethod": "GET",
+    "path": "/internal/orders/{orderId}",
+    "summary": "get order info",
+    "source": "commerce/src/main/java/com/devticket/commerce/order/presentation/controller/InternalOrderController.java"
+  },
+  {
+    "module": "commerce",
+    "controller": "InternalOrderController",
+    "method": "getOrderListForSettlement",
+    "httpMethod": "GET",
+    "path": "/internal/orders/{id}/items",
+    "summary": "get order list for settlement",
+    "source": "commerce/src/main/java/com/devticket/commerce/order/presentation/controller/InternalOrderController.java"
+  },
+  {
+    "module": "commerce",
+    "controller": "InternalOrderController",
+    "method": "getSettlementData",
+    "httpMethod": "GET",
+    "path": "/internal/orders/settlement-data",
+    "summary": "get settlement data",
+    "source": "commerce/src/main/java/com/devticket/commerce/order/presentation/controller/InternalOrderController.java"
+  },
+  {
+    "module": "commerce",
+    "controller": "InternalOrderController",
+    "method": "completeOrder",
+    "httpMethod": "POST",
+    "path": "/internal/orders/{orderId}/payment-completed",
+    "summary": "complete order",
+    "source": "commerce/src/main/java/com/devticket/commerce/order/presentation/controller/InternalOrderController.java"
+  },
+  {
+    "module": "commerce",
+    "controller": "InternalOrderController",
+    "method": "failOrder",
+    "httpMethod": "PATCH",
+    "path": "/internal/orders/{orderId}/payment-failed",
+    "summary": "fail order",
+    "source": "commerce/src/main/java/com/devticket/commerce/order/presentation/controller/InternalOrderController.java"
+  },
+  {
+    "module": "commerce",
+    "controller": "InternalOrderController",
+    "method": "getOrderItemByTicketId",
+    "httpMethod": "GET",
+    "path": "/internal/order-items/by-ticket/{ticketId}",
+    "summary": "get order item by ticket id",
+    "source": "commerce/src/main/java/com/devticket/commerce/order/presentation/controller/InternalOrderController.java"
+  },
+  {
+    "module": "commerce",
+    "controller": "InternalOrderController",
+    "method": "getOrderTickets",
+    "httpMethod": "GET",
+    "path": "/internal/orders/{orderId}/tickets",
+    "summary": "get order tickets",
+    "source": "commerce/src/main/java/com/devticket/commerce/order/presentation/controller/InternalOrderController.java"
+  },
+  {
+    "module": "commerce",
+    "controller": "OrderController",
+    "method": "createOrderByCart",
+    "httpMethod": "POST",
+    "path": "/api/orders",
+    "summary": "create order by cart",
+    "source": "commerce/src/main/java/com/devticket/commerce/order/presentation/controller/OrderController.java"
+  },
+  {
+    "module": "commerce",
+    "controller": "OrderController",
+    "method": "getOrderDetail",
+    "httpMethod": "GET",
+    "path": "/api/orders/{orderId}",
+    "summary": "get order detail",
+    "source": "commerce/src/main/java/com/devticket/commerce/order/presentation/controller/OrderController.java"
+  },
+  {
+    "module": "commerce",
+    "controller": "OrderController",
+    "method": "cancelOrder",
+    "httpMethod": "PATCH",
+    "path": "/api/orders/{orderId}/cancel",
+    "summary": "cancel order",
+    "source": "commerce/src/main/java/com/devticket/commerce/order/presentation/controller/OrderController.java"
+  },
+  {
+    "module": "commerce",
+    "controller": "InternalTicketController",
+    "method": "getSettlementData",
+    "httpMethod": "POST",
+    "path": "/internal/tickets/settlement-data",
+    "summary": "get settlement data",
+    "source": "commerce/src/main/java/com/devticket/commerce/ticket/presentation/controller/InternalTicketController.java"
+  },
+  {
+    "module": "commerce",
+    "controller": "SellerTicketController",
+    "method": "getParticipantList",
+    "httpMethod": "GET",
+    "path": "/api/seller/events/{eventId}/participants",
+    "summary": "get participant list",
+    "source": "commerce/src/main/java/com/devticket/commerce/ticket/presentation/controller/SellerTicketController.java"
+  },
+  {
+    "module": "commerce",
+    "controller": "TicketController",
+    "method": "getTicketList",
+    "httpMethod": "GET",
+    "path": "/api/tickets",
+    "summary": "get ticket list",
+    "source": "commerce/src/main/java/com/devticket/commerce/ticket/presentation/controller/TicketController.java"
+  },
+  {
+    "module": "commerce",
+    "controller": "TicketController",
+    "method": "getTicketDetail",
+    "httpMethod": "GET",
+    "path": "/api/tickets/{ticketId}",
+    "summary": "get ticket detail",
+    "source": "commerce/src/main/java/com/devticket/commerce/ticket/presentation/controller/TicketController.java"
+  },
+  {
+    "module": "commerce",
+    "controller": "TicketController",
+    "method": "createTickets",
+    "httpMethod": "POST",
+    "path": "/api/tickets",
+    "summary": "create tickets",
+    "source": "commerce/src/main/java/com/devticket/commerce/ticket/presentation/controller/TicketController.java"
+  },
+  {
+    "module": "event",
+    "controller": "DwellController",
+    "method": "reportDwell",
+    "httpMethod": "POST",
+    "path": "/api/events/{eventId}/dwell",
+    "summary": "report dwell",
+    "source": "event/src/main/java/com/devticket/event/presentation/controller/DwellController.java"
+  },
+  {
+    "module": "event",
+    "controller": "EventController",
+    "method": "getEvent",
+    "httpMethod": "GET",
+    "path": "/api/events/{eventId}",
+    "summary": "get event",
+    "source": "event/src/main/java/com/devticket/event/presentation/controller/EventController.java"
+  },
+  {
+    "module": "event",
+    "controller": "EventController",
+    "method": "getEventList",
+    "httpMethod": "GET",
+    "path": "/api/events",
+    "summary": "get event list",
+    "source": "event/src/main/java/com/devticket/event/presentation/controller/EventController.java"
+  },
+  {
+    "module": "event",
+    "controller": "EventController",
+    "method": "getRecommendations",
+    "httpMethod": "GET",
+    "path": "/api/events/user/recommendations",
+    "summary": "get recommendations",
+    "source": "event/src/main/java/com/devticket/event/presentation/controller/EventController.java"
+  },
+  {
+    "module": "event",
+    "controller": "EventInternalController",
+    "method": "getEvents",
+    "httpMethod": "GET",
+    "path": "/internal/events",
+    "summary": "get events",
+    "source": "event/src/main/java/com/devticket/event/presentation/controller/EventInternalController.java"
+  },
+  {
+    "module": "event",
+    "controller": "EventInternalController",
+    "method": "getEventInfo",
+    "httpMethod": "GET",
+    "path": "/internal/events/{eventId}",
+    "summary": "get event info",
+    "source": "event/src/main/java/com/devticket/event/presentation/controller/EventInternalController.java"
+  },
+  {
+    "module": "event",
+    "controller": "EventInternalController",
+    "method": "getBulkEventInfo",
+    "httpMethod": "POST",
+    "path": "/internal/events/bulk",
+    "summary": "get bulk event info",
+    "source": "event/src/main/java/com/devticket/event/presentation/controller/EventInternalController.java"
+  },
+  {
+    "module": "event",
+    "controller": "EventInternalController",
+    "method": "validatePurchase",
+    "httpMethod": "GET",
+    "path": "/internal/events/{eventId}/validate-purchase",
+    "summary": "validate purchase",
+    "source": "event/src/main/java/com/devticket/event/presentation/controller/EventInternalController.java"
+  },
+  {
+    "module": "event",
+    "controller": "EventInternalController",
+    "method": "adjustStockBulk",
+    "httpMethod": "PATCH",
+    "path": "/internal/events/stock-adjustments",
+    "summary": "adjust stock bulk",
+    "source": "event/src/main/java/com/devticket/event/presentation/controller/EventInternalController.java"
+  },
+  {
+    "module": "event",
+    "controller": "EventInternalController",
+    "method": "deductStock",
+    "httpMethod": "POST",
+    "path": "/internal/events/{eventId}/deduct-stock",
+    "summary": "deduct stock",
+    "source": "event/src/main/java/com/devticket/event/presentation/controller/EventInternalController.java"
+  },
+  {
+    "module": "event",
+    "controller": "EventInternalController",
+    "method": "restoreStock",
+    "httpMethod": "POST",
+    "path": "/internal/events/{eventId}/restore-stock",
+    "summary": "restore stock",
+    "source": "event/src/main/java/com/devticket/event/presentation/controller/EventInternalController.java"
+  },
+  {
+    "module": "event",
+    "controller": "EventInternalController",
+    "method": "getEventsBySeller",
+    "httpMethod": "GET",
+    "path": "/internal/events/by-seller/{sellerId}",
+    "summary": "get events by seller",
+    "source": "event/src/main/java/com/devticket/event/presentation/controller/EventInternalController.java"
+  },
+  {
+    "module": "event",
+    "controller": "EventInternalController",
+    "method": "getEndedEventsByDate",
+    "httpMethod": "GET",
+    "path": "/internal/events/ended",
+    "summary": "get ended events by date",
+    "source": "event/src/main/java/com/devticket/event/presentation/controller/EventInternalController.java"
+  },
+  {
+    "module": "event",
+    "controller": "EventInternalController",
+    "method": "getEventsBySellerForSettlement",
+    "httpMethod": "GET",
+    "path": "/internal/events/by-seller/{sellerId}/settlement",
+    "summary": "get events by seller for settlement",
+    "source": "event/src/main/java/com/devticket/event/presentation/controller/EventInternalController.java"
+  },
+  {
+    "module": "event",
+    "controller": "EventInternalController",
+    "method": "forceCancel",
+    "httpMethod": "PATCH",
+    "path": "/internal/events/{eventId}/force-cancel",
+    "summary": "force cancel",
+    "source": "event/src/main/java/com/devticket/event/presentation/controller/EventInternalController.java"
+  },
+  {
+    "module": "event",
+    "controller": "EventInternalController",
+    "method": "getPopularEvents",
+    "httpMethod": "POST",
+    "path": "/internal/events/popular",
+    "summary": "get popular events",
+    "source": "event/src/main/java/com/devticket/event/presentation/controller/EventInternalController.java"
+  },
+  {
+    "module": "event",
+    "controller": "SellerEventController",
+    "method": "createEvent",
+    "httpMethod": "POST",
+    "path": "/api/seller/events",
+    "summary": "create event",
+    "source": "event/src/main/java/com/devticket/event/presentation/controller/SellerEventController.java"
+  },
+  {
+    "module": "event",
+    "controller": "SellerEventController",
+    "method": "getSellerEvents",
+    "httpMethod": "GET",
+    "path": "/api/seller/events",
+    "summary": "get seller events",
+    "source": "event/src/main/java/com/devticket/event/presentation/controller/SellerEventController.java"
+  },
+  {
+    "module": "event",
+    "controller": "SellerEventController",
+    "method": "getSellerEventDetail",
+    "httpMethod": "GET",
+    "path": "/api/seller/events/{eventId}",
+    "summary": "get seller event detail",
+    "source": "event/src/main/java/com/devticket/event/presentation/controller/SellerEventController.java"
+  },
+  {
+    "module": "event",
+    "controller": "SellerEventController",
+    "method": "getEventSummary",
+    "httpMethod": "GET",
+    "path": "/api/seller/events/{eventId}/statistics",
+    "summary": "get event summary",
+    "source": "event/src/main/java/com/devticket/event/presentation/controller/SellerEventController.java"
+  },
+  {
+    "module": "event",
+    "controller": "SellerEventController",
+    "method": "updateEvent",
+    "httpMethod": "PATCH",
+    "path": "/api/seller/events/{eventId}",
+    "summary": "update event",
+    "source": "event/src/main/java/com/devticket/event/presentation/controller/SellerEventController.java"
+  },
+  {
+    "module": "event",
+    "controller": "SellerImageUploadController",
+    "method": "uploadImage",
+    "httpMethod": "POST",
+    "path": "/api/seller/images/upload",
+    "summary": "upload image",
+    "source": "event/src/main/java/com/devticket/event/presentation/controller/SellerImageUploadController.java"
+  },
+  {
+    "module": "member",
+    "controller": "AuthController",
+    "method": "signup",
+    "httpMethod": "POST",
+    "path": "/api/auth/signup",
+    "summary": "signup",
+    "source": "member/src/main/java/com/devticket/member/presentation/controller/AuthController.java"
+  },
+  {
+    "module": "member",
+    "controller": "AuthController",
+    "method": "oauthSignUpOrLogin",
+    "httpMethod": "POST",
+    "path": "/api/auth/google-signup",
+    "summary": "oauth sign up or login",
+    "source": "member/src/main/java/com/devticket/member/presentation/controller/AuthController.java"
+  },
+  {
+    "module": "member",
+    "controller": "AuthController",
+    "method": "login",
+    "httpMethod": "POST",
+    "path": "/api/auth/login",
+    "summary": "login",
+    "source": "member/src/main/java/com/devticket/member/presentation/controller/AuthController.java"
+  },
+  {
+    "module": "member",
+    "controller": "AuthController",
+    "method": "socialLogin",
+    "httpMethod": "POST",
+    "path": "/api/auth/social/google",
+    "summary": "social login",
+    "source": "member/src/main/java/com/devticket/member/presentation/controller/AuthController.java"
+  },
+  {
+    "module": "member",
+    "controller": "AuthController",
+    "method": "logout",
+    "httpMethod": "POST",
+    "path": "/api/auth/logout",
+    "summary": "logout",
+    "source": "member/src/main/java/com/devticket/member/presentation/controller/AuthController.java"
+  },
+  {
+    "module": "member",
+    "controller": "AuthController",
+    "method": "reissue",
+    "httpMethod": "POST",
+    "path": "/api/auth/reissue",
+    "summary": "reissue",
+    "source": "member/src/main/java/com/devticket/member/presentation/controller/AuthController.java"
+  },
+  {
+    "module": "member",
+    "controller": "InternalMemberController",
+    "method": "getSellerApplications",
+    "httpMethod": "GET",
+    "path": "/internal/members/seller-applications",
+    "summary": "판매자 신청 목록 조회",
+    "source": "member/src/main/java/com/devticket/member/presentation/controller/InternalMemberController.java"
+  },
+  {
+    "module": "member",
+    "controller": "InternalMemberController",
+    "method": "decideSellerApplication",
+    "httpMethod": "PATCH",
+    "path": "/internal/members/seller-applications/{applicationId}",
+    "summary": "decide seller application",
+    "source": "member/src/main/java/com/devticket/member/presentation/controller/InternalMemberController.java"
+  },
+  {
+    "module": "member",
+    "controller": "InternalMemberController",
+    "method": "getSellerId",
+    "httpMethod": "GET",
+    "path": "/internal/members/sellers",
+    "summary": "판매자 ID 목록 조회",
+    "source": "member/src/main/java/com/devticket/member/presentation/controller/InternalMemberController.java"
+  },
+  {
+    "module": "member",
+    "controller": "InternalMemberController",
+    "method": "getMemberInfo",
+    "httpMethod": "GET",
+    "path": "/internal/members/{userId}",
+    "summary": "get member info",
+    "source": "member/src/main/java/com/devticket/member/presentation/controller/InternalMemberController.java"
+  },
+  {
+    "module": "member",
+    "controller": "InternalMemberController",
+    "method": "getMemberStatus",
+    "httpMethod": "GET",
+    "path": "/internal/members/{userId}/status",
+    "summary": "get member status",
+    "source": "member/src/main/java/com/devticket/member/presentation/controller/InternalMemberController.java"
+  },
+  {
+    "module": "member",
+    "controller": "InternalMemberController",
+    "method": "getMemberRole",
+    "httpMethod": "GET",
+    "path": "/internal/members/{userId}/role",
+    "summary": "get member role",
+    "source": "member/src/main/java/com/devticket/member/presentation/controller/InternalMemberController.java"
+  },
+  {
+    "module": "member",
+    "controller": "InternalMemberController",
+    "method": "getSellerInfo",
+    "httpMethod": "GET",
+    "path": "/internal/members/{userId}/seller-info",
+    "summary": "get seller info",
+    "source": "member/src/main/java/com/devticket/member/presentation/controller/InternalMemberController.java"
+  },
+  {
+    "module": "member",
+    "controller": "InternalMemberController",
+    "method": "searchMembers",
+    "httpMethod": "GET",
+    "path": "/internal/members",
+    "summary": "관리자 회원 목록 조회",
+    "source": "member/src/main/java/com/devticket/member/presentation/controller/InternalMemberController.java"
+  },
+  {
+    "module": "member",
+    "controller": "InternalMemberController",
+    "method": "updateMemberStatus",
+    "httpMethod": "PATCH",
+    "path": "/internal/members/{userId}/status",
+    "summary": "update member status",
+    "source": "member/src/main/java/com/devticket/member/presentation/controller/InternalMemberController.java"
+  },
+  {
+    "module": "member",
+    "controller": "InternalMemberController",
+    "method": "updateMemberRole",
+    "httpMethod": "PATCH",
+    "path": "/internal/members/{userId}/role",
+    "summary": "update member role",
+    "source": "member/src/main/java/com/devticket/member/presentation/controller/InternalMemberController.java"
+  },
+  {
+    "module": "member",
+    "controller": "InternalMemberController",
+    "method": "getMemberInfoBatch",
+    "httpMethod": "GET",
+    "path": "/internal/members/batch",
+    "summary": "get member info batch",
+    "source": "member/src/main/java/com/devticket/member/presentation/controller/InternalMemberController.java"
+  },
+  {
+    "module": "member",
+    "controller": "InternalMemberController",
+    "method": "getUserTechStacks",
+    "httpMethod": "GET",
+    "path": "/internal/members/{userId}/tech-stacks",
+    "summary": "get user tech stacks",
+    "source": "member/src/main/java/com/devticket/member/presentation/controller/InternalMemberController.java"
+  },
+  {
+    "module": "member",
+    "controller": "MemberController",
+    "method": "health",
+    "httpMethod": "GET",
+    "path": "/api/members/health",
+    "summary": "Member 서비스 헬스 체크",
+    "source": "member/src/main/java/com/devticket/member/presentation/controller/MemberController.java"
+  },
+  {
+    "module": "member",
+    "controller": "SellerApplicationController",
+    "method": "apply",
+    "httpMethod": "POST",
+    "path": "/api/seller-applications",
+    "summary": "apply",
+    "source": "member/src/main/java/com/devticket/member/presentation/controller/SellerApplicationController.java"
+  },
+  {
+    "module": "member",
+    "controller": "SellerApplicationController",
+    "method": "getMyApplication",
+    "httpMethod": "GET",
+    "path": "/api/seller-applications/me",
+    "summary": "get my application",
+    "source": "member/src/main/java/com/devticket/member/presentation/controller/SellerApplicationController.java"
+  },
+  {
+    "module": "member",
+    "controller": "TechStackController",
+    "method": "getTechStacks",
+    "httpMethod": "GET",
+    "path": "/api/tech-stacks",
+    "summary": "기술 스택 목록 조회",
+    "source": "member/src/main/java/com/devticket/member/presentation/controller/TechStackController.java"
+  },
+  {
+    "module": "member",
+    "controller": "UserController",
+    "method": "createProfile",
+    "httpMethod": "POST",
+    "path": "/api/users/profile",
+    "summary": "create profile",
+    "source": "member/src/main/java/com/devticket/member/presentation/controller/UserController.java"
+  },
+  {
+    "module": "member",
+    "controller": "UserController",
+    "method": "getProfile",
+    "httpMethod": "GET",
+    "path": "/api/users/me",
+    "summary": "get profile",
+    "source": "member/src/main/java/com/devticket/member/presentation/controller/UserController.java"
+  },
+  {
+    "module": "member",
+    "controller": "UserController",
+    "method": "updateProfile",
+    "httpMethod": "PATCH",
+    "path": "/api/users/me",
+    "summary": "update profile",
+    "source": "member/src/main/java/com/devticket/member/presentation/controller/UserController.java"
+  },
+  {
+    "module": "member",
+    "controller": "UserController",
+    "method": "changePassword",
+    "httpMethod": "PATCH",
+    "path": "/api/users/me/password",
+    "summary": "change password",
+    "source": "member/src/main/java/com/devticket/member/presentation/controller/UserController.java"
+  },
+  {
+    "module": "member",
+    "controller": "UserController",
+    "method": "withdraw",
+    "httpMethod": "DELETE",
+    "path": "/api/users/me",
+    "summary": "withdraw",
+    "source": "member/src/main/java/com/devticket/member/presentation/controller/UserController.java"
+  },
+  {
+    "module": "payment",
+    "controller": "MockCommerceController",
+    "method": "getOrderInfo",
+    "httpMethod": "GET",
+    "path": "/internal/orders/{orderId}",
+    "summary": "get order info",
+    "source": "payment/src/main/java/com/devticket/payment/mock/MockCommerceController.java"
+  },
+  {
+    "module": "payment",
+    "controller": "MockCommerceController",
+    "method": "getOrderItemByTicketId",
+    "httpMethod": "GET",
+    "path": "/internal/order-items/by-ticket/{ticketId}",
+    "summary": "get order item by ticket id",
+    "source": "payment/src/main/java/com/devticket/payment/mock/MockCommerceController.java"
+  },
+  {
+    "module": "payment",
+    "controller": "MockCommerceController",
+    "method": "mockCharge",
+    "httpMethod": "POST",
+    "path": "/mock/wallet/charge",
+    "summary": "mock charge",
+    "source": "payment/src/main/java/com/devticket/payment/mock/MockCommerceController.java"
+  },
+  {
+    "module": "payment",
+    "controller": "PaymentController",
+    "method": "readyPayment",
+    "httpMethod": "POST",
+    "path": "/api/payments/ready",
+    "summary": "ready payment",
+    "source": "payment/src/main/java/com/devticket/payment/payment/presentation/controller/PaymentController.java"
+  },
+  {
+    "module": "payment",
+    "controller": "PaymentController",
+    "method": "confirm",
+    "httpMethod": "POST",
+    "path": "/api/payments/confirm",
+    "summary": "PG 결제 승인",
+    "source": "payment/src/main/java/com/devticket/payment/payment/presentation/controller/PaymentController.java"
+  },
+  {
+    "module": "payment",
+    "controller": "PaymentController",
+    "method": "fail",
+    "httpMethod": "POST",
+    "path": "/api/payments/fail",
+    "summary": "PG 결제 실패 처리",
+    "source": "payment/src/main/java/com/devticket/payment/payment/presentation/controller/PaymentController.java"
+  },
+  {
+    "module": "payment",
+    "controller": "PaymentInternalController",
+    "method": "getPaymentByOrderId",
+    "httpMethod": "GET",
+    "path": "/internal/payments/by-order/{orderId}",
+    "summary": "get payment by order id",
+    "source": "payment/src/main/java/com/devticket/payment/payment/presentation/controller/PaymentInternalController.java"
+  },
+  {
+    "module": "payment",
+    "controller": "AdminRefundController",
+    "method": "cancelAdminEvent",
+    "httpMethod": "POST",
+    "path": "/api/admin/events/{eventId}/cancel",
+    "summary": "cancel admin event",
+    "source": "payment/src/main/java/com/devticket/payment/refund/presentation/controller/AdminRefundController.java"
+  },
+  {
+    "module": "payment",
+    "controller": "RefundController",
+    "method": "getRefundInfo",
+    "httpMethod": "GET",
+    "path": "/api/refunds/info",
+    "summary": "get refund info",
+    "source": "payment/src/main/java/com/devticket/payment/refund/presentation/controller/RefundController.java"
+  },
+  {
+    "module": "payment",
+    "controller": "RefundController",
+    "method": "getRefundList",
+    "httpMethod": "GET",
+    "path": "/api/refunds",
+    "summary": "get refund list",
+    "source": "payment/src/main/java/com/devticket/payment/refund/presentation/controller/RefundController.java"
+  },
+  {
+    "module": "payment",
+    "controller": "RefundController",
+    "method": "getRefundDetail",
+    "httpMethod": "GET",
+    "path": "/api/refunds/{refundId}",
+    "summary": "get refund detail",
+    "source": "payment/src/main/java/com/devticket/payment/refund/presentation/controller/RefundController.java"
+  },
+  {
+    "module": "payment",
+    "controller": "RefundController",
+    "method": "refundPgTicket",
+    "httpMethod": "POST",
+    "path": "/api/refunds/pg/{ticketId}",
+    "summary": "refund pg ticket",
+    "source": "payment/src/main/java/com/devticket/payment/refund/presentation/controller/RefundController.java"
+  },
+  {
+    "module": "payment",
+    "controller": "RefundController",
+    "method": "refundOrder",
+    "httpMethod": "POST",
+    "path": "/api/refunds/orders/{orderId}",
+    "summary": "refund order",
+    "source": "payment/src/main/java/com/devticket/payment/refund/presentation/controller/RefundController.java"
+  },
+  {
+    "module": "payment",
+    "controller": "SellerRefundController",
+    "method": "getSellerRefundListByEventId",
+    "httpMethod": "GET",
+    "path": "/api/seller/refunds/events/{eventId}",
+    "summary": "get seller refund list by event id",
+    "source": "payment/src/main/java/com/devticket/payment/refund/presentation/controller/SellerRefundController.java"
+  },
+  {
+    "module": "payment",
+    "controller": "SellerRefundController",
+    "method": "cancelSellerEvent",
+    "httpMethod": "POST",
+    "path": "/api/seller/events/{eventId}/cancel",
+    "summary": "cancel seller event",
+    "source": "payment/src/main/java/com/devticket/payment/refund/presentation/controller/SellerRefundController.java"
+  },
+  {
+    "module": "payment",
+    "controller": "WalletController",
+    "method": "charge",
+    "httpMethod": "POST",
+    "path": "/api/wallet/charge",
+    "summary": "예치금 충전 시작",
+    "source": "payment/src/main/java/com/devticket/payment/wallet/presentation/controller/WalletController.java"
+  },
+  {
+    "module": "payment",
+    "controller": "WalletController",
+    "method": "failCharge",
+    "httpMethod": "PATCH",
+    "path": "/api/wallet/charge/{chargeId}/fail",
+    "summary": "예치금 충전 실패 처리",
+    "source": "payment/src/main/java/com/devticket/payment/wallet/presentation/controller/WalletController.java"
+  },
+  {
+    "module": "payment",
+    "controller": "WalletController",
+    "method": "confirmCharge",
+    "httpMethod": "POST",
+    "path": "/api/wallet/charge/confirm",
+    "summary": "예치금 충전 승인",
+    "source": "payment/src/main/java/com/devticket/payment/wallet/presentation/controller/WalletController.java"
+  },
+  {
+    "module": "payment",
+    "controller": "WalletController",
+    "method": "getBalance",
+    "httpMethod": "GET",
+    "path": "/api/wallet",
+    "summary": "예치금 잔액 조회",
+    "source": "payment/src/main/java/com/devticket/payment/wallet/presentation/controller/WalletController.java"
+  },
+  {
+    "module": "payment",
+    "controller": "WalletController",
+    "method": "getTransactions",
+    "httpMethod": "GET",
+    "path": "/api/wallet/transactions",
+    "summary": "예치금 거래 내역 조회",
+    "source": "payment/src/main/java/com/devticket/payment/wallet/presentation/controller/WalletController.java"
+  },
+  {
+    "module": "payment",
+    "controller": "WalletController",
+    "method": "withdraw",
+    "httpMethod": "POST",
+    "path": "/api/wallet/withdraw",
+    "summary": "예치금 출금 요청",
+    "source": "payment/src/main/java/com/devticket/payment/wallet/presentation/controller/WalletController.java"
+  },
+  {
+    "module": "payment",
+    "controller": "WalletInternalController",
+    "method": "depositFromSettlement",
+    "httpMethod": "POST",
+    "path": "/internal/wallet/settlement-deposit",
+    "summary": "deposit from settlement",
+    "source": "payment/src/main/java/com/devticket/payment/wallet/presentation/controller/WalletInternalController.java"
+  },
+  {
+    "module": "settlement",
+    "controller": "InternalSettlementController",
+    "method": "getSettlements",
+    "httpMethod": "GET",
+    "path": "/api/admin/settlements",
+    "summary": "get settlements",
+    "source": "settlement/src/main/java/com/devticket/settlement/presentation/controller/InternalSettlementController.java"
+  },
+  {
+    "module": "settlement",
+    "controller": "InternalSettlementController",
+    "method": "getSettlementDetail",
+    "httpMethod": "GET",
+    "path": "/api/admin/settlements/{settlementId}",
+    "summary": "get settlement detail",
+    "source": "settlement/src/main/java/com/devticket/settlement/presentation/controller/InternalSettlementController.java"
+  },
+  {
+    "module": "settlement",
+    "controller": "InternalSettlementController",
+    "method": "runSettlement",
+    "httpMethod": "POST",
+    "path": "/api/admin/settlements/run",
+    "summary": "run settlement",
+    "source": "settlement/src/main/java/com/devticket/settlement/presentation/controller/InternalSettlementController.java"
+  },
+  {
+    "module": "settlement",
+    "controller": "InternalSettlementController",
+    "method": "createSettlementFromItems",
+    "httpMethod": "POST",
+    "path": "/api/admin/settlements/create-from-items",
+    "summary": "create settlement from items",
+    "source": "settlement/src/main/java/com/devticket/settlement/presentation/controller/InternalSettlementController.java"
+  },
+  {
+    "module": "settlement",
+    "controller": "InternalSettlementController",
+    "method": "cancelSettlement",
+    "httpMethod": "POST",
+    "path": "/api/admin/settlements/{settlementId}/cancel",
+    "summary": "cancel settlement",
+    "source": "settlement/src/main/java/com/devticket/settlement/presentation/controller/InternalSettlementController.java"
+  },
+  {
+    "module": "settlement",
+    "controller": "InternalSettlementController",
+    "method": "processPayment",
+    "httpMethod": "POST",
+    "path": "/api/admin/settlements/{settlementId}/payment",
+    "summary": "process payment",
+    "source": "settlement/src/main/java/com/devticket/settlement/presentation/controller/InternalSettlementController.java"
+  },
+  {
+    "module": "settlement",
+    "controller": "SettlementController",
+    "method": "previewSettlementTarget",
+    "httpMethod": "GET",
+    "path": "/api/test/settlement-target/preview",
+    "summary": "[테스트] 정산대상 데이터 수집 미리보기",
+    "source": "settlement/src/main/java/com/devticket/settlement/presentation/controller/SettlementController.java"
+  },
+  {
+    "module": "settlement",
+    "controller": "SettlementController",
+    "method": "getSettlementByPeriod",
+    "httpMethod": "GET",
+    "path": "/api/seller/settlements/{yearMonth:[0-9]{6}}",
+    "summary": "판매자 월별 정산 조회",
+    "source": "settlement/src/main/java/com/devticket/settlement/presentation/controller/SettlementController.java"
+  },
+  {
+    "module": "settlement",
+    "controller": "SettlementController",
+    "method": "getSettlementPreview",
+    "httpMethod": "GET",
+    "path": "/api/seller/settlements/preview",
+    "summary": "판매자 당월 예상 정산 미리보기",
+    "source": "settlement/src/main/java/com/devticket/settlement/presentation/controller/SettlementController.java"
+  }
+]

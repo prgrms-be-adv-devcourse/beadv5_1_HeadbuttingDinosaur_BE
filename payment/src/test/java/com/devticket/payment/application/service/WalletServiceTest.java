@@ -18,7 +18,6 @@ import com.devticket.payment.payment.domain.enums.PaymentMethod;
 import com.devticket.payment.payment.domain.enums.PaymentStatus;
 import com.devticket.payment.payment.domain.model.Payment;
 import com.devticket.payment.payment.domain.repository.PaymentRepository;
-import com.devticket.payment.payment.infrastructure.client.CommerceInternalClient;
 import com.devticket.payment.payment.infrastructure.external.PgPaymentClient;
 import com.devticket.payment.wallet.application.event.PaymentCompletedEvent;
 import com.devticket.payment.wallet.application.service.WalletServiceImpl;
@@ -34,7 +33,6 @@ import com.devticket.payment.wallet.domain.repository.WalletChargeRepository;
 import com.devticket.payment.wallet.domain.repository.WalletRepository;
 import com.devticket.payment.wallet.domain.repository.WalletTransactionRepository;
 import com.devticket.payment.payment.application.dto.PgPaymentConfirmResult;
-import com.devticket.payment.wallet.infrastructure.client.dto.InternalEventOrdersResponse;
 import com.devticket.payment.wallet.presentation.dto.WalletBalanceResponse;
 import com.devticket.payment.wallet.presentation.dto.WalletChargeConfirmRequest;
 import com.devticket.payment.wallet.presentation.dto.WalletChargeConfirmResponse;
@@ -75,7 +73,6 @@ class WalletServiceTest {
     // @Mock private RefundRepository refundRepository; // TODO: Refund 모듈 완성 후 활성화
     @Mock private PgPaymentClient pgPaymentClient;
     @Mock private OutboxService outboxService;
-    @Mock private CommerceInternalClient commerceInternalClient;
     @Mock private WalletChargeTransactionService walletChargeTransactionService;
 
     @Spy
@@ -995,24 +992,4 @@ class WalletServiceTest {
         return payment;
     }
 
-    private InternalEventOrdersResponse eventOrdersOf(
-        UUID eventId, List<InternalEventOrdersResponse.OrderInfo> orders
-    ) {
-        InternalEventOrdersResponse res = new InternalEventOrdersResponse();
-        ReflectionTestUtils.setField(res, "eventId", eventId);
-        ReflectionTestUtils.setField(res, "orders", orders);
-        return res;
-    }
-
-    private InternalEventOrdersResponse.OrderInfo orderInfoOf(
-        UUID orderId, String userId, String paymentMethod, int totalAmount, String status
-    ) {
-        InternalEventOrdersResponse.OrderInfo info = new InternalEventOrdersResponse.OrderInfo();
-        ReflectionTestUtils.setField(info, "orderId", orderId);
-        ReflectionTestUtils.setField(info, "userId", userId);
-        ReflectionTestUtils.setField(info, "paymentMethod", paymentMethod);
-        ReflectionTestUtils.setField(info, "totalAmount", totalAmount);
-        ReflectionTestUtils.setField(info, "status", status);
-        return info;
-    }
 }

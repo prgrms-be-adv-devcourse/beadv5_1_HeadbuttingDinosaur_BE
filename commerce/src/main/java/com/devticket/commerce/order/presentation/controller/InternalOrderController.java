@@ -48,12 +48,12 @@ public class InternalOrderController {
 //        return ResponseEntity.ok(response).getBody();
 //    }
 
-    //Settelement -> Commerce : 기간별 정산 대상 데이터 조회
+    //Settlement -> Commerce : 기간별 정산 대상 데이터 조회
     @GetMapping("/orders/settlement-data")
     public ResponseEntity<InternalSettlementDataResponse> getSettlementData(@RequestParam UUID sellerId,
         @RequestParam String periodStart, @RequestParam String periodEnd) {
 
-        InternalSettlementDataResponse response = orderUsecase.getSettelmentData(sellerId, periodStart, periodEnd);
+        InternalSettlementDataResponse response = orderUsecase.getSettlementData(sellerId, periodStart, periodEnd);
         return ResponseEntity.ok(response);
     }
 

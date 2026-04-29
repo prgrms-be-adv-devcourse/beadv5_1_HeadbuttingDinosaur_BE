@@ -21,6 +21,7 @@ import com.devticket.payment.refund.domain.exception.RefundException;
 import com.devticket.payment.refund.domain.model.OrderRefund;
 import com.devticket.payment.refund.domain.model.Refund;
 import com.devticket.payment.refund.domain.model.RefundTicket;
+import com.devticket.payment.refund.domain.enums.RefundTicketStatus;
 import com.devticket.payment.refund.domain.repository.OrderRefundRepository;
 import com.devticket.payment.refund.domain.repository.RefundRepository;
 import com.devticket.payment.refund.domain.repository.RefundTicketRepository;
@@ -48,6 +49,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.hibernate.exception.ConstraintViolationException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.web.client.HttpClientErrorException;
 
 @Service
@@ -122,6 +125,11 @@ public class RefundServiceImpl implements RefundService {
 
         UUID ticketUuid = UUID.fromString(ticketId);
 
+        if (refundTicketRepository.existsByTicketIdAndStatusIn(
+                ticketUuid, List.of(RefundTicketStatus.ACTIVE, RefundTicketStatus.COMPLETED))) {
+            throw new RefundException(RefundErrorCode.REFUND_ALREADY_IN_PROGRESS);
+        }
+
         OrderRefund ledger = upsertOrderRefund(
             orderItem.orderId(), userId, payment.getPaymentId(),
             payment.getPaymentMethod(), payment.getAmount(),
@@ -141,7 +149,14 @@ public class RefundServiceImpl implements RefundService {
             refundRate
         );
         refundRepository.save(refund);
-        refundTicketRepository.save(RefundTicket.of(refund.getRefundId(), ticketUuid));
+        try {
+            refundTicketRepository.save(RefundTicket.of(refund.getRefundId(), ticketUuid));
+        } catch (DataIntegrityViolationException e) {
+            if (!isTicketUniqueViolation(e)) {
+                throw e;
+            }
+            throw new RefundException(RefundErrorCode.REFUND_ALREADY_IN_PROGRESS);
+        }
 
         RefundRequestedEvent requested = new RefundRequestedEvent(
             refund.getRefundId(),
@@ -271,6 +286,25 @@ public class RefundServiceImpl implements RefundService {
     // =========================================================
     // Helpers
     // =========================================================
+
+    // ticket_id partial unique index 위반인지 확인 — 다른 제약 위반(NOT NULL 등)과 구분
+    // 원인 체인을 끝까지 순회: Spring이 PersistenceException으로 한 번 더 래핑하는 환경 대응
+    // contains 사용: H2는 constraint name에 테이블·컬럼 정보가 붙어 오는 경우가 있음
+    private boolean isTicketUniqueViolation(DataIntegrityViolationException e) {
+        Throwable t = e;
+        while (t != null) {
+            if (t instanceof ConstraintViolationException cve) {
+                String name = cve.getConstraintName();
+                if (name != null) {
+                    return name.toLowerCase().contains("uk_refund_ticket_active");
+                }
+                String msg = cve.getMessage();
+                return msg != null && msg.toLowerCase().contains("uk_refund_ticket_active");
+            }
+            t = t.getCause();
+        }
+        return false;
+    }
 
     private OrderRefund upsertOrderRefund(
         UUID orderId, UUID userId, UUID paymentId,

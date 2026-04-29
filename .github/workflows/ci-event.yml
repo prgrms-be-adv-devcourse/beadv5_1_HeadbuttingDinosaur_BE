@@ -1,20 +1,14 @@
 name: CI - Event Service
-
-# 트리거: 명시된 브랜치로 PR이 생성되거나 업데이트될 때 실행
 on:
   pull_request:
     branches:
       - 'develop/event'
       - 'devticket-event'
-    # paths:
-    #   - 'devticket-event/**' # (선택) 해당 서비스 디렉토리의 코드가 변경될 때만 트리거되도록 제한
 
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
 
-    # ES 는 Testcontainers 가 직접 기동 (ElasticsearchIntegrationTestBase)
-    # → GitHub Actions service container 불필요. Docker runtime 만 있으면 됨 (ubuntu-latest 기본 포함).
     steps:
       - name: 1. Checkout Repository
         uses: actions/checkout@v4
@@ -30,10 +24,20 @@ jobs:
         run: chmod +x event/gradlew
 
       - name: 4. Gradle Test
-        # @Tag("elasticsearch") 테스트는 CI 에서 스킵 (build.gradle 의 `CI` env 감지 → excludeTags 'elasticsearch')
         run: cd event && ./gradlew test
         env:
           SPRING_PROFILES_ACTIVE: test
+          AWS_S3_BUCKET_NAME: ${{ secrets.AWS_S3_BUCKET_NAME }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-      - name: 5. Gradle Build
-        run: cd event && ./gradlew build -x test
+      - name: 5. Gradle Build & SpotBugs
+        run: cd event && ./gradlew build spotbugsMain -x test
+
+      - name: 6. Upload SpotBugs Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spotbugs-report-event
+          path: event/build/reports/spotbugs/
