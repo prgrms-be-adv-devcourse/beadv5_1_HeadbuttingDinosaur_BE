@@ -61,7 +61,7 @@ public class CartController {
     @Operation(description = "장바구니 아이템 증감")
     public ResponseEntity<CartItemQuantityResponse> updateCartItemQuantity(
         @RequestHeader("X-User-Id") UUID userId,
-        @PathVariable Long cartItemId,
+        @PathVariable UUID cartItemId,
         @RequestBody CartItemQuantityRequest request
     ) {
         CartItemQuantityResponse response = cartItemUseCase.updateTicket(userId, cartItemId, request);
@@ -74,7 +74,7 @@ public class CartController {
     @DeleteMapping("/items/{cartItemId}")
     @Operation(description = "장바구니 아이템 삭제")
     public ResponseEntity<CartItemDeleteResponse> deleteCartItem(
-        @PathVariable Long cartItemId,
+        @PathVariable UUID cartItemId,
         @RequestHeader("X-User-Id") UUID userId
     ) {
         CartItemDeleteResponse response = cartItemUseCase.deleteTicket(userId, cartItemId);
