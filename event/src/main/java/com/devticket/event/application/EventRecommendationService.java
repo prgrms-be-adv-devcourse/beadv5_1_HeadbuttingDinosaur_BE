@@ -25,6 +25,7 @@ public class EventRecommendationService {
 
     private static final Set<EventStatus> EXCLUDED_STATUSES = Set.of(
         EventStatus.SALE_ENDED,
+        EventStatus.ENDED,
         EventStatus.CANCELLED,
         EventStatus.FORCE_CANCELLED,
         EventStatus.DRAFT
