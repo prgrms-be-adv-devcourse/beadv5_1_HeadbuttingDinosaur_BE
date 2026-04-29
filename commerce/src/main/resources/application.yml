@@ -30,3 +30,9 @@ management:
 logging:
   file:
     name: ./spring-logs/commerce/commerce.log
+
+devticket:
+  outbox:
+    # Outbox 직접 발행(afterCommit) 경로가 우선 처리할 수 있도록
+    # 스케줄러 fallback 은 createdAt 기준 grace period 경과 후 row 만 잡는다.
+    publish-grace-seconds: 5
