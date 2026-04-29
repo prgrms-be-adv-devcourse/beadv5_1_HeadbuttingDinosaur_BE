@@ -21,10 +21,8 @@ import com.devticket.payment.common.outbox.OutboxService;
 import com.devticket.payment.payment.application.dto.PgPaymentConfirmCommand;
 import com.devticket.payment.payment.application.dto.PgPaymentConfirmResult;
 import com.devticket.payment.payment.domain.enums.PaymentMethod;
-import com.devticket.payment.payment.domain.enums.PaymentStatus;
 import com.devticket.payment.payment.domain.model.Payment;
 import com.devticket.payment.payment.domain.repository.PaymentRepository;
-import com.devticket.payment.payment.infrastructure.client.CommerceInternalClient;
 import com.devticket.payment.payment.infrastructure.external.PgPaymentClient;
 import com.devticket.payment.payment.infrastructure.external.dto.TossPaymentStatusResponse;
 import com.devticket.payment.wallet.application.event.PaymentCompletedEvent;
@@ -37,7 +35,6 @@ import com.devticket.payment.wallet.domain.model.WalletTransaction;
 import com.devticket.payment.wallet.domain.repository.WalletChargeRepository;
 import com.devticket.payment.wallet.domain.repository.WalletRepository;
 import com.devticket.payment.wallet.domain.repository.WalletTransactionRepository;
-import com.devticket.payment.wallet.infrastructure.client.dto.InternalEventOrdersResponse;
 import com.devticket.payment.wallet.presentation.dto.SettlementDepositRequest;
 import com.devticket.payment.wallet.presentation.dto.WalletBalanceResponse;
 import com.devticket.payment.wallet.presentation.dto.WalletChargeConfirmRequest;
@@ -61,7 +58,6 @@ public class WalletServiceImpl implements WalletService {
     // private final RefundRepository refundRepository; // TODO: Refund 모듈 완성 후 활성화
     private final PgPaymentClient pgPaymentClient;
     private final OutboxService outboxService;
-    private final CommerceInternalClient commerceInternalClient;
     private final WalletChargeTransactionService walletChargeTransactionService;
 
     // =====================================================================
@@ -362,70 +358,14 @@ public class WalletServiceImpl implements WalletService {
         );
         walletTransactionRepository.save(tx);
 
+        // 기존 USE_<orderId> 키 무효화 — readyPayment 재시도(예: WALLET_PG 2000→3000)에서
+        // 새 deductForWalletPg 가 동일 키 충돌로 멱등 skip 되며 차감 누락되는 문제 방지.
+        String useKey = "USE_" + orderId;
+        walletTransactionRepository.findByTransactionKey(useKey)
+            .ifPresent(WalletTransaction::revoke);
+
         log.info("[WalletPG] 예치금 복구 완료 — orderId={}, walletAmount={}, balanceAfter={}",
             orderId, walletAmount, wallet.getBalance());
-    }
-
-    // =====================================================================
-    // event.force-cancelled / event.sale-stopped — 일괄 환불
-    // =====================================================================
-
-    @Override
-    @Transactional
-    public void processBatchRefund(UUID eventId) {
-        InternalEventOrdersResponse response = commerceInternalClient.getOrdersByEvent(eventId);
-
-        if (response == null || response.getOrders() == null || response.getOrders().isEmpty()) {
-            log.info("[BatchRefund] 환불 대상 주문 없음 — eventId={}", eventId);
-            return;
-        }
-
-        List<InternalEventOrdersResponse.OrderInfo> orders = response.getOrders().stream()
-            .filter(o -> "PAID".equals(o.getStatus()))
-            .toList();
-
-        log.info("[BatchRefund] 일괄 환불 시작 — eventId={}, 대상 건수={}", eventId, orders.size());
-
-        for (InternalEventOrdersResponse.OrderInfo orderInfo : orders) {
-            UUID orderId = orderInfo.getOrderId();
-            UUID userId = UUID.fromString(orderInfo.getUserId());
-            int refundAmount = orderInfo.getTotalAmount();
-
-            Payment payment = paymentRepository.findByOrderId(orderId).orElse(null);
-            if (payment == null) {
-                log.warn("[BatchRefund] Payment 없음 — orderId={}", orderId);
-                continue;
-            }
-            if (payment.getStatus() == PaymentStatus.REFUNDED) {
-                log.info("[BatchRefund] 이미 환불됨 — orderId={}", orderId);
-                continue;
-            }
-
-            // TODO: Refund 모듈 완성 후 주석 해제
-            // Refund refund = Refund.createForBatch(payment, refundAmount, 100);
-            // refundRepository.save(refund);
-            // payment.refund();
-
-            // if ("WALLET".equals(orderInfo.getPaymentMethod())) {
-            // restoreBalance(userId, refundAmount, refund.getRefundId(), orderId);
-            // }
-
-            // RefundCompletedEvent event = RefundCompletedEvent.builder()
-            // .refundId(refund.getRefundId())
-            // .orderId(orderId)
-            // .userId(userId)
-            // .paymentId(payment.getPaymentId())
-            // .paymentMethod(payment.getPaymentMethod())
-            // .refundAmount(refundAmount)
-            // .refundRate(100)
-            // .timestamp(Instant.now())
-            // .build();
-            // outboxService.save("REFUND", refund.getId(), KafkaTopics.REFUND_COMPLETED, event);
-
-            // log.info("[BatchRefund] 환불 완료 — orderId={}, refundId={}",
-            // orderId, refund.getRefundId());
-            log.info("[BatchRefund] Refund 모듈 미완성 — 스킵 orderId={}", orderId);
-        }
     }
 
     // =====================================================================

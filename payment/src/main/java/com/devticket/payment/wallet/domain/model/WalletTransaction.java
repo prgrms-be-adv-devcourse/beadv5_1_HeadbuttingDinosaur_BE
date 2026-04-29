@@ -157,6 +157,17 @@ public class WalletTransaction extends BaseEntity {
         this.deletedAt = LocalDateTime.now();
     }
 
+    /**
+     * transactionKey 를 무효화한다 — 재시도 흐름에서 같은 orderId 로 새 차감/환원이 가능하도록
+     * 기존 키를 unique 충돌 없는 형태로 rename + softDelete.
+     * Why: WALLET_PG 재시도(예: 2000→3000) 시 기존 USE_<orderId> 행이 멱등 키를 점유해
+     *      두 번째 deduct 가 skip 되며 차감 누락이 발생. 환원 시 이 메서드로 USE 키를 해제한다.
+     */
+    public void revoke() {
+        this.transactionKey = "REVOKED_" + this.transactionKey + "_" + UUID.randomUUID();
+        this.deletedAt = LocalDateTime.now();
+    }
+
     public boolean isSameTransactionKey(String transactionKey) {
         return this.transactionKey.equals(transactionKey);
     }
