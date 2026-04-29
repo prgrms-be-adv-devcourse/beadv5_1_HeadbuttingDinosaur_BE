@@ -129,7 +129,8 @@ public class Event extends BaseEntity {
     public boolean canBeCancelled() {
         return this.status != EventStatus.CANCELLED
             && this.status != EventStatus.FORCE_CANCELLED
-            && this.status != EventStatus.SALE_ENDED;
+            && this.status != EventStatus.SALE_ENDED
+            && this.status != EventStatus.ENDED;
     }
 
     public void update(String title, String description, String location,
@@ -187,12 +188,30 @@ public class Event extends BaseEntity {
         if (quantity < 1) {
             throw new BusinessException(EventErrorCode.INVALID_STOCK_QUANTITY);
         }
-        if (this.status == EventStatus.CANCELLED || this.status == EventStatus.FORCE_CANCELLED) {
+        if (this.status == EventStatus.CANCELLED
+                || this.status == EventStatus.FORCE_CANCELLED
+                || this.status == EventStatus.ENDED) {
             throw new BusinessException(EventErrorCode.CANNOT_CHANGE_STATUS);
         }
         this.remainingQuantity = Math.min(this.totalQuantity, this.remainingQuantity + quantity);
         if (this.status == EventStatus.SOLD_OUT && this.remainingQuantity > 0) {
             this.status = EventStatus.ON_SALE;
+        }
+    }
+
+    public void expireSale() {
+        if ((this.status == EventStatus.ON_SALE || this.status == EventStatus.SOLD_OUT)
+                && LocalDateTime.now().isAfter(this.saleEndAt)) {
+            this.status = EventStatus.SALE_ENDED;
+        }
+    }
+
+    public void endEvent() {
+        if ((this.status == EventStatus.ON_SALE
+                || this.status == EventStatus.SOLD_OUT
+                || this.status == EventStatus.SALE_ENDED)
+                && LocalDateTime.now().isAfter(this.eventDateTime)) {
+            this.status = EventStatus.ENDED;
         }
     }
 

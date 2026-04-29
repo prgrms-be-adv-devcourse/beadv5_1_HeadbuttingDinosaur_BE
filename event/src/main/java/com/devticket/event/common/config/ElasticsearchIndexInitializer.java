@@ -30,10 +30,10 @@ import org.springframework.stereotype.Component;
 public class ElasticsearchIndexInitializer {
 
     private static final List<EventStatus> ACTIVE_STATUSES =
-        List.of(EventStatus.DRAFT, EventStatus.ON_SALE, EventStatus.SOLD_OUT);
+        List.of(EventStatus.DRAFT, EventStatus.ON_SALE, EventStatus.SOLD_OUT, EventStatus.SALE_ENDED);
 
     private static final List<EventStatus> TERMINATED_STATUSES =
-        List.of(EventStatus.CANCELLED, EventStatus.FORCE_CANCELLED);
+        List.of(EventStatus.ENDED, EventStatus.CANCELLED, EventStatus.FORCE_CANCELLED);
 
     private static final int BATCH_SIZE = 50;
 

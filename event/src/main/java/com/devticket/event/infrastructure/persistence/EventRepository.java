@@ -78,6 +78,10 @@ public interface EventRepository extends JpaRepository<Event, Long> {
 
     List<Event> findAllByStatusAndSaleStartAtBefore(EventStatus status, LocalDateTime now);
 
+    List<Event> findAllByStatusInAndSaleEndAtBefore(List<EventStatus> statuses, LocalDateTime now);
+
+    List<Event> findAllByStatusInAndEventDateTimeBefore(List<EventStatus> statuses, LocalDateTime now);
+
     // 판매자별 이벤트 조회
     List<Event> findBySellerIdOrderByCreatedAtDesc(UUID sellerId);
 

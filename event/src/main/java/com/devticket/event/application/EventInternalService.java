@@ -242,6 +242,9 @@ public class EventInternalService {
         if (status == EventStatus.CANCELLED || status == EventStatus.FORCE_CANCELLED) {
             return PurchaseUnavailableReason.EVENT_CANCELLED;
         }
+        if (status == EventStatus.ENDED) {
+            return PurchaseUnavailableReason.SALE_ENDED;
+        }
         if (status == EventStatus.SOLD_OUT) {
             return PurchaseUnavailableReason.SOLD_OUT;
         }

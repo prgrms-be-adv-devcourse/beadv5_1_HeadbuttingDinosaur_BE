@@ -273,6 +273,29 @@ public class EventService {
 
     @Scheduled(fixedDelay = 60000)
     @Transactional
+    public void expireSaleEvents() {
+        List<Event> events = eventRepository.findAllByStatusInAndSaleEndAtBefore(
+            List.of(EventStatus.ON_SALE, EventStatus.SOLD_OUT), LocalDateTime.now());
+        events.forEach(event -> {
+            event.expireSale();
+            syncToElasticsearch(event);
+        });
+    }
+
+    @Scheduled(fixedDelay = 60000)
+    @Transactional
+    public void endEvents() {
+        List<Event> events = eventRepository.findAllByStatusInAndEventDateTimeBefore(
+            List.of(EventStatus.ON_SALE, EventStatus.SOLD_OUT, EventStatus.SALE_ENDED),
+            LocalDateTime.now());
+        events.forEach(event -> {
+            event.endEvent();
+            syncToElasticsearch(event);
+        });
+    }
+
+    @Scheduled(fixedDelay = 60000)
+    @Transactional
     public void promoteDraftEvents() {
         List<Event> events = eventRepository
             .findAllByStatusAndSaleStartAtBefore(EventStatus.DRAFT, LocalDateTime.now());
