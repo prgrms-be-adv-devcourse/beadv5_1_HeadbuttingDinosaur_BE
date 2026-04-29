@@ -151,7 +151,7 @@ class EventServiceTest {
 
         // then
         assertThat(response.eventId()).isEqualTo(expectedUuid);
-        assertThat(response.status()).isEqualTo(EventStatus.ON_SALE);
+        assertThat(response.status()).isEqualTo(EventStatus.DRAFT);
 
         // save 3회 호출 — (1) 이벤트 본체 + (2) techStackIds + (3) imageUrls (fixture 에 "url1" 포함)
         verify(eventRepository, times(3)).save(argThat(event -> event != null));
@@ -377,29 +377,39 @@ class EventServiceTest {
     }
 
     @Test
-    void 타인_비공개_이벤트_조회시_권한예외_발생() {
+    void DRAFT_상태는_공개_상태이므로_타인도_조회_가능하다() {
         // given
         UUID sellerId = UUID.randomUUID();
-        UUID otherUserId = UUID.randomUUID(); // 다른 사용자 (타인)
+        UUID otherUserId = UUID.randomUUID();
         EventListRequest request = new EventListRequest(null, null, null, sellerId, EventStatus.DRAFT);
         Pageable pageable = PageRequest.of(0, 20);
 
-        // when & then
-        assertThatThrownBy(() -> eventService.getEventList(request, otherUserId, pageable))
-            .isInstanceOf(BusinessException.class)
-            .hasMessageContaining(EventErrorCode.UNAUTHORIZED_SELLER.getMessage());
+        doReturn(mockEmptySearchHits())
+            .when(elasticsearchOperations).search(any(Query.class), eq(EventDocument.class));
+
+        // when
+        EventListResponse response = eventService.getEventList(request, otherUserId, pageable);
+
+        // then
+        assertThat(response).isNotNull();
+        assertThat(response.content()).isEmpty();
     }
 
     @Test
-    void 비로그인_사용자_비공개_이벤트_조회시_권한예외_발생() {
+    void DRAFT_상태는_공개_상태이므로_비로그인_사용자도_조회_가능하다() {
         // given
         EventListRequest request = new EventListRequest(null, null, null, null, EventStatus.DRAFT);
         Pageable pageable = PageRequest.of(0, 20);
 
-        // when & then (currentUserId에 null 전달)
-        assertThatThrownBy(() -> eventService.getEventList(request, null, pageable))
-            .isInstanceOf(BusinessException.class)
-            .hasMessageContaining(EventErrorCode.UNAUTHORIZED_SELLER.getMessage());
+        doReturn(mockEmptySearchHits())
+            .when(elasticsearchOperations).search(any(Query.class), eq(EventDocument.class));
+
+        // when
+        EventListResponse response = eventService.getEventList(request, null, pageable);
+
+        // then
+        assertThat(response).isNotNull();
+        assertThat(response.content()).isEmpty();
     }
 
     @Test
