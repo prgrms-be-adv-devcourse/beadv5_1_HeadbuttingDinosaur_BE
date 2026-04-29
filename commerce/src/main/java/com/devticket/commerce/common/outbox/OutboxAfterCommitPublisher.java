@@ -1,6 +1,7 @@
 package com.devticket.commerce.common.outbox;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -31,7 +32,7 @@ public class OutboxAfterCommitPublisher {
     public OutboxAfterCommitPublisher(
             OutboxRepository outboxRepository,
             OutboxEventProducer outboxEventProducer,
-            ThreadPoolTaskExecutor outboxAfterCommitExecutor,
+            @Qualifier("outboxAfterCommitExecutor") ThreadPoolTaskExecutor outboxAfterCommitExecutor,
             PlatformTransactionManager transactionManager) {
         this.outboxRepository = outboxRepository;
         this.outboxEventProducer = outboxEventProducer;
