@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -88,7 +89,7 @@ class OutboxRepositoryTest {
         @Test
         void nextRetryAt이_현재와_동일하면_스킵된다() {
             // `<` 연산자라서 경계값은 배제 — 다음 틱에서 픽업됨
-            Instant now = Instant.now();
+            Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
             Outbox saved = saveWithNextRetryAt(now);
 
             List<Outbox> result = outboxRepository.findPendingToPublish(

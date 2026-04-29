@@ -1,7 +1,5 @@
 package com.devticket.payment.wallet.infrastructure.kafka;
 
-import java.util.UUID;
-
 import lombok.RequiredArgsConstructor;
 
 import org.springframework.stereotype.Service;
@@ -16,7 +14,7 @@ public class RefundCompletedHandler {
     private final MessageDeduplicationService deduplicationService;
 
     @Transactional
-    public void markProcessedOnly(UUID messageId, String topic) {
+    public void markProcessedOnly(String messageId, String topic) {
         deduplicationService.markProcessed(messageId, topic);
     }
 }

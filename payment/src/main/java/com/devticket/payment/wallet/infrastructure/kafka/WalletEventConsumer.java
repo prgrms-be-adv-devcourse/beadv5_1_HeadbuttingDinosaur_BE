@@ -37,20 +37,20 @@ public class WalletEventConsumer {
         containerFactory = "kafkaListenerContainerFactory"
     )
     public void consumeRefundCompleted(ConsumerRecord<String, String> record, Acknowledgment ack) {
-        UUID messageUUID = extractMessageId(record);
+        String messageId = extractMessageId(record);
 
-        if (deduplicationService.isDuplicate(messageUUID)) {
+        if (deduplicationService.isDuplicate(messageId)) {
             log.info("[Consumer] 중복 메시지 스킵 — topic={}, offset={}", record.topic(), record.offset());
             ack.acknowledge();
             return;
         }
 
         try {
-            refundCompletedHandler.markProcessedOnly(messageUUID, record.topic());
+            refundCompletedHandler.markProcessedOnly(messageId, record.topic());
             ack.acknowledge();
         } catch (Exception e) {
             log.error("[Consumer] refund.completed 처리 실패 — messageId={}, error={}",
-                messageUUID, e.getMessage(), e);
+                messageId, e.getMessage(), e);
             throw new RuntimeException("refund.completed 처리 실패", e);
         }
     }
@@ -59,11 +59,11 @@ public class WalletEventConsumer {
      * Kafka 헤더에서 X-Message-Id를 추출한다.
      * 헤더가 없거나 파싱 실패 시 topic:partition:offset 기반 결정적 UUID(v3)로 폴백한다.
      */
-    private UUID extractMessageId(ConsumerRecord<String, String> record) {
+    private String extractMessageId(ConsumerRecord<String, String> record) {
         Header header = record.headers().lastHeader("X-Message-Id");
         if (header != null) {
             try {
-                return UUID.fromString(new String(header.value(), StandardCharsets.UTF_8));
+                return UUID.fromString(new String(header.value(), StandardCharsets.UTF_8)).toString();
             } catch (IllegalArgumentException e) {
                 log.warn("[Consumer] X-Message-Id 파싱 실패, 레거시 폴백 사용 — topic={}, offset={}",
                     record.topic(), record.offset());
@@ -71,6 +71,6 @@ public class WalletEventConsumer {
         }
         // 폴백: 헤더 없거나 파싱 실패 시 topic:partition:offset 기반 결정적 UUID
         String fallback = record.topic() + ":" + record.partition() + ":" + record.offset();
-        return UUID.nameUUIDFromBytes(fallback.getBytes(StandardCharsets.UTF_8));
+        return UUID.nameUUIDFromBytes(fallback.getBytes(StandardCharsets.UTF_8)).toString();
     }
 }

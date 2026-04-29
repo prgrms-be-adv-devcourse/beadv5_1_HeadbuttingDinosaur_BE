@@ -2,6 +2,7 @@ package com.devticket.payment.wallet.infrastructure.persistence;
 
 import com.devticket.payment.wallet.domain.model.WalletTransaction;
 import com.devticket.payment.wallet.domain.repository.WalletTransactionRepository;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -26,6 +27,11 @@ public class WalletTransactionRepositoryImpl implements WalletTransactionReposit
     @Override
     public boolean existsByTransactionKey(String transactionKey) {
         return walletTransactionJpaRepository.existsByTransactionKey(transactionKey);
+    }
+
+    @Override
+    public Optional<WalletTransaction> findByTransactionKey(String transactionKey) {
+        return walletTransactionJpaRepository.findByTransactionKey(transactionKey);
     }
 
     @Override

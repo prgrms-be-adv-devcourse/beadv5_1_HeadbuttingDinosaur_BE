@@ -274,7 +274,7 @@ class RefundSagaOrchestratorTest {
     class OnOrderFailedTest {
 
         @Test
-        @DisplayName("실패 수신 — SagaState.FAILED + Refund.fail + OrderRefund.FAILED")
+        @DisplayName("실패 수신 — SagaState.FAILED + Refund.fail + OrderRefund.FAILED + RefundTicket.FAILED")
         void 실패_처리() {
             SagaState st = state(SagaStep.ORDER_CANCELLING);
             given(sagaStateRepository.findByRefundId(refundId)).willReturn(Optional.of(st));
@@ -286,6 +286,7 @@ class RefundSagaOrchestratorTest {
 
             assertThat(st.getStatus()).isEqualTo(SagaStatus.FAILED);
             assertThat(ledger.getStatus()).isEqualTo(OrderRefundStatus.FAILED);
+            verify(refundTicketRepository).markFailedByRefundId(refundId);
             verify(outboxService, never()).save(any(), any(), any(), any(), any());
         }
     }
@@ -295,7 +296,7 @@ class RefundSagaOrchestratorTest {
     class OnTicketFailedTest {
 
         @Test
-        @DisplayName("ticket 실패 → order.compensate 발행")
+        @DisplayName("ticket 실패 → RefundTicket FAILED 마킹 + order.compensate 발행")
         void 보상_경로() {
             SagaState st = state(SagaStep.TICKET_CANCELLING);
             given(sagaStateRepository.findByRefundId(refundId)).willReturn(Optional.of(st));
@@ -304,6 +305,7 @@ class RefundSagaOrchestratorTest {
             orchestrator.onTicketFailed(new RefundTicketFailedEvent(refundId, orderId, "reason", Instant.now()));
 
             assertThat(st.getStatus()).isEqualTo(SagaStatus.COMPENSATING);
+            verify(refundTicketRepository).markFailedByRefundId(refundId);
             verify(outboxService).save(
                 eq(refundId.toString()),
                 eq(orderId.toString()),
@@ -319,7 +321,7 @@ class RefundSagaOrchestratorTest {
     class OnStockFailedTest {
 
         @Test
-        @DisplayName("stock 실패 → ticket+order compensate 순차 발행")
+        @DisplayName("stock 실패 → RefundTicket FAILED 마킹 + ticket+order compensate 순차 발행")
         void 보상_두번_발행() {
             SagaState st = state(SagaStep.STOCK_RESTORING);
             given(sagaStateRepository.findByRefundId(refundId)).willReturn(Optional.of(st));
@@ -330,6 +332,7 @@ class RefundSagaOrchestratorTest {
             orchestrator.onStockFailed(new RefundStockFailedEvent(refundId, orderId, "reason", Instant.now()));
 
             assertThat(st.getStatus()).isEqualTo(SagaStatus.COMPENSATING);
+            verify(refundTicketRepository).markFailedByRefundId(refundId);
             verify(outboxService).save(
                 any(), any(), eq(KafkaTopics.REFUND_TICKET_COMPENSATE),
                 eq(KafkaTopics.REFUND_TICKET_COMPENSATE), any());
@@ -361,6 +364,7 @@ class RefundSagaOrchestratorTest {
 
             verify(walletService).restoreBalance(eq(userId), eq(10_000), any(UUID.class), eq(orderId));
             verify(pgPaymentClient, never()).cancelPartial(any());
+            verify(refundTicketRepository).markCompletedByRefundId(any(UUID.class));
             verify(outboxService).save(
                 any(), any(), eq(KafkaTopics.REFUND_COMPLETED),
                 eq(KafkaTopics.REFUND_COMPLETED), any());
@@ -390,6 +394,7 @@ class RefundSagaOrchestratorTest {
             verify(pgPaymentClient, atLeastOnce()).cancelPartial(cmd.capture());
             assertThat(cmd.getValue().idempotencyKey()).isEqualTo(refund.getRefundId().toString());
             verify(walletService, never()).restoreBalance(any(), anyInt(), any(), any());
+            verify(refundTicketRepository).markCompletedByRefundId(any(UUID.class));
             verify(outboxService).save(any(), any(), eq(KafkaTopics.REFUND_COMPLETED),
                 eq(KafkaTopics.REFUND_COMPLETED), any());
             assertThat(st.getStatus()).isEqualTo(SagaStatus.COMPLETED);
@@ -418,6 +423,7 @@ class RefundSagaOrchestratorTest {
             assertThat(cmd.getValue().idempotencyKey())
                 .isEqualTo(refund.getRefundId().toString() + "-pg");
             verify(walletService).restoreBalance(eq(userId), anyInt(), any(UUID.class), eq(orderId));
+            verify(refundTicketRepository).markCompletedByRefundId(any(UUID.class));
             assertThat(st.getStatus()).isEqualTo(SagaStatus.COMPLETED);
         }
     }

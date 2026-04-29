@@ -9,7 +9,6 @@ import com.devticket.payment.refund.application.saga.event.RefundStockDoneEvent;
 import com.devticket.payment.refund.application.saga.event.RefundStockFailedEvent;
 import com.devticket.payment.refund.application.saga.event.RefundTicketDoneEvent;
 import com.devticket.payment.refund.application.saga.event.RefundTicketFailedEvent;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,43 +26,43 @@ public class RefundSagaHandler {
     private final MessageDeduplicationService deduplicationService;
 
     @Transactional
-    public void startAndMark(RefundRequestedEvent event, UUID messageId, String topic) {
+    public void startAndMark(RefundRequestedEvent event, String messageId, String topic) {
         orchestrator.start(event);
         deduplicationService.markProcessed(messageId, topic);
     }
 
     @Transactional
-    public void onOrderDoneAndMark(RefundOrderDoneEvent event, UUID messageId, String topic) {
+    public void onOrderDoneAndMark(RefundOrderDoneEvent event, String messageId, String topic) {
         orchestrator.onOrderDone(event);
         deduplicationService.markProcessed(messageId, topic);
     }
 
     @Transactional
-    public void onOrderFailedAndMark(RefundOrderFailedEvent event, UUID messageId, String topic) {
+    public void onOrderFailedAndMark(RefundOrderFailedEvent event, String messageId, String topic) {
         orchestrator.onOrderFailed(event);
         deduplicationService.markProcessed(messageId, topic);
     }
 
     @Transactional
-    public void onTicketDoneAndMark(RefundTicketDoneEvent event, UUID messageId, String topic) {
+    public void onTicketDoneAndMark(RefundTicketDoneEvent event, String messageId, String topic) {
         orchestrator.onTicketDone(event);
         deduplicationService.markProcessed(messageId, topic);
     }
 
     @Transactional
-    public void onTicketFailedAndMark(RefundTicketFailedEvent event, UUID messageId, String topic) {
+    public void onTicketFailedAndMark(RefundTicketFailedEvent event, String messageId, String topic) {
         orchestrator.onTicketFailed(event);
         deduplicationService.markProcessed(messageId, topic);
     }
 
     @Transactional
-    public void onStockDoneAndMark(RefundStockDoneEvent event, UUID messageId, String topic) {
+    public void onStockDoneAndMark(RefundStockDoneEvent event, String messageId, String topic) {
         orchestrator.onStockDone(event);
         deduplicationService.markProcessed(messageId, topic);
     }
 
     @Transactional
-    public void onStockFailedAndMark(RefundStockFailedEvent event, UUID messageId, String topic) {
+    public void onStockFailedAndMark(RefundStockFailedEvent event, String messageId, String topic) {
         orchestrator.onStockFailed(event);
         deduplicationService.markProcessed(messageId, topic);
     }
