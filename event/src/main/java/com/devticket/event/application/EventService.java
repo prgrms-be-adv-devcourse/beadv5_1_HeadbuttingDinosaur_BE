@@ -53,6 +53,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.elasticsearch.client.elc.NativeQuery;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.SearchHits;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -194,7 +195,7 @@ public class EventService {
         if (request.status() != null) {
             allowedStatuses = List.of(request.status());
         } else if (!isOwnEventRequest) {
-            allowedStatuses = List.of(EventStatus.ON_SALE, EventStatus.SOLD_OUT, EventStatus.SALE_ENDED);
+            allowedStatuses = List.of(EventStatus.DRAFT, EventStatus.ON_SALE, EventStatus.SOLD_OUT, EventStatus.SALE_ENDED);
         }
 
         // ES 검색
@@ -270,10 +271,22 @@ public class EventService {
         return SellerEventSummaryResponse.from(event);
     }
 
+    @Scheduled(fixedDelay = 60000)
+    @Transactional
+    public void promoteDraftEvents() {
+        List<Event> events = eventRepository
+            .findAllByStatusAndSaleStartAtBefore(EventStatus.DRAFT, LocalDateTime.now());
+        events.forEach(event -> {
+            event.promoteToOnSale();
+            syncToElasticsearch(event);
+        });
+    }
+
     private boolean isPublicStatus(EventStatus status) {
         return status == EventStatus.ON_SALE ||
             status == EventStatus.SOLD_OUT ||
-            status == EventStatus.SALE_ENDED;
+            status == EventStatus.SALE_ENDED ||
+            status == EventStatus.DRAFT;
     }
 
     @Transactional

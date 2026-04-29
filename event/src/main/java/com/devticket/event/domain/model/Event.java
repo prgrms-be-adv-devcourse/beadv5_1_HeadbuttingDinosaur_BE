@@ -117,7 +117,7 @@ public class Event extends BaseEntity {
             .totalQuantity(totalQuantity)
             .maxQuantity(maxQuantity)
             .remainingQuantity(totalQuantity)
-            .status(EventStatus.ON_SALE)
+            .status(LocalDateTime.now().isBefore(saleStartAt) ? EventStatus.DRAFT : EventStatus.ON_SALE)
             .category(category)
             .build();
     }
@@ -192,6 +192,12 @@ public class Event extends BaseEntity {
         }
         this.remainingQuantity = Math.min(this.totalQuantity, this.remainingQuantity + quantity);
         if (this.status == EventStatus.SOLD_OUT && this.remainingQuantity > 0) {
+            this.status = EventStatus.ON_SALE;
+        }
+    }
+
+    public void promoteToOnSale() {
+        if (this.status == EventStatus.DRAFT && !LocalDateTime.now().isBefore(this.saleStartAt)) {
             this.status = EventStatus.ON_SALE;
         }
     }

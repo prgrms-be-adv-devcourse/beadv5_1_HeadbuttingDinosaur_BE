@@ -44,7 +44,7 @@ class EventDocumentTest {
         assertThat(doc.getEventId()).isEqualTo(eventId.toString());
         assertThat(doc.getTitle()).isEqualTo("스프링 부트 밋업");
         assertThat(doc.getCategory()).isEqualTo(EventCategory.MEETUP.name());
-        assertThat(doc.getStatus()).isEqualTo(EventStatus.ON_SALE.name());
+        assertThat(doc.getStatus()).isEqualTo(EventStatus.DRAFT.name());
         assertThat(doc.getSellerId()).isEqualTo(sellerId.toString());
     }
 
