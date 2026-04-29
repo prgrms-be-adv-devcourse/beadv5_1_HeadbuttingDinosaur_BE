@@ -196,6 +196,12 @@ public class Event extends BaseEntity {
         }
     }
 
+    public void promoteToOnSale() {
+        if (this.status == EventStatus.DRAFT && !LocalDateTime.now().isBefore(this.saleStartAt)) {
+            this.status = EventStatus.ON_SALE;
+        }
+    }
+
     public boolean isPurchasable(int requestedQuantity) {
         if (requestedQuantity < 1) {
             return false;

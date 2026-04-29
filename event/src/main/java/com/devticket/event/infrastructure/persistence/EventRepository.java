@@ -76,6 +76,8 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     @Query("SELECT e FROM Event e WHERE e.eventId IN :eventIds ORDER BY e.eventId ASC")
     List<Event> findAllByEventIdInWithLock(@Param("eventIds") List<UUID> eventIds);
 
+    List<Event> findAllByStatusAndSaleStartAtBefore(EventStatus status, LocalDateTime now);
+
     // 판매자별 이벤트 조회
     List<Event> findBySellerIdOrderByCreatedAtDesc(UUID sellerId);
 
