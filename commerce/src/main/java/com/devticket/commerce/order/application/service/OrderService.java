@@ -234,7 +234,7 @@ public class OrderService implements OrderUsecase {
     }
 
     @Override
-    public InternalSettlementDataResponse getSettelmentData(UUID sellerId, String periodStart, String periodEnd) {
+    public InternalSettlementDataResponse getSettlementData(UUID sellerId, String periodStart, String periodEnd) {
         try {
             log.info("[Settlement Debug] 시작 - sellerId: {}, period: {} ~ {}", sellerId, periodStart, periodEnd);
 

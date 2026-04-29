@@ -37,7 +37,7 @@ public interface OrderUsecase {
 
     void failOrder(UUID orderId);
 
-    InternalSettlementDataResponse getSettelmentData(UUID sellerId, String periodStart, String periodEnd);
+    InternalSettlementDataResponse getSettlementData(UUID sellerId, String periodStart, String periodEnd);
 
     InternalOrderItemResponse getOrderItemByTicketId(UUID ticketId);
 
