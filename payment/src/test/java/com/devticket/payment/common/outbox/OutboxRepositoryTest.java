@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -69,7 +70,7 @@ class OutboxRepositoryTest {
             Outbox saved = saveWithNextRetryAt(null);
 
             List<Outbox> result = outboxRepository.findPendingToPublish(
-                OutboxStatus.PENDING, Instant.now());
+                OutboxStatus.PENDING, Instant.now(), java.time.LocalDateTime.now().plusSeconds(60));
 
             assertThat(result).extracting(Outbox::getId).contains(saved.getId());
         }
@@ -80,7 +81,7 @@ class OutboxRepositoryTest {
             Outbox saved = saveWithNextRetryAt(now.minusSeconds(1));
 
             List<Outbox> result = outboxRepository.findPendingToPublish(
-                OutboxStatus.PENDING, now);
+                OutboxStatus.PENDING, now, java.time.LocalDateTime.now().plusSeconds(60));
 
             assertThat(result).extracting(Outbox::getId).contains(saved.getId());
         }
@@ -88,11 +89,11 @@ class OutboxRepositoryTest {
         @Test
         void nextRetryAt이_현재와_동일하면_스킵된다() {
             // `<` 연산자라서 경계값은 배제 — 다음 틱에서 픽업됨
-            Instant now = Instant.now();
+            Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
             Outbox saved = saveWithNextRetryAt(now);
 
             List<Outbox> result = outboxRepository.findPendingToPublish(
-                OutboxStatus.PENDING, now);
+                OutboxStatus.PENDING, now, java.time.LocalDateTime.now().plusSeconds(60));
 
             assertThat(result).extracting(Outbox::getId).doesNotContain(saved.getId());
         }
@@ -103,7 +104,7 @@ class OutboxRepositoryTest {
             Outbox saved = saveWithNextRetryAt(now.plusSeconds(10));
 
             List<Outbox> result = outboxRepository.findPendingToPublish(
-                OutboxStatus.PENDING, now);
+                OutboxStatus.PENDING, now, java.time.LocalDateTime.now().plusSeconds(60));
 
             assertThat(result).extracting(Outbox::getId).doesNotContain(saved.getId());
         }
@@ -115,9 +116,37 @@ class OutboxRepositoryTest {
             outboxRepository.saveAndFlush(outbox);
 
             List<Outbox> result = outboxRepository.findPendingToPublish(
-                OutboxStatus.PENDING, Instant.now());
+                OutboxStatus.PENDING, Instant.now(), java.time.LocalDateTime.now().plusSeconds(60));
 
             assertThat(result).extracting(Outbox::getId).doesNotContain(outbox.getId());
+        }
+    }
+
+    @Nested
+    @DisplayName("createdAt < :graceCutoff 경계 조건")
+    class GracePeriod {
+
+        @Test
+        void createdAt이_graceCutoff보다_과거이면_픽업된다() {
+            Outbox saved = saveWithNextRetryAt(null);
+
+            java.time.LocalDateTime graceCutoff = java.time.LocalDateTime.now().plusSeconds(60);
+            List<Outbox> result = outboxRepository.findPendingToPublish(
+                OutboxStatus.PENDING, Instant.now(), graceCutoff);
+
+            assertThat(result).extracting(Outbox::getId).contains(saved.getId());
+        }
+
+        @Test
+        void createdAt이_graceCutoff_이후이면_스킵된다() {
+            Outbox saved = saveWithNextRetryAt(null);
+
+            // graceCutoff가 createdAt보다 과거 → 5초 grace 내 row를 시뮬레이션
+            java.time.LocalDateTime graceCutoff = java.time.LocalDateTime.now().minusSeconds(60);
+            List<Outbox> result = outboxRepository.findPendingToPublish(
+                OutboxStatus.PENDING, Instant.now(), graceCutoff);
+
+            assertThat(result).extracting(Outbox::getId).doesNotContain(saved.getId());
         }
     }
 
@@ -140,7 +169,7 @@ class OutboxRepositoryTest {
             em.flush();
 
             List<Outbox> result = outboxRepository.findPendingToPublish(
-                OutboxStatus.PENDING, Instant.now());
+                OutboxStatus.PENDING, Instant.now(), java.time.LocalDateTime.now().plusSeconds(60));
 
             assertThat(result).hasSize(50);
         }

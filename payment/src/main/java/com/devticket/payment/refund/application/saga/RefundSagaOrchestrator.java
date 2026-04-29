@@ -150,6 +150,8 @@ public class RefundSagaOrchestrator {
                 orderRefundRepository.save(or);
             });
 
+        refundTicketRepository.markFailedByRefundId(event.refundId());
+
         log.error("[Saga] order 취소 실패 — refundId={}, reason={}",
             event.refundId(), event.reason());
     }
@@ -232,6 +234,8 @@ public class RefundSagaOrchestrator {
         refund.fail();
         refundRepository.save(refund);
 
+        refundTicketRepository.markFailedByRefundId(event.refundId());
+
         RefundOrderCompensateEvent comp = new RefundOrderCompensateEvent(
             event.refundId(),
             event.orderId(),
@@ -282,6 +286,8 @@ public class RefundSagaOrchestrator {
 
         List<UUID> ticketIds = refundTicketRepository.findByRefundId(event.refundId())
             .stream().map(RefundTicket::getTicketId).toList();
+
+        refundTicketRepository.markFailedByRefundId(event.refundId());
 
         RefundTicketCompensateEvent ticketComp = new RefundTicketCompensateEvent(
             event.refundId(),
@@ -382,6 +388,8 @@ public class RefundSagaOrchestrator {
 
         refund.complete(completedAt);
         refundRepository.save(refund);
+
+        refundTicketRepository.markCompletedByRefundId(refund.getRefundId());
 
         int ticketCount = refundTicketRepository.findByRefundId(refund.getRefundId()).size();
         if (ticketCount == 0) {

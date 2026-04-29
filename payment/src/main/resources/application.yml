@@ -15,6 +15,13 @@ kafka-producer:
   delivery-timeout-ms: 1500
   send-timeout-ms: 2000
 
+# Outbox 직접 발행 우선 + 스케줄러 fallback grace period (초)
+# 직접 발행 경로가 실패한 row만 스케줄러가 잡도록 createdAt < now - graceSeconds 조건에 사용.
+# poll-interval-ms: 폴링 주기 — fallback 전용이므로 길게 잡는다 (장애 시 최대 지연 ≒ poll + grace).
+outbox:
+  publish-grace-seconds: 5
+  poll-interval-ms: 60000
+
 springdoc:
   swagger-ui:
     path: /swagger-ui.html

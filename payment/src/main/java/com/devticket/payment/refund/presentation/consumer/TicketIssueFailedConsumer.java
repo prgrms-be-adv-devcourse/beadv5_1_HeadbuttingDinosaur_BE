@@ -37,7 +37,7 @@ public class TicketIssueFailedConsumer {
         containerFactory = "kafkaListenerContainerFactory"
     )
     public void consume(ConsumerRecord<String, String> record, Acknowledgment ack) {
-        UUID messageId = extractMessageId(record);
+        String messageId = extractMessageId(record);
         if (deduplicationService.isDuplicate(messageId)) {
             ack.acknowledge();
             return;
@@ -53,17 +53,17 @@ public class TicketIssueFailedConsumer {
         }
     }
 
-    private UUID extractMessageId(ConsumerRecord<String, String> record) {
+    private String extractMessageId(ConsumerRecord<String, String> record) {
         Header header = record.headers().lastHeader("X-Message-Id");
         if (header != null) {
             try {
-                return UUID.fromString(new String(header.value(), StandardCharsets.UTF_8));
+                return UUID.fromString(new String(header.value(), StandardCharsets.UTF_8)).toString();
             } catch (IllegalArgumentException e) {
                 log.warn("[Consumer] X-Message-Id 파싱 실패 — topic={}, offset={}",
                     record.topic(), record.offset());
             }
         }
         String fallback = record.topic() + ":" + record.partition() + ":" + record.offset();
-        return UUID.nameUUIDFromBytes(fallback.getBytes(StandardCharsets.UTF_8));
+        return UUID.nameUUIDFromBytes(fallback.getBytes(StandardCharsets.UTF_8)).toString();
     }
 }

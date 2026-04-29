@@ -36,8 +36,6 @@ public interface WalletService {
 
     void restoreForWalletPgFail(UUID userId, int walletAmount, UUID orderId);
 
-    void processBatchRefund(UUID eventId);
-
     void recoverStalePendingCharge(UUID chargeId);
 
     void depositFromSettlement(SettlementDepositRequest request);
