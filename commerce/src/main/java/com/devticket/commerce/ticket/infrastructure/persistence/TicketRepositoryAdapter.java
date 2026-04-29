@@ -68,4 +68,9 @@ public class TicketRepositoryAdapter implements TicketRepository {
     public List<Ticket> findAllByOrderIdAndStatus(Long orderId, TicketStatus status) {
         return ticketJpaRepository.findAllByOrderIdAndStatus(orderId, status);
     }
+
+    @Override
+    public int countByUserIdAndEventIdAndStatus(UUID userId, UUID eventId, TicketStatus status) {
+        return ticketJpaRepository.countByUserIdAndEventIdAndStatus(userId, eventId, status);
+    }
 }

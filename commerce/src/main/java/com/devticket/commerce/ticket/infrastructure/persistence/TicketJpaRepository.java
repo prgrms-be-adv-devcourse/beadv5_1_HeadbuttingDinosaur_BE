@@ -41,4 +41,6 @@ public interface TicketJpaRepository extends JpaRepository<Ticket, Long> {
     List<Ticket> findAllByOrderIdAndStatus(
         @Param("orderId") Long orderId,
         @Param("status") TicketStatus status);
+
+    int countByUserIdAndEventIdAndStatus(UUID userId, UUID eventId, TicketStatus status);
 }
