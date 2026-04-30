@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.devticket.payment.payment.application.dto.PgPaymentConfirmResult;
+import com.devticket.payment.payment.infrastructure.external.dto.TossPaymentStatusResponse;
 import com.devticket.payment.wallet.domain.WalletPolicyConstants;
 import com.devticket.payment.wallet.domain.exception.WalletErrorCode;
 import com.devticket.payment.wallet.domain.exception.WalletException;
@@ -132,5 +133,79 @@ public class WalletChargeTransactionService {
             walletCharge.getChargeId().toString(), walletCharge.getAmount(),
             wallet.getBalance(), walletCharge.getStatus().name(), walletTransaction.getCreatedAt()
         );
+    }
+
+    // =====================================================================
+    // 사후 보정 (Self-healing) — WalletChargeRecoveryScheduler에서 호출
+    // =====================================================================
+
+    // 복구용 선점: 비관적 락으로 PENDING → PROCESSING. 이미 처리됐거나 찾을 수 없으면 false.
+    @Transactional
+    public boolean claimChargeForRecovery(UUID chargeId) {
+        WalletCharge walletCharge = walletChargeRepository.findByChargeIdForUpdate(chargeId)
+            .orElse(null);
+
+        if (walletCharge == null || !walletCharge.isPending()) {
+            return false;
+        }
+
+        walletCharge.markProcessing();
+        return true;
+    }
+
+    // PG 조회 실패 시 PROCESSING → PENDING 원복 (다음 스케줄에서 재시도 가능하도록).
+    @Transactional
+    public void revertToPending(UUID chargeId) {
+        WalletCharge walletCharge = walletChargeRepository.findByChargeId(chargeId).orElse(null);
+        if (walletCharge != null && walletCharge.isProcessing()) {
+            walletCharge.revertToPending();
+        }
+    }
+
+    // PG 조회 결과에 따라 COMPLETED 또는 FAILED 처리.
+    @Transactional
+    public void applyRecoveryResult(UUID chargeId, Optional<TossPaymentStatusResponse> pgStatusOpt) {
+        WalletCharge walletCharge = walletChargeRepository.findByChargeId(chargeId)
+            .orElse(null);
+        if (walletCharge == null) {
+            return;
+        }
+
+        if (pgStatusOpt.isEmpty()) {
+            walletCharge.fail();
+            log.info("[Recovery] Toss 미도달(404) — chargeId={} → FAILED", chargeId);
+            return;
+        }
+
+        TossPaymentStatusResponse pgStatus = pgStatusOpt.get();
+
+        if ("DONE".equals(pgStatus.status())) {
+            String transactionKey = "CHARGE:" + pgStatus.paymentKey();
+
+            if (walletTransactionRepository.existsByTransactionKey(transactionKey)) {
+                walletCharge.complete(pgStatus.paymentKey());
+                log.info("[Recovery] 거래 기록 중복 확인 — chargeId={} → COMPLETED (잔액 반영 생략)", chargeId);
+                return;
+            }
+
+            walletCharge.complete(pgStatus.paymentKey());
+            walletRepository.chargeBalanceAtomic(walletCharge.getUserId(), walletCharge.getAmount());
+
+            Wallet wallet = walletRepository.findByUserId(walletCharge.getUserId())
+                .orElseThrow(() -> new WalletException(WalletErrorCode.WALLET_NOT_FOUND));
+
+            WalletTransaction tx = WalletTransaction.createCharge(
+                wallet.getId(), walletCharge.getUserId(),
+                transactionKey, walletCharge.getAmount(), wallet.getBalance()
+            );
+            walletTransactionRepository.save(tx);
+
+            log.info("[Recovery] PG DONE 감지 — chargeId={}, amount={}, balance={} → COMPLETED",
+                chargeId, walletCharge.getAmount(), wallet.getBalance());
+
+        } else {
+            walletCharge.fail();
+            log.info("[Recovery] PG 상태 '{}' — chargeId={} → FAILED", pgStatus.status(), chargeId);
+        }
     }
 }

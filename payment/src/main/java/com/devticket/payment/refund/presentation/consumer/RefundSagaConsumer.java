@@ -10,6 +10,9 @@ import com.devticket.payment.refund.application.saga.event.RefundStockDoneEvent;
 import com.devticket.payment.refund.application.saga.event.RefundStockFailedEvent;
 import com.devticket.payment.refund.application.saga.event.RefundTicketDoneEvent;
 import com.devticket.payment.refund.application.saga.event.RefundTicketFailedEvent;
+import com.devticket.payment.refund.domain.exception.RefundErrorCode;
+import com.devticket.payment.refund.domain.exception.RefundException;
+import com.devticket.payment.refund.domain.exception.RefundInconsistencyException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
@@ -25,6 +28,8 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 public class RefundSagaConsumer {
+
+    private static final int PAYLOAD_SNAPSHOT_MAX_LEN = 2_000;
 
     private final RefundSagaHandler handler;
     private final MessageDeduplicationService deduplicationService;
@@ -46,8 +51,7 @@ public class RefundSagaConsumer {
             handler.startAndMark(event, messageId, record.topic());
             ack.acknowledge();
         } catch (Exception e) {
-            log.error("[Saga.Consumer] refund.requested 처리 실패 — messageId={}", messageId, e);
-            throw new RuntimeException("refund.requested 처리 실패", e);
+            handleConsumeFailure(record, messageId, e);
         }
     }
 
@@ -67,8 +71,7 @@ public class RefundSagaConsumer {
             handler.onOrderDoneAndMark(event, messageId, record.topic());
             ack.acknowledge();
         } catch (Exception e) {
-            log.error("[Saga.Consumer] refund.order.done 처리 실패 — messageId={}", messageId, e);
-            throw new RuntimeException("refund.order.done 처리 실패", e);
+            handleConsumeFailure(record, messageId, e);
         }
     }
 
@@ -88,8 +91,7 @@ public class RefundSagaConsumer {
             handler.onOrderFailedAndMark(event, messageId, record.topic());
             ack.acknowledge();
         } catch (Exception e) {
-            log.error("[Saga.Consumer] refund.order.failed 처리 실패 — messageId={}", messageId, e);
-            throw new RuntimeException("refund.order.failed 처리 실패", e);
+            handleConsumeFailure(record, messageId, e);
         }
     }
 
@@ -109,8 +111,7 @@ public class RefundSagaConsumer {
             handler.onTicketDoneAndMark(event, messageId, record.topic());
             ack.acknowledge();
         } catch (Exception e) {
-            log.error("[Saga.Consumer] refund.ticket.done 처리 실패 — messageId={}", messageId, e);
-            throw new RuntimeException("refund.ticket.done 처리 실패", e);
+            handleConsumeFailure(record, messageId, e);
         }
     }
 
@@ -130,8 +131,7 @@ public class RefundSagaConsumer {
             handler.onTicketFailedAndMark(event, messageId, record.topic());
             ack.acknowledge();
         } catch (Exception e) {
-            log.error("[Saga.Consumer] refund.ticket.failed 처리 실패 — messageId={}", messageId, e);
-            throw new RuntimeException("refund.ticket.failed 처리 실패", e);
+            handleConsumeFailure(record, messageId, e);
         }
     }
 
@@ -151,8 +151,7 @@ public class RefundSagaConsumer {
             handler.onStockDoneAndMark(event, messageId, record.topic());
             ack.acknowledge();
         } catch (Exception e) {
-            log.error("[Saga.Consumer] refund.stock.done 처리 실패 — messageId={}", messageId, e);
-            throw new RuntimeException("refund.stock.done 처리 실패", e);
+            handleConsumeFailure(record, messageId, e);
         }
     }
 
@@ -172,9 +171,46 @@ public class RefundSagaConsumer {
             handler.onStockFailedAndMark(event, messageId, record.topic());
             ack.acknowledge();
         } catch (Exception e) {
-            log.error("[Saga.Consumer] refund.stock.failed 처리 실패 — messageId={}", messageId, e);
-            throw new RuntimeException("refund.stock.failed 처리 실패", e);
+            handleConsumeFailure(record, messageId, e);
         }
+    }
+
+    /**
+     * 컨슈머 공통 실패 처리.
+     * - REFUND_NOT_FOUND 가 원인이면 부정합으로 분류 → 마커 로그 + 페이로드 스냅샷 + 재시도 없이 DLT
+     * - 그 외 일반 처리 실패는 기존대로 재시도 후 DLT
+     */
+    private void handleConsumeFailure(ConsumerRecord<String, String> record, String messageId, Exception e) {
+        if (isRefundNotFound(e)) {
+            String snapshot = truncatePayload(record.value());
+            log.error("[Saga.Inconsistency] {} — Refund/SagaState 레코드 미발견. "
+                    + "messageId={}, partition={}, offset={}, payload={}",
+                record.topic(), messageId, record.partition(), record.offset(), snapshot, e);
+            throw new RefundInconsistencyException(record.topic(), messageId, snapshot, e);
+        }
+
+        log.error("[Saga.Consumer] {} 처리 실패 — messageId={}", record.topic(), messageId, e);
+        throw new RuntimeException(record.topic() + " 처리 실패", e);
+    }
+
+    private static boolean isRefundNotFound(Throwable e) {
+        Throwable cur = e;
+        while (cur != null) {
+            if (cur instanceof RefundException re && re.getErrorCode() == RefundErrorCode.REFUND_NOT_FOUND) {
+                return true;
+            }
+            cur = cur.getCause();
+        }
+        return false;
+    }
+
+    private static String truncatePayload(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.length() <= PAYLOAD_SNAPSHOT_MAX_LEN
+            ? value
+            : value.substring(0, PAYLOAD_SNAPSHOT_MAX_LEN) + "...(truncated)";
     }
 
     private String extractMessageId(ConsumerRecord<String, String> record) {
