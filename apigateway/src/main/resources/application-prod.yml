@@ -31,7 +31,7 @@ spring:
             - id: settlement-service
               uri: http://settlement:8085
               predicates:
-                - Path=/api/settlements/**, /api/seller/settlements, /api/seller/settlements/**
+                - Path=/api/settlements/**, /api/seller/settlements, /api/seller/settlements/**, /api/admin/settlements/**
             - id: log-service
               uri: http://log:8086
               predicates:
