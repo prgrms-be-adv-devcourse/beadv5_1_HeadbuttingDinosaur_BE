@@ -5,6 +5,7 @@ import java.util.UUID;
 
 public record InternalPurchaseValidationResponse(
     UUID eventId,
+    UUID sellerId,
     Boolean purchasable,
     @Nullable String reason,
     Integer maxQuantity,
