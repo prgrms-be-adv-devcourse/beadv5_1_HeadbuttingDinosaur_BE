@@ -15,6 +15,8 @@ import com.devticket.payment.payment.application.dto.PgPaymentCancelResult;
 import com.devticket.payment.payment.domain.enums.PaymentMethod;
 import com.devticket.payment.payment.domain.model.Payment;
 import com.devticket.payment.payment.domain.repository.PaymentRepository;
+import com.devticket.payment.payment.infrastructure.client.CommerceInternalClient;
+import com.devticket.payment.payment.infrastructure.client.dto.InternalOrderInfoResponse;
 import com.devticket.payment.payment.infrastructure.external.PgPaymentClient;
 import com.devticket.payment.refund.application.saga.event.RefundOrderDoneEvent;
 import com.devticket.payment.refund.application.saga.event.RefundOrderFailedEvent;
@@ -69,6 +71,8 @@ class RefundSagaOrchestratorTest {
     PgPaymentClient pgPaymentClient;
     @Mock
     WalletService walletService;
+    @Mock
+    CommerceInternalClient commerceInternalClient;
 
     @InjectMocks
     RefundSagaOrchestrator orchestrator;
@@ -132,6 +136,11 @@ class RefundSagaOrchestratorTest {
             given(paymentRepository.findByPaymentId(paymentId))
                 .willReturn(Optional.of(mockPayment(PaymentMethod.PG)));
             given(orderRefundRepository.findByOrderId(orderId)).willReturn(Optional.empty());
+            given(commerceInternalClient.getOrderInfo(orderId))
+                .willReturn(new InternalOrderInfoResponse(
+                    orderId, userId, "test", 10_000, "PAID", "2025-01-01T00:00:00",
+                    List.of(new InternalOrderInfoResponse.OrderItem(UUID.randomUUID(), 1))
+                ));
             given(orderRefundRepository.save(any(OrderRefund.class)))
                 .willAnswer(inv -> inv.getArgument(0));
 
@@ -143,6 +152,33 @@ class RefundSagaOrchestratorTest {
             assertThat(refundCaptor.getValue().getRefundId()).isEqualTo(refundId);
             verify(refundTicketRepository).saveAll(any());
             verify(sagaStateRepository).save(any(SagaState.class));
+        }
+
+        @Test
+        @DisplayName("다중 이벤트 주문 부분 강제취소 — Commerce orderInfo 의 quantity 합으로 totalTickets 산정")
+        void fanout_다중이벤트_totalTickets() {
+            given(sagaStateRepository.findByRefundId(refundId)).willReturn(Optional.empty());
+            given(refundRepository.findByRefundId(refundId)).willReturn(Optional.empty());
+            given(paymentRepository.findByPaymentId(paymentId))
+                .willReturn(Optional.of(mockPayment(PaymentMethod.PG)));
+            given(orderRefundRepository.findByOrderId(orderId)).willReturn(Optional.empty());
+            // 주문에 event A(2장) + event B(3장) — 총 5장. event A 만 강제취소되어 ticketIds.size() = 2.
+            given(commerceInternalClient.getOrderInfo(orderId))
+                .willReturn(new InternalOrderInfoResponse(
+                    orderId, userId, "multi", 50_000, "PAID", "2025-01-01T00:00:00",
+                    List.of(
+                        new InternalOrderInfoResponse.OrderItem(UUID.randomUUID(), 2),
+                        new InternalOrderInfoResponse.OrderItem(UUID.randomUUID(), 3)
+                    )
+                ));
+            given(orderRefundRepository.save(any(OrderRefund.class)))
+                .willAnswer(inv -> inv.getArgument(0));
+
+            orchestrator.start(newRequested(PaymentMethod.PG, false));
+
+            ArgumentCaptor<OrderRefund> ledgerCaptor = ArgumentCaptor.forClass(OrderRefund.class);
+            verify(orderRefundRepository).save(ledgerCaptor.capture());
+            assertThat(ledgerCaptor.getValue().getTotalTickets()).isEqualTo(5);
         }
 
         @Test

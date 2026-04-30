@@ -7,6 +7,8 @@ import com.devticket.payment.payment.application.dto.PgPaymentCancelResult;
 import com.devticket.payment.payment.domain.enums.PaymentMethod;
 import com.devticket.payment.payment.domain.model.Payment;
 import com.devticket.payment.payment.domain.repository.PaymentRepository;
+import com.devticket.payment.payment.infrastructure.client.CommerceInternalClient;
+import com.devticket.payment.payment.infrastructure.client.dto.InternalOrderInfoResponse;
 import com.devticket.payment.payment.infrastructure.external.PgPaymentClient;
 import com.devticket.payment.refund.application.saga.event.RefundOrderCancelEvent;
 import com.devticket.payment.refund.application.saga.event.RefundOrderCompensateEvent;
@@ -56,6 +58,7 @@ public class RefundSagaOrchestrator {
     private final OutboxService outboxService;
     private final PgPaymentClient pgPaymentClient;
     private final WalletService walletService;
+    private final CommerceInternalClient commerceInternalClient;
 
     /**
      * Saga 진입점 — refund.requested 수신 또는 ticket.issue-failed 수신 시 호출. SagaState 생성 + refund.order.cancel 발행.
@@ -456,10 +459,6 @@ public class RefundSagaOrchestrator {
     /**
      * Commerce fan-out 경로에서 누락되는 Refund/OrderRefund/RefundTicket 을 멱등 upsert.
      * 사용자 직접 환불 경로는 RefundServiceImpl 가 미리 만들어두므로 여기서 모두 스킵된다.
-     *
-     * <p>TODO: 다중 이벤트 주문(한 order 에 여러 event 의 티켓이 섞인 경우) 부분 강제취소 시
-     * totalTickets 가 실제 주문 전체 티켓 수보다 작게 잡힐 수 있다. 단일 이벤트 주문(대부분의 케이스)에서는
-     * wholeOrder=true 로 ticketIds.size() == orderTickets.size() 가 성립해 정확하다.
      */
     private void provisionRefundRecords(RefundRequestedEvent event) {
         if (refundRepository.findByRefundId(event.refundId()).isPresent()) {
@@ -469,10 +468,6 @@ public class RefundSagaOrchestrator {
         Payment payment = paymentRepository.findByPaymentId(event.paymentId())
             .orElseThrow(() -> new RefundException(RefundErrorCode.PAYMENT_NOT_FOUND));
 
-        int totalTickets = (event.ticketIds() != null && !event.ticketIds().isEmpty())
-            ? event.ticketIds().size()
-            : 1;
-
         OrderRefund ledger = orderRefundRepository.findByOrderId(event.orderId())
             .orElseGet(() -> orderRefundRepository.save(
                 OrderRefund.create(
@@ -481,7 +476,7 @@ public class RefundSagaOrchestrator {
                     event.paymentId(),
                     event.paymentMethod(),
                     payment.getAmount(),
-                    totalTickets
+                    inferOrderTotalTickets(event)
                 )
             ));
 
@@ -506,5 +501,28 @@ public class RefundSagaOrchestrator {
         log.info("[Saga] Refund 레코드 프로비저닝 — refundId={}, orderId={}, amount={}, tickets={}",
             event.refundId(), event.orderId(), event.refundAmount(),
             event.ticketIds() == null ? 0 : event.ticketIds().size());
+    }
+
+    /**
+     * 주문의 전체 티켓 수 — 다중 이벤트 주문 부분 강제취소 시에도 OrderRefund 원장이
+     * 정확하도록 Commerce 에서 OrderItem.quantity 합계를 조회한다.
+     * Commerce 호출이 실패하거나 응답이 비면 이벤트의 ticketIds 크기로 폴백.
+     */
+    private int inferOrderTotalTickets(RefundRequestedEvent event) {
+        try {
+            InternalOrderInfoResponse info = commerceInternalClient.getOrderInfo(event.orderId());
+            if (info != null && info.orderItems() != null && !info.orderItems().isEmpty()) {
+                int sum = info.orderItems().stream()
+                    .mapToInt(InternalOrderInfoResponse.OrderItem::quantity)
+                    .sum();
+                if (sum > 0) {
+                    return sum;
+                }
+            }
+        } catch (Exception e) {
+            log.warn("[Saga] Commerce order info 조회 실패 — orderId={}, fallback ticketIds.size()", event.orderId(), e);
+        }
+        int fallback = event.ticketIds() == null ? 0 : event.ticketIds().size();
+        return Math.max(fallback, 1);
     }
 }
