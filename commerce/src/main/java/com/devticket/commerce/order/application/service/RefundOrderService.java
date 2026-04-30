@@ -174,8 +174,7 @@ public class RefundOrderService {
             ticket.refundTicket();
         }
 
-        order.adjustAmountForRefund(event.refundAmount());
-
+        // total_amount 는 주문 당시 결제액 스냅샷으로 불변 — 환불 진행도는 Ticket.status 가 SSoT.
         // 잔여 ISSUED 티켓이 있으면 부분환불 — PAID로 복귀해 다음 티켓 환불 허용
         // 모두 환불됐으면 REFUNDED로 확정
         List<Ticket> remainingTickets = ticketRepository

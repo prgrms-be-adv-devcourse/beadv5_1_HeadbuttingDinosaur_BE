@@ -63,6 +63,11 @@ class RefundOrderServiceTest {
 
     private Order orderIn(OrderStatus status) {
         Order order = Order.create(UUID.randomUUID(), 30_000, "hash");
+        setOrderStatus(order, status);
+        return order;
+    }
+
+    private static void setOrderStatus(Order order, OrderStatus status) {
         try {
             Field field = Order.class.getDeclaredField("status");
             field.setAccessible(true);
@@ -70,7 +75,6 @@ class RefundOrderServiceTest {
         } catch (ReflectiveOperationException e) {
             throw new RuntimeException(e);
         }
-        return order;
     }
 
     private String toJson(Object event) {
@@ -184,6 +188,7 @@ class RefundOrderServiceTest {
         void REFUND_PENDING_에서_PAID_로_롤백() {
             UUID messageId = UUID.randomUUID();
             Order order = orderIn(OrderStatus.REFUND_PENDING);
+            int before = order.getTotalAmount();
             RefundOrderCompensateEvent event = new RefundOrderCompensateEvent(
                 UUID.randomUUID(), order.getOrderId(), "ticket cancel failed", Instant.now());
             given(deduplicationService.isDuplicate(messageId)).willReturn(false);
@@ -193,6 +198,7 @@ class RefundOrderServiceTest {
                 messageId, KafkaTopics.REFUND_ORDER_COMPENSATE, toJson(event));
 
             assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
+            assertThat(order.getTotalAmount()).isEqualTo(before);
             then(deduplicationService).should().markProcessed(messageId, KafkaTopics.REFUND_ORDER_COMPENSATE);
         }
 
@@ -234,7 +240,7 @@ class RefundOrderServiceTest {
     class ProcessRefundCompleted {
 
         @Test
-        void REFUND_PENDING_에서_REFUNDED_로_최종_확정_및_금액_차감_및_티켓_일괄_REFUNDED() {
+        void 잔여_ISSUED_없으면_REFUNDED_로_최종_확정_티켓_일괄_REFUNDED_총액_불변() {
             UUID messageId = UUID.randomUUID();
             Order order = orderIn(OrderStatus.REFUND_PENDING);
             int before = order.getTotalAmount();
@@ -252,14 +258,126 @@ class RefundOrderServiceTest {
             given(orderRepository.findByOrderId(order.getOrderId())).willReturn(Optional.of(order));
             given(ticketRepository.findAllByOrderIdAndStatus(order.getId(), TicketStatus.CANCELLED))
                 .willReturn(List.of(t1, t2));
+            given(ticketRepository.findAllByOrderIdAndStatus(order.getId(), TicketStatus.ISSUED))
+                .willReturn(List.of());
 
             refundOrderService.processRefundCompleted(
                 messageId, KafkaTopics.REFUND_COMPLETED, toJson(event));
 
             assertThat(order.getStatus()).isEqualTo(OrderStatus.REFUNDED);
-            assertThat(order.getTotalAmount()).isEqualTo(before - 10_000);
+            assertThat(order.getTotalAmount()).isEqualTo(before);
             assertThat(t1.getStatus()).isEqualTo(TicketStatus.REFUNDED);
             assertThat(t2.getStatus()).isEqualTo(TicketStatus.REFUNDED);
+            then(deduplicationService).should().markProcessed(messageId, KafkaTopics.REFUND_COMPLETED);
+        }
+
+        @Test
+        void 잔여_ISSUED_있으면_부분환불_PAID_로_복귀_총액_불변() {
+            UUID messageId = UUID.randomUUID();
+            Order order = orderIn(OrderStatus.REFUND_PENDING);
+            int before = order.getTotalAmount();
+
+            Ticket cancelled = Ticket.create(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
+            setTicketStatus(cancelled, TicketStatus.CANCELLED);
+            Ticket remaining = Ticket.create(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
+
+            RefundCompletedEvent event = new RefundCompletedEvent(
+                UUID.randomUUID(), order.getOrderId(), UUID.randomUUID(), UUID.randomUUID(),
+                PaymentMethod.PG, 10_000, 100, Instant.now());
+
+            given(deduplicationService.isDuplicate(messageId)).willReturn(false);
+            given(orderRepository.findByOrderId(order.getOrderId())).willReturn(Optional.of(order));
+            given(ticketRepository.findAllByOrderIdAndStatus(order.getId(), TicketStatus.CANCELLED))
+                .willReturn(List.of(cancelled));
+            given(ticketRepository.findAllByOrderIdAndStatus(order.getId(), TicketStatus.ISSUED))
+                .willReturn(List.of(remaining));
+
+            refundOrderService.processRefundCompleted(
+                messageId, KafkaTopics.REFUND_COMPLETED, toJson(event));
+
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
+            assertThat(order.getTotalAmount()).isEqualTo(before);
+            assertThat(cancelled.getStatus()).isEqualTo(TicketStatus.REFUNDED);
+            assertThat(remaining.getStatus()).isEqualTo(TicketStatus.ISSUED);
+            then(deduplicationService).should().markProcessed(messageId, KafkaTopics.REFUND_COMPLETED);
+        }
+
+        @Test
+        void 부분환불_연속_3회_마지막에_REFUNDED_로_종결_총액_불변() {
+            Order order = orderIn(OrderStatus.REFUND_PENDING);
+            int before = order.getTotalAmount();
+
+            Ticket t1 = Ticket.create(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
+            Ticket t2 = Ticket.create(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
+            Ticket t3 = Ticket.create(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
+
+            RefundCompletedEvent event = new RefundCompletedEvent(
+                UUID.randomUUID(), order.getOrderId(), UUID.randomUUID(), UUID.randomUUID(),
+                PaymentMethod.PG, 10_000, 100, Instant.now());
+
+            given(deduplicationService.isDuplicate(any())).willReturn(false);
+            given(orderRepository.findByOrderId(order.getOrderId())).willReturn(Optional.of(order));
+
+            // 1회차 — t1만 환불, t2/t3 잔여 → PAID 복귀
+            setTicketStatus(t1, TicketStatus.CANCELLED);
+            given(ticketRepository.findAllByOrderIdAndStatus(order.getId(), TicketStatus.CANCELLED))
+                .willReturn(List.of(t1));
+            given(ticketRepository.findAllByOrderIdAndStatus(order.getId(), TicketStatus.ISSUED))
+                .willReturn(List.of(t2, t3));
+            refundOrderService.processRefundCompleted(
+                UUID.randomUUID(), KafkaTopics.REFUND_COMPLETED, toJson(event));
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
+            assertThat(t1.getStatus()).isEqualTo(TicketStatus.REFUNDED);
+
+            // 2회차 — REFUND_PENDING 재진입, t2 환불, t3 잔여
+            setOrderStatus(order, OrderStatus.REFUND_PENDING);
+            setTicketStatus(t2, TicketStatus.CANCELLED);
+            given(ticketRepository.findAllByOrderIdAndStatus(order.getId(), TicketStatus.CANCELLED))
+                .willReturn(List.of(t2));
+            given(ticketRepository.findAllByOrderIdAndStatus(order.getId(), TicketStatus.ISSUED))
+                .willReturn(List.of(t3));
+            refundOrderService.processRefundCompleted(
+                UUID.randomUUID(), KafkaTopics.REFUND_COMPLETED, toJson(event));
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
+            assertThat(t2.getStatus()).isEqualTo(TicketStatus.REFUNDED);
+
+            // 3회차 — 마지막 t3 환불, ISSUED 0개 → REFUNDED 종결
+            setOrderStatus(order, OrderStatus.REFUND_PENDING);
+            setTicketStatus(t3, TicketStatus.CANCELLED);
+            given(ticketRepository.findAllByOrderIdAndStatus(order.getId(), TicketStatus.CANCELLED))
+                .willReturn(List.of(t3));
+            given(ticketRepository.findAllByOrderIdAndStatus(order.getId(), TicketStatus.ISSUED))
+                .willReturn(List.of());
+            refundOrderService.processRefundCompleted(
+                UUID.randomUUID(), KafkaTopics.REFUND_COMPLETED, toJson(event));
+
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.REFUNDED);
+            assertThat(t3.getStatus()).isEqualTo(TicketStatus.REFUNDED);
+            assertThat(order.getTotalAmount()).isEqualTo(before);
+        }
+
+        @Test
+        void CANCELLED_도_ISSUED_도_없으면_REFUNDED_로_종결_총액_불변() {
+            UUID messageId = UUID.randomUUID();
+            Order order = orderIn(OrderStatus.REFUND_PENDING);
+            int before = order.getTotalAmount();
+
+            RefundCompletedEvent event = new RefundCompletedEvent(
+                UUID.randomUUID(), order.getOrderId(), UUID.randomUUID(), UUID.randomUUID(),
+                PaymentMethod.PG, 10_000, 100, Instant.now());
+
+            given(deduplicationService.isDuplicate(messageId)).willReturn(false);
+            given(orderRepository.findByOrderId(order.getOrderId())).willReturn(Optional.of(order));
+            given(ticketRepository.findAllByOrderIdAndStatus(order.getId(), TicketStatus.CANCELLED))
+                .willReturn(List.of());
+            given(ticketRepository.findAllByOrderIdAndStatus(order.getId(), TicketStatus.ISSUED))
+                .willReturn(List.of());
+
+            refundOrderService.processRefundCompleted(
+                messageId, KafkaTopics.REFUND_COMPLETED, toJson(event));
+
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.REFUNDED);
+            assertThat(order.getTotalAmount()).isEqualTo(before);
             then(deduplicationService).should().markProcessed(messageId, KafkaTopics.REFUND_COMPLETED);
         }
 
