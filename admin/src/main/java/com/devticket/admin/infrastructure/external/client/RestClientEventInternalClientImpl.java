@@ -43,9 +43,10 @@ public class RestClientEventInternalClientImpl implements EventInternalClient {
     }
 
     @Override
-    public void forceCancel(UUID eventId) {
+    public void forceCancel(UUID adminId, UUID eventId) {
         restClient.patch()
             .uri(eventServerUrl + "/internal/events/{eventId}/force-cancel", eventId)
+            .header("X-User-Id", adminId.toString())
             .contentType(MediaType.APPLICATION_JSON)
             .body(new InternalEventForceCancelRequest("관리자 강제 취소"))
             .retrieve()

@@ -113,7 +113,7 @@ class AdminEventServiceImplTest {
             adminEventService.forceCancel(adminId, eventId);
 
             // then
-            then(eventInternalClient).should().forceCancel(eventId);
+            then(eventInternalClient).should().forceCancel(adminId, eventId);
 
             ArgumentCaptor<AdminActionHistory> captor = ArgumentCaptor.forClass(AdminActionHistory.class);
             then(adminActionRepository).should().save(captor.capture());

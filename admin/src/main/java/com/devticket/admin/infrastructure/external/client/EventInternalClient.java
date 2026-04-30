@@ -6,5 +6,5 @@ import java.util.UUID;
 
 public interface EventInternalClient {
     InternalAdminEventPageResponse getEvents(AdminEventSearchRequest condition);
-    void forceCancel(UUID eventId);
+    void forceCancel(UUID adminId, UUID eventId);
 }
