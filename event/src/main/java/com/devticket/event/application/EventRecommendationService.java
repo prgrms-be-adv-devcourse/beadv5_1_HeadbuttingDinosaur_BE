@@ -4,8 +4,10 @@ import static java.util.stream.Collectors.toList;
 
 import com.devticket.event.domain.enums.EventStatus;
 import com.devticket.event.domain.model.Event;
+import com.devticket.event.domain.model.EventView;
 import com.devticket.event.infrastructure.client.AiClient;
 import com.devticket.event.infrastructure.persistence.EventRepository;
+import com.devticket.event.infrastructure.persistence.EventViewRepository;
 import com.devticket.event.presentation.dto.EventListContentResponse;
 import com.devticket.event.presentation.dto.RecommendationResponse;
 import java.util.List;
@@ -35,6 +37,7 @@ public class EventRecommendationService {
 
     private final AiClient aiClient;
     private final EventRepository eventRepository;
+    private final EventViewRepository eventViewRepository;
 
     @Transactional(readOnly = true)
     public RecommendationResponse getRecommendations(UUID userId) {
@@ -65,6 +68,12 @@ public class EventRecommendationService {
         Map<UUID, Event> imagesById = eventRepository.findEventImagesByEventIdIn(rankedIds).stream()
             .collect(Collectors.toMap(Event::getEventId, e -> e));
 
+        Map<UUID, Long> viewCountById = eventViewRepository.findAllByEventIdIn(rankedIds).stream()
+            .collect(Collectors.toMap(
+                ev -> ev.getEvent().getEventId(),
+                EventView::getViewCount
+            ));
+
         // AI 랭킹 순서 유지 + 필터링 (deleted_at IS NULL은 @SQLRestriction 처리)
         List<EventListContentResponse> results = rankedIds.stream()
             .map(id -> {
@@ -74,7 +83,7 @@ public class EventRecommendationService {
             })
             .filter(Objects::nonNull)
             .filter(e -> !EXCLUDED_STATUSES.contains(e.getStatus()))
-            .map(event -> EventListContentResponse.from(event, 0L))
+            .map(event -> EventListContentResponse.from(event, viewCountById.getOrDefault(event.getEventId(), 0L)))
             .toList();
 
         return new RecommendationResponse(results);
