@@ -33,6 +33,7 @@ import com.devticket.commerce.order.presentation.dto.res.InternalOrderItemRespon
 import com.devticket.commerce.order.presentation.dto.res.InternalOrderItemsResponse;
 import com.devticket.commerce.order.presentation.dto.res.InternalSettlementDataResponse;
 import com.devticket.commerce.order.presentation.dto.res.OrderCancelResponse;
+import com.devticket.commerce.order.presentation.dto.res.OrderDetailItemResponse;
 import com.devticket.commerce.order.presentation.dto.res.OrderDetailResponse;
 import com.devticket.commerce.order.presentation.dto.res.OrderListResponse;
 import com.devticket.commerce.order.presentation.dto.res.OrderResponse;
@@ -177,7 +178,15 @@ public class OrderService implements OrderUsecase {
         Map<UUID, String> eventTitles = orderToEventClient.getBulkEventInfo(eventIds).stream()
             .collect(Collectors.toMap(InternalEventInfoResponse::eventId, InternalEventInfoResponse::title));
 
-        return OrderDetailResponse.of(order, orderItems, eventTitles);
+        Map<UUID, List<OrderDetailItemResponse.TicketSummary>> ticketsByOrderItemId = ticketRepository
+            .findAllByOrderId(order.getId())
+            .stream()
+            .collect(Collectors.groupingBy(
+                Ticket::getOrderItemId,
+                Collectors.mapping(OrderDetailItemResponse.TicketSummary::from, Collectors.toList())
+            ));
+
+        return OrderDetailResponse.of(order, orderItems, eventTitles, ticketsByOrderItemId);
     }
 
     @Override

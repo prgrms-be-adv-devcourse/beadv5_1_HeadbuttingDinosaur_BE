@@ -47,6 +47,7 @@ class CartServiceTest {
     private CartService cartService;
 
     private static final Long CART_ID = 1L;
+    private static final UUID SELLER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
     @BeforeEach
     void setUp() {
@@ -73,7 +74,7 @@ class CartServiceTest {
     }
 
     private InternalPurchaseValidationResponse purchasableEvent(UUID eventId, int maxQuantity) {
-        return new InternalPurchaseValidationResponse(eventId, true, null, maxQuantity, "테스트 이벤트", 10_000);
+        return new InternalPurchaseValidationResponse(eventId, SELLER_ID, true, null, maxQuantity, "테스트 이벤트", 10_000);
     }
 
     // ── save — 1인당 한도 검증 ─────────────────────────────────────────────────
@@ -192,6 +193,47 @@ class CartServiceTest {
 
             then(ticketRepository).should()
                 .countByUserIdAndEventIdAndStatus(userId, eventId, TicketStatus.ISSUED);
+        }
+    }
+
+    // ── save — 판매자 본인 이벤트 차단 ────────────────────────────────────────
+
+    @Nested
+    class save_판매자_본인_이벤트_차단 {
+
+        @Test
+        void 본인이_등록한_이벤트는_장바구니에_담을_수_없다() {
+            UUID userId = UUID.randomUUID();
+            UUID eventId = UUID.randomUUID();
+
+            // sellerId == userId (본인 이벤트)
+            given(eventClient.getValidateEventStatus(eventId, userId, 1))
+                .willReturn(new InternalPurchaseValidationResponse(
+                    eventId, userId, true, null, 2, "테스트 이벤트", 10_000));
+
+            assertThatThrownBy(() -> cartService.save(userId, new CartItemRequest(eventId, 1)))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
+                    .isEqualTo(CartErrorCode.SELLER_CANNOT_PURCHASE_OWN_EVENT));
+        }
+
+        @Test
+        void 다른_판매자의_이벤트는_장바구니에_담을_수_있다() {
+            UUID userId = UUID.randomUUID();
+            UUID eventId = UUID.randomUUID();
+            CartItem newItem = cartItem(eventId, 1);
+
+            // sellerId != userId (타인 이벤트)
+            given(eventClient.getValidateEventStatus(eventId, userId, 1))
+                .willReturn(purchasableEvent(eventId, 2));
+            given(cartRepository.findByUserId(userId)).willReturn(Optional.of(cart(userId)));
+            given(cartItemRepository.findByCartIdAndEventId(CART_ID, eventId)).willReturn(Optional.empty());
+            given(ticketRepository.countByUserIdAndEventIdAndStatus(userId, eventId, TicketStatus.ISSUED)).willReturn(0);
+            given(cartItemRepository.save(any())).willReturn(newItem);
+
+            CartItemResponse response = cartService.save(userId, new CartItemRequest(eventId, 1));
+
+            assertThat(response).isNotNull();
         }
     }
 

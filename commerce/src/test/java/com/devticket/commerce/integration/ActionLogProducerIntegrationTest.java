@@ -310,7 +310,7 @@ class ActionLogProducerIntegrationTest {
     private void stubEventPrice(UUID eventId, int price) {
         given(eventClient.getValidateEventStatus(any(), any(), anyInt()))
                 .willReturn(new InternalPurchaseValidationResponse(
-                        eventId, Boolean.TRUE, null, 10, "테스트-이벤트", price));
+                        eventId, UUID.randomUUID(), Boolean.TRUE, null, 10, "테스트-이벤트", price));
     }
 
     private ActionLogEvent awaitSingleActionLog(UUID expectedUserId) throws Exception {
