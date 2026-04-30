@@ -37,7 +37,7 @@ public class AdminEventServiceImpl implements AdminEventService {
     @Override
     @Transactional
     public void forceCancel(UUID adminId, UUID eventId) {
-        eventInternalClient.forceCancel(eventId);
+        eventInternalClient.forceCancel(adminId, eventId);
         adminActionRepository.save(
             AdminActionHistory.builder()
                 .adminId(adminId)
