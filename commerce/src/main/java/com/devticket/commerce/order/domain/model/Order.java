@@ -219,14 +219,6 @@ public class Order extends BaseEntity {
         this.status = OrderStatus.CANCELLED;
     }
 
-    //환불에 의한 총 주문금액 차감 (PAID 상태에서도 허용)
-    public void adjustAmountForRefund(int refundAmount) {
-        if (refundAmount <= 0) {
-            throw new BusinessException(OrderErrorCode.INVALID_ORDER_AMOUNT);
-        }
-        this.totalAmount -= refundAmount;
-    }
-
     // refund.order.cancel 수신: PAID → REFUND_PENDING (Refund Saga 1단계)
     public void requestRefund() {
         if (!canTransitionTo(OrderStatus.REFUND_PENDING)) {
