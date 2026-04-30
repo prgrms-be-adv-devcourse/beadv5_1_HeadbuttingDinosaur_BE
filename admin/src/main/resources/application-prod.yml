@@ -16,16 +16,15 @@ spring:
     consumer:
       group-id: devticket-admin
       auto-offset-reset: latest
+  elasticsearch:
+    uris: http://elasticsearch:9200
+    connection-timeout: 5s
+    socket-timeout: 30s
 
 jwt:
   secret-key: ${JWT_SECRET_KEY}
   access-token-ttl: 1800000
   refresh-token-ttl: 604800000
-
-elasticsearch:
-  uris: http://elasticsearch:9200
-  connection-timeout: 5s
-  socket-timeout: 30s
 
 openai:
   embedding:
