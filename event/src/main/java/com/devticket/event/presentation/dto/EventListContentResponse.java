@@ -21,7 +21,8 @@ public record EventListContentResponse(
     List<String> techStacks,
     LocalDateTime saleEndAt,
     Integer totalQuantity,
-    Integer remainingQuantity
+    Integer remainingQuantity,
+    String category
 ) {
     public static EventListContentResponse from(Event event) {
         String thumbnailUrl = event.getEventImages().stream()
@@ -42,7 +43,8 @@ public record EventListContentResponse(
             techStacks,
             event.getSaleEndAt(),
             event.getTotalQuantity(),
-            event.getRemainingQuantity()
+            event.getRemainingQuantity(),
+            event.getCategory().name()
         );
     }
 
