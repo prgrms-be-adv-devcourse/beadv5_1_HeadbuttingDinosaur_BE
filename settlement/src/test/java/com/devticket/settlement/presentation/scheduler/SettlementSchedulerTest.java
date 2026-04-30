@@ -7,7 +7,7 @@ import static org.mockito.BDDMockito.willDoNothing;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verify;
 
-import com.devticket.settlement.application.service.SettlementInternalService;
+import com.devticket.settlement.application.service.SettlementAdminService;
 import com.devticket.settlement.application.service.SettlementService;
 import com.devticket.settlement.common.exception.BusinessException;
 import com.devticket.settlement.common.exception.CommonErrorCode;
@@ -27,7 +27,7 @@ class SettlementSchedulerTest {
     private SettlementService settlementService;
 
     @Mock
-    private SettlementInternalService settlementInternalService;
+    private SettlementAdminService settlementAdminService;
 
     @InjectMocks
     private SettlementScheduler settlementScheduler;
@@ -91,17 +91,17 @@ class SettlementSchedulerTest {
 
     @Test
     void createMonthlySettlement_성공_서비스호출() {
-        willDoNothing().given(settlementInternalService).createSettlementFromItems();
+        willDoNothing().given(settlementAdminService).createSettlementFromItems();
 
         settlementScheduler.createMonthlySettlement();
 
-        verify(settlementInternalService).createSettlementFromItems();
+        verify(settlementAdminService).createSettlementFromItems();
     }
 
     @Test
     void createMonthlySettlement_예외발생_밖으로_전파하지않음() {
         willThrow(new RuntimeException("정산 생성 실패"))
-            .given(settlementInternalService).createSettlementFromItems();
+            .given(settlementAdminService).createSettlementFromItems();
 
         assertThatNoException().isThrownBy(
             () -> settlementScheduler.createMonthlySettlement()
@@ -111,7 +111,7 @@ class SettlementSchedulerTest {
     @Test
     void createMonthlySettlement_비즈니스예외발생_밖으로_전파하지않음() {
         willThrow(new BusinessException(CommonErrorCode.EXTERNAL_SERVICE_ERROR))
-            .given(settlementInternalService).createSettlementFromItems();
+            .given(settlementAdminService).createSettlementFromItems();
 
         assertThatNoException().isThrownBy(
             () -> settlementScheduler.createMonthlySettlement()

@@ -13,6 +13,7 @@ import com.devticket.settlement.domain.repository.SettlementRepository;
 import com.devticket.settlement.infrastructure.client.SettlementToPaymentClient;
 import com.devticket.settlement.infrastructure.external.dto.AdminSettlementDetailResponse;
 import com.devticket.settlement.infrastructure.external.dto.AdminSettlementDetailResponse.CarriedInSettlement;
+import com.devticket.settlement.presentation.dto.MonthlyRevenueResponse;
 import com.devticket.settlement.infrastructure.client.SettlementToCommerceClient;
 import com.devticket.settlement.infrastructure.client.SettlementToMemberClient;
 import com.devticket.settlement.infrastructure.client.dto.req.InternalSettlementDataRequest;
@@ -22,6 +23,7 @@ import com.devticket.settlement.infrastructure.external.dto.InternalSettlementRe
 import com.devticket.settlement.presentation.dto.EventItemResponse;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.YearMonth;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -39,7 +41,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class SettlementInternalServiceImpl implements SettlementInternalService {
+public class SettlementAdminServiceImpl implements SettlementAdminService {
 
     private static final int MIN_SETTLEMENT_AMOUNT = 10_000;
 
@@ -274,6 +276,28 @@ public class SettlementInternalServiceImpl implements SettlementInternalService 
             log.error("[지급 실패] settlementId={}", settlementId, e);
             throw new BusinessException(SettlementErrorCode.PAYMENT_FAILED);
         }
+    }
+
+    // ────────────────────────────────────────────────
+    // 월별 수익 조회 (관리자)
+    // ────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public MonthlyRevenueResponse getMonthlyRevenue(YearMonth yearMonth) {
+        LocalDate periodStartDate = yearMonth.minusMonths(1).atDay(26);
+        LocalDate periodEndDate = yearMonth.atDay(25);
+
+        LocalDateTime from = periodStartDate.atStartOfDay();
+        LocalDateTime to = periodStartDate.atTime(LocalTime.MAX);
+
+        long totalFeeAmount = settlementRepository.sumFeeAmountByPeriodStartAt(from, to);
+
+        return new MonthlyRevenueResponse(
+            yearMonth.toString(),
+            periodStartDate.toString(),
+            periodEndDate.toString(),
+            totalFeeAmount
+        );
     }
 
     // ────────────────────────────────────────────────

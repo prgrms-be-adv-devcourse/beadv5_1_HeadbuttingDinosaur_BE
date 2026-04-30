@@ -38,7 +38,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
-class SettlementInternalServiceImplTest {
+class SettlementAdminServiceImplTest {
 
     @Mock private SettlementToCommerceClient settlementToCommerceClient;
     @Mock private SettlementToPaymentClient settlementToPaymentClient;
@@ -48,7 +48,7 @@ class SettlementInternalServiceImplTest {
     @Mock private SettlementItemRepository settlementItemRepository;
 
     @InjectMocks
-    private SettlementInternalServiceImpl service;
+    private SettlementAdminServiceImpl service;
 
     private final UUID sellerId = UUID.randomUUID();
 

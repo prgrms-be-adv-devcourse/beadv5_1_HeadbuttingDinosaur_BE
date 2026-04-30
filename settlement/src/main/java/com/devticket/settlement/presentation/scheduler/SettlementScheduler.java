@@ -1,6 +1,6 @@
 package com.devticket.settlement.presentation.scheduler;
 
-import com.devticket.settlement.application.service.SettlementInternalService;
+import com.devticket.settlement.application.service.SettlementAdminService;
 import com.devticket.settlement.application.service.SettlementService;
 import com.devticket.settlement.presentation.dto.SettlementTargetPreviewResponse;
 import java.time.LocalDate;
@@ -15,7 +15,7 @@ import org.springframework.stereotype.Component;
 public class SettlementScheduler {
 
     private final SettlementService settlementService;
-    private final SettlementInternalService settlementInternalService;
+    private final SettlementAdminService settlementAdminService;
 
     @Scheduled(cron = "1 0 0 * * *")
     public void collectDailySettlementTargets() {
@@ -34,7 +34,7 @@ public class SettlementScheduler {
     public void createMonthlySettlement() {
         log.info("[SettlementScheduler] 월 정산 생성 시작");
         try {
-            settlementInternalService.createSettlementFromItems();
+            settlementAdminService.createSettlementFromItems();
             log.info("[SettlementScheduler] 월 정산 생성 완료");
         } catch (Exception e) {
             log.error("[SettlementScheduler] 월 정산 생성 실패", e);
