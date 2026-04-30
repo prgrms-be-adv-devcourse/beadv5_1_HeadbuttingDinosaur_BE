@@ -103,9 +103,11 @@ class RefundSagaOrchestratorTest {
     class StartTest {
 
         @Test
-        @DisplayName("새 Saga 시작 — SagaState 생성 + refund.order.cancel 발행")
+        @DisplayName("새 Saga 시작 — 사용자 직접 환불(Refund 선존재) 경로에서 SagaState 생성 + refund.order.cancel 발행")
         void 정상_시작() {
             given(sagaStateRepository.findByRefundId(refundId)).willReturn(Optional.empty());
+            // 사용자 직접 환불 경로 — RefundServiceImpl 가 사전에 Refund 생성한 상태
+            given(refundRepository.findByRefundId(refundId)).willReturn(Optional.of(mockRefund()));
 
             orchestrator.start(newRequested(PaymentMethod.PG, false));
 
@@ -117,6 +119,30 @@ class RefundSagaOrchestratorTest {
                 eq(KafkaTopics.REFUND_ORDER_CANCEL),
                 any()
             );
+            // 선존재 케이스 — Refund/OrderRefund 새로 만들지 않음
+            verify(refundRepository, never()).save(any(Refund.class));
+            verify(orderRefundRepository, never()).save(any(OrderRefund.class));
+        }
+
+        @Test
+        @DisplayName("Commerce fan-out 진입 — Refund/OrderRefund 가 없으면 멱등 upsert 후 saga 진행")
+        void fanout_프로비저닝() {
+            given(sagaStateRepository.findByRefundId(refundId)).willReturn(Optional.empty());
+            given(refundRepository.findByRefundId(refundId)).willReturn(Optional.empty());
+            given(paymentRepository.findByPaymentId(paymentId))
+                .willReturn(Optional.of(mockPayment(PaymentMethod.PG)));
+            given(orderRefundRepository.findByOrderId(orderId)).willReturn(Optional.empty());
+            given(orderRefundRepository.save(any(OrderRefund.class)))
+                .willAnswer(inv -> inv.getArgument(0));
+
+            orchestrator.start(newRequested(PaymentMethod.PG, false));
+
+            verify(orderRefundRepository).save(any(OrderRefund.class));
+            ArgumentCaptor<Refund> refundCaptor = ArgumentCaptor.forClass(Refund.class);
+            verify(refundRepository).save(refundCaptor.capture());
+            assertThat(refundCaptor.getValue().getRefundId()).isEqualTo(refundId);
+            verify(refundTicketRepository).saveAll(any());
+            verify(sagaStateRepository).save(any(SagaState.class));
         }
 
         @Test

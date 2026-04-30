@@ -67,6 +67,10 @@ public class RefundSagaOrchestrator {
             return;
         }
 
+        // Commerce fan-out (event.force-cancelled) 경로는 Refund/OrderRefund row 가 아직 없음 — 여기서 멱등 upsert.
+        // 사용자 직접 환불 경로는 RefundServiceImpl 에서 이미 만들어 두므로 findByRefundId 가 비어있지 않아 스킵됨.
+        provisionRefundRecords(event);
+
         SagaState state = SagaState.create(
             event.refundId(),
             event.orderId(),
@@ -447,5 +451,60 @@ public class RefundSagaOrchestrator {
     private SagaState requireState(UUID refundId) {
         return sagaStateRepository.findByRefundId(refundId)
             .orElseThrow(() -> new RefundException(RefundErrorCode.REFUND_NOT_FOUND));
+    }
+
+    /**
+     * Commerce fan-out 경로에서 누락되는 Refund/OrderRefund/RefundTicket 을 멱등 upsert.
+     * 사용자 직접 환불 경로는 RefundServiceImpl 가 미리 만들어두므로 여기서 모두 스킵된다.
+     *
+     * <p>TODO: 다중 이벤트 주문(한 order 에 여러 event 의 티켓이 섞인 경우) 부분 강제취소 시
+     * totalTickets 가 실제 주문 전체 티켓 수보다 작게 잡힐 수 있다. 단일 이벤트 주문(대부분의 케이스)에서는
+     * wholeOrder=true 로 ticketIds.size() == orderTickets.size() 가 성립해 정확하다.
+     */
+    private void provisionRefundRecords(RefundRequestedEvent event) {
+        if (refundRepository.findByRefundId(event.refundId()).isPresent()) {
+            return;
+        }
+
+        Payment payment = paymentRepository.findByPaymentId(event.paymentId())
+            .orElseThrow(() -> new RefundException(RefundErrorCode.PAYMENT_NOT_FOUND));
+
+        int totalTickets = (event.ticketIds() != null && !event.ticketIds().isEmpty())
+            ? event.ticketIds().size()
+            : 1;
+
+        OrderRefund ledger = orderRefundRepository.findByOrderId(event.orderId())
+            .orElseGet(() -> orderRefundRepository.save(
+                OrderRefund.create(
+                    event.orderId(),
+                    event.userId(),
+                    event.paymentId(),
+                    event.paymentMethod(),
+                    payment.getAmount(),
+                    totalTickets
+                )
+            ));
+
+        Refund refund = Refund.createWithId(
+            event.refundId(),
+            ledger.getOrderRefundId(),
+            event.orderId(),
+            event.paymentId(),
+            event.userId(),
+            event.refundAmount(),
+            event.refundRate()
+        );
+        refundRepository.save(refund);
+
+        if (event.ticketIds() != null && !event.ticketIds().isEmpty()) {
+            List<RefundTicket> rts = event.ticketIds().stream()
+                .map(tid -> RefundTicket.of(event.refundId(), tid))
+                .toList();
+            refundTicketRepository.saveAll(rts);
+        }
+
+        log.info("[Saga] Refund 레코드 프로비저닝 — refundId={}, orderId={}, amount={}, tickets={}",
+            event.refundId(), event.orderId(), event.refundAmount(),
+            event.ticketIds() == null ? 0 : event.ticketIds().size());
     }
 }
