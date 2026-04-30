@@ -1,13 +1,16 @@
  package com.devticket.settlement.presentation.controller;
 
-import com.devticket.settlement.application.service.SettlementInternalService;
+import com.devticket.settlement.application.service.SettlementAdminService;
 import com.devticket.settlement.infrastructure.external.dto.AdminSettlementDetailResponse;
 import com.devticket.settlement.infrastructure.external.dto.InternalSettlementPageResponse;
+import com.devticket.settlement.presentation.dto.MonthlyRevenueResponse;
+import java.time.YearMonth;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -20,9 +23,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/admin/settlements")
 @RequiredArgsConstructor
-public class InternalSettlementController {
+public class SettlementAdminController {
 
-    private final SettlementInternalService settlementInternalService;
+    private final SettlementAdminService settlementAdminService;
 
     @GetMapping
     public ResponseEntity<InternalSettlementPageResponse> getSettlements(
@@ -32,7 +35,7 @@ public class InternalSettlementController {
         @PageableDefault(size = 20) Pageable pageable
     ) {
         return ResponseEntity.ok(
-            settlementInternalService.getSettlements(status, sellerId, yearMonth, pageable)
+            settlementAdminService.getSettlements(status, sellerId, yearMonth, pageable)
         );
     }
 
@@ -40,32 +43,39 @@ public class InternalSettlementController {
     public ResponseEntity<AdminSettlementDetailResponse> getSettlementDetail(
         @PathVariable UUID settlementId
     ) {
-        return ResponseEntity.ok(settlementInternalService.getSettlementDetail(settlementId));
+        return ResponseEntity.ok(settlementAdminService.getSettlementDetail(settlementId));
     }
 
     @PostMapping("/run")
     public ResponseEntity<Void> runSettlement() {
         //settlementInternalService.runSettlement();
-        settlementInternalService.createSettlementFromItems();
+        settlementAdminService.createSettlementFromItems();
         return ResponseEntity.ok().build();
     }
 
     // 정산기능 수동테스트용 API : SettlementItem데이터를 기반으로 Settelemnt생성
     @PostMapping("/create-from-items")
     public ResponseEntity<Void> createSettlementFromItems() {
-        settlementInternalService.createSettlementFromItems();
+        settlementAdminService.createSettlementFromItems();
         return ResponseEntity.ok().build();
     }
 
     @PostMapping("/{settlementId}/cancel")
     public ResponseEntity<Void> cancelSettlement(@PathVariable UUID settlementId) {
-        settlementInternalService.cancelSettlement(settlementId);
+        settlementAdminService.cancelSettlement(settlementId);
         return ResponseEntity.ok().build();
     }
 
     @PostMapping("/{settlementId}/payment")
     public ResponseEntity<Void> processPayment(@PathVariable UUID settlementId) {
-        settlementInternalService.processPayment(settlementId);
+        settlementAdminService.processPayment(settlementId);
         return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/revenues/{yearMonth}")
+    public ResponseEntity<MonthlyRevenueResponse> getMonthlyRevenue(
+        @PathVariable @DateTimeFormat(pattern = "yyyy-MM") YearMonth yearMonth
+    ) {
+        return ResponseEntity.ok(settlementAdminService.getMonthlyRevenue(yearMonth));
     }
 }

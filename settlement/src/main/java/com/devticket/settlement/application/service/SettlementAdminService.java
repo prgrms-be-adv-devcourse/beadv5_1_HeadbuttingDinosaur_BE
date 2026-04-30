@@ -1,13 +1,13 @@
 package com.devticket.settlement.application.service;
 
-import com.devticket.settlement.infrastructure.client.dto.res.InternalSettlementDataResponse;
 import com.devticket.settlement.infrastructure.external.dto.AdminSettlementDetailResponse;
 import com.devticket.settlement.infrastructure.external.dto.InternalSettlementPageResponse;
+import com.devticket.settlement.presentation.dto.MonthlyRevenueResponse;
+import java.time.YearMonth;
 import java.util.UUID;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 
-public interface SettlementInternalService {
+public interface SettlementAdminService {
 
     InternalSettlementPageResponse getSettlements(
         String status,
@@ -25,4 +25,6 @@ public interface SettlementInternalService {
     void cancelSettlement(UUID settlementId);
 
     void processPayment(UUID settlementId);
+
+    MonthlyRevenueResponse getMonthlyRevenue(YearMonth yearMonth);
 }

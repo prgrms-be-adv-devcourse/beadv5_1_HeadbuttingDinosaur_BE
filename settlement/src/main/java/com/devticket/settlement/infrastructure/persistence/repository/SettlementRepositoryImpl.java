@@ -82,4 +82,12 @@ public class SettlementRepositoryImpl implements SettlementRepository {
         return settlementJpaRepository.findBySellerIdAndStatusAndCarriedToSettlementIdIsNull(sellerId, status);
     }
 
+    @Override
+    public long sumFeeAmountByPeriodStartAt(LocalDateTime from, LocalDateTime to) {
+        Long result = settlementJpaRepository.sumFeeAmountByPeriodStartAtBetweenAndStatus(
+            from, to, SettlementStatus.PAID
+        );
+        return result != null ? result : 0L;
+    }
+
 }
