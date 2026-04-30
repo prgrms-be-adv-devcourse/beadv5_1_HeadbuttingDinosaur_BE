@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "Batch", description = "배치 수동 실행 API")
 @Slf4j
 @RestController
-@RequestMapping("/internal/batch")
+@RequestMapping("/api/admin/settlements/batch")
 public class BatchController {
 
     private final JobOperator jobOperator;
