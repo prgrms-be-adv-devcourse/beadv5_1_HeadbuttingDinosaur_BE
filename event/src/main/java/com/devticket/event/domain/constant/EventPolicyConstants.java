@@ -12,7 +12,7 @@ public final class EventPolicyConstants {
     public static final int EVENT_MIN_CAPACITY = 5;
     public static final int EVENT_MAX_CAPACITY = 9_999;
 
-    public static final int EVENT_MAX_IMAGES = 2;
+    public static final int EVENT_MAX_IMAGES = 1;
 
     public static final int EVENT_REGISTER_DEADLINE_DAYS = 3;
     public static final int EVENT_EDIT_DEADLINE_DAYS = 1;
