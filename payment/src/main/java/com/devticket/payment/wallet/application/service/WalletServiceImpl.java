@@ -375,11 +375,16 @@ public class WalletServiceImpl implements WalletService {
     /**
      * 스케줄러가 넘겨준 chargeId 한 건을 복구한다.
      * 비관적 락 구간을 최소화하기 위해 선점 → PG 조회 → 결과 반영으로 분리.
+     *
+     * 클래스 레벨 readOnly=true 컨텍스트가 SELECT FOR UPDATE 와 충돌하므로,
+     * 본 메서드는 트랜잭션 없이 실행하고 실제 락/쓰기는 WalletChargeTransactionService 의
+     * @Transactional 메서드로 위임한다(타 빈 호출이라 프록시 적용).
      */
     @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public void recoverStalePendingCharge(UUID chargeId) {
         // ── 1단계: 비관적 락으로 선점 (PENDING → PROCESSING) ──
-        if (!claimChargeForRecovery(chargeId)) {
+        if (!walletChargeTransactionService.claimChargeForRecovery(chargeId)) {
             return; // 이미 처리됐거나 찾을 수 없음
         }
 
@@ -388,90 +393,14 @@ public class WalletServiceImpl implements WalletService {
         try {
             pgStatusOpt = pgPaymentClient.findPaymentByOrderId(chargeId.toString());
         } catch (Exception e) {
-            log.warn("[Recovery] PG 상태 조회 실패 — chargeId={}, PROCESSING 상태 유지 후 다음 주기 재시도. error={}",
+            log.warn("[Recovery] PG 상태 조회 실패 — chargeId={}, PENDING 으로 원복 후 다음 주기 재시도. error={}",
                 chargeId, e.getMessage());
-            revertTopending(chargeId);
+            walletChargeTransactionService.revertToPending(chargeId);
             return;
         }
 
         // ── 3단계: 새 트랜잭션에서 결과 반영 ──
-        applyRecoveryResult(chargeId, pgStatusOpt);
-    }
-
-    /**
-     * 복구용 선점: PENDING → PROCESSING. 이미 처리됐으면 false 반환.
-     */
-    @Transactional
-    public boolean claimChargeForRecovery(UUID chargeId) {
-        WalletCharge walletCharge = walletChargeRepository.findByChargeIdForUpdate(chargeId)
-            .orElse(null);
-
-        if (walletCharge == null || !walletCharge.isPending()) {
-            return false;
-        }
-
-        walletCharge.markProcessing();
-        return true;
-    }
-
-    /**
-     * PG 조회 실패 시 PROCESSING → PENDING 원복 (다음 스케줄에서 재시도 가능하도록).
-     */
-    @Transactional
-    public void revertTopending(UUID chargeId) {
-        WalletCharge walletCharge = walletChargeRepository.findByChargeId(chargeId).orElse(null);
-        if (walletCharge != null && walletCharge.isProcessing()) {
-            walletCharge.revertToPending();
-        }
-    }
-
-    /**
-     * PG 조회 결과에 따라 COMPLETED 또는 FAILED 처리.
-     */
-    @Transactional
-    public void applyRecoveryResult(UUID chargeId, Optional<TossPaymentStatusResponse> pgStatusOpt) {
-        WalletCharge walletCharge = walletChargeRepository.findByChargeId(chargeId)
-            .orElse(null);
-        if (walletCharge == null) {
-            return;
-        }
-
-        if (pgStatusOpt.isEmpty()) {
-            walletCharge.fail();
-            log.info("[Recovery] Toss 미도달(404) — chargeId={} → FAILED", chargeId);
-            return;
-        }
-
-        TossPaymentStatusResponse pgStatus = pgStatusOpt.get();
-
-        if ("DONE".equals(pgStatus.status())) {
-            String transactionKey = "CHARGE:" + pgStatus.paymentKey();
-
-            if (walletTransactionRepository.existsByTransactionKey(transactionKey)) {
-                walletCharge.complete(pgStatus.paymentKey());
-                log.info("[Recovery] 거래 기록 중복 확인 — chargeId={} → COMPLETED (잔액 반영 생략)", chargeId);
-                return;
-            }
-
-            walletCharge.complete(pgStatus.paymentKey());
-            walletRepository.chargeBalanceAtomic(walletCharge.getUserId(), walletCharge.getAmount());
-
-            Wallet wallet = walletRepository.findByUserId(walletCharge.getUserId())
-                .orElseThrow(() -> new WalletException(WalletErrorCode.WALLET_NOT_FOUND));
-
-            WalletTransaction tx = WalletTransaction.createCharge(
-                wallet.getId(), walletCharge.getUserId(),
-                transactionKey, walletCharge.getAmount(), wallet.getBalance()
-            );
-            walletTransactionRepository.save(tx);
-
-            log.info("[Recovery] PG DONE 감지 — chargeId={}, amount={}, balance={} → COMPLETED",
-                chargeId, walletCharge.getAmount(), wallet.getBalance());
-
-        } else {
-            walletCharge.fail();
-            log.info("[Recovery] PG 상태 '{}' — chargeId={} → FAILED", pgStatus.status(), chargeId);
-        }
+        walletChargeTransactionService.applyRecoveryResult(chargeId, pgStatusOpt);
     }
 
     // =====================================================================
