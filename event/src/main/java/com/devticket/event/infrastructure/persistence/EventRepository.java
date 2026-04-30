@@ -42,7 +42,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
       AND (:#{#techStacks == null || #techStacks.isEmpty()} = true
            OR EXISTS (SELECT t FROM EventTechStack t WHERE t.event = e AND t.techStackId IN :techStacks))
       AND (:sellerId IS NULL OR e.sellerId = :sellerId)
-    ORDER BY e.createdAt DESC
+    ORDER BY e.saleStartAt DESC
     """)
     Page<Event> searchEventsWithStatuses(
         @Param("keyword") String keyword,

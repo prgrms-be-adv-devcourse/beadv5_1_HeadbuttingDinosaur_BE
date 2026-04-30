@@ -49,6 +49,7 @@ public class ElasticsearchSyncService {
             doc.put("techStacks", techStackNames);
             doc.put("status", event.getStatus().name());
             doc.put("sellerId", event.getSellerId().toString());
+            doc.put("saleStartAt", event.getSaleStartAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")));
             // mapping의 date_hour_minute_second 형식에 맞춤 (나노초 제외)
             doc.put("indexedAt", LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")));
 
