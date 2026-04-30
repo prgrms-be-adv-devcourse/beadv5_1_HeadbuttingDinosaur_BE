@@ -45,8 +45,8 @@ public class TicketRepositoryAdapter implements TicketRepository {
     }
 
     @Override
-    public Page<Ticket> findAllByEventId(UUID eventId, SellerEventParticipantListRequest request) {
-        return ticketJpaRepository.findAllByEventId(eventId, request.toPageable());
+    public Page<Ticket> findAllByEventIdAndStatus(UUID eventId, TicketStatus status, SellerEventParticipantListRequest request) {
+        return ticketJpaRepository.findAllByEventIdAndStatus(eventId, status, request.toPageable());
     }
 
     @Override

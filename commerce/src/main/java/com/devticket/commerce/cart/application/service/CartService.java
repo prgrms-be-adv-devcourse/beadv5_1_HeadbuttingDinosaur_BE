@@ -62,6 +62,10 @@ public class CartService implements CartUseCase, CartItemUseCase {
             request.eventId(), userId, request.quantity());
         handlePurchaseValidationError(event);
 
+        if (userId.equals(event.sellerId())) {
+            throw new BusinessException(CartErrorCode.SELLER_CANNOT_PURCHASE_OWN_EVENT);
+        }
+
         // Cart와 CartItem -> 객체참조x, 연관관계 매핑 없이 식별자참조.
         Cart cart = findOrCreateCart(userId);
 
