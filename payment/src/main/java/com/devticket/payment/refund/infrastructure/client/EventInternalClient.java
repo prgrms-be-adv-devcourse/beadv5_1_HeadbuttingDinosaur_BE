@@ -35,10 +35,11 @@ public class EventInternalClient {
         return response.data();
     }
 
-    public void forceCancel(UUID eventId, UUID userId, String reason) {
+    public void forceCancel(UUID eventId, UUID userId, String userRole, String reason) {
         restClient.patch()
             .uri("/internal/events/{eventId}/force-cancel", eventId)
             .header("X-User-Id", userId.toString())
+            .header("X-User-Role", userRole)
             .body(new InternalEventForceCancelRequest(reason))
             .retrieve()
             .toBodilessEntity();

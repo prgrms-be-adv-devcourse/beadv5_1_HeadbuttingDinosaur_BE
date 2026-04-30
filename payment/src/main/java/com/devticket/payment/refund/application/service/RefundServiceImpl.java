@@ -352,7 +352,7 @@ public class RefundServiceImpl implements RefundService {
         }
 
         // 2) Event 서비스에 force-cancel 호출 — 내부적으로 상태 전이 + Kafka event.force-cancelled 발행
-        eventInternalClient.forceCancel(eventId, sellerId, reason);
+        eventInternalClient.forceCancel(eventId, sellerId, "SELLER", reason);
 
         log.info("[Seller Cancel] 이벤트 강제 취소 요청 완료 — eventId={}, sellerId={}, reason={}",
             eventId, sellerId, reason);
@@ -361,7 +361,7 @@ public class RefundServiceImpl implements RefundService {
     @Override
     public void cancelAdminEvent(UUID adminId, UUID eventId, String reason) {
         // 소유권 검증 없음 — admin 권한은 게이트웨이/admin-service 에서 사전 검증됐다고 가정
-        eventInternalClient.forceCancel(eventId, adminId, reason);
+        eventInternalClient.forceCancel(eventId, adminId, "ADMIN", reason);
 
         log.info("[Admin Cancel] 이벤트 강제 취소 요청 완료 — eventId={}, adminId={}, reason={}",
             eventId, adminId, reason);
