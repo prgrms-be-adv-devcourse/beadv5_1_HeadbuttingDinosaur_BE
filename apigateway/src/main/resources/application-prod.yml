@@ -1,14 +1,14 @@
+server:
+  forward-headers-strategy: framework
+  reactive:
+    session:
+      cookie:
+        name: DEV_TICKET_SESSION
+        same-site: lax
+        secure: true
 spring:
   cloud:
     gateway:
-      server:
-        forward-headers-strategy: framework
-        reactive:
-          session:
-            cookie:
-              name: DEV_TICKET_SESSION
-              same-site: lax
-              secure: true
         webflux:
           routes:
             - id: member-service
