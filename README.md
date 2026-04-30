@@ -18,7 +18,7 @@
 
 | 구분 | 기술 |
 |------|------|
-| Backend | Java 17, Spring Boot, Spring Security, JPA |
+| Backend | JDK 21, Spring Boot, Spring Security, JPA |
 | Database | MySQL |
 | Messaging | Apache Kafka |
 | Auth | JWT (Access Token + Refresh Token), Google OAuth2.0 |

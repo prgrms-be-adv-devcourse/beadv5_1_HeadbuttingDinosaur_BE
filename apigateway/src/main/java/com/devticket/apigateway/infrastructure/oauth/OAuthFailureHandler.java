@@ -1,5 +1,6 @@
 package com.devticket.apigateway.infrastructure.oauth;
 
+import jakarta.annotation.PostConstruct;
 import java.net.URI;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -24,6 +25,11 @@ public class OAuthFailureHandler implements ServerAuthenticationFailureHandler {
 
     public OAuthFailureHandler(@Value("${oauth2.redirect-uri}") String redirectUri) {
         this.redirectUri = redirectUri;
+    }
+
+    @PostConstruct
+    void validateRedirectUri() {
+        OAuthRedirectUriValidator.validate(redirectUri);
     }
 
     @Override

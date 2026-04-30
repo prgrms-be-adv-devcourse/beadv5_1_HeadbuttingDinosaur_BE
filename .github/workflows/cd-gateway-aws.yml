@@ -39,8 +39,8 @@ jobs:
           distribution: "temurin"
           cache: "gradle"
           cache-dependency-path: |
-            gateway/**/*.gradle*
-            gateway/**/gradle-wrapper.properties
+            apigateway/**/*.gradle*
+            apigateway/**/gradle-wrapper.properties
 
       - name: Build Spring Boot jar
         run: |
