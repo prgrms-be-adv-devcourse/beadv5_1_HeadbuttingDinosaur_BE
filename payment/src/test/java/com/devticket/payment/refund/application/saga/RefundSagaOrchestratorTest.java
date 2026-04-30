@@ -87,10 +87,14 @@ class RefundSagaOrchestratorTest {
     }
 
     private RefundRequestedEvent newRequested(PaymentMethod method, boolean wholeOrder) {
+        return newRequested(method, wholeOrder, 1);
+    }
+
+    private RefundRequestedEvent newRequested(PaymentMethod method, boolean wholeOrder, int totalOrderTickets) {
         return new RefundRequestedEvent(
             refundId, UUID.randomUUID(), orderId, userId, paymentId, method,
             wholeOrder ? List.of() : List.of(UUID.randomUUID()),
-            10_000, 100, wholeOrder, "test-reason", Instant.now()
+            10_000, 100, wholeOrder, "test-reason", Instant.now(), totalOrderTickets
         );
     }
 
@@ -99,13 +103,14 @@ class RefundSagaOrchestratorTest {
     }
 
     @Nested
-    @DisplayName("start")
-    class StartTest {
+    @DisplayName("start — 사용자 직접 환불 경로 (Refund 선존재)")
+    class StartUserDirectTest {
 
         @Test
-        @DisplayName("새 Saga 시작 — SagaState 생성 + refund.order.cancel 발행")
+        @DisplayName("Refund 선존재 — provisioning 스킵, SagaState 생성 + refund.order.cancel 발행")
         void 정상_시작() {
             given(sagaStateRepository.findByRefundId(refundId)).willReturn(Optional.empty());
+            given(refundRepository.findByRefundId(refundId)).willReturn(Optional.of(mockRefund()));
 
             orchestrator.start(newRequested(PaymentMethod.PG, false));
 
@@ -117,19 +122,354 @@ class RefundSagaOrchestratorTest {
                 eq(KafkaTopics.REFUND_ORDER_CANCEL),
                 any()
             );
+            verify(refundRepository, never()).save(any(Refund.class));
+            verify(orderRefundRepository, never()).save(any(OrderRefund.class));
+            verify(refundTicketRepository, never()).saveAll(any());
+            verify(paymentRepository, never()).findByPaymentId(any());
         }
 
         @Test
-        @DisplayName("이미 존재하는 SagaState — 중복 진입 스킵")
-        void 중복_진입_스킵() {
+        @DisplayName("발행되는 refund.order.cancel 페이로드 — refundId/orderId/wholeOrder 보존")
+        void cancel_페이로드() {
+            given(sagaStateRepository.findByRefundId(refundId)).willReturn(Optional.empty());
+            given(refundRepository.findByRefundId(refundId)).willReturn(Optional.of(mockRefund()));
+
+            orchestrator.start(newRequested(PaymentMethod.PG, true));
+
+            ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+            verify(outboxService).save(any(), any(), any(), any(), captor.capture());
+            com.devticket.payment.refund.application.saga.event.RefundOrderCancelEvent published =
+                (com.devticket.payment.refund.application.saga.event.RefundOrderCancelEvent) captor.getValue();
+            assertThat(published.refundId()).isEqualTo(refundId);
+            assertThat(published.orderId()).isEqualTo(orderId);
+            assertThat(published.wholeOrder()).isTrue();
+        }
+
+        @Test
+        @DisplayName("저장되는 SagaState — refundId/orderId/method/step=ORDER_CANCELLING")
+        void sagaState_초기화() {
+            given(sagaStateRepository.findByRefundId(refundId)).willReturn(Optional.empty());
+            given(refundRepository.findByRefundId(refundId)).willReturn(Optional.of(mockRefund()));
+
+            orchestrator.start(newRequested(PaymentMethod.WALLET, false));
+
+            ArgumentCaptor<SagaState> stateCaptor = ArgumentCaptor.forClass(SagaState.class);
+            verify(sagaStateRepository).save(stateCaptor.capture());
+            SagaState saved = stateCaptor.getValue();
+            assertThat(saved.getRefundId()).isEqualTo(refundId);
+            assertThat(saved.getOrderId()).isEqualTo(orderId);
+            assertThat(saved.getPaymentMethod()).isEqualTo(PaymentMethod.WALLET);
+            assertThat(saved.getCurrentStep()).isEqualTo(SagaStep.ORDER_CANCELLING);
+        }
+    }
+
+    @Nested
+    @DisplayName("start — Commerce fan-out 경로 (Refund 미존재)")
+    class StartFanoutTest {
+
+        @Test
+        @DisplayName("아무 것도 없는 상태 — Refund/OrderRefund/RefundTicket 모두 생성")
+        void 전체_프로비저닝() {
+            stubFanout();
+            given(orderRefundRepository.save(any(OrderRefund.class))).willAnswer(echo());
+
+            orchestrator.start(newRequested(PaymentMethod.PG, false));
+
+            verify(orderRefundRepository).save(any(OrderRefund.class));
+            verify(refundRepository).save(any(Refund.class));
+            verify(refundTicketRepository).saveAll(any());
+            verify(sagaStateRepository).save(any(SagaState.class));
+            verify(outboxService).save(any(), any(), eq(KafkaTopics.REFUND_ORDER_CANCEL), any(), any());
+        }
+
+        @Test
+        @DisplayName("저장되는 Refund.refundId — Commerce 가 발급한 event.refundId 와 동일")
+        void refundId_보존() {
+            stubFanout();
+            given(orderRefundRepository.save(any(OrderRefund.class))).willAnswer(echo());
+
+            orchestrator.start(newRequested(PaymentMethod.PG, false));
+
+            ArgumentCaptor<Refund> captor = ArgumentCaptor.forClass(Refund.class);
+            verify(refundRepository).save(captor.capture());
+            assertThat(captor.getValue().getRefundId()).isEqualTo(refundId);
+        }
+
+        @Test
+        @DisplayName("저장되는 Refund — orderId/paymentId/userId/refundAmount/refundRate 가 event 와 동일")
+        void refund_필드_매핑() {
+            stubFanout();
+            given(orderRefundRepository.save(any(OrderRefund.class))).willAnswer(echo());
+
+            RefundRequestedEvent event = new RefundRequestedEvent(
+                refundId, null, orderId, userId, paymentId, PaymentMethod.PG,
+                List.of(UUID.randomUUID()), 7_777, 50, false, "reason", Instant.now(), 1
+            );
+            orchestrator.start(event);
+
+            ArgumentCaptor<Refund> captor = ArgumentCaptor.forClass(Refund.class);
+            verify(refundRepository).save(captor.capture());
+            Refund saved = captor.getValue();
+            assertThat(saved.getOrderId()).isEqualTo(orderId);
+            assertThat(saved.getPaymentId()).isEqualTo(paymentId);
+            assertThat(saved.getUserId()).isEqualTo(userId);
+            assertThat(saved.getRefundAmount()).isEqualTo(7_777);
+            assertThat(saved.getRefundRate()).isEqualTo(50);
+        }
+
+        @Test
+        @DisplayName("저장되는 OrderRefund — totalAmount = payment.amount, totalTickets = event.totalOrderTickets")
+        void ledger_필드_매핑() {
+            // Payment.amount = 10_000 (mockPayment 헬퍼)
+            stubFanout();
+            given(orderRefundRepository.save(any(OrderRefund.class))).willAnswer(echo());
+
+            orchestrator.start(newRequested(PaymentMethod.PG, false, 5));
+
+            ArgumentCaptor<OrderRefund> captor = ArgumentCaptor.forClass(OrderRefund.class);
+            verify(orderRefundRepository).save(captor.capture());
+            OrderRefund saved = captor.getValue();
+            assertThat(saved.getTotalAmount()).isEqualTo(10_000);
+            assertThat(saved.getTotalTickets()).isEqualTo(5);
+            assertThat(saved.getOrderId()).isEqualTo(orderId);
+            assertThat(saved.getUserId()).isEqualTo(userId);
+            assertThat(saved.getPaymentId()).isEqualTo(paymentId);
+            assertThat(saved.getStatus()).isEqualTo(OrderRefundStatus.NONE);
+        }
+
+        @Test
+        @DisplayName("Refund 와 OrderRefund 연결 — Refund.orderRefundId = ledger.orderRefundId")
+        void refund_ledger_연결() {
+            stubFanout();
+            given(orderRefundRepository.save(any(OrderRefund.class))).willAnswer(echo());
+
+            orchestrator.start(newRequested(PaymentMethod.PG, false));
+
+            ArgumentCaptor<OrderRefund> ledgerCaptor = ArgumentCaptor.forClass(OrderRefund.class);
+            verify(orderRefundRepository).save(ledgerCaptor.capture());
+            ArgumentCaptor<Refund> refundCaptor = ArgumentCaptor.forClass(Refund.class);
+            verify(refundRepository).save(refundCaptor.capture());
+
+            assertThat(refundCaptor.getValue().getOrderRefundId())
+                .isEqualTo(ledgerCaptor.getValue().getOrderRefundId());
+        }
+
+        @Test
+        @DisplayName("RefundTicket — event.ticketIds 의 모든 티켓에 대해 saveAll 호출")
+        void refundTicket_전체저장() {
+            UUID t1 = UUID.randomUUID();
+            UUID t2 = UUID.randomUUID();
+            UUID t3 = UUID.randomUUID();
+            stubFanout();
+            given(orderRefundRepository.save(any(OrderRefund.class))).willAnswer(echo());
+
+            RefundRequestedEvent event = new RefundRequestedEvent(
+                refundId, null, orderId, userId, paymentId, PaymentMethod.PG,
+                List.of(t1, t2, t3), 9_000, 100, false, "r", Instant.now(), 3
+            );
+            orchestrator.start(event);
+
+            @SuppressWarnings("unchecked")
+            ArgumentCaptor<List<RefundTicket>> captor = ArgumentCaptor.forClass(List.class);
+            verify(refundTicketRepository).saveAll(captor.capture());
+            assertThat(captor.getValue()).hasSize(3);
+            assertThat(captor.getValue())
+                .extracting(RefundTicket::getTicketId)
+                .containsExactlyInAnyOrder(t1, t2, t3);
+            assertThat(captor.getValue())
+                .extracting(RefundTicket::getRefundId)
+                .containsOnly(refundId);
+        }
+
+        @Test
+        @DisplayName("wholeOrder=true + ticketIds 비어있음 — RefundTicket.saveAll 호출 안 함")
+        void wholeOrder_빈ticketIds() {
+            stubFanout();
+            given(orderRefundRepository.save(any(OrderRefund.class))).willAnswer(echo());
+
+            orchestrator.start(newRequested(PaymentMethod.PG, true, 2));
+
+            verify(refundTicketRepository, never()).saveAll(any());
+        }
+
+        @Test
+        @DisplayName("OrderRefund 가 이미 존재 — 재사용, 새로 저장하지 않음 (다른 event 가 먼저 saga 시작한 케이스)")
+        void ledger_재사용() {
+            given(sagaStateRepository.findByRefundId(refundId)).willReturn(Optional.empty());
+            given(refundRepository.findByRefundId(refundId)).willReturn(Optional.empty());
+            given(paymentRepository.findByPaymentId(paymentId))
+                .willReturn(Optional.of(mockPayment(PaymentMethod.PG)));
+            OrderRefund existing = mockLedger();
+            given(orderRefundRepository.findByOrderId(orderId)).willReturn(Optional.of(existing));
+
+            orchestrator.start(newRequested(PaymentMethod.PG, false));
+
+            verify(orderRefundRepository, never()).save(any(OrderRefund.class));
+            ArgumentCaptor<Refund> refundCaptor = ArgumentCaptor.forClass(Refund.class);
+            verify(refundRepository).save(refundCaptor.capture());
+            assertThat(refundCaptor.getValue().getOrderRefundId())
+                .isEqualTo(existing.getOrderRefundId());
+        }
+
+        @Test
+        @DisplayName("Payment 미존재 — PAYMENT_NOT_FOUND 예외")
+        void payment_미존재() {
+            given(sagaStateRepository.findByRefundId(refundId)).willReturn(Optional.empty());
+            given(refundRepository.findByRefundId(refundId)).willReturn(Optional.empty());
+            given(paymentRepository.findByPaymentId(paymentId)).willReturn(Optional.empty());
+
+            org.assertj.core.api.Assertions.assertThatThrownBy(
+                    () -> orchestrator.start(newRequested(PaymentMethod.PG, false)))
+                .isInstanceOf(com.devticket.payment.refund.domain.exception.RefundException.class);
+
+            verify(refundRepository, never()).save(any(Refund.class));
+            verify(orderRefundRepository, never()).save(any(OrderRefund.class));
+            verify(sagaStateRepository, never()).save(any(SagaState.class));
+            verify(outboxService, never()).save(any(), any(), any(), any(), any());
+        }
+    }
+
+    @Nested
+    @DisplayName("start — fan-out totalOrderTickets 산정 (event 필드 / 폴백)")
+    class StartFanoutTotalTicketsTest {
+
+        @Test
+        @DisplayName("event.totalOrderTickets > 0 — 그대로 OrderRefund.totalTickets 로 사용 (다중 이벤트 합산값)")
+        void event_필드_사용() {
+            stubFanout();
+            given(orderRefundRepository.save(any(OrderRefund.class))).willAnswer(echo());
+
+            orchestrator.start(newRequested(PaymentMethod.PG, false, 5));
+
+            assertThat(savedLedger().getTotalTickets()).isEqualTo(5);
+        }
+
+        @Test
+        @DisplayName("event.totalOrderTickets == 1 — 단일 이벤트 단일 티켓 주문")
+        void 단일_티켓() {
+            stubFanout();
+            given(orderRefundRepository.save(any(OrderRefund.class))).willAnswer(echo());
+
+            orchestrator.start(newRequested(PaymentMethod.PG, false, 1));
+
+            assertThat(savedLedger().getTotalTickets()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("event.totalOrderTickets == 0 (구버전 in-flight 메시지) — ticketIds.size() 로 폴백")
+        void 구버전_메시지_폴백() {
+            stubFanout();
+            given(orderRefundRepository.save(any(OrderRefund.class))).willAnswer(echo());
+
+            UUID t1 = UUID.randomUUID();
+            UUID t2 = UUID.randomUUID();
+            RefundRequestedEvent event = new RefundRequestedEvent(
+                refundId, null, orderId, userId, paymentId, PaymentMethod.PG,
+                List.of(t1, t2), 5_000, 100, false, "r", Instant.now(), 0
+            );
+            orchestrator.start(event);
+
+            assertThat(savedLedger().getTotalTickets()).isEqualTo(2);
+        }
+
+        @Test
+        @DisplayName("event.totalOrderTickets == 0 + ticketIds 빈 리스트 — 최소값 1 보장 (OrderRefund.create 제약 통과)")
+        void 폴백_최소값_1() {
+            stubFanout();
+            given(orderRefundRepository.save(any(OrderRefund.class))).willAnswer(echo());
+
+            // 구버전 메시지에서 wholeOrder=true 인 경우 ticketIds 가 빈 리스트일 수 있음
+            RefundRequestedEvent event = new RefundRequestedEvent(
+                refundId, null, orderId, userId, paymentId, PaymentMethod.PG,
+                List.of(), 5_000, 100, true, "r", Instant.now(), 0
+            );
+            orchestrator.start(event);
+
+            assertThat(savedLedger().getTotalTickets()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("event.totalOrderTickets 음수 — 폴백 처리")
+        void 음수_방어() {
+            stubFanout();
+            given(orderRefundRepository.save(any(OrderRefund.class))).willAnswer(echo());
+
+            RefundRequestedEvent event = new RefundRequestedEvent(
+                refundId, null, orderId, userId, paymentId, PaymentMethod.PG,
+                List.of(UUID.randomUUID()), 5_000, 100, false, "r", Instant.now(), -3
+            );
+            orchestrator.start(event);
+
+            assertThat(savedLedger().getTotalTickets()).isEqualTo(1);
+        }
+    }
+
+    @Nested
+    @DisplayName("start — 멱등성 / 결제수단별")
+    class StartIdempotencyTest {
+
+        @Test
+        @DisplayName("이미 존재하는 SagaState — 모든 작업 스킵")
+        void sagaState_선존재_전체스킵() {
             given(sagaStateRepository.findByRefundId(refundId))
                 .willReturn(Optional.of(state(SagaStep.ORDER_CANCELLING)));
 
             orchestrator.start(newRequested(PaymentMethod.PG, false));
 
             verify(sagaStateRepository, never()).save(any());
+            verify(refundRepository, never()).save(any(Refund.class));
+            verify(orderRefundRepository, never()).save(any(OrderRefund.class));
+            verify(refundTicketRepository, never()).saveAll(any());
             verify(outboxService, never()).save(any(), any(), any(), any(), any());
+            verify(paymentRepository, never()).findByPaymentId(any());
         }
+
+        @Test
+        @DisplayName("결제수단 WALLET — provisioning + saga 진행")
+        void wallet_정상동작() {
+            stubFanout();
+            given(orderRefundRepository.save(any(OrderRefund.class))).willAnswer(echo());
+
+            orchestrator.start(newRequested(PaymentMethod.WALLET, false));
+
+            ArgumentCaptor<SagaState> stateCaptor = ArgumentCaptor.forClass(SagaState.class);
+            verify(sagaStateRepository).save(stateCaptor.capture());
+            assertThat(stateCaptor.getValue().getPaymentMethod()).isEqualTo(PaymentMethod.WALLET);
+        }
+
+        @Test
+        @DisplayName("결제수단 WALLET_PG — provisioning + saga 진행")
+        void walletPg_정상동작() {
+            stubFanout();
+            given(orderRefundRepository.save(any(OrderRefund.class))).willAnswer(echo());
+
+            orchestrator.start(newRequested(PaymentMethod.WALLET_PG, false));
+
+            ArgumentCaptor<SagaState> stateCaptor = ArgumentCaptor.forClass(SagaState.class);
+            verify(sagaStateRepository).save(stateCaptor.capture());
+            assertThat(stateCaptor.getValue().getPaymentMethod()).isEqualTo(PaymentMethod.WALLET_PG);
+        }
+    }
+
+    // ====== 헬퍼 ======
+
+    /** Commerce fan-out 진입 stub — Refund/SagaState 미존재, Payment 존재, OrderRefund 미존재 */
+    private void stubFanout() {
+        given(sagaStateRepository.findByRefundId(refundId)).willReturn(Optional.empty());
+        given(refundRepository.findByRefundId(refundId)).willReturn(Optional.empty());
+        given(paymentRepository.findByPaymentId(paymentId))
+            .willReturn(Optional.of(mockPayment(PaymentMethod.PG)));
+        given(orderRefundRepository.findByOrderId(orderId)).willReturn(Optional.empty());
+    }
+
+    private static <T> org.mockito.stubbing.Answer<T> echo() {
+        return inv -> inv.getArgument(0);
+    }
+
+    private OrderRefund savedLedger() {
+        ArgumentCaptor<OrderRefund> captor = ArgumentCaptor.forClass(OrderRefund.class);
+        verify(orderRefundRepository).save(captor.capture());
+        return captor.getValue();
     }
 
     @Nested

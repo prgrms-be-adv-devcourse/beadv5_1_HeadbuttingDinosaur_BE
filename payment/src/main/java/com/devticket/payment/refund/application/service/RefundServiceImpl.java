@@ -170,7 +170,8 @@ public class RefundServiceImpl implements RefundService {
             refundRate,
             false,
             request.reason(),
-            Instant.now()
+            Instant.now(),
+            ledger.getTotalTickets()
         );
         outboxService.save(
             refund.getRefundId().toString(),
@@ -259,7 +260,8 @@ public class RefundServiceImpl implements RefundService {
             refundRate,
             true,
             reason,                          // ← 추가: 메서드 인자의 reason 전달
-            Instant.now()
+            Instant.now(),
+            totalTickets
         );
         outboxService.save(
             refund.getRefundId().toString(),
