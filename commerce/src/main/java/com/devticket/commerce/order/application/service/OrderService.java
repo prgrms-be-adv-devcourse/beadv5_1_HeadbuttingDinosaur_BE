@@ -177,7 +177,15 @@ public class OrderService implements OrderUsecase {
         Map<UUID, String> eventTitles = orderToEventClient.getBulkEventInfo(eventIds).stream()
             .collect(Collectors.toMap(InternalEventInfoResponse::eventId, InternalEventInfoResponse::title));
 
-        return OrderDetailResponse.of(order, orderItems, eventTitles);
+        Map<UUID, List<UUID>> ticketIdsByOrderItemId = ticketRepository
+            .findAllByOrderIdAndStatus(order.getId(), com.devticket.commerce.ticket.domain.enums.TicketStatus.ISSUED)
+            .stream()
+            .collect(Collectors.groupingBy(
+                Ticket::getOrderItemId,
+                Collectors.mapping(Ticket::getTicketId, Collectors.toList())
+            ));
+
+        return OrderDetailResponse.of(order, orderItems, eventTitles, ticketIdsByOrderItemId);
     }
 
     @Override

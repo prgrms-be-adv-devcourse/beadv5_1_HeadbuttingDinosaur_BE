@@ -22,11 +22,17 @@ public record OrderDetailResponse(
     LocalDateTime createdAt
 ) {
 
-    public static OrderDetailResponse of(Order order, List<OrderItem> orderItems, Map<UUID, String> eventTitles) {
+    public static OrderDetailResponse of(
+        Order order,
+        List<OrderItem> orderItems,
+        Map<UUID, String> eventTitles,
+        Map<UUID, List<UUID>> ticketIdsByOrderItemId
+    ) {
         List<OrderDetailItemResponse> itemResponses = orderItems.stream()
             .map(item -> {
                 String title = eventTitles.getOrDefault(item.getEventId(), "알 수 없는 이벤트");
-                return OrderDetailItemResponse.of(item, title);
+                List<UUID> ticketIds = ticketIdsByOrderItemId.getOrDefault(item.getOrderItemId(), List.of());
+                return OrderDetailItemResponse.of(item, title, ticketIds);
             })
             .toList();
 
@@ -40,4 +46,3 @@ public record OrderDetailResponse(
             .build();
     }
 }
-
