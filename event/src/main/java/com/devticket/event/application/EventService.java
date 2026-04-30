@@ -1,6 +1,5 @@
 package com.devticket.event.application;
 
-import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch._types.FieldValue;
 import co.elastic.clients.elasticsearch._types.query_dsl.BoolQuery;
 import co.elastic.clients.elasticsearch._types.query_dsl.Query;
@@ -34,11 +33,8 @@ import com.devticket.event.presentation.dto.SellerEventDetailResponse;
 import com.devticket.event.presentation.dto.SellerEventSummaryResponse;
 import com.devticket.event.presentation.dto.SellerEventUpdateRequest;
 import com.devticket.event.presentation.dto.SellerEventUpdateResponse;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import java.io.StringReader;
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -66,11 +62,10 @@ public class EventService {
     private final MemberClient memberClient;
     private final AdminClient adminClient;
     private final ElasticsearchOperations elasticsearchOperations;
-    private final ElasticsearchClient esClient;
+    private final ElasticsearchSyncService elasticsearchSyncService;
     private final OpenAiEmbeddingClient openAiEmbeddingClient;
     private final OutboxService outboxService;
     private final MessageDeduplicationService deduplicationService;
-    private final ObjectMapper objectMapper;
     private final ApplicationEventPublisher eventPublisher;
     private final EventViewRepository eventViewRepository;
 
@@ -131,7 +126,7 @@ public class EventService {
             eventRepository.save(savedEvent);
         }
 
-        syncToElasticsearch(savedEvent);
+        elasticsearchSyncService.sync(savedEvent);
 
         return SellerEventCreateResponse.from(savedEvent);
     }
@@ -200,7 +195,13 @@ public class EventService {
 
         // ES 검색
         NativeQuery query = buildSearchQuery(request, allowedStatuses, pageable);
-        SearchHits<EventDocument> searchHits = elasticsearchOperations.search(query, EventDocument.class);
+        SearchHits<EventDocument> searchHits;
+        try {
+            searchHits = elasticsearchOperations.search(query, EventDocument.class);
+        } catch (Exception e) {
+            log.warn("[ES 검색 실패] DB 폴백 적용 - {}", e.getMessage());
+            return getEventListFromDb(request, allowedStatuses, pageable);
+        }
 
         List<UUID> pageEventIds = searchHits.stream()
             .map(hit -> UUID.fromString(hit.getContent().getId()))
@@ -278,7 +279,7 @@ public class EventService {
             List.of(EventStatus.ON_SALE, EventStatus.SOLD_OUT), LocalDateTime.now());
         events.forEach(event -> {
             event.expireSale();
-            syncToElasticsearch(event);
+            elasticsearchSyncService.sync(event);
         });
     }
 
@@ -290,7 +291,7 @@ public class EventService {
             LocalDateTime.now());
         events.forEach(event -> {
             event.endEvent();
-            syncToElasticsearch(event);
+            elasticsearchSyncService.sync(event);
         });
     }
 
@@ -301,7 +302,7 @@ public class EventService {
             .findAllByStatusAndSaleStartAtBefore(EventStatus.DRAFT, LocalDateTime.now());
         events.forEach(event -> {
             event.promoteToOnSale();
-            syncToElasticsearch(event);
+            elasticsearchSyncService.sync(event);
         });
     }
 
@@ -336,7 +337,7 @@ public class EventService {
                 KafkaTopics.EVENT_SALE_STOPPED,
                 new EventSaleStoppedEvent(event.getEventId(), event.getSellerId(), Instant.now())
             );
-            syncToElasticsearch(event);
+            elasticsearchSyncService.sync(event);
             return SellerEventUpdateResponse.from(event);
         }
 
@@ -403,7 +404,7 @@ public class EventService {
             }
         }
 
-        syncToElasticsearch(event);
+        elasticsearchSyncService.sync(event);
 
         return SellerEventUpdateResponse.from(event);
     }
@@ -427,57 +428,26 @@ public class EventService {
             new EventForceCancelledEvent(event.getEventId(), event.getSellerId(), reason, Instant.now())
         );
 
-        syncToElasticsearch(event);
+        elasticsearchSyncService.sync(event);
     }
 
-    /**
-     * Spring Data ES 컨버터를 완전히 우회하고 esClient.index()로 직접 인덱싱.
-     * dense_vector(embedding)은 Spring Data ES 컨버터가 직렬화하지 못하므로
-     * Map<String, Object>로 전체 문서를 구성해서 ES REST API에 직접 전송.
-     */
-    public void syncToElasticsearch(Event event) {
-        try {
-            List<String> techStackNames = event.getEventTechStacks().stream()
-                .map(EventTechStack::getTechStackName)
-                .toList();
+    private EventListResponse getEventListFromDb(
+        EventListRequest request, List<EventStatus> allowedStatuses, Pageable pageable) {
 
-            String embeddingText = techStackNames.isEmpty()
-                ? event.getTitle() + ". Category: " + event.getCategory().name()
-                : event.getTitle() + ". Category: " + event.getCategory().name()
-                    + ". Tech Stacks: " + String.join(", ", techStackNames);
+        var page = eventRepository.searchEventsWithStatuses(
+            request.keyword(), allowedStatuses, request.sellerId(), pageable);
 
-            Map<String, Object> doc = new HashMap<>();
-            doc.put("id", event.getEventId().toString());
-            // AI 추천 서비스는 _source.eventId 로 추출 (PR #540 계약). _id 는 hit._source 에 포함되지 않으므로 body 에 명시.
-            doc.put("eventId", event.getEventId().toString());
-            doc.put("title", event.getTitle());
-            doc.put("category", event.getCategory().name());
-            doc.put("techStacks", techStackNames);
-            doc.put("status", event.getStatus().name());
-            doc.put("sellerId", event.getSellerId().toString());
-            // mapping의 date_hour_minute_second 형식에 맞춤 (나노초 제외)
-            doc.put("indexedAt", LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")));
+        List<EventListContentResponse> content = page.getContent().stream()
+            .map(EventListContentResponse::from)
+            .toList();
 
-            float[] vector = openAiEmbeddingClient.embed(embeddingText);
-            if (vector != null) {
-                List<Float> vectorList = new ArrayList<>(vector.length);
-                for (float v : vector) vectorList.add(v);
-                doc.put("embedding", vectorList);
-            } else {
-                log.warn("[ES 동기화] embedding 생성 실패 - eventId: {}", event.getEventId());
-            }
-
-            String json = new ObjectMapper().writeValueAsString(doc);
-
-            esClient.index(i -> i
-                .index("event")
-                .id(event.getEventId().toString())
-                .withJson(new StringReader(json)));
-
-            log.debug("[ES 동기화 완료] eventId: {}", event.getEventId());
-        } catch (Exception e) {
-            log.warn("[ES 동기화 실패] eventId: {}", event.getEventId(), e);
-        }
+        return new EventListResponse(
+            content,
+            pageable.getPageNumber(),
+            pageable.getPageSize(),
+            page.getTotalElements(),
+            page.getTotalPages()
+        );
     }
 
     private NativeQuery buildSearchQuery(

@@ -3,7 +3,7 @@ package com.devticket.event.common.config;
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch._types.FieldValue;
 import co.elastic.clients.elasticsearch._types.SortOrder;
-import com.devticket.event.application.EventService;
+import com.devticket.event.application.ElasticsearchSyncService;
 import com.devticket.event.domain.enums.EventStatus;
 import com.devticket.event.domain.model.Event;
 import com.devticket.event.infrastructure.persistence.EventRepository;
@@ -40,7 +40,7 @@ public class ElasticsearchIndexInitializer {
     private final ElasticsearchOperations elasticsearchOperations;
     private final ElasticsearchClient esClient;
     private final EventRepository eventRepository;
-    private final EventService eventService;
+    private final ElasticsearchSyncService elasticsearchSyncService;
 
     @Async
     @EventListener(ApplicationReadyEvent.class)
@@ -163,7 +163,7 @@ public class ElasticsearchIndexInitializer {
             List<Event> events = eventRepository.findAllWithDetailsByEventIdIn(batch);
             for (Event event : events) {
                 try {
-                    eventService.syncToElasticsearch(event);
+                    elasticsearchSyncService.sync(event);
                     count++;
                 } catch (Exception e) {
                     log.warn("{} eventId: {}", errorLogPrefix, event.getEventId(), e);

@@ -33,6 +33,20 @@ public interface EventRepository extends JpaRepository<Event, Long> {
         Pageable pageable
     );
 
+    @Query("""
+    SELECT e FROM Event e
+    WHERE (:keyword IS NULL OR e.title LIKE CONCAT('%', :keyword, '%'))
+      AND (:#{#statuses == null || #statuses.isEmpty()} = true OR e.status IN :statuses)
+      AND (:sellerId IS NULL OR e.sellerId = :sellerId)
+    ORDER BY e.createdAt DESC
+    """)
+    Page<Event> searchEventsWithStatuses(
+        @Param("keyword") String keyword,
+        @Param("statuses") List<EventStatus> statuses,
+        @Param("sellerId") UUID sellerId,
+        Pageable pageable
+    );
+
     @Query("SELECT e.eventId FROM Event e WHERE e.status IN :statuses")
     List<UUID> findAllEventIdsByStatusIn(@Param("statuses") List<EventStatus> statuses);
 
