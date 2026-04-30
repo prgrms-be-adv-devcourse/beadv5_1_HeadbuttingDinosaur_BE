@@ -812,158 +812,75 @@ class WalletServiceTest {
     // =====================================================================
 
     @Nested
-    @DisplayName("사후 보정 (recoverStalePendingCharge)")
+    @DisplayName("사후 보정 (recoverStalePendingCharge) — 오케스트레이션")
     class RecoverStalePendingCharge {
 
+        // 락/쓰기 동작은 WalletChargeTransactionServiceTest 에서 검증.
+        // 본 블록은 WalletServiceImpl 오케스트레이션 책임(선점 → PG 호출 → 결과 반영)만 검증한다.
+
         @Test
-        void chargeId_없으면_PG_조회_없이_조기_반환() {
+        void 선점_실패시_PG_조회_없이_조기_반환() {
+            // given: claim 단계에서 false (이미 처리됐거나 미존재)
+            UUID chargeId = UUID.randomUUID();
+            given(walletChargeTransactionService.claimChargeForRecovery(chargeId)).willReturn(false);
+
+            // when
+            walletService.recoverStalePendingCharge(chargeId);
+
+            // then: PG 조회 / 결과 반영 모두 호출 없음
+            then(pgPaymentClient).should(never()).findPaymentByOrderId(any());
+            then(walletChargeTransactionService).should(never()).applyRecoveryResult(any(), any());
+            then(walletChargeTransactionService).should(never()).revertToPending(any());
+        }
+
+        @Test
+        void 선점_성공_PG_정상응답_결과반영_위임() {
             // given
             UUID chargeId = UUID.randomUUID();
-            given(walletChargeRepository.findByChargeIdForUpdate(chargeId)).willReturn(Optional.empty());
+            TossPaymentStatusResponse pgResp = new TossPaymentStatusResponse(
+                "pk-1", chargeId.toString(), "DONE", 10_000, "2024-01-01T12:00:00");
+            given(walletChargeTransactionService.claimChargeForRecovery(chargeId)).willReturn(true);
+            given(pgPaymentClient.findPaymentByOrderId(chargeId.toString()))
+                .willReturn(Optional.of(pgResp));
 
             // when
             walletService.recoverStalePendingCharge(chargeId);
 
-            // then: PG 조회 없이 종료
-            then(pgPaymentClient).should(never()).findPaymentByOrderId(any());
+            // then: 결과 반영 메서드에 동일 응답 위임
+            then(walletChargeTransactionService).should(times(1))
+                .applyRecoveryResult(eq(chargeId), eq(Optional.of(pgResp)));
+            then(walletChargeTransactionService).should(never()).revertToPending(any());
         }
 
         @Test
-        void 이미_처리된_건은_PG_조회_없이_조기_반환() {
-            // given: COMPLETED 상태
+        void 선점_성공_PG_404_빈_Optional_위임() {
+            // given: Toss에 결제 자체가 없음
             UUID chargeId = UUID.randomUUID();
-            WalletCharge walletCharge = pendingCharge(chargeId, USER_ID, 10_000);
-            walletCharge.complete("already-done-key");
-            given(walletChargeRepository.findByChargeIdForUpdate(chargeId)).willReturn(Optional.of(walletCharge));
+            given(walletChargeTransactionService.claimChargeForRecovery(chargeId)).willReturn(true);
+            given(pgPaymentClient.findPaymentByOrderId(chargeId.toString())).willReturn(Optional.empty());
 
             // when
             walletService.recoverStalePendingCharge(chargeId);
 
-            // then
-            then(pgPaymentClient).should(never()).findPaymentByOrderId(any());
+            // then: 빈 Optional 그대로 위임 (서비스 측에서 FAILED 처리)
+            then(walletChargeTransactionService).should(times(1))
+                .applyRecoveryResult(eq(chargeId), eq(Optional.empty()));
         }
 
         @Test
-        void PG_조회_예외시_상태_변경_없이_스킵() {
-            // given: PG 네트워크 오류 등
+        void 선점_성공_PG_조회_예외시_revertToPending_호출_및_조기종료() {
+            // given: PG 호출 자체에서 예외
             UUID chargeId = UUID.randomUUID();
-            WalletCharge walletCharge = pendingCharge(chargeId, USER_ID, 10_000);
-            given(walletChargeRepository.findByChargeIdForUpdate(chargeId)).willReturn(Optional.of(walletCharge));
-            given(walletChargeRepository.findByChargeId(chargeId)).willReturn(Optional.of(walletCharge));
+            given(walletChargeTransactionService.claimChargeForRecovery(chargeId)).willReturn(true);
             given(pgPaymentClient.findPaymentByOrderId(chargeId.toString()))
                 .willThrow(new RuntimeException("PG timeout"));
 
             // when
             walletService.recoverStalePendingCharge(chargeId);
 
-            // then: 상태 변경 없음, 다음 주기에 재시도
-            assertThat(walletCharge.getStatus()).isEqualTo(WalletChargeStatus.PENDING);
-            then(walletRepository).should(never()).chargeBalanceAtomic(any(), anyInt());
-        }
-
-        @Test
-        void Toss_404_미도달_PENDING_to_FAILED() {
-            // given: Toss에서 해당 orderId 결제 없음 (결제창 진입 전 중단)
-            UUID chargeId = UUID.randomUUID();
-            WalletCharge walletCharge = pendingCharge(chargeId, USER_ID, 10_000);
-            given(walletChargeRepository.findByChargeIdForUpdate(chargeId)).willReturn(Optional.of(walletCharge));
-            given(walletChargeRepository.findByChargeId(chargeId)).willReturn(Optional.of(walletCharge));
-            given(pgPaymentClient.findPaymentByOrderId(chargeId.toString())).willReturn(Optional.empty());
-
-            // when
-            walletService.recoverStalePendingCharge(chargeId);
-
-            // then
-            assertThat(walletCharge.getStatus()).isEqualTo(WalletChargeStatus.FAILED);
-            then(walletRepository).should(never()).chargeBalanceAtomic(any(), anyInt());
-        }
-
-        @Test
-        void PG_DONE_잔액_반영_및_거래기록_생성_후_COMPLETED() {
-            // given: Toss 결제 승인 완료, WalletTransaction 미존재
-            UUID chargeId = UUID.randomUUID();
-            String paymentKey = "pk-recovery-123";
-            WalletCharge walletCharge = pendingCharge(chargeId, USER_ID, 10_000);
-            Wallet wallet = walletWithBalance(60_000); // 충전 후 잔액
-
-            given(walletChargeRepository.findByChargeIdForUpdate(chargeId)).willReturn(Optional.of(walletCharge));
-            given(walletChargeRepository.findByChargeId(chargeId)).willReturn(Optional.of(walletCharge));
-            given(pgPaymentClient.findPaymentByOrderId(chargeId.toString()))
-                .willReturn(Optional.of(new TossPaymentStatusResponse(
-                    paymentKey, chargeId.toString(), "DONE", 10_000, "2024-01-01T12:00:00")));
-            given(walletTransactionRepository.existsByTransactionKey("CHARGE:" + paymentKey)).willReturn(false);
-            given(walletRepository.chargeBalanceAtomic(USER_ID, 10_000)).willReturn(1);
-            given(walletRepository.findByUserId(USER_ID)).willReturn(Optional.of(wallet));
-            given(walletTransactionRepository.save(any())).willReturn(
-                WalletTransaction.createCharge(1L, USER_ID, "CHARGE:" + paymentKey, 10_000, 60_000));
-
-            // when
-            walletService.recoverStalePendingCharge(chargeId);
-
-            // then
-            assertThat(walletCharge.getStatus()).isEqualTo(WalletChargeStatus.COMPLETED);
-            then(walletRepository).should(times(1)).chargeBalanceAtomic(USER_ID, 10_000);
-            then(walletTransactionRepository).should(times(1)).save(any(WalletTransaction.class));
-        }
-
-        @Test
-        void PG_DONE_거래기록_이미_존재_잔액_반영_생략_COMPLETED() {
-            // given: Toss DONE이지만 WalletTransaction이 이미 존재 (부분 실패 후 재시도 케이스)
-            UUID chargeId = UUID.randomUUID();
-            String paymentKey = "pk-already-recorded";
-            WalletCharge walletCharge = pendingCharge(chargeId, USER_ID, 10_000);
-
-            given(walletChargeRepository.findByChargeIdForUpdate(chargeId)).willReturn(Optional.of(walletCharge));
-            given(walletChargeRepository.findByChargeId(chargeId)).willReturn(Optional.of(walletCharge));
-            given(pgPaymentClient.findPaymentByOrderId(chargeId.toString()))
-                .willReturn(Optional.of(new TossPaymentStatusResponse(
-                    paymentKey, chargeId.toString(), "DONE", 10_000, "2024-01-01T12:00:00")));
-            given(walletTransactionRepository.existsByTransactionKey("CHARGE:" + paymentKey)).willReturn(true);
-
-            // when
-            walletService.recoverStalePendingCharge(chargeId);
-
-            // then: WalletCharge만 COMPLETED, 잔액 반영 및 거래기록 생성 생략
-            assertThat(walletCharge.getStatus()).isEqualTo(WalletChargeStatus.COMPLETED);
-            then(walletRepository).should(never()).chargeBalanceAtomic(any(), anyInt());
-            then(walletTransactionRepository).should(never()).save(any());
-        }
-
-        @Test
-        void PG_CANCELED_PENDING_to_FAILED() {
-            // given
-            UUID chargeId = UUID.randomUUID();
-            WalletCharge walletCharge = pendingCharge(chargeId, USER_ID, 10_000);
-            given(walletChargeRepository.findByChargeIdForUpdate(chargeId)).willReturn(Optional.of(walletCharge));
-            given(walletChargeRepository.findByChargeId(chargeId)).willReturn(Optional.of(walletCharge));
-            given(pgPaymentClient.findPaymentByOrderId(chargeId.toString()))
-                .willReturn(Optional.of(new TossPaymentStatusResponse(
-                    null, chargeId.toString(), "CANCELED", 10_000, null)));
-
-            // when
-            walletService.recoverStalePendingCharge(chargeId);
-
-            // then
-            assertThat(walletCharge.getStatus()).isEqualTo(WalletChargeStatus.FAILED);
-            then(walletRepository).should(never()).chargeBalanceAtomic(any(), anyInt());
-        }
-
-        @Test
-        void PG_ABORTED_PENDING_to_FAILED() {
-            // given
-            UUID chargeId = UUID.randomUUID();
-            WalletCharge walletCharge = pendingCharge(chargeId, USER_ID, 10_000);
-            given(walletChargeRepository.findByChargeIdForUpdate(chargeId)).willReturn(Optional.of(walletCharge));
-            given(walletChargeRepository.findByChargeId(chargeId)).willReturn(Optional.of(walletCharge));
-            given(pgPaymentClient.findPaymentByOrderId(chargeId.toString()))
-                .willReturn(Optional.of(new TossPaymentStatusResponse(
-                    null, chargeId.toString(), "ABORTED", 10_000, null)));
-
-            // when
-            walletService.recoverStalePendingCharge(chargeId);
-
-            // then
-            assertThat(walletCharge.getStatus()).isEqualTo(WalletChargeStatus.FAILED);
+            // then: 원복 호출, 결과 반영 없음
+            then(walletChargeTransactionService).should(times(1)).revertToPending(chargeId);
+            then(walletChargeTransactionService).should(never()).applyRecoveryResult(any(), any());
         }
     }
 
