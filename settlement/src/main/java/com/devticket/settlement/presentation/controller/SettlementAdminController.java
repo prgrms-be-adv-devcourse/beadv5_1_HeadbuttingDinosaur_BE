@@ -72,9 +72,9 @@ public class SettlementAdminController {
         return ResponseEntity.ok().build();
     }
 
-    @GetMapping("/revenues")
+    @GetMapping("/revenues/{yearMonth}")
     public ResponseEntity<MonthlyRevenueResponse> getMonthlyRevenue(
-        @RequestParam @DateTimeFormat(pattern = "yyyy-MM") YearMonth yearMonth
+        @PathVariable @DateTimeFormat(pattern = "yyyy-MM") YearMonth yearMonth
     ) {
         return ResponseEntity.ok(settlementAdminService.getMonthlyRevenue(yearMonth));
     }
