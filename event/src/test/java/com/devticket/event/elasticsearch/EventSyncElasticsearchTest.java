@@ -6,7 +6,7 @@ import static org.mockito.Mockito.when;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch.core.GetResponse;
-import com.devticket.event.application.EventService;
+import com.devticket.event.application.ElasticsearchSyncService;
 import com.devticket.event.domain.enums.EventCategory;
 import com.devticket.event.domain.enums.EventStatus;
 import com.devticket.event.domain.model.Event;
@@ -46,7 +46,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 class EventSyncElasticsearchTest extends ElasticsearchIntegrationTestBase {
 
     @Autowired
-    private EventService eventService;
+    private ElasticsearchSyncService elasticsearchSyncService;
 
     @Autowired
     private EventSearchRepository eventSearchRepository;
@@ -79,7 +79,7 @@ class EventSyncElasticsearchTest extends ElasticsearchIntegrationTestBase {
         Event event = createEvent(sellerId, "Spring Boot 심화 밋업", EventStatus.ON_SALE);
 
         // when
-        eventService.syncToElasticsearch(event);
+        elasticsearchSyncService.sync(event);
         elasticsearchOperations.indexOps(EventDocument.class).refresh();
 
         // then
@@ -99,7 +99,7 @@ class EventSyncElasticsearchTest extends ElasticsearchIntegrationTestBase {
         Event event = createEvent(UUID.randomUUID(), "임베딩 없는 이벤트", EventStatus.ON_SALE);
 
         // when
-        eventService.syncToElasticsearch(event);
+        elasticsearchSyncService.sync(event);
         elasticsearchOperations.indexOps(EventDocument.class).refresh();
 
         // then
@@ -118,11 +118,11 @@ class EventSyncElasticsearchTest extends ElasticsearchIntegrationTestBase {
         when(openAiEmbeddingClient.embed(anyString())).thenReturn(null);
         Event event = createEvent(UUID.randomUUID(), "원본 제목", EventStatus.ON_SALE);
 
-        eventService.syncToElasticsearch(event);
+        elasticsearchSyncService.sync(event);
         elasticsearchOperations.indexOps(EventDocument.class).refresh();
 
         ReflectionTestUtils.setField(event, "title", "수정된 제목");
-        eventService.syncToElasticsearch(event);
+        elasticsearchSyncService.sync(event);
         elasticsearchOperations.indexOps(EventDocument.class).refresh();
 
         // then
@@ -139,11 +139,11 @@ class EventSyncElasticsearchTest extends ElasticsearchIntegrationTestBase {
         when(openAiEmbeddingClient.embed(anyString())).thenReturn(null);
         Event event = createEvent(UUID.randomUUID(), "취소 예정 이벤트", EventStatus.ON_SALE);
 
-        eventService.syncToElasticsearch(event);
+        elasticsearchSyncService.sync(event);
         elasticsearchOperations.indexOps(EventDocument.class).refresh();
 
         ReflectionTestUtils.setField(event, "status", EventStatus.CANCELLED);
-        eventService.syncToElasticsearch(event);
+        elasticsearchSyncService.sync(event);
         elasticsearchOperations.indexOps(EventDocument.class).refresh();
 
         // then
@@ -163,7 +163,7 @@ class EventSyncElasticsearchTest extends ElasticsearchIntegrationTestBase {
         event.getEventTechStacks().add(EventTechStack.of(event, 3L, "Redis"));
 
         // when
-        eventService.syncToElasticsearch(event);
+        elasticsearchSyncService.sync(event);
         elasticsearchOperations.indexOps(EventDocument.class).refresh();
 
         // then
@@ -182,7 +182,7 @@ class EventSyncElasticsearchTest extends ElasticsearchIntegrationTestBase {
         Event event = createEvent(UUID.randomUUID(), "기술 스택 없음", EventStatus.ON_SALE);
 
         // when
-        eventService.syncToElasticsearch(event);
+        elasticsearchSyncService.sync(event);
         elasticsearchOperations.indexOps(EventDocument.class).refresh();
 
         // then
@@ -207,7 +207,7 @@ class EventSyncElasticsearchTest extends ElasticsearchIntegrationTestBase {
         Event event = createEvent(UUID.randomUUID(), "AI 계약 확인 이벤트", EventStatus.ON_SALE);
 
         // when
-        eventService.syncToElasticsearch(event);
+        elasticsearchSyncService.sync(event);
         elasticsearchOperations.indexOps(EventDocument.class).refresh();
 
         // then
@@ -227,7 +227,7 @@ class EventSyncElasticsearchTest extends ElasticsearchIntegrationTestBase {
         Event event = createEvent(UUID.randomUUID(), "날짜 형식 테스트", EventStatus.ON_SALE);
 
         // when
-        eventService.syncToElasticsearch(event);
+        elasticsearchSyncService.sync(event);
         elasticsearchOperations.indexOps(EventDocument.class).refresh();
 
         // then
