@@ -75,7 +75,7 @@ public class SellerEventController {
     public ResponseEntity<SuccessResponse<SellerEventUpdateResponse>> updateEvent(
         @RequestHeader("X-User-Id") UUID sellerId,
         @PathVariable UUID eventId,
-        @RequestBody SellerEventUpdateRequest request) {
+        @Valid @RequestBody SellerEventUpdateRequest request) {
         return ResponseEntity.ok(SuccessResponse.success(eventService.updateEvent(sellerId, eventId, request)));
     }
 }
