@@ -15,8 +15,6 @@ import com.devticket.payment.payment.application.dto.PgPaymentCancelResult;
 import com.devticket.payment.payment.domain.enums.PaymentMethod;
 import com.devticket.payment.payment.domain.model.Payment;
 import com.devticket.payment.payment.domain.repository.PaymentRepository;
-import com.devticket.payment.payment.infrastructure.client.CommerceInternalClient;
-import com.devticket.payment.payment.infrastructure.client.dto.InternalOrderInfoResponse;
 import com.devticket.payment.payment.infrastructure.external.PgPaymentClient;
 import com.devticket.payment.refund.application.saga.event.RefundOrderDoneEvent;
 import com.devticket.payment.refund.application.saga.event.RefundOrderFailedEvent;
@@ -71,8 +69,6 @@ class RefundSagaOrchestratorTest {
     PgPaymentClient pgPaymentClient;
     @Mock
     WalletService walletService;
-    @Mock
-    CommerceInternalClient commerceInternalClient;
 
     @InjectMocks
     RefundSagaOrchestrator orchestrator;
@@ -91,10 +87,14 @@ class RefundSagaOrchestratorTest {
     }
 
     private RefundRequestedEvent newRequested(PaymentMethod method, boolean wholeOrder) {
+        return newRequested(method, wholeOrder, 1);
+    }
+
+    private RefundRequestedEvent newRequested(PaymentMethod method, boolean wholeOrder, int totalOrderTickets) {
         return new RefundRequestedEvent(
             refundId, UUID.randomUUID(), orderId, userId, paymentId, method,
             wholeOrder ? List.of() : List.of(UUID.randomUUID()),
-            10_000, 100, wholeOrder, "test-reason", Instant.now()
+            10_000, 100, wholeOrder, "test-reason", Instant.now(), totalOrderTickets
         );
     }
 
@@ -126,7 +126,6 @@ class RefundSagaOrchestratorTest {
             verify(orderRefundRepository, never()).save(any(OrderRefund.class));
             verify(refundTicketRepository, never()).saveAll(any());
             verify(paymentRepository, never()).findByPaymentId(any());
-            verify(commerceInternalClient, never()).getOrderInfo(any());
         }
 
         @Test
@@ -171,7 +170,7 @@ class RefundSagaOrchestratorTest {
         @Test
         @DisplayName("아무 것도 없는 상태 — Refund/OrderRefund/RefundTicket 모두 생성")
         void 전체_프로비저닝() {
-            stubFanout(List.of(orderItem(1)));
+            stubFanout();
             given(orderRefundRepository.save(any(OrderRefund.class))).willAnswer(echo());
 
             orchestrator.start(newRequested(PaymentMethod.PG, false));
@@ -186,7 +185,7 @@ class RefundSagaOrchestratorTest {
         @Test
         @DisplayName("저장되는 Refund.refundId — Commerce 가 발급한 event.refundId 와 동일")
         void refundId_보존() {
-            stubFanout(List.of(orderItem(1)));
+            stubFanout();
             given(orderRefundRepository.save(any(OrderRefund.class))).willAnswer(echo());
 
             orchestrator.start(newRequested(PaymentMethod.PG, false));
@@ -199,12 +198,12 @@ class RefundSagaOrchestratorTest {
         @Test
         @DisplayName("저장되는 Refund — orderId/paymentId/userId/refundAmount/refundRate 가 event 와 동일")
         void refund_필드_매핑() {
-            stubFanout(List.of(orderItem(1)));
+            stubFanout();
             given(orderRefundRepository.save(any(OrderRefund.class))).willAnswer(echo());
 
             RefundRequestedEvent event = new RefundRequestedEvent(
                 refundId, null, orderId, userId, paymentId, PaymentMethod.PG,
-                List.of(UUID.randomUUID()), 7_777, 50, false, "reason", Instant.now()
+                List.of(UUID.randomUUID()), 7_777, 50, false, "reason", Instant.now(), 1
             );
             orchestrator.start(event);
 
@@ -219,13 +218,13 @@ class RefundSagaOrchestratorTest {
         }
 
         @Test
-        @DisplayName("저장되는 OrderRefund — totalAmount = payment.amount, totalTickets = sum(orderItem.quantity)")
+        @DisplayName("저장되는 OrderRefund — totalAmount = payment.amount, totalTickets = event.totalOrderTickets")
         void ledger_필드_매핑() {
             // Payment.amount = 10_000 (mockPayment 헬퍼)
-            stubFanout(List.of(orderItem(2), orderItem(3)));
+            stubFanout();
             given(orderRefundRepository.save(any(OrderRefund.class))).willAnswer(echo());
 
-            orchestrator.start(newRequested(PaymentMethod.PG, false));
+            orchestrator.start(newRequested(PaymentMethod.PG, false, 5));
 
             ArgumentCaptor<OrderRefund> captor = ArgumentCaptor.forClass(OrderRefund.class);
             verify(orderRefundRepository).save(captor.capture());
@@ -241,7 +240,7 @@ class RefundSagaOrchestratorTest {
         @Test
         @DisplayName("Refund 와 OrderRefund 연결 — Refund.orderRefundId = ledger.orderRefundId")
         void refund_ledger_연결() {
-            stubFanout(List.of(orderItem(1)));
+            stubFanout();
             given(orderRefundRepository.save(any(OrderRefund.class))).willAnswer(echo());
 
             orchestrator.start(newRequested(PaymentMethod.PG, false));
@@ -261,12 +260,12 @@ class RefundSagaOrchestratorTest {
             UUID t1 = UUID.randomUUID();
             UUID t2 = UUID.randomUUID();
             UUID t3 = UUID.randomUUID();
-            stubFanout(List.of(orderItem(3)));
+            stubFanout();
             given(orderRefundRepository.save(any(OrderRefund.class))).willAnswer(echo());
 
             RefundRequestedEvent event = new RefundRequestedEvent(
                 refundId, null, orderId, userId, paymentId, PaymentMethod.PG,
-                List.of(t1, t2, t3), 9_000, 100, false, "r", Instant.now()
+                List.of(t1, t2, t3), 9_000, 100, false, "r", Instant.now(), 3
             );
             orchestrator.start(event);
 
@@ -285,10 +284,10 @@ class RefundSagaOrchestratorTest {
         @Test
         @DisplayName("wholeOrder=true + ticketIds 비어있음 — RefundTicket.saveAll 호출 안 함")
         void wholeOrder_빈ticketIds() {
-            stubFanout(List.of(orderItem(2)));
+            stubFanout();
             given(orderRefundRepository.save(any(OrderRefund.class))).willAnswer(echo());
 
-            orchestrator.start(newRequested(PaymentMethod.PG, true));
+            orchestrator.start(newRequested(PaymentMethod.PG, true, 2));
 
             verify(refundTicketRepository, never()).saveAll(any());
         }
@@ -306,7 +305,6 @@ class RefundSagaOrchestratorTest {
             orchestrator.start(newRequested(PaymentMethod.PG, false));
 
             verify(orderRefundRepository, never()).save(any(OrderRefund.class));
-            verify(commerceInternalClient, never()).getOrderInfo(any());
             ArgumentCaptor<Refund> refundCaptor = ArgumentCaptor.forClass(Refund.class);
             verify(refundRepository).save(refundCaptor.capture());
             assertThat(refundCaptor.getValue().getOrderRefundId())
@@ -332,48 +330,42 @@ class RefundSagaOrchestratorTest {
     }
 
     @Nested
-    @DisplayName("start — fan-out totalTickets 산정 (다중 이벤트 / 폴백)")
+    @DisplayName("start — fan-out totalOrderTickets 산정 (event 필드 / 폴백)")
     class StartFanoutTotalTicketsTest {
 
         @Test
-        @DisplayName("다중 이벤트 주문 — Commerce orderInfo 의 quantity 합으로 totalTickets 산정")
-        void 다중이벤트_합산() {
-            stubFanout(List.of(orderItem(2), orderItem(3)));
+        @DisplayName("event.totalOrderTickets > 0 — 그대로 OrderRefund.totalTickets 로 사용 (다중 이벤트 합산값)")
+        void event_필드_사용() {
+            stubFanout();
             given(orderRefundRepository.save(any(OrderRefund.class))).willAnswer(echo());
 
-            orchestrator.start(newRequested(PaymentMethod.PG, false));
+            orchestrator.start(newRequested(PaymentMethod.PG, false, 5));
 
             assertThat(savedLedger().getTotalTickets()).isEqualTo(5);
         }
 
         @Test
-        @DisplayName("단일 이벤트 — Commerce 응답 quantity 그대로")
-        void 단일이벤트() {
-            stubFanout(List.of(orderItem(4)));
+        @DisplayName("event.totalOrderTickets == 1 — 단일 이벤트 단일 티켓 주문")
+        void 단일_티켓() {
+            stubFanout();
             given(orderRefundRepository.save(any(OrderRefund.class))).willAnswer(echo());
 
-            orchestrator.start(newRequested(PaymentMethod.PG, false));
+            orchestrator.start(newRequested(PaymentMethod.PG, false, 1));
 
-            assertThat(savedLedger().getTotalTickets()).isEqualTo(4);
+            assertThat(savedLedger().getTotalTickets()).isEqualTo(1);
         }
 
         @Test
-        @DisplayName("Commerce 호출 예외 — ticketIds.size() 로 폴백")
-        void commerce_예외_폴백() {
-            given(sagaStateRepository.findByRefundId(refundId)).willReturn(Optional.empty());
-            given(refundRepository.findByRefundId(refundId)).willReturn(Optional.empty());
-            given(paymentRepository.findByPaymentId(paymentId))
-                .willReturn(Optional.of(mockPayment(PaymentMethod.PG)));
-            given(orderRefundRepository.findByOrderId(orderId)).willReturn(Optional.empty());
-            given(commerceInternalClient.getOrderInfo(orderId))
-                .willThrow(new RuntimeException("commerce down"));
+        @DisplayName("event.totalOrderTickets == 0 (구버전 in-flight 메시지) — ticketIds.size() 로 폴백")
+        void 구버전_메시지_폴백() {
+            stubFanout();
             given(orderRefundRepository.save(any(OrderRefund.class))).willAnswer(echo());
 
             UUID t1 = UUID.randomUUID();
             UUID t2 = UUID.randomUUID();
             RefundRequestedEvent event = new RefundRequestedEvent(
                 refundId, null, orderId, userId, paymentId, PaymentMethod.PG,
-                List.of(t1, t2), 5_000, 100, false, "r", Instant.now()
+                List.of(t1, t2), 5_000, 100, false, "r", Instant.now(), 0
             );
             orchestrator.start(event);
 
@@ -381,41 +373,15 @@ class RefundSagaOrchestratorTest {
         }
 
         @Test
-        @DisplayName("Commerce 응답 null — ticketIds.size() 로 폴백")
-        void commerce_null_폴백() {
-            given(sagaStateRepository.findByRefundId(refundId)).willReturn(Optional.empty());
-            given(refundRepository.findByRefundId(refundId)).willReturn(Optional.empty());
-            given(paymentRepository.findByPaymentId(paymentId))
-                .willReturn(Optional.of(mockPayment(PaymentMethod.PG)));
-            given(orderRefundRepository.findByOrderId(orderId)).willReturn(Optional.empty());
-            given(commerceInternalClient.getOrderInfo(orderId)).willReturn(null);
+        @DisplayName("event.totalOrderTickets == 0 + ticketIds 빈 리스트 — 최소값 1 보장 (OrderRefund.create 제약 통과)")
+        void 폴백_최소값_1() {
+            stubFanout();
             given(orderRefundRepository.save(any(OrderRefund.class))).willAnswer(echo());
 
+            // 구버전 메시지에서 wholeOrder=true 인 경우 ticketIds 가 빈 리스트일 수 있음
             RefundRequestedEvent event = new RefundRequestedEvent(
                 refundId, null, orderId, userId, paymentId, PaymentMethod.PG,
-                List.of(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID()),
-                5_000, 100, false, "r", Instant.now()
-            );
-            orchestrator.start(event);
-
-            assertThat(savedLedger().getTotalTickets()).isEqualTo(3);
-        }
-
-        @Test
-        @DisplayName("Commerce 응답 orderItems null — ticketIds.size() 로 폴백")
-        void commerce_orderItems_null_폴백() {
-            given(sagaStateRepository.findByRefundId(refundId)).willReturn(Optional.empty());
-            given(refundRepository.findByRefundId(refundId)).willReturn(Optional.empty());
-            given(paymentRepository.findByPaymentId(paymentId))
-                .willReturn(Optional.of(mockPayment(PaymentMethod.PG)));
-            given(orderRefundRepository.findByOrderId(orderId)).willReturn(Optional.empty());
-            given(commerceInternalClient.getOrderInfo(orderId))
-                .willReturn(new InternalOrderInfoResponse(orderId, userId, "x", 1_000, "PAID", "t", null));
-            given(orderRefundRepository.save(any(OrderRefund.class))).willAnswer(echo());
-
-            RefundRequestedEvent event = new RefundRequestedEvent(
-                refundId, null, orderId, userId, paymentId, PaymentMethod.PG,
-                List.of(UUID.randomUUID()), 5_000, 100, false, "r", Instant.now()
+                List.of(), 5_000, 100, true, "r", Instant.now(), 0
             );
             orchestrator.start(event);
 
@@ -423,35 +389,16 @@ class RefundSagaOrchestratorTest {
         }
 
         @Test
-        @DisplayName("Commerce 응답 orderItems 빈 리스트 — ticketIds.size() 로 폴백")
-        void commerce_orderItems_빈리스트_폴백() {
-            stubFanout(List.of());
+        @DisplayName("event.totalOrderTickets 음수 — 폴백 처리")
+        void 음수_방어() {
+            stubFanout();
             given(orderRefundRepository.save(any(OrderRefund.class))).willAnswer(echo());
 
             RefundRequestedEvent event = new RefundRequestedEvent(
                 refundId, null, orderId, userId, paymentId, PaymentMethod.PG,
-                List.of(UUID.randomUUID(), UUID.randomUUID()), 5_000, 100, false, "r", Instant.now()
+                List.of(UUID.randomUUID()), 5_000, 100, false, "r", Instant.now(), -3
             );
             orchestrator.start(event);
-
-            assertThat(savedLedger().getTotalTickets()).isEqualTo(2);
-        }
-
-        @Test
-        @DisplayName("ticketIds 가 빈 리스트 + Commerce 폴백 — 최소값 1 보장")
-        void wholeOrder_빈ticketIds_최소값1() {
-            given(sagaStateRepository.findByRefundId(refundId)).willReturn(Optional.empty());
-            given(refundRepository.findByRefundId(refundId)).willReturn(Optional.empty());
-            given(paymentRepository.findByPaymentId(paymentId))
-                .willReturn(Optional.of(mockPayment(PaymentMethod.PG)));
-            given(orderRefundRepository.findByOrderId(orderId)).willReturn(Optional.empty());
-            given(commerceInternalClient.getOrderInfo(orderId))
-                .willThrow(new RuntimeException("commerce down"));
-            given(orderRefundRepository.save(any(OrderRefund.class))).willAnswer(echo());
-
-            // wholeOrder=true + ticketIds 빈 리스트 — Commerce 도 실패. OrderRefund.create 가 totalTickets <= 0 이면 throw 하므로
-            // 폴백이 최소 1 을 보장해야 한다.
-            orchestrator.start(newRequested(PaymentMethod.PG, true));
 
             assertThat(savedLedger().getTotalTickets()).isEqualTo(1);
         }
@@ -475,13 +422,12 @@ class RefundSagaOrchestratorTest {
             verify(refundTicketRepository, never()).saveAll(any());
             verify(outboxService, never()).save(any(), any(), any(), any(), any());
             verify(paymentRepository, never()).findByPaymentId(any());
-            verify(commerceInternalClient, never()).getOrderInfo(any());
         }
 
         @Test
         @DisplayName("결제수단 WALLET — provisioning + saga 진행")
         void wallet_정상동작() {
-            stubFanout(List.of(orderItem(1)));
+            stubFanout();
             given(orderRefundRepository.save(any(OrderRefund.class))).willAnswer(echo());
 
             orchestrator.start(newRequested(PaymentMethod.WALLET, false));
@@ -494,7 +440,7 @@ class RefundSagaOrchestratorTest {
         @Test
         @DisplayName("결제수단 WALLET_PG — provisioning + saga 진행")
         void walletPg_정상동작() {
-            stubFanout(List.of(orderItem(1)));
+            stubFanout();
             given(orderRefundRepository.save(any(OrderRefund.class))).willAnswer(echo());
 
             orchestrator.start(newRequested(PaymentMethod.WALLET_PG, false));
@@ -507,20 +453,13 @@ class RefundSagaOrchestratorTest {
 
     // ====== 헬퍼 ======
 
-    private void stubFanout(List<InternalOrderInfoResponse.OrderItem> orderItems) {
+    /** Commerce fan-out 진입 stub — Refund/SagaState 미존재, Payment 존재, OrderRefund 미존재 */
+    private void stubFanout() {
         given(sagaStateRepository.findByRefundId(refundId)).willReturn(Optional.empty());
         given(refundRepository.findByRefundId(refundId)).willReturn(Optional.empty());
         given(paymentRepository.findByPaymentId(paymentId))
             .willReturn(Optional.of(mockPayment(PaymentMethod.PG)));
         given(orderRefundRepository.findByOrderId(orderId)).willReturn(Optional.empty());
-        given(commerceInternalClient.getOrderInfo(orderId))
-            .willReturn(new InternalOrderInfoResponse(
-                orderId, userId, "test", 10_000, "PAID", "2025-01-01T00:00:00", orderItems
-            ));
-    }
-
-    private InternalOrderInfoResponse.OrderItem orderItem(int quantity) {
-        return new InternalOrderInfoResponse.OrderItem(UUID.randomUUID(), quantity);
     }
 
     private static <T> org.mockito.stubbing.Answer<T> echo() {

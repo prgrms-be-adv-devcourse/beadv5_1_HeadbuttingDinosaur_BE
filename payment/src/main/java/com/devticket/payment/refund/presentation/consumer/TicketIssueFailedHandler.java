@@ -91,7 +91,8 @@ public class TicketIssueFailedHandler {
             RefundRateConstants.FULL,
             issuedTicketIds.isEmpty(),
             event.reason(),
-            Instant.now()
+            Instant.now(),
+            ledger.getTotalTickets()
         );
 
         outboxService.save(

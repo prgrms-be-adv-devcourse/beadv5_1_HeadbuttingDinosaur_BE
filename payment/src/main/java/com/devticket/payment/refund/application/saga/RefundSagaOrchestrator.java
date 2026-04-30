@@ -7,8 +7,6 @@ import com.devticket.payment.payment.application.dto.PgPaymentCancelResult;
 import com.devticket.payment.payment.domain.enums.PaymentMethod;
 import com.devticket.payment.payment.domain.model.Payment;
 import com.devticket.payment.payment.domain.repository.PaymentRepository;
-import com.devticket.payment.payment.infrastructure.client.CommerceInternalClient;
-import com.devticket.payment.payment.infrastructure.client.dto.InternalOrderInfoResponse;
 import com.devticket.payment.payment.infrastructure.external.PgPaymentClient;
 import com.devticket.payment.refund.application.saga.event.RefundOrderCancelEvent;
 import com.devticket.payment.refund.application.saga.event.RefundOrderCompensateEvent;
@@ -58,7 +56,6 @@ public class RefundSagaOrchestrator {
     private final OutboxService outboxService;
     private final PgPaymentClient pgPaymentClient;
     private final WalletService walletService;
-    private final CommerceInternalClient commerceInternalClient;
 
     /**
      * Saga 진입점 — refund.requested 수신 또는 ticket.issue-failed 수신 시 호출. SagaState 생성 + refund.order.cancel 발행.
@@ -476,7 +473,7 @@ public class RefundSagaOrchestrator {
                     event.paymentId(),
                     event.paymentMethod(),
                     payment.getAmount(),
-                    inferOrderTotalTickets(event)
+                    resolveTotalOrderTickets(event)
                 )
             ));
 
@@ -504,23 +501,12 @@ public class RefundSagaOrchestrator {
     }
 
     /**
-     * 주문의 전체 티켓 수 — 다중 이벤트 주문 부분 강제취소 시에도 OrderRefund 원장이
-     * 정확하도록 Commerce 에서 OrderItem.quantity 합계를 조회한다.
-     * Commerce 호출이 실패하거나 응답이 비면 이벤트의 ticketIds 크기로 폴백.
+     * 이벤트의 totalOrderTickets 우선 사용. 0 이하(구버전 in-flight 메시지 호환) 인 경우만
+     * ticketIds 크기로 폴백. OrderRefund.create 의 totalTickets > 0 제약을 위해 최소 1 보장.
      */
-    private int inferOrderTotalTickets(RefundRequestedEvent event) {
-        try {
-            InternalOrderInfoResponse info = commerceInternalClient.getOrderInfo(event.orderId());
-            if (info != null && info.orderItems() != null && !info.orderItems().isEmpty()) {
-                int sum = info.orderItems().stream()
-                    .mapToInt(InternalOrderInfoResponse.OrderItem::quantity)
-                    .sum();
-                if (sum > 0) {
-                    return sum;
-                }
-            }
-        } catch (Exception e) {
-            log.warn("[Saga] Commerce order info 조회 실패 — orderId={}, fallback ticketIds.size()", event.orderId(), e);
+    private int resolveTotalOrderTickets(RefundRequestedEvent event) {
+        if (event.totalOrderTickets() > 0) {
+            return event.totalOrderTickets();
         }
         int fallback = event.ticketIds() == null ? 0 : event.ticketIds().size();
         return Math.max(fallback, 1);
