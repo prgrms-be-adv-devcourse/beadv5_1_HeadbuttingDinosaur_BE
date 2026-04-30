@@ -120,4 +120,33 @@ class OrderRefundTransitionTest {
                 .hasFieldOrPropertyWithValue("errorCode", OrderErrorCode.REFUND_ROLLBACK_INVALID);
         }
     }
+
+    @Nested
+    @DisplayName("환불 전이 시 total_amount 불변")
+    class TotalAmountImmutability {
+
+        @Test
+        void requestRefund_은_total_amount_를_변경하지_않는다() {
+            Order order = orderIn(OrderStatus.PAID);
+            int before = order.getTotalAmount();
+            order.requestRefund();
+            assertThat(order.getTotalAmount()).isEqualTo(before);
+        }
+
+        @Test
+        void completeRefund_는_total_amount_를_변경하지_않는다() {
+            Order order = orderIn(OrderStatus.REFUND_PENDING);
+            int before = order.getTotalAmount();
+            order.completeRefund();
+            assertThat(order.getTotalAmount()).isEqualTo(before);
+        }
+
+        @Test
+        void rollbackRefund_는_total_amount_를_변경하지_않는다() {
+            Order order = orderIn(OrderStatus.REFUND_PENDING);
+            int before = order.getTotalAmount();
+            order.rollbackRefund();
+            assertThat(order.getTotalAmount()).isEqualTo(before);
+        }
+    }
 }

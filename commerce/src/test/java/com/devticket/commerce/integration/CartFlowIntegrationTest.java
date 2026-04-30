@@ -84,7 +84,7 @@ class CartFlowIntegrationTest {
         UUID userId = UUID.randomUUID();
         CartItemQuantityRequest request = new CartItemQuantityRequest(1);
 
-        assertThatThrownBy(() -> cartItemUseCase.updateTicket(userId, 1L, request))
+        assertThatThrownBy(() -> cartItemUseCase.updateTicket(userId, UUID.randomUUID(), request))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(CartErrorCode.ITEM_NOT_FOUND);
@@ -95,7 +95,7 @@ class CartFlowIntegrationTest {
     void deleteTicketThrowsItemNotFoundForNewUser() {
         UUID userId = UUID.randomUUID();
 
-        assertThatThrownBy(() -> cartItemUseCase.deleteTicket(userId, 1L))
+        assertThatThrownBy(() -> cartItemUseCase.deleteTicket(userId, UUID.randomUUID()))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(CartErrorCode.ITEM_NOT_FOUND);

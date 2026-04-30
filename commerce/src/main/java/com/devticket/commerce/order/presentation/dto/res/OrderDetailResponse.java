@@ -4,6 +4,7 @@ import com.devticket.commerce.common.enums.OrderStatus;
 import com.devticket.commerce.common.enums.PaymentMethod;
 import com.devticket.commerce.order.domain.model.Order;
 import com.devticket.commerce.order.domain.model.OrderItem;
+import com.devticket.commerce.order.presentation.dto.res.OrderDetailItemResponse.TicketSummary;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -22,11 +23,17 @@ public record OrderDetailResponse(
     LocalDateTime createdAt
 ) {
 
-    public static OrderDetailResponse of(Order order, List<OrderItem> orderItems, Map<UUID, String> eventTitles) {
+    public static OrderDetailResponse of(
+        Order order,
+        List<OrderItem> orderItems,
+        Map<UUID, String> eventTitles,
+        Map<UUID, List<TicketSummary>> ticketsByOrderItemId
+    ) {
         List<OrderDetailItemResponse> itemResponses = orderItems.stream()
             .map(item -> {
                 String title = eventTitles.getOrDefault(item.getEventId(), "알 수 없는 이벤트");
-                return OrderDetailItemResponse.of(item, title);
+                List<TicketSummary> tickets = ticketsByOrderItemId.getOrDefault(item.getOrderItemId(), List.of());
+                return OrderDetailItemResponse.of(item, title, tickets);
             })
             .toList();
 
@@ -40,4 +47,3 @@ public record OrderDetailResponse(
             .build();
     }
 }
-
