@@ -21,6 +21,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.batch.infrastructure.item.ItemReader;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 @Slf4j
@@ -31,6 +32,9 @@ public class MonthlySettlementReader implements ItemReader<SellerSettlementData>
 
     private final SettlementItemRepository settlementItemRepository;
     private final SettlementRepository settlementRepository;
+
+    @Value("#{jobParameters['yearMonth']}")
+    private String yearMonth;
 
     private List<Map.Entry<UUID, List<SettlementItem>>> sellerData;
     private LocalDateTime periodStart;
@@ -60,16 +64,19 @@ public class MonthlySettlementReader implements ItemReader<SellerSettlementData>
     }
 
     private void init() {
-        LocalDate periodFrom = YearMonth.now().minusMonths(2).atDay(26);
-        LocalDate periodTo = YearMonth.now().minusMonths(1).atDay(25);
+        // yearMonth(예: 2026-03) 기준으로 정산 기간 계산
+        // periodFrom = 전월 26일, periodTo = 해당월 25일
+        YearMonth ym = YearMonth.parse(yearMonth);
+        LocalDate periodFrom = ym.minusMonths(1).atDay(26);
+        LocalDate periodTo = ym.atDay(25);
         this.periodStart = periodFrom.atStartOfDay();
         this.periodEnd = periodTo.atTime(23, 59, 59);
 
         Map<UUID, List<SettlementItem>> itemsBySeller = collectItemsBySeller(periodFrom, periodTo);
         includeCarryOverSellers(itemsBySeller);
 
-        log.info("[MonthlySettlementReader] 대상 기간: {} ~ {}, 판매자: {}명",
-            periodFrom, periodTo, itemsBySeller.size());
+        log.info("[MonthlySettlementReader] yearMonth={}, 대상 기간: {} ~ {}, 판매자: {}명",
+            yearMonth, periodFrom, periodTo, itemsBySeller.size());
         this.sellerData = new ArrayList<>(itemsBySeller.entrySet());
     }
 
