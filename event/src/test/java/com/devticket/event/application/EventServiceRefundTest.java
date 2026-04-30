@@ -20,10 +20,11 @@ import com.devticket.event.domain.enums.EventCategory;
 import com.devticket.event.domain.enums.EventStatus;
 import com.devticket.event.domain.exception.EventErrorCode;
 import com.devticket.event.domain.model.Event;
+import com.devticket.event.infrastructure.client.AdminClient;
 import com.devticket.event.infrastructure.client.MemberClient;
 import com.devticket.event.infrastructure.client.OpenAiEmbeddingClient;
 import com.devticket.event.infrastructure.persistence.EventRepository;
-import com.devticket.event.presentation.dto.SellerEventUpdateRequest;
+import com.devticket.event.infrastructure.persistence.EventViewRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -36,48 +37,32 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.test.util.ReflectionTestUtils;
 
-/**
- * EventService 의 환불 Saga 관련 메서드(forceCancel, updateEvent CANCELLED Outbox) 검증.
- */
 @ExtendWith(MockitoExtension.class)
 class EventServiceRefundTest {
 
-    @Mock
-    private EventRepository eventRepository;
-
-    @Mock
-    private OutboxService outboxService;
-
-    @Mock
-    private MessageDeduplicationService deduplicationService;
-
-    @Mock
-    private MemberClient memberClient;
-
-    @Mock
-    private ElasticsearchOperations elasticsearchOperations;
-
-    @Mock
-    private ElasticsearchClient esClient;
-
-    @Mock
-    private OpenAiEmbeddingClient openAiEmbeddingClient;
-
-    @Mock
-    private ObjectMapper objectMapper;
+    @Mock private EventRepository eventRepository;
+    @Mock private OutboxService outboxService;
+    @Mock private MessageDeduplicationService deduplicationService;
+    @Mock private MemberClient memberClient;
+    @Mock private AdminClient adminClient;
+    @Mock private ElasticsearchOperations elasticsearchOperations;
+    @Mock private ElasticsearchClient esClient;
+    @Mock private OpenAiEmbeddingClient openAiEmbeddingClient;
+    @Mock private ObjectMapper objectMapper;
+    @Mock private ApplicationEventPublisher eventPublisher;
+    @Mock private EventViewRepository eventViewRepository;
 
     @InjectMocks
     private EventService eventService;
 
     private UUID eventId;
     private UUID sellerId;
-    private Event event;
     private UUID adminId;
-
-
+    private Event event;
 
     @BeforeEach
     void setUp() {
@@ -101,7 +86,7 @@ class EventServiceRefundTest {
         @Test
         @DisplayName("어드민이 요청하면 FORCE_CANCELLED 로 전이하고 event.force-cancelled Outbox 를 발행한다")
         void forceCancel_admin_publishesForceCancel() {
-            given(eventRepository.findWithDetailsByEventId(eventId)).willReturn(Optional.of(event));
+            given(eventRepository.findByEventIdWithLock(eventId)).willReturn(Optional.of(event));
 
             eventService.forceCancel(adminId, "ADMIN", eventId, "policy violation");
 
@@ -122,7 +107,7 @@ class EventServiceRefundTest {
         @Test
         @DisplayName("존재하지 않는 eventId 면 EVENT_NOT_FOUND 예외를 던지고 Outbox 발행하지 않는다")
         void forceCancel_notFound() {
-            given(eventRepository.findWithDetailsByEventId(eventId)).willReturn(Optional.empty());
+            given(eventRepository.findByEventIdWithLock(eventId)).willReturn(Optional.empty());
 
             assertThatThrownBy(() -> eventService.forceCancel(adminId, "ADMIN", eventId, "reason"))
                 .isInstanceOf(BusinessException.class)
@@ -136,7 +121,7 @@ class EventServiceRefundTest {
         @DisplayName("이미 CANCELLED 인 이벤트는 CANNOT_CHANGE_STATUS 로 거절된다")
         void forceCancel_alreadyCancelled() {
             ReflectionTestUtils.setField(event, "status", EventStatus.CANCELLED);
-            given(eventRepository.findWithDetailsByEventId(eventId)).willReturn(Optional.of(event));
+            given(eventRepository.findByEventIdWithLock(eventId)).willReturn(Optional.of(event));
 
             assertThatThrownBy(() -> eventService.forceCancel(adminId, "ADMIN", eventId, "reason"))
                 .isInstanceOf(BusinessException.class)
@@ -150,7 +135,7 @@ class EventServiceRefundTest {
         @DisplayName("이미 FORCE_CANCELLED 인 이벤트도 CANNOT_CHANGE_STATUS 로 거절된다")
         void forceCancel_alreadyForceCancelled() {
             ReflectionTestUtils.setField(event, "status", EventStatus.FORCE_CANCELLED);
-            given(eventRepository.findWithDetailsByEventId(eventId)).willReturn(Optional.of(event));
+            given(eventRepository.findByEventIdWithLock(eventId)).willReturn(Optional.of(event));
 
             assertThatThrownBy(() -> eventService.forceCancel(adminId, "ADMIN", eventId, "reason"))
                 .isInstanceOf(BusinessException.class);
@@ -161,7 +146,7 @@ class EventServiceRefundTest {
         @Test
         @DisplayName("판매자가 본인 이벤트를 취소하면 CANCELLED 로 전이하고 event.sale-stopped Outbox 를 발행한다")
         void forceCancel_seller_publishesSaleStopped() {
-            given(eventRepository.findWithDetailsByEventId(eventId)).willReturn(Optional.of(event));
+            given(eventRepository.findByEventIdWithLock(eventId)).willReturn(Optional.of(event));
 
             eventService.forceCancel(sellerId, "SELLER", eventId, null);
 
@@ -181,7 +166,7 @@ class EventServiceRefundTest {
         @Test
         @DisplayName("판매자가 타인 이벤트를 취소하면 UNAUTHORIZED_SELLER 예외가 발생한다")
         void forceCancel_seller_unauthorized() {
-            given(eventRepository.findWithDetailsByEventId(eventId)).willReturn(Optional.of(event));
+            given(eventRepository.findByEventIdWithLock(eventId)).willReturn(Optional.of(event));
 
             assertThatThrownBy(() ->
                 eventService.forceCancel(UUID.randomUUID(), "SELLER", eventId, null))
@@ -196,7 +181,7 @@ class EventServiceRefundTest {
         @DisplayName("판매자가 취소 불가 상태 이벤트를 취소하면 CANNOT_CHANGE_STATUS 예외가 발생한다")
         void forceCancel_seller_cannotCancel() {
             ReflectionTestUtils.setField(event, "status", EventStatus.FORCE_CANCELLED);
-            given(eventRepository.findWithDetailsByEventId(eventId)).willReturn(Optional.of(event));
+            given(eventRepository.findByEventIdWithLock(eventId)).willReturn(Optional.of(event));
 
             assertThatThrownBy(() ->
                 eventService.forceCancel(sellerId, "SELLER", eventId, null))
@@ -207,5 +192,4 @@ class EventServiceRefundTest {
             verify(outboxService, never()).save(any(), any(), any(), any(), any());
         }
     }
-
 }
