@@ -22,9 +22,10 @@ public record EventListContentResponse(
     LocalDateTime saleEndAt,
     Integer totalQuantity,
     Integer remainingQuantity,
-    String category
+    String category,
+    Long viewCount
 ) {
-    public static EventListContentResponse from(Event event) {
+    public static EventListContentResponse from(Event event, Long viewCount) {
         String thumbnailUrl = event.getEventImages().stream()
             .min(Comparator.comparingInt(EventImage::getSortOrder))
             .map(EventImage::getImageUrl)
@@ -44,7 +45,8 @@ public record EventListContentResponse(
             event.getSaleEndAt(),
             event.getTotalQuantity(),
             event.getRemainingQuantity(),
-            event.getCategory().name()
+            event.getCategory().name(),
+            viewCount
         );
     }
 
