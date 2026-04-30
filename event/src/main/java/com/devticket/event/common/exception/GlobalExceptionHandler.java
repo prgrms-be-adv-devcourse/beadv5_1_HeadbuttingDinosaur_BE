@@ -1,6 +1,7 @@
 package com.devticket.event.common.exception;
 
 import java.io.IOException;
+import java.util.Locale;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.catalina.connector.ClientAbortException;
 import org.springframework.http.HttpStatus;
@@ -91,9 +92,14 @@ public class GlobalExceptionHandler {
             if (t instanceof ClientAbortException) {
                 return true;
             }
-            String msg = t.getMessage();
-            if (t instanceof IOException && msg != null && msg.contains("Broken pipe")) {
-                return true;
+            if (t instanceof IOException) {
+                String msg = t.getMessage();
+                if (msg != null) {
+                    String lower = msg.toLowerCase(Locale.ROOT);
+                    if (lower.contains("broken pipe") || lower.contains("connection reset")) {
+                        return true;
+                    }
+                }
             }
             t = t.getCause();
         }
