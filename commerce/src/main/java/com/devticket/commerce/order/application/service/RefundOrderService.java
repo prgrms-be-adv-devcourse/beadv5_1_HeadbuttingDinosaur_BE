@@ -155,6 +155,20 @@ public class RefundOrderService {
             return;
         }
 
+        // 부분환불 후 PAID 복귀 상태에서 동일 환불의 재수신(새 messageId 로 재발행/수동 재처리) 멱등 처리.
+        // CANCELLED 티켓이 0개 = 직전 처리에서 모두 REFUNDED 로 전이됨.
+        // PAID + CANCELLED 존재 = saga 순서 이상 → 아래 throw 분기로 떨어뜨려 DLT 운영 개입 유도.
+        if (order.getStatus() == OrderStatus.PAID) {
+            boolean hasPendingCancellations = !ticketRepository
+                .findAllByOrderIdAndStatus(order.getId(), TicketStatus.CANCELLED).isEmpty();
+            if (!hasPendingCancellations) {
+                log.info("[refund.completed] 멱등 스킵 — 부분환불 후 PAID + 미처리 CANCELLED 없음. orderId={}",
+                    event.orderId());
+                deduplicationService.markProcessed(messageId, topic);
+                return;
+            }
+        }
+
         if (!order.canTransitionTo(OrderStatus.REFUNDED)) {
             if (order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.FAILED) {
                 log.warn("[refund.completed] 정책적 스킵 — orderId={}, 현재상태={}",
@@ -167,14 +181,24 @@ public class RefundOrderService {
                 order.getStatus(), event.orderId()));
         }
 
-        order.completeRefund();
-        order.adjustAmountForRefund(event.refundAmount());
-
-        // CANCELLED 티켓 일괄 REFUNDED 전이 — 전액 환불 경로 가정 (REFUND_PENDING 도달 = 전액 환불)
+        // CANCELLED 티켓 → REFUNDED 전이
         List<Ticket> cancelledTickets = ticketRepository
             .findAllByOrderIdAndStatus(order.getId(), TicketStatus.CANCELLED);
         for (Ticket ticket : cancelledTickets) {
             ticket.refundTicket();
+        }
+
+        // total_amount 는 주문 당시 결제액 스냅샷으로 불변 — 환불 진행도는 Ticket.status 가 SSoT.
+        // 잔여 ISSUED 티켓이 있으면 부분환불 — PAID로 복귀해 다음 티켓 환불 허용
+        // 모두 환불됐으면 REFUNDED로 확정
+        List<Ticket> remainingTickets = ticketRepository
+            .findAllByOrderIdAndStatus(order.getId(), TicketStatus.ISSUED);
+        if (remainingTickets.isEmpty()) {
+            order.completeRefund();
+        } else {
+            order.rollbackRefund();
+            log.info("[refund.completed] 부분환불 완료, 잔여 티켓={}매 — orderId={}",
+                remainingTickets.size(), event.orderId());
         }
 
         deduplicationService.markProcessed(messageId, topic);
