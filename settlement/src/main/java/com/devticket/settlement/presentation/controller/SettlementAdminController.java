@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/admin/settlements")
 @RequiredArgsConstructor
-public class InternalSettlementController {
+public class SettlementAdminController {
 
     private final SettlementInternalService settlementInternalService;
 
