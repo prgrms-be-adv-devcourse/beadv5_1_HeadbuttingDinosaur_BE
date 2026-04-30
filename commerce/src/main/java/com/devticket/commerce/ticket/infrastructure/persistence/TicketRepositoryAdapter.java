@@ -45,8 +45,8 @@ public class TicketRepositoryAdapter implements TicketRepository {
     }
 
     @Override
-    public Page<Ticket> findAllByEventId(UUID eventId, SellerEventParticipantListRequest request) {
-        return ticketJpaRepository.findAllByEventId(eventId, request.toPageable());
+    public Page<Ticket> findAllByEventIdAndStatus(UUID eventId, TicketStatus status, SellerEventParticipantListRequest request) {
+        return ticketJpaRepository.findAllByEventIdAndStatus(eventId, status, request.toPageable());
     }
 
     @Override
@@ -67,5 +67,10 @@ public class TicketRepositoryAdapter implements TicketRepository {
     @Override
     public List<Ticket> findAllByOrderIdAndStatus(Long orderId, TicketStatus status) {
         return ticketJpaRepository.findAllByOrderIdAndStatus(orderId, status);
+    }
+
+    @Override
+    public int countByUserIdAndEventIdAndStatus(UUID userId, UUID eventId, TicketStatus status) {
+        return ticketJpaRepository.countByUserIdAndEventIdAndStatus(userId, eventId, status);
     }
 }

@@ -21,7 +21,7 @@ public interface TicketRepository {
 
     Optional<Ticket> findByTicketId(UUID ticketId);
 
-    Page<Ticket> findAllByEventId(UUID eventId, SellerEventParticipantListRequest request);
+    Page<Ticket> findAllByEventIdAndStatus(UUID eventId, TicketStatus status, SellerEventParticipantListRequest request);
 
     List<Ticket> findAllByEventIdIn(List<UUID> eventIds);
 
@@ -30,4 +30,6 @@ public interface TicketRepository {
     List<Ticket> findAllByOrderId(Long orderId);
 
     List<Ticket> findAllByOrderIdAndStatus(Long orderId, TicketStatus status);
+
+    int countByUserIdAndEventIdAndStatus(UUID userId, UUID eventId, TicketStatus status);
 }
