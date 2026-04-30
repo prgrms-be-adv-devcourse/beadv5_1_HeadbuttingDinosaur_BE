@@ -50,6 +50,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.elasticsearch.client.elc.NativeQuery;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.SearchHits;
@@ -484,7 +485,7 @@ public class EventService {
             doc.put("techStacks", techStackNames);
             doc.put("status", event.getStatus().name());
             doc.put("sellerId", event.getSellerId().toString());
-            // mapping의 date_hour_minute_second 형식에 맞춤 (나노초 제외)
+            doc.put("saleStartAt", event.getSaleStartAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")));
             doc.put("indexedAt", LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")));
 
             float[] vector = openAiEmbeddingClient.embed(embeddingText);
@@ -573,6 +574,10 @@ public class EventService {
         queryBuilder
             .withFilter(Query.of(q -> q.bool(filterQuery.build())))
             .withPageable(pageable);
+
+        if (request.keyword() == null || request.keyword().isBlank()) {
+            queryBuilder.withSort(Sort.by(Sort.Direction.DESC, "saleStartAt"));
+        }
 
         return queryBuilder.build();
     }
