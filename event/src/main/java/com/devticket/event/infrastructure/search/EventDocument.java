@@ -51,11 +51,14 @@ public class EventDocument {
     private List<Float> embedding;
 
     @Field(type = FieldType.Date, format = {}, pattern = "yyyy-MM-dd'T'HH:mm:ss[.SSSSSS]")
+    private LocalDateTime saleStartAt;
+
+    @Field(type = FieldType.Date, format = {}, pattern = "yyyy-MM-dd'T'HH:mm:ss[.SSSSSS]")
     private LocalDateTime indexedAt;
 
     @Builder
     private EventDocument(String id, String eventId, String title, String category, List<String> techStacks,
-        String status, String sellerId, LocalDateTime indexedAt) {
+        String status, String sellerId, LocalDateTime saleStartAt, LocalDateTime indexedAt) {
         this.id = id;
         this.eventId = eventId;
         this.title = title;
@@ -63,6 +66,7 @@ public class EventDocument {
         this.techStacks = techStacks;
         this.status = status;
         this.sellerId = sellerId;
+        this.saleStartAt = saleStartAt;
         this.indexedAt = indexedAt;
     }
 
@@ -79,6 +83,7 @@ public class EventDocument {
             .techStacks(techStackNames)
             .status(event.getStatus().name())
             .sellerId(event.getSellerId().toString())
+            .saleStartAt(event.getSaleStartAt())
             .indexedAt(LocalDateTime.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS))
             .build();
     }

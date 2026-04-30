@@ -12,6 +12,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+
 public interface SettlementJpaRepository extends JpaRepository<Settlement, Long> {
 
     List<Settlement> findBySellerId(UUID sellerId);
@@ -46,5 +47,17 @@ public interface SettlementJpaRepository extends JpaRepository<Settlement, Long>
     List<Settlement> findByCarriedToSettlementId(UUID carriedToSettlementId);
 
     List<Settlement> findBySellerIdAndStatusAndCarriedToSettlementIdIsNull(UUID sellerId, SettlementStatus status);
+
+    @Query("""
+    SELECT SUM(s.totalFeeAmount)
+    FROM Settlement s
+    WHERE s.periodStartAt >= :from AND s.periodStartAt <= :to
+      AND s.status = :status
+    """)
+    Long sumFeeAmountByPeriodStartAtBetweenAndStatus(
+        @Param("from") LocalDateTime from,
+        @Param("to") LocalDateTime to,
+        @Param("status") SettlementStatus status
+    );
 
 }

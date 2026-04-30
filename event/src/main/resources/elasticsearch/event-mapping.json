@@ -24,6 +24,9 @@
       "index": true,
       "similarity": "cosine"
     },
+    "saleStartAt": {
+      "type": "date"
+    },
     "indexedAt": {
       "type": "date"
     }
