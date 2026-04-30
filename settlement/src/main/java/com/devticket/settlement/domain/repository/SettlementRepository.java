@@ -34,4 +34,6 @@ public interface SettlementRepository {
     List<Settlement> findByCarriedToSettlementId(UUID settlementId);
 
     List<Settlement> findBySellerIdAndStatusAndCarriedToSettlementIdIsNull(UUID sellerId, SettlementStatus status);
+
+    long sumFeeAmountByPeriodStartAt(LocalDateTime from, LocalDateTime to);
 }
