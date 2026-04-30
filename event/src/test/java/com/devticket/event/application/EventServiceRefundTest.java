@@ -75,11 +75,15 @@ class EventServiceRefundTest {
     private UUID eventId;
     private UUID sellerId;
     private Event event;
+    private UUID adminId;
+
+
 
     @BeforeEach
     void setUp() {
         eventId = UUID.randomUUID();
         sellerId = UUID.randomUUID();
+        adminId = UUID.randomUUID();
         event = Event.create(
             sellerId, "테스트 이벤트", "설명", "강남",
             LocalDateTime.now().plusDays(15),
@@ -95,11 +99,11 @@ class EventServiceRefundTest {
     class ForceCancel {
 
         @Test
-        @DisplayName("이벤트를 FORCE_CANCELLED 로 전이하고 event.force-cancelled Outbox 를 발행한다")
-        void forceCancel_publishesEvent() {
-            given(eventRepository.findByEventIdWithLock(eventId)).willReturn(Optional.of(event));
+        @DisplayName("어드민이 요청하면 FORCE_CANCELLED 로 전이하고 event.force-cancelled Outbox 를 발행한다")
+        void forceCancel_admin_publishesForceCancel() {
+            given(eventRepository.findWithDetailsByEventId(eventId)).willReturn(Optional.of(event));
 
-            eventService.forceCancel(eventId, "policy violation");
+            eventService.forceCancel(adminId, "ADMIN", eventId, "policy violation");
 
             assertThat(event.getStatus()).isEqualTo(EventStatus.FORCE_CANCELLED);
             verify(outboxService, times(1)).save(
@@ -118,9 +122,9 @@ class EventServiceRefundTest {
         @Test
         @DisplayName("존재하지 않는 eventId 면 EVENT_NOT_FOUND 예외를 던지고 Outbox 발행하지 않는다")
         void forceCancel_notFound() {
-            given(eventRepository.findByEventIdWithLock(eventId)).willReturn(Optional.empty());
+            given(eventRepository.findWithDetailsByEventId(eventId)).willReturn(Optional.empty());
 
-            assertThatThrownBy(() -> eventService.forceCancel(eventId, "reason"))
+            assertThatThrownBy(() -> eventService.forceCancel(adminId, "ADMIN", eventId, "reason"))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(EventErrorCode.EVENT_NOT_FOUND);
@@ -132,9 +136,9 @@ class EventServiceRefundTest {
         @DisplayName("이미 CANCELLED 인 이벤트는 CANNOT_CHANGE_STATUS 로 거절된다")
         void forceCancel_alreadyCancelled() {
             ReflectionTestUtils.setField(event, "status", EventStatus.CANCELLED);
-            given(eventRepository.findByEventIdWithLock(eventId)).willReturn(Optional.of(event));
+            given(eventRepository.findWithDetailsByEventId(eventId)).willReturn(Optional.of(event));
 
-            assertThatThrownBy(() -> eventService.forceCancel(eventId, "reason"))
+            assertThatThrownBy(() -> eventService.forceCancel(adminId, "ADMIN", eventId, "reason"))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(EventErrorCode.CANNOT_CHANGE_STATUS);
@@ -146,30 +150,20 @@ class EventServiceRefundTest {
         @DisplayName("이미 FORCE_CANCELLED 인 이벤트도 CANNOT_CHANGE_STATUS 로 거절된다")
         void forceCancel_alreadyForceCancelled() {
             ReflectionTestUtils.setField(event, "status", EventStatus.FORCE_CANCELLED);
-            given(eventRepository.findByEventIdWithLock(eventId)).willReturn(Optional.of(event));
+            given(eventRepository.findWithDetailsByEventId(eventId)).willReturn(Optional.of(event));
 
-            assertThatThrownBy(() -> eventService.forceCancel(eventId, "reason"))
+            assertThatThrownBy(() -> eventService.forceCancel(adminId, "ADMIN", eventId, "reason"))
                 .isInstanceOf(BusinessException.class);
 
             verify(outboxService, never()).save(any(), any(), any(), any(), any());
         }
-    }
-
-    @Nested
-    @DisplayName("updateEvent — 판매자 취소 분기")
-    class SellerCancel {
 
         @Test
-        @DisplayName("판매자가 CANCELLED 로 전이 시 event.sale-stopped Outbox 를 발행한다")
-        void sellerCancel_publishesSaleStopped() {
+        @DisplayName("판매자가 본인 이벤트를 취소하면 CANCELLED 로 전이하고 event.sale-stopped Outbox 를 발행한다")
+        void forceCancel_seller_publishesSaleStopped() {
             given(eventRepository.findWithDetailsByEventId(eventId)).willReturn(Optional.of(event));
-            SellerEventUpdateRequest request = new SellerEventUpdateRequest(
-                null, null, null, null, null, null,
-                null, null, null, null, null, null,
-                EventStatus.CANCELLED
-            );
 
-            eventService.updateEvent(sellerId, eventId, request);
+            eventService.forceCancel(sellerId, "SELLER", eventId, null);
 
             assertThat(event.getStatus()).isEqualTo(EventStatus.CANCELLED);
             verify(outboxService, times(1)).save(
@@ -179,8 +173,39 @@ class EventServiceRefundTest {
                 eq(KafkaTopics.EVENT_SALE_STOPPED),
                 argThat(payload -> payload instanceof EventSaleStoppedEvent e
                     && e.eventId().equals(eventId)
-                    && e.sellerId().equals(sellerId))
+                    && e.sellerId().equals(sellerId)
+                    && e.occurredAt() != null)
             );
         }
+
+        @Test
+        @DisplayName("판매자가 타인 이벤트를 취소하면 UNAUTHORIZED_SELLER 예외가 발생한다")
+        void forceCancel_seller_unauthorized() {
+            given(eventRepository.findWithDetailsByEventId(eventId)).willReturn(Optional.of(event));
+
+            assertThatThrownBy(() ->
+                eventService.forceCancel(UUID.randomUUID(), "SELLER", eventId, null))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(EventErrorCode.UNAUTHORIZED_SELLER);
+
+            verify(outboxService, never()).save(any(), any(), any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("판매자가 취소 불가 상태 이벤트를 취소하면 CANNOT_CHANGE_STATUS 예외가 발생한다")
+        void forceCancel_seller_cannotCancel() {
+            ReflectionTestUtils.setField(event, "status", EventStatus.FORCE_CANCELLED);
+            given(eventRepository.findWithDetailsByEventId(eventId)).willReturn(Optional.of(event));
+
+            assertThatThrownBy(() ->
+                eventService.forceCancel(sellerId, "SELLER", eventId, null))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(EventErrorCode.CANNOT_CHANGE_STATUS);
+
+            verify(outboxService, never()).save(any(), any(), any(), any(), any());
+        }
     }
+
 }
