@@ -160,6 +160,9 @@ class RefundFanoutServiceTest {
             .containsExactlyInAnyOrder(c1.getTicketId(), c2.getTicketId());
         // 다른 이벤트 티켓이 남아있으므로 wholeOrder = false
         org.assertj.core.api.Assertions.assertThat(published.wholeOrder()).isFalse();
+        // 주문 전체 티켓 수 — Payment 의 OrderRefund 원장 totalTickets 계산용
+        // cancelledItem.quantity(2) + otherItem.quantity(3) = 5
+        org.assertj.core.api.Assertions.assertThat(published.totalOrderTickets()).isEqualTo(5);
     }
 
     @Test
@@ -267,6 +270,8 @@ class RefundFanoutServiceTest {
         org.assertj.core.api.Assertions.assertThat(published.refundAmount()).isEqualTo(20_000);
         org.assertj.core.api.Assertions.assertThat(published.ticketIds()).hasSize(2);
         org.assertj.core.api.Assertions.assertThat(published.refundRate()).isEqualTo(100);
+        // 단일 이벤트 단일 OrderItem(quantity=2) — totalOrderTickets = 2
+        org.assertj.core.api.Assertions.assertThat(published.totalOrderTickets()).isEqualTo(2);
     }
 
     @Test
