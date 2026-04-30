@@ -13,7 +13,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import com.devticket.event.common.exception.BusinessException;
 import com.devticket.event.common.outbox.OutboxService;
 import com.devticket.event.domain.enums.EventCategory;
@@ -24,12 +23,11 @@ import com.devticket.event.domain.model.EventView;
 import com.devticket.event.fixture.EventTestFixture;
 import com.devticket.event.infrastructure.client.AdminClient;
 import com.devticket.event.infrastructure.client.MemberClient;
-import com.devticket.event.infrastructure.client.OpenAiEmbeddingClient;
 import com.devticket.event.infrastructure.client.dto.TechStackItem;
 import com.devticket.event.infrastructure.persistence.EventRepository;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.devticket.event.infrastructure.persistence.EventViewRepository;
 import com.devticket.event.infrastructure.search.EventDocument;
+import com.devticket.event.infrastructure.client.OpenAiEmbeddingClient;
 import com.devticket.event.presentation.dto.EventDetailResponse;
 import com.devticket.event.presentation.dto.EventListRequest;
 import com.devticket.event.presentation.dto.EventListResponse;
@@ -74,9 +72,8 @@ class EventServiceTest {
     @Mock
     private ElasticsearchOperations elasticsearchOperations;
 
-
     @Mock
-    private ElasticsearchClient esClient;
+    private ElasticsearchSyncService elasticsearchSyncService;
 
     @Mock
     private OpenAiEmbeddingClient openAiEmbeddingClient;
@@ -86,9 +83,6 @@ class EventServiceTest {
 
     @Mock
     private MessageDeduplicationService deduplicationService;
-
-    @Mock
-    private ObjectMapper objectMapper;
 
     @Mock
     private EventViewRepository eventViewRepository;
