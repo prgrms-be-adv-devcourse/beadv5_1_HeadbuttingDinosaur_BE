@@ -9,6 +9,7 @@ server:
 spring:
   cloud:
     gateway:
+      server:
         webflux:
           routes:
             - id: member-service
