@@ -46,7 +46,7 @@ class RestClientEventInternalClientImplTest {
     class ForceCancel {
 
         @Test
-        @DisplayName("PATCH 메서드와 reason 본문, X-User-Id 헤더를 포함해 event-svc 의 internal 강제취소 엔드포인트를 호출한다")
+        @DisplayName("PATCH 메서드와 reason 본문, X-User-Id·X-User-Role 헤더를 포함해 event-svc 의 internal 강제취소 엔드포인트를 호출한다")
         void shouldCallEventInternalForceCancelWithPatchAndReasonBody() {
             UUID adminId = UUID.fromString("22222222-2222-2222-2222-222222222222");
             UUID eventId = UUID.fromString("11111111-1111-1111-1111-111111111111");
@@ -54,6 +54,7 @@ class RestClientEventInternalClientImplTest {
             server.expect(requestTo(EVENT_SERVER_URL + "/internal/events/" + eventId + "/force-cancel"))
                 .andExpect(method(HttpMethod.PATCH))
                 .andExpect(header("X-User-Id", adminId.toString()))
+                .andExpect(header("X-User-Role", "ADMIN"))
                 .andExpect(header("Content-Type", MediaType.APPLICATION_JSON_VALUE))
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.reason").value("관리자 강제 취소"))
