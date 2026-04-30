@@ -204,7 +204,7 @@ public class TicketService implements TicketUsecase {
             throw new BusinessException(TicketErrorCode.UNAUTHORIZED_EVENT_ACCESS);
         }
 
-        Page<Ticket> ticketPage = ticketRepository.findAllByEventId(eventId, request);
+        Page<Ticket> ticketPage = ticketRepository.findAllByEventIdAndStatus(eventId, TicketStatus.ISSUED, request);
 
         // 유저별 티켓 그룹핑
         Map<UUID, List<Ticket>> ticketsByUser = ticketPage.getContent().stream()
