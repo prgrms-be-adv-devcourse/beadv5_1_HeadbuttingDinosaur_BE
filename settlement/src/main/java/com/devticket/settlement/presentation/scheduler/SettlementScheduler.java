@@ -17,7 +17,8 @@ public class SettlementScheduler {
     private final SettlementService settlementService;
     private final SettlementInternalService settlementInternalService;
 
-    @Scheduled(cron = "1 0 0 * * *")
+    // 매일 10:00:00 실행 (기존 00:00:01에서 변경)
+    @Scheduled(cron = "0 0 10 * * *")
     public void collectDailySettlementTargets() {
         LocalDate yesterday = LocalDate.now().minusDays(1);
         log.info("[SettlementScheduler] 정산대상 데이터 수집 시작 - targetDate: {}", yesterday);
@@ -30,7 +31,8 @@ public class SettlementScheduler {
         }
     }
 
-    @Scheduled(cron = "0 10 0 1 * *")
+    // 매월 1일 10:10:00 실행 (기존 00:10:00에서 변경)
+    @Scheduled(cron = "0 10 10 1 * *")
     public void createMonthlySettlement() {
         log.info("[SettlementScheduler] 월 정산 생성 시작");
         try {
