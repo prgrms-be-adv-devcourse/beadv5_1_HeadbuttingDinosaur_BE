@@ -155,6 +155,20 @@ public class RefundOrderService {
             return;
         }
 
+        // 부분환불 후 PAID 복귀 상태에서 동일 환불의 재수신(새 messageId 로 재발행/수동 재처리) 멱등 처리.
+        // CANCELLED 티켓이 0개 = 직전 처리에서 모두 REFUNDED 로 전이됨.
+        // PAID + CANCELLED 존재 = saga 순서 이상 → 아래 throw 분기로 떨어뜨려 DLT 운영 개입 유도.
+        if (order.getStatus() == OrderStatus.PAID) {
+            boolean hasPendingCancellations = !ticketRepository
+                .findAllByOrderIdAndStatus(order.getId(), TicketStatus.CANCELLED).isEmpty();
+            if (!hasPendingCancellations) {
+                log.info("[refund.completed] 멱등 스킵 — 부분환불 후 PAID + 미처리 CANCELLED 없음. orderId={}",
+                    event.orderId());
+                deduplicationService.markProcessed(messageId, topic);
+                return;
+            }
+        }
+
         if (!order.canTransitionTo(OrderStatus.REFUNDED)) {
             if (order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.FAILED) {
                 log.warn("[refund.completed] 정책적 스킵 — orderId={}, 현재상태={}",

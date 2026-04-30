@@ -153,6 +153,30 @@ class RefundFlowIntegrationTest {
         assertThat(finalState.getTotalAmount()).isEqualTo(30_000);
     }
 
+    @Test
+    @DisplayName("IT-Refund-D: 부분환불 후 PAID 복귀 상태에서 동일 환불의 재수신(새 messageId)은 멱등 스킵")
+    void replayedRefundCompletedAfterPartialRefundIsIdempotent() throws Exception {
+        Fixture f = persistFixture(20_000, /*ticketCount=*/ 2);
+
+        // 1차 — t1 환불, t2 잔여 → PAID 복귀
+        transitionTicketToCancelled(f.tickets[0]);
+        sendRefundCompleted(f.orderUuid, 10_000);
+        assertThat(orderRepository.findByOrderId(f.orderUuid).orElseThrow().getStatus())
+            .isEqualTo(OrderStatus.PAID);
+
+        // 2차 — 동일 환불 재전송. 새 messageId 로 들어오지만 처리할 CANCELLED 0개 → 멱등 스킵.
+        // throw 가 나면 IllegalStateException 으로 테스트 실패 → 회귀 검출.
+        sendRefundCompleted(f.orderUuid, 10_000);
+
+        Order after = orderRepository.findByOrderId(f.orderUuid).orElseThrow();
+        assertThat(after.getStatus()).isEqualTo(OrderStatus.PAID);
+        assertThat(after.getTotalAmount()).isEqualTo(20_000);
+        assertThat(ticketRepository.findById(f.tickets[0]).orElseThrow().getStatus())
+            .isEqualTo(TicketStatus.REFUNDED);
+        assertThat(ticketRepository.findById(f.tickets[1]).orElseThrow().getStatus())
+            .isEqualTo(TicketStatus.ISSUED);
+    }
+
     // ---- 픽스처 / 헬퍼 ------------------------------------------------------
 
     private record Fixture(UUID orderUuid, Long[] tickets) {}

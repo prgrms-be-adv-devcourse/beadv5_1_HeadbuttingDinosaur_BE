@@ -382,6 +382,67 @@ class RefundOrderServiceTest {
         }
 
         @Test
+        void 부분환불_PAID_복귀_후_같은_환불의_재수신은_멱등_스킵() {
+            UUID firstMsg = UUID.randomUUID();
+            UUID replayMsg = UUID.randomUUID();
+            Order order = orderIn(OrderStatus.REFUND_PENDING);
+            int before = order.getTotalAmount();
+
+            Ticket cancelled = Ticket.create(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
+            setTicketStatus(cancelled, TicketStatus.CANCELLED);
+            Ticket remaining = Ticket.create(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
+
+            RefundCompletedEvent event = new RefundCompletedEvent(
+                UUID.randomUUID(), order.getOrderId(), UUID.randomUUID(), UUID.randomUUID(),
+                PaymentMethod.PG, 10_000, 100, Instant.now());
+
+            given(deduplicationService.isDuplicate(any())).willReturn(false);
+            given(orderRepository.findByOrderId(order.getOrderId())).willReturn(Optional.of(order));
+
+            // 1차 — CANCELLED 1장 환불 + 잔여 ISSUED 1장 → PAID 복귀
+            given(ticketRepository.findAllByOrderIdAndStatus(order.getId(), TicketStatus.CANCELLED))
+                .willReturn(List.of(cancelled));
+            given(ticketRepository.findAllByOrderIdAndStatus(order.getId(), TicketStatus.ISSUED))
+                .willReturn(List.of(remaining));
+            refundOrderService.processRefundCompleted(firstMsg, KafkaTopics.REFUND_COMPLETED, toJson(event));
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
+
+            // 2차 — 동일 환불을 새 messageId 로 재전송 (수동 재처리/재발행 시나리오).
+            // 처리할 CANCELLED 0개 → 멱등 스킵 (throw 발생하면 회귀)
+            given(ticketRepository.findAllByOrderIdAndStatus(order.getId(), TicketStatus.CANCELLED))
+                .willReturn(List.of());
+            refundOrderService.processRefundCompleted(replayMsg, KafkaTopics.REFUND_COMPLETED, toJson(event));
+
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
+            assertThat(order.getTotalAmount()).isEqualTo(before);
+            then(deduplicationService).should().markProcessed(replayMsg, KafkaTopics.REFUND_COMPLETED);
+        }
+
+        @Test
+        void PAID_상태에서_CANCELLED_티켓이_있으면_saga_이상으로_throw() {
+            UUID messageId = UUID.randomUUID();
+            Order order = orderIn(OrderStatus.PAID);
+
+            Ticket cancelled = Ticket.create(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
+            setTicketStatus(cancelled, TicketStatus.CANCELLED);
+
+            RefundCompletedEvent event = new RefundCompletedEvent(
+                UUID.randomUUID(), order.getOrderId(), UUID.randomUUID(), UUID.randomUUID(),
+                PaymentMethod.PG, 10_000, 100, Instant.now());
+
+            given(deduplicationService.isDuplicate(messageId)).willReturn(false);
+            given(orderRepository.findByOrderId(order.getOrderId())).willReturn(Optional.of(order));
+            given(ticketRepository.findAllByOrderIdAndStatus(order.getId(), TicketStatus.CANCELLED))
+                .willReturn(List.of(cancelled));
+
+            assertThatThrownBy(() -> refundOrderService.processRefundCompleted(
+                messageId, KafkaTopics.REFUND_COMPLETED, toJson(event)))
+                .isInstanceOf(IllegalStateException.class);
+
+            then(deduplicationService).should(never()).markProcessed(any(), any());
+        }
+
+        @Test
         void 이미_REFUNDED_면_멱등_스킵() {
             UUID messageId = UUID.randomUUID();
             Order order = orderIn(OrderStatus.REFUNDED);
