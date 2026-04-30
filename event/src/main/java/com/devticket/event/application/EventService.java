@@ -413,22 +413,42 @@ public class EventService {
      * Commerce 가 이를 수신해 해당 이벤트의 PAID 주문에 대해 환불 fan-out 을 수행한다.
      */
     @Transactional
-    public void forceCancel(UUID eventId, String reason) {
+    public void forceCancel(UUID userId, String userRole, UUID eventId, String reason) {
         Event event = eventRepository.findByEventIdWithLock(eventId)
             .orElseThrow(() -> new BusinessException(EventErrorCode.EVENT_NOT_FOUND));
 
-        event.forceCancel();
+        if("ADMIN".equals(userRole)){
+            event.forceCancel();
+            outboxService.save(
+                event.getEventId().toString(),
+                event.getEventId().toString(),
+                "EVENT_FORCE_CANCELLED",
+                KafkaTopics.EVENT_FORCE_CANCELLED,
+                new EventForceCancelledEvent(event.getEventId(), event.getSellerId(), reason, Instant.now())
+            );
+        }
+        else {
+            if (!event.getSellerId().equals(userId)) {
+                throw new BusinessException(EventErrorCode.UNAUTHORIZED_SELLER);
+            }
+            if (!event.canBeCancelled()) {
+                throw new BusinessException(EventErrorCode.CANNOT_CHANGE_STATUS);
+            }
 
-        outboxService.save(
-            event.getEventId().toString(),
-            event.getEventId().toString(),
-            "EVENT_FORCE_CANCELLED",
-            KafkaTopics.EVENT_FORCE_CANCELLED,
-            new EventForceCancelledEvent(event.getEventId(), event.getSellerId(), reason, Instant.now())
-        );
+
+        event.cancel();
+            outboxService.save(
+                event.getEventId().toString(),
+                event.getEventId().toString(),
+                "EVENT_SALE_STOPPED",
+                KafkaTopics.EVENT_SALE_STOPPED,
+                new EventSaleStoppedEvent(event.getEventId(), event.getSellerId(), Instant.now())
+            );
+        }
 
         syncToElasticsearch(event);
     }
+
 
     /**
      * Spring Data ES 컨버터를 완전히 우회하고 esClient.index()로 직접 인덱싱.
