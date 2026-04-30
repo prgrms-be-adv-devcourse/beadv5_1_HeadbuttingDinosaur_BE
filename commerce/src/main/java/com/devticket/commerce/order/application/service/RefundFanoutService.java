@@ -81,8 +81,8 @@ public class RefundFanoutService {
             // 환불 금액 — 대상 티켓 합계로 한정 (다중 이벤트 주문의 과환불 방지).
             // 티켓 : OrderItem = N:1 (결제 완료 시 OrderItem.quantity 만큼 티켓 생성),
             // 각 티켓의 단가는 해당 OrderItem.price 와 동일하므로 단가 × 티켓수 로 산정.
-            Map<UUID, Integer> priceByOrderItemId = orderItemRepository.findAllByOrderId(order.getId())
-                .stream()
+            List<OrderItem> orderItems = orderItemRepository.findAllByOrderId(order.getId());
+            Map<UUID, Integer> priceByOrderItemId = orderItems.stream()
                 .collect(Collectors.toMap(OrderItem::getOrderItemId, OrderItem::getPrice));
             int refundAmount = targetTickets.stream()
                 .mapToInt(t -> priceByOrderItemId.getOrDefault(t.getOrderItemId(), 0))
@@ -96,6 +96,9 @@ public class RefundFanoutService {
 
             List<UUID> ticketIds = targetTickets.stream().map(Ticket::getTicketId).toList();
             boolean wholeOrder = ticketIds.size() == orderTickets.size();
+            // 주문 전체 티켓 수 — Payment 가 OrderRefund 원장의 totalTickets 로 사용.
+            // 다중 이벤트 주문 부분 강제취소 시에도 원장이 정확하도록 모든 OrderItem.quantity 합계로 산정.
+            int totalOrderTickets = orderItems.stream().mapToInt(OrderItem::getQuantity).sum();
 
             RefundRequestedEvent request = new RefundRequestedEvent(
                 UUID.randomUUID(),           // refundId — Commerce 생성
@@ -109,7 +112,8 @@ public class RefundFanoutService {
                 100,                          // refundRate — 강제 취소는 100%
                 wholeOrder,                   // 대상 티켓이 주문 전체 티켓과 일치할 때만 true
                 reason,
-                now
+                now,
+                totalOrderTickets
             );
             outboxService.save(
                 order.getOrderId().toString(),
