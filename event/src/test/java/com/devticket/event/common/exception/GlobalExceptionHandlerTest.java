@@ -127,6 +127,28 @@ class GlobalExceptionHandlerTest {
         assertWarnOnly();
     }
 
+    @Test
+    @DisplayName("[8] HttpMessageNotWritableException + IOException(Connection reset by peer) → WARN")
+    void httpMessageNotWritable_withConnectionReset_logsWarnOnly() throws Exception {
+        controller.toThrow = new HttpMessageNotWritableException(
+            "write failed", new IOException("Connection reset by peer"));
+
+        mockMvc.perform(get("/test/fault"));
+
+        assertWarnOnly();
+    }
+
+    @Test
+    @DisplayName("[9] case-insensitive 매칭 — IOException(CONNECTION RESET) → WARN")
+    void httpMessageNotWritable_withUpperCaseMessage_logsWarnOnly() throws Exception {
+        controller.toThrow = new HttpMessageNotWritableException(
+            "write failed", new IOException("CONNECTION RESET"));
+
+        mockMvc.perform(get("/test/fault"));
+
+        assertWarnOnly();
+    }
+
     private void assertWarnOnly() {
         assertThat(countByLevel(Level.WARN)).as("WARN count").isEqualTo(1);
         assertThat(countByLevel(Level.ERROR)).as("ERROR count").isZero();
