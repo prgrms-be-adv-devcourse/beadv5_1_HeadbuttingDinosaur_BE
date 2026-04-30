@@ -481,11 +481,19 @@ public class EventService {
         Map<UUID, Event> imagesById = eventRepository.findEventImagesByEventIdIn(pageEventIds).stream()
             .collect(Collectors.toMap(Event::getEventId, e -> e));
 
+        Map<UUID, Long> viewCountById = eventViewRepository.findAllByEventIdIn(pageEventIds).stream()
+            .collect(Collectors.toMap(
+                ev -> ev.getEvent().getEventId(),
+                EventView::getViewCount
+            ));
+
         List<EventListContentResponse> content = pageEventIds.stream()
             .map(id -> {
                 Event hydrated = hydratedById.get(id);
                 if (hydrated == null) return null;
-                return EventListContentResponse.from(imagesById.getOrDefault(id, hydrated));
+                Event withImages = imagesById.getOrDefault(id, hydrated);
+                Long viewCount = viewCountById.getOrDefault(id, 0L);
+                return EventListContentResponse.from(withImages, viewCount);
             })
             .filter(Objects::nonNull)
             .toList();
