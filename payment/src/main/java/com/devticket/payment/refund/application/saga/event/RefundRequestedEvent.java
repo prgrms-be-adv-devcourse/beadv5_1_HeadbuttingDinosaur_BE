@@ -17,5 +17,6 @@ public record RefundRequestedEvent(
     int refundRate,
     boolean wholeOrder,
     String reason,
-    Instant timestamp
+    Instant timestamp,
+    int totalOrderTickets
 ) {}

@@ -87,8 +87,21 @@ public class Refund extends BaseEntity {
         Integer amount,
         Integer refundRate
     ) {
+        return createWithId(UUID.randomUUID(), orderRefundId, orderId, paymentId, userId, amount, refundRate);
+    }
+
+    // Commerce fan-out (event.force-cancelled) 처럼 refundId 가 외부에서 주어지는 saga 진입점에서 사용.
+    public static Refund createWithId(
+        UUID refundId,
+        UUID orderRefundId,
+        UUID orderId,
+        UUID paymentId,
+        UUID userId,
+        Integer amount,
+        Integer refundRate
+    ) {
         Refund refund = new Refund();
-        refund.refundId = UUID.randomUUID();
+        refund.refundId = refundId;
         refund.orderRefundId = orderRefundId;
         refund.orderId = orderId;
         refund.paymentId = paymentId;
