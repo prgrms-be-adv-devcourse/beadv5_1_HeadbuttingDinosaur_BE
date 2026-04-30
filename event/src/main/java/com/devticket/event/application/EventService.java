@@ -1,6 +1,5 @@
 package com.devticket.event.application;
 
-import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch._types.FieldValue;
 import co.elastic.clients.elasticsearch._types.query_dsl.BoolQuery;
 import co.elastic.clients.elasticsearch._types.query_dsl.Query;
@@ -34,11 +33,8 @@ import com.devticket.event.presentation.dto.SellerEventDetailResponse;
 import com.devticket.event.presentation.dto.SellerEventSummaryResponse;
 import com.devticket.event.presentation.dto.SellerEventUpdateRequest;
 import com.devticket.event.presentation.dto.SellerEventUpdateResponse;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import java.io.StringReader;
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -50,6 +46,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.elasticsearch.client.elc.NativeQuery;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.SearchHits;
@@ -66,11 +63,10 @@ public class EventService {
     private final MemberClient memberClient;
     private final AdminClient adminClient;
     private final ElasticsearchOperations elasticsearchOperations;
-    private final ElasticsearchClient esClient;
+    private final ElasticsearchSyncService elasticsearchSyncService;
     private final OpenAiEmbeddingClient openAiEmbeddingClient;
     private final OutboxService outboxService;
     private final MessageDeduplicationService deduplicationService;
-    private final ObjectMapper objectMapper;
     private final ApplicationEventPublisher eventPublisher;
     private final EventViewRepository eventViewRepository;
 
@@ -131,7 +127,7 @@ public class EventService {
             eventRepository.save(savedEvent);
         }
 
-        syncToElasticsearch(savedEvent);
+        elasticsearchSyncService.sync(savedEvent);
 
         return SellerEventCreateResponse.from(savedEvent);
     }
@@ -200,7 +196,13 @@ public class EventService {
 
         // ES 검색
         NativeQuery query = buildSearchQuery(request, allowedStatuses, pageable);
-        SearchHits<EventDocument> searchHits = elasticsearchOperations.search(query, EventDocument.class);
+        SearchHits<EventDocument> searchHits;
+        try {
+            searchHits = elasticsearchOperations.search(query, EventDocument.class);
+        } catch (Exception e) {
+            log.warn("[ES 검색 실패] DB 폴백 적용 - {}", e.getMessage());
+            return getEventListFromDb(request, allowedStatuses, pageable);
+        }
 
         List<UUID> pageEventIds = searchHits.stream()
             .map(hit -> UUID.fromString(hit.getContent().getId()))
@@ -222,13 +224,22 @@ public class EventService {
         Map<UUID, Event> imagesById = eventRepository.findEventImagesByEventIdIn(pageEventIds).stream()
             .collect(Collectors.toMap(Event::getEventId, e -> e));
 
+
+        // viewCount 조회
+        Map<UUID, Long> viewCountById = eventViewRepository.findAllByEventIdIn(pageEventIds).stream()
+            .collect(Collectors.toMap(
+                ev -> ev.getEvent().getEventId(),
+                EventView::getViewCount
+            ));
+
         // ES 결과 순서 유지
         List<EventListContentResponse> content = pageEventIds.stream()
             .map(id -> {
                 Event hydrated = hydratedById.get(id);
                 if (hydrated == null) return null;
                 Event withImages = imagesById.getOrDefault(id, hydrated);
-                return EventListContentResponse.from(withImages);
+                Long viewCount = viewCountById.getOrDefault(id, 0L);
+                return EventListContentResponse.from(withImages, viewCount);
             })
             .filter(Objects::nonNull)
             .toList();
@@ -278,7 +289,7 @@ public class EventService {
             List.of(EventStatus.ON_SALE, EventStatus.SOLD_OUT), LocalDateTime.now());
         events.forEach(event -> {
             event.expireSale();
-            syncToElasticsearch(event);
+            elasticsearchSyncService.sync(event);
         });
     }
 
@@ -290,7 +301,7 @@ public class EventService {
             LocalDateTime.now());
         events.forEach(event -> {
             event.endEvent();
-            syncToElasticsearch(event);
+            elasticsearchSyncService.sync(event);
         });
     }
 
@@ -301,7 +312,7 @@ public class EventService {
             .findAllByStatusAndSaleStartAtBefore(EventStatus.DRAFT, LocalDateTime.now());
         events.forEach(event -> {
             event.promoteToOnSale();
-            syncToElasticsearch(event);
+            elasticsearchSyncService.sync(event);
         });
     }
 
@@ -336,7 +347,7 @@ public class EventService {
                 KafkaTopics.EVENT_SALE_STOPPED,
                 new EventSaleStoppedEvent(event.getEventId(), event.getSellerId(), Instant.now())
             );
-            syncToElasticsearch(event);
+            elasticsearchSyncService.sync(event);
             return SellerEventUpdateResponse.from(event);
         }
 
@@ -403,7 +414,7 @@ public class EventService {
             }
         }
 
-        syncToElasticsearch(event);
+        elasticsearchSyncService.sync(event);
 
         return SellerEventUpdateResponse.from(event);
     }
@@ -413,71 +424,87 @@ public class EventService {
      * Commerce 가 이를 수신해 해당 이벤트의 PAID 주문에 대해 환불 fan-out 을 수행한다.
      */
     @Transactional
-    public void forceCancel(UUID eventId, String reason) {
+    public void forceCancel(UUID userId, String userRole, UUID eventId, String reason) {
         Event event = eventRepository.findByEventIdWithLock(eventId)
             .orElseThrow(() -> new BusinessException(EventErrorCode.EVENT_NOT_FOUND));
 
-        event.forceCancel();
-
-        outboxService.save(
-            event.getEventId().toString(),
-            event.getEventId().toString(),
-            "EVENT_FORCE_CANCELLED",
-            KafkaTopics.EVENT_FORCE_CANCELLED,
-            new EventForceCancelledEvent(event.getEventId(), event.getSellerId(), reason, Instant.now())
-        );
-
-        syncToElasticsearch(event);
-    }
-
-    /**
-     * Spring Data ES 컨버터를 완전히 우회하고 esClient.index()로 직접 인덱싱.
-     * dense_vector(embedding)은 Spring Data ES 컨버터가 직렬화하지 못하므로
-     * Map<String, Object>로 전체 문서를 구성해서 ES REST API에 직접 전송.
-     */
-    public void syncToElasticsearch(Event event) {
-        try {
-            List<String> techStackNames = event.getEventTechStacks().stream()
-                .map(EventTechStack::getTechStackName)
-                .toList();
-
-            String embeddingText = techStackNames.isEmpty()
-                ? event.getTitle() + ". Category: " + event.getCategory().name()
-                : event.getTitle() + ". Category: " + event.getCategory().name()
-                    + ". Tech Stacks: " + String.join(", ", techStackNames);
-
-            Map<String, Object> doc = new HashMap<>();
-            doc.put("id", event.getEventId().toString());
-            // AI 추천 서비스는 _source.eventId 로 추출 (PR #540 계약). _id 는 hit._source 에 포함되지 않으므로 body 에 명시.
-            doc.put("eventId", event.getEventId().toString());
-            doc.put("title", event.getTitle());
-            doc.put("category", event.getCategory().name());
-            doc.put("techStacks", techStackNames);
-            doc.put("status", event.getStatus().name());
-            doc.put("sellerId", event.getSellerId().toString());
-            // mapping의 date_hour_minute_second 형식에 맞춤 (나노초 제외)
-            doc.put("indexedAt", LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")));
-
-            float[] vector = openAiEmbeddingClient.embed(embeddingText);
-            if (vector != null) {
-                List<Float> vectorList = new ArrayList<>(vector.length);
-                for (float v : vector) vectorList.add(v);
-                doc.put("embedding", vectorList);
-            } else {
-                log.warn("[ES 동기화] embedding 생성 실패 - eventId: {}", event.getEventId());
+        if("ADMIN".equals(userRole)){
+            event.forceCancel();
+            outboxService.save(
+                event.getEventId().toString(),
+                event.getEventId().toString(),
+                "EVENT_FORCE_CANCELLED",
+                KafkaTopics.EVENT_FORCE_CANCELLED,
+                new EventForceCancelledEvent(event.getEventId(), event.getSellerId(), reason, Instant.now())
+            );
+        }
+        else {
+            if (!event.getSellerId().equals(userId)) {
+                throw new BusinessException(EventErrorCode.UNAUTHORIZED_SELLER);
+            }
+            if (!event.canBeCancelled()) {
+                throw new BusinessException(EventErrorCode.CANNOT_CHANGE_STATUS);
             }
 
-            String json = new ObjectMapper().writeValueAsString(doc);
 
-            esClient.index(i -> i
-                .index("event")
-                .id(event.getEventId().toString())
-                .withJson(new StringReader(json)));
-
-            log.debug("[ES 동기화 완료] eventId: {}", event.getEventId());
-        } catch (Exception e) {
-            log.warn("[ES 동기화 실패] eventId: {}", event.getEventId(), e);
+        event.cancel();
+            outboxService.save(
+                event.getEventId().toString(),
+                event.getEventId().toString(),
+                "EVENT_SALE_STOPPED",
+                KafkaTopics.EVENT_SALE_STOPPED,
+                new EventSaleStoppedEvent(event.getEventId(), event.getSellerId(), Instant.now())
+            );
         }
+
+        elasticsearchSyncService.sync(event);
+    }
+
+    private EventListResponse getEventListFromDb(
+        EventListRequest request, List<EventStatus> allowedStatuses, Pageable pageable) {
+
+        var page = eventRepository.searchEventsWithStatuses(
+            request.keyword(), allowedStatuses, request.category(), request.techStacks(),
+            request.sellerId(), pageable);
+
+        List<UUID> pageEventIds = page.getContent().stream()
+            .map(Event::getEventId)
+            .toList();
+
+        if (pageEventIds.isEmpty()) {
+            return new EventListResponse(
+                List.of(), pageable.getPageNumber(), pageable.getPageSize(), 0L, 0);
+        }
+
+        Map<UUID, Event> hydratedById = eventRepository.findAllWithDetailsByEventIdIn(pageEventIds).stream()
+            .collect(Collectors.toMap(Event::getEventId, e -> e));
+        Map<UUID, Event> imagesById = eventRepository.findEventImagesByEventIdIn(pageEventIds).stream()
+            .collect(Collectors.toMap(Event::getEventId, e -> e));
+
+        Map<UUID, Long> viewCountById = eventViewRepository.findAllByEventIdIn(pageEventIds).stream()
+            .collect(Collectors.toMap(
+                ev -> ev.getEvent().getEventId(),
+                EventView::getViewCount
+            ));
+
+        List<EventListContentResponse> content = pageEventIds.stream()
+            .map(id -> {
+                Event hydrated = hydratedById.get(id);
+                if (hydrated == null) return null;
+                Event withImages = imagesById.getOrDefault(id, hydrated);
+                Long viewCount = viewCountById.getOrDefault(id, 0L);
+                return EventListContentResponse.from(withImages, viewCount);
+            })
+            .filter(Objects::nonNull)
+            .toList();
+
+        return new EventListResponse(
+            content,
+            pageable.getPageNumber(),
+            pageable.getPageSize(),
+            page.getTotalElements(),
+            page.getTotalPages()
+        );
     }
 
     private NativeQuery buildSearchQuery(
@@ -544,6 +571,10 @@ public class EventService {
         queryBuilder
             .withFilter(Query.of(q -> q.bool(filterQuery.build())))
             .withPageable(pageable);
+
+        if (request.keyword() == null || request.keyword().isBlank()) {
+            queryBuilder.withSort(Sort.by(Sort.Direction.DESC, "saleStartAt"));
+        }
 
         return queryBuilder.build();
     }

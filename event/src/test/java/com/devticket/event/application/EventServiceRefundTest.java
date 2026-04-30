@@ -20,10 +20,12 @@ import com.devticket.event.domain.enums.EventCategory;
 import com.devticket.event.domain.enums.EventStatus;
 import com.devticket.event.domain.exception.EventErrorCode;
 import com.devticket.event.domain.model.Event;
+import com.devticket.event.infrastructure.client.AdminClient;
 import com.devticket.event.infrastructure.client.MemberClient;
 import com.devticket.event.infrastructure.client.OpenAiEmbeddingClient;
 import com.devticket.event.infrastructure.persistence.EventRepository;
-import com.devticket.event.presentation.dto.SellerEventUpdateRequest;
+import com.devticket.event.infrastructure.persistence.EventViewRepository;
+import com.devticket.event.application.ElasticsearchSyncService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -36,50 +38,39 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.test.util.ReflectionTestUtils;
 
-/**
- * EventService 의 환불 Saga 관련 메서드(forceCancel, updateEvent CANCELLED Outbox) 검증.
- */
 @ExtendWith(MockitoExtension.class)
 class EventServiceRefundTest {
 
-    @Mock
-    private EventRepository eventRepository;
-
-    @Mock
-    private OutboxService outboxService;
-
-    @Mock
-    private MessageDeduplicationService deduplicationService;
-
-    @Mock
-    private MemberClient memberClient;
-
-    @Mock
-    private ElasticsearchOperations elasticsearchOperations;
-
-    @Mock
-    private ElasticsearchClient esClient;
-
-    @Mock
-    private OpenAiEmbeddingClient openAiEmbeddingClient;
-
-    @Mock
-    private ObjectMapper objectMapper;
+    @Mock private EventRepository eventRepository;
+    @Mock private OutboxService outboxService;
+    @Mock private ElasticsearchSyncService elasticsearchSyncService;
+    @Mock private MessageDeduplicationService deduplicationService;
+    @Mock private MemberClient memberClient;
+    @Mock private AdminClient adminClient;
+    @Mock private ElasticsearchOperations elasticsearchOperations;
+    @Mock private ElasticsearchClient esClient;
+    @Mock private OpenAiEmbeddingClient openAiEmbeddingClient;
+    @Mock private ObjectMapper objectMapper;
+    @Mock private ApplicationEventPublisher eventPublisher;
+    @Mock private EventViewRepository eventViewRepository;
 
     @InjectMocks
     private EventService eventService;
 
     private UUID eventId;
     private UUID sellerId;
+    private UUID adminId;
     private Event event;
 
     @BeforeEach
     void setUp() {
         eventId = UUID.randomUUID();
         sellerId = UUID.randomUUID();
+        adminId = UUID.randomUUID();
         event = Event.create(
             sellerId, "테스트 이벤트", "설명", "강남",
             LocalDateTime.now().plusDays(15),
@@ -95,11 +86,11 @@ class EventServiceRefundTest {
     class ForceCancel {
 
         @Test
-        @DisplayName("이벤트를 FORCE_CANCELLED 로 전이하고 event.force-cancelled Outbox 를 발행한다")
-        void forceCancel_publishesEvent() {
+        @DisplayName("어드민이 요청하면 FORCE_CANCELLED 로 전이하고 event.force-cancelled Outbox 를 발행한다")
+        void forceCancel_admin_publishesForceCancel() {
             given(eventRepository.findByEventIdWithLock(eventId)).willReturn(Optional.of(event));
 
-            eventService.forceCancel(eventId, "policy violation");
+            eventService.forceCancel(adminId, "ADMIN", eventId, "policy violation");
 
             assertThat(event.getStatus()).isEqualTo(EventStatus.FORCE_CANCELLED);
             verify(outboxService, times(1)).save(
@@ -120,7 +111,7 @@ class EventServiceRefundTest {
         void forceCancel_notFound() {
             given(eventRepository.findByEventIdWithLock(eventId)).willReturn(Optional.empty());
 
-            assertThatThrownBy(() -> eventService.forceCancel(eventId, "reason"))
+            assertThatThrownBy(() -> eventService.forceCancel(adminId, "ADMIN", eventId, "reason"))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(EventErrorCode.EVENT_NOT_FOUND);
@@ -134,7 +125,7 @@ class EventServiceRefundTest {
             ReflectionTestUtils.setField(event, "status", EventStatus.CANCELLED);
             given(eventRepository.findByEventIdWithLock(eventId)).willReturn(Optional.of(event));
 
-            assertThatThrownBy(() -> eventService.forceCancel(eventId, "reason"))
+            assertThatThrownBy(() -> eventService.forceCancel(adminId, "ADMIN", eventId, "reason"))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(EventErrorCode.CANNOT_CHANGE_STATUS);
@@ -148,28 +139,18 @@ class EventServiceRefundTest {
             ReflectionTestUtils.setField(event, "status", EventStatus.FORCE_CANCELLED);
             given(eventRepository.findByEventIdWithLock(eventId)).willReturn(Optional.of(event));
 
-            assertThatThrownBy(() -> eventService.forceCancel(eventId, "reason"))
+            assertThatThrownBy(() -> eventService.forceCancel(adminId, "ADMIN", eventId, "reason"))
                 .isInstanceOf(BusinessException.class);
 
             verify(outboxService, never()).save(any(), any(), any(), any(), any());
         }
-    }
-
-    @Nested
-    @DisplayName("updateEvent — 판매자 취소 분기")
-    class SellerCancel {
 
         @Test
-        @DisplayName("판매자가 CANCELLED 로 전이 시 event.sale-stopped Outbox 를 발행한다")
-        void sellerCancel_publishesSaleStopped() {
-            given(eventRepository.findWithDetailsByEventId(eventId)).willReturn(Optional.of(event));
-            SellerEventUpdateRequest request = new SellerEventUpdateRequest(
-                null, null, null, null, null, null,
-                null, null, null, null, null, null,
-                EventStatus.CANCELLED
-            );
+        @DisplayName("판매자가 본인 이벤트를 취소하면 CANCELLED 로 전이하고 event.sale-stopped Outbox 를 발행한다")
+        void forceCancel_seller_publishesSaleStopped() {
+            given(eventRepository.findByEventIdWithLock(eventId)).willReturn(Optional.of(event));
 
-            eventService.updateEvent(sellerId, eventId, request);
+            eventService.forceCancel(sellerId, "SELLER", eventId, null);
 
             assertThat(event.getStatus()).isEqualTo(EventStatus.CANCELLED);
             verify(outboxService, times(1)).save(
@@ -179,8 +160,38 @@ class EventServiceRefundTest {
                 eq(KafkaTopics.EVENT_SALE_STOPPED),
                 argThat(payload -> payload instanceof EventSaleStoppedEvent e
                     && e.eventId().equals(eventId)
-                    && e.sellerId().equals(sellerId))
+                    && e.sellerId().equals(sellerId)
+                    && e.occurredAt() != null)
             );
+        }
+
+        @Test
+        @DisplayName("판매자가 타인 이벤트를 취소하면 UNAUTHORIZED_SELLER 예외가 발생한다")
+        void forceCancel_seller_unauthorized() {
+            given(eventRepository.findByEventIdWithLock(eventId)).willReturn(Optional.of(event));
+
+            assertThatThrownBy(() ->
+                eventService.forceCancel(UUID.randomUUID(), "SELLER", eventId, null))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(EventErrorCode.UNAUTHORIZED_SELLER);
+
+            verify(outboxService, never()).save(any(), any(), any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("판매자가 취소 불가 상태 이벤트를 취소하면 CANNOT_CHANGE_STATUS 예외가 발생한다")
+        void forceCancel_seller_cannotCancel() {
+            ReflectionTestUtils.setField(event, "status", EventStatus.FORCE_CANCELLED);
+            given(eventRepository.findByEventIdWithLock(eventId)).willReturn(Optional.of(event));
+
+            assertThatThrownBy(() ->
+                eventService.forceCancel(sellerId, "SELLER", eventId, null))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(EventErrorCode.CANNOT_CHANGE_STATUS);
+
+            verify(outboxService, never()).save(any(), any(), any(), any(), any());
         }
     }
 }

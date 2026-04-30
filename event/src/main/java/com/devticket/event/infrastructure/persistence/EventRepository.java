@@ -1,5 +1,6 @@
 package com.devticket.event.infrastructure.persistence;
 
+import com.devticket.event.domain.enums.EventCategory;
 import com.devticket.event.domain.enums.EventStatus;
 import com.devticket.event.domain.model.Event;
 import jakarta.persistence.LockModeType;
@@ -29,6 +30,25 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     Page<Event> searchEvents(
         @Param("keyword") String keyword,
         @Param("status") EventStatus status,
+        @Param("sellerId") UUID sellerId,
+        Pageable pageable
+    );
+
+    @Query("""
+    SELECT DISTINCT e FROM Event e
+    WHERE (:keyword IS NULL OR e.title LIKE CONCAT('%', :keyword, '%'))
+      AND (:#{#statuses == null || #statuses.isEmpty()} = true OR e.status IN :statuses)
+      AND (:category IS NULL OR e.category = :category)
+      AND (:#{#techStacks == null || #techStacks.isEmpty()} = true
+           OR EXISTS (SELECT t FROM EventTechStack t WHERE t.event = e AND t.techStackId IN :techStacks))
+      AND (:sellerId IS NULL OR e.sellerId = :sellerId)
+    ORDER BY e.saleStartAt DESC
+    """)
+    Page<Event> searchEventsWithStatuses(
+        @Param("keyword") String keyword,
+        @Param("statuses") List<EventStatus> statuses,
+        @Param("category") EventCategory category,
+        @Param("techStacks") List<Long> techStacks,
         @Param("sellerId") UUID sellerId,
         Pageable pageable
     );

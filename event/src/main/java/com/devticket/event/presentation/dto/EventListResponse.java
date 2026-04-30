@@ -13,7 +13,7 @@ public record EventListResponse(
 ) {
     public static EventListResponse of(Page<Event> page) {
         List<EventListContentResponse> content = page.getContent().stream()
-            .map(EventListContentResponse::from)
+            .map(event -> EventListContentResponse.from(event, 0L))
             .toList();
 
         return new EventListResponse(
