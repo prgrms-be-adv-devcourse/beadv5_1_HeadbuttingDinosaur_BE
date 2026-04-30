@@ -25,6 +25,7 @@ import com.devticket.event.infrastructure.client.MemberClient;
 import com.devticket.event.infrastructure.client.OpenAiEmbeddingClient;
 import com.devticket.event.infrastructure.persistence.EventRepository;
 import com.devticket.event.infrastructure.persistence.EventViewRepository;
+import com.devticket.event.application.ElasticsearchSyncService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -46,6 +47,7 @@ class EventServiceRefundTest {
 
     @Mock private EventRepository eventRepository;
     @Mock private OutboxService outboxService;
+    @Mock private ElasticsearchSyncService elasticsearchSyncService;
     @Mock private MessageDeduplicationService deduplicationService;
     @Mock private MemberClient memberClient;
     @Mock private AdminClient adminClient;
