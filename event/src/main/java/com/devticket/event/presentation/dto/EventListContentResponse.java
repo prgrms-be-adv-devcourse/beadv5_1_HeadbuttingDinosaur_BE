@@ -21,9 +21,11 @@ public record EventListContentResponse(
     List<String> techStacks,
     LocalDateTime saleEndAt,
     Integer totalQuantity,
-    Integer remainingQuantity
+    Integer remainingQuantity,
+    String category,
+    Long viewCount
 ) {
-    public static EventListContentResponse from(Event event) {
+    public static EventListContentResponse from(Event event, Long viewCount) {
         String thumbnailUrl = event.getEventImages().stream()
             .min(Comparator.comparingInt(EventImage::getSortOrder))
             .map(EventImage::getImageUrl)
@@ -42,7 +44,9 @@ public record EventListContentResponse(
             techStacks,
             event.getSaleEndAt(),
             event.getTotalQuantity(),
-            event.getRemainingQuantity()
+            event.getRemainingQuantity(),
+            event.getCategory().name(),
+            viewCount
         );
     }
 

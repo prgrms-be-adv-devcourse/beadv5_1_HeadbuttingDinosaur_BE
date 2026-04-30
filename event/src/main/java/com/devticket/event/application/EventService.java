@@ -46,6 +46,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.elasticsearch.client.elc.NativeQuery;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.SearchHits;
@@ -223,13 +224,22 @@ public class EventService {
         Map<UUID, Event> imagesById = eventRepository.findEventImagesByEventIdIn(pageEventIds).stream()
             .collect(Collectors.toMap(Event::getEventId, e -> e));
 
+
+        // viewCount 조회
+        Map<UUID, Long> viewCountById = eventViewRepository.findAllByEventIdIn(pageEventIds).stream()
+            .collect(Collectors.toMap(
+                ev -> ev.getEvent().getEventId(),
+                EventView::getViewCount
+            ));
+
         // ES 결과 순서 유지
         List<EventListContentResponse> content = pageEventIds.stream()
             .map(id -> {
                 Event hydrated = hydratedById.get(id);
                 if (hydrated == null) return null;
                 Event withImages = imagesById.getOrDefault(id, hydrated);
-                return EventListContentResponse.from(withImages);
+                Long viewCount = viewCountById.getOrDefault(id, 0L);
+                return EventListContentResponse.from(withImages, viewCount);
             })
             .filter(Objects::nonNull)
             .toList();
@@ -553,6 +563,10 @@ public class EventService {
         queryBuilder
             .withFilter(Query.of(q -> q.bool(filterQuery.build())))
             .withPageable(pageable);
+
+        if (request.keyword() == null || request.keyword().isBlank()) {
+            queryBuilder.withSort(Sort.by(Sort.Direction.DESC, "saleStartAt"));
+        }
 
         return queryBuilder.build();
     }

@@ -1,5 +1,7 @@
 package com.devticket.event.application;
 
+import static java.util.stream.Collectors.toList;
+
 import com.devticket.event.domain.enums.EventStatus;
 import com.devticket.event.domain.model.Event;
 import com.devticket.event.infrastructure.client.AiClient;
@@ -72,7 +74,7 @@ public class EventRecommendationService {
             })
             .filter(Objects::nonNull)
             .filter(e -> !EXCLUDED_STATUSES.contains(e.getStatus()))
-            .map(EventListContentResponse::from)
+            .map(event -> EventListContentResponse.from(event, 0L))
             .toList();
 
         return new RecommendationResponse(results);
