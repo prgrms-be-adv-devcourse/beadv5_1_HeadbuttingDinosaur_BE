@@ -222,13 +222,22 @@ public class EventService {
         Map<UUID, Event> imagesById = eventRepository.findEventImagesByEventIdIn(pageEventIds).stream()
             .collect(Collectors.toMap(Event::getEventId, e -> e));
 
+
+        // viewCount 조회
+        Map<UUID, Long> viewCountById = eventViewRepository.findAllByEventIdIn(pageEventIds).stream()
+            .collect(Collectors.toMap(
+                ev -> ev.getEvent().getEventId(),
+                EventView::getViewCount
+            ));
+
         // ES 결과 순서 유지
         List<EventListContentResponse> content = pageEventIds.stream()
             .map(id -> {
                 Event hydrated = hydratedById.get(id);
                 if (hydrated == null) return null;
                 Event withImages = imagesById.getOrDefault(id, hydrated);
-                return EventListContentResponse.from(withImages);
+                Long viewCount = viewCountById.getOrDefault(id, 0L);
+                return EventListContentResponse.from(withImages, viewCount);
             })
             .filter(Objects::nonNull)
             .toList();
