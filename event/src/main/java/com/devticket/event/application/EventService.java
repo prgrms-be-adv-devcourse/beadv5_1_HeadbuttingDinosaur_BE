@@ -454,10 +454,30 @@ public class EventService {
         EventListRequest request, List<EventStatus> allowedStatuses, Pageable pageable) {
 
         var page = eventRepository.searchEventsWithStatuses(
-            request.keyword(), allowedStatuses, request.sellerId(), pageable);
+            request.keyword(), allowedStatuses, request.category(), request.techStacks(),
+            request.sellerId(), pageable);
 
-        List<EventListContentResponse> content = page.getContent().stream()
-            .map(EventListContentResponse::from)
+        List<UUID> pageEventIds = page.getContent().stream()
+            .map(Event::getEventId)
+            .toList();
+
+        if (pageEventIds.isEmpty()) {
+            return new EventListResponse(
+                List.of(), pageable.getPageNumber(), pageable.getPageSize(), 0L, 0);
+        }
+
+        Map<UUID, Event> hydratedById = eventRepository.findAllWithDetailsByEventIdIn(pageEventIds).stream()
+            .collect(Collectors.toMap(Event::getEventId, e -> e));
+        Map<UUID, Event> imagesById = eventRepository.findEventImagesByEventIdIn(pageEventIds).stream()
+            .collect(Collectors.toMap(Event::getEventId, e -> e));
+
+        List<EventListContentResponse> content = pageEventIds.stream()
+            .map(id -> {
+                Event hydrated = hydratedById.get(id);
+                if (hydrated == null) return null;
+                return EventListContentResponse.from(imagesById.getOrDefault(id, hydrated));
+            })
+            .filter(Objects::nonNull)
             .toList();
 
         return new EventListResponse(
