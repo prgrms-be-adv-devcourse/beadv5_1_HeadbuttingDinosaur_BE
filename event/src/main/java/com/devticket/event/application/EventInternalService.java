@@ -108,13 +108,13 @@ public class EventInternalService {
 
         if (event.isPurchasable(requestedQuantity)) {
             return InternalPurchaseValidationResponse.success(
-                event.getEventId(), event.getSellerId(), event.getMaxQuantity(), event.getTitle(), event.getPrice()
+                event.getEventId(), event.getMaxQuantity(), event.getTitle(), event.getPrice()
             );
         }
 
         PurchaseUnavailableReason reason = resolveReason(event, requestedQuantity);
         return InternalPurchaseValidationResponse.failure(
-            event.getEventId(), event.getSellerId(), reason, event.getMaxQuantity(), event.getTitle(), event.getPrice()
+            event.getEventId(), reason, event.getMaxQuantity(), event.getTitle(), event.getPrice()
         );
     }
 
