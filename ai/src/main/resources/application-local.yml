@@ -1,0 +1,52 @@
+spring:
+  kafka:
+    bootstrap-servers: localhost:9093
+    consumer:
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+
+  batch:
+    job:
+      enabled: false
+    jdbc:
+      initialize-schema: always
+
+  datasource:
+    url: jdbc:h2:mem:batch;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
+
+  elasticsearch:
+    uris: http://localhost:9200
+    connection-timeout: 5s
+    socket-timeout: 30s
+
+openai:
+  api-key: ${OPENAI_API_KEY}
+  embedding:
+    url: https://api.openai.com/v1/embeddings
+    model: text-embedding-3-small
+
+internal:
+  log-service:
+    url: http://localhost:8085
+  member-service:
+    url: http://localhost:8081
+  event-service:
+    url: http://localhost:8082
+
+logging:
+  level:
+    com.devticket: DEBUG

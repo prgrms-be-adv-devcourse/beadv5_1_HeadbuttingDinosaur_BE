@@ -1,0 +1,31 @@
+jwt:
+  secret-key: local-dev-jwt-secret-key-devticket-2025
+  access-token-ttl: 1800000
+  refresh-token-ttl: 604800000
+
+logging:
+  level:
+    com.devticket: DEBUG
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+
+# OAuth2 소셜 로그인 자격증명 (로컬 개발용 - 각 플랫폼 개발자 콘솔에서 발급)
+spring:
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID:your-google-client-id}
+            client-secret: ${GOOGLE_CLIENT_SECRET:your-google-client-secret}
+
+services:
+  member:
+    url: http://localhost:8081
+
+oauth2:
+  redirect-uri: http://localhost:13000/oauth/callback

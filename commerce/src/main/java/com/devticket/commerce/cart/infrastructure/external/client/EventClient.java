@@ -1,0 +1,44 @@
+package com.devticket.commerce.cart.infrastructure.external.client;
+
+import com.devticket.commerce.cart.infrastructure.external.client.dto.EventSuccessResponse;
+import com.devticket.commerce.cart.infrastructure.external.client.dto.InternalPurchaseValidationResponse;
+import com.devticket.commerce.common.exception.BusinessException;
+import com.devticket.commerce.common.exception.CommonErrorCode;
+import java.util.UUID;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClient;
+
+@Slf4j
+@Component
+public class EventClient {
+
+    private final RestClient restClient;
+
+    public EventClient(@Qualifier("eventRestClient") RestClient restClient) {
+        this.restClient = restClient;
+    }
+
+    //장바구니 담기진행시 -> Event의 현재구매가능상태, 1인당 구매제한 수량 정보를 가져옵니다.
+    public InternalPurchaseValidationResponse getValidateEventStatus(UUID eventId, UUID userId, Integer quantity) {
+        EventSuccessResponse<InternalPurchaseValidationResponse> response = restClient.get()
+            .uri(uriBuilder -> uriBuilder
+                .path("/internal/events/{eventId}/validate-purchase")
+                .queryParam("userId", userId)
+                .queryParam("requestedQuantity", quantity)
+                .build(eventId))
+            .retrieve()
+            .onStatus(HttpStatusCode::isError, (req, res) -> {
+                throw new BusinessException(CommonErrorCode.EXTERNAL_SERVICE_ERROR);
+            })
+            .body(new ParameterizedTypeReference<EventSuccessResponse<InternalPurchaseValidationResponse>>() {
+            });
+
+        return response.data();
+    }
+
+
+}

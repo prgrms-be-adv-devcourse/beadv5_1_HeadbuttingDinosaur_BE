@@ -1,0 +1,109 @@
+package com.devticket.payment.refund.presentation.controller;
+
+import com.devticket.payment.refund.application.service.RefundService;
+import com.devticket.payment.refund.presentation.dto.OrderRefundResponse;
+import com.devticket.payment.refund.presentation.dto.RefundDetailResponse;
+import com.devticket.payment.refund.presentation.dto.RefundInfoResponse;
+import com.devticket.payment.refund.presentation.dto.RefundListItemResponse;
+import com.devticket.payment.refund.presentation.dto.PgRefundRequest;
+import com.devticket.payment.refund.presentation.dto.PgRefundResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api/refunds")
+@Tag(name = "Refund", description = "환불 API")
+@RequiredArgsConstructor
+public class RefundController {
+
+    private final RefundService refundService;
+
+    @Operation(summary = "환불 정보 조회", description = "ticketId 기반으로 환불 예상 금액 및 정책 조회")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "조회 성공"),
+        @ApiResponse(responseCode = "404", description = "결제 정보 없음")
+    })
+    @GetMapping("/info")
+    public ResponseEntity<RefundInfoResponse> getRefundInfo(
+        @RequestHeader("X-User-Id") UUID userId,
+        @RequestParam String ticketId) {
+
+        return ResponseEntity.ok(refundService.getRefundInfo(userId, ticketId));
+    }
+
+    @Operation(summary = "환불 내역 목록 조회", description = "사용자의 환불 내역을 페이징으로 조회합니다.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "조회 성공")
+    })
+    @GetMapping()
+    public ResponseEntity<Page<RefundListItemResponse>> getRefundList(
+        @RequestHeader("X-User-Id") UUID userId,
+        @PageableDefault(size = 10, sort = "requestedAt", direction = Sort.Direction.DESC) Pageable pageable
+    ) {
+        return ResponseEntity.ok(refundService.getRefundList(userId, pageable));
+    }
+
+    @Operation(summary = "환불 상세 조회", description = "refundId로 환불 상세 정보를 조회합니다.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "조회 성공"),
+        @ApiResponse(responseCode = "404", description = "환불 내역 없음")
+    })
+    @GetMapping("/{refundId}")
+    public ResponseEntity<RefundDetailResponse> getRefundDetail(
+        @RequestHeader("X-User-Id") UUID userId,
+        @PathVariable UUID refundId
+    ) {
+        return ResponseEntity.ok(refundService.getRefundDetail(userId, refundId));
+    }
+
+    @Operation(summary = "티켓 단건 환불 요청 (Saga)", description = "PG 결제 티켓 1장의 환불 Saga 를 시작합니다. 실제 환불은 비동기로 처리됩니다.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "202", description = "환불 요청 접수"),
+        @ApiResponse(responseCode = "400", description = "환불 불가 (기간/상태)"),
+        @ApiResponse(responseCode = "404", description = "티켓/결제 정보 없음")
+    })
+    @PostMapping("/pg/{ticketId}")
+    public ResponseEntity<PgRefundResponse> refundPgTicket(
+        @RequestHeader("X-User-Id") UUID userId,
+        @PathVariable String ticketId,
+        @Valid @RequestBody PgRefundRequest request
+    ) {
+        PgRefundResponse response = refundService.refundPgTicket(userId, ticketId, request);
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(response);
+    }
+
+    @Operation(summary = "오더 전체 환불 요청 (Saga)", description = "주문 내 남은 모든 티켓에 대한 환불 Saga 를 시작합니다. 실제 환불은 비동기로 처리됩니다.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "202", description = "환불 요청 접수"),
+        @ApiResponse(responseCode = "400", description = "환불 불가 (기간/상태)"),
+        @ApiResponse(responseCode = "404", description = "주문/결제 정보 없음")
+    })
+    @PostMapping("/orders/{orderId}")
+    public ResponseEntity<OrderRefundResponse> refundOrder(
+        @RequestHeader("X-User-Id") UUID userId,
+        @PathVariable UUID orderId,
+        @Valid @RequestBody PgRefundRequest request
+    ) {
+        OrderRefundResponse response = refundService.refundOrder(userId, orderId, request.reason());
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(response);
+    }
+}

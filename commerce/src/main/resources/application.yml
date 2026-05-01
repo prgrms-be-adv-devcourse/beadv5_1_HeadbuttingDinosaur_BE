@@ -1,0 +1,40 @@
+spring:
+  application:
+    name: devticket-commerce
+  profiles:
+    active: local
+
+server:
+  port: 8083
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, prometheus
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: never
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+
+logging:
+  file:
+    name: ./spring-logs/commerce/commerce.log
+
+devticket:
+  outbox:
+    # Outbox 직접 발행(afterCommit) 경로가 우선 처리할 수 있도록
+    # 스케줄러 fallback 은 createdAt 기준 grace period 경과 후 row 만 잡는다.
+    publish-grace-seconds: 5
+    # fallback 폴링 주기 — 정상 발행은 afterCommit 즉시 처리되므로 운영 부하 감소를 위해 60초로 완화.
+    scheduler-delay-ms: 60000
