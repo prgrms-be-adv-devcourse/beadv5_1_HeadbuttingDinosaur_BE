@@ -88,8 +88,8 @@ presentation/dto 27건 + Kafka payload 10건. Event/SellerEvent + force-cancel/s
 `event/src/main/java/com/devticket/event/common/messaging/event/**`
 
 ### 발행 (Producer) — 4종
-- `EventForceCancelledEvent` ★ — `EventService.forceCancel` (admin 호출 시)
-- `EventSaleStoppedEvent` — `stopSale` (판매 중지)
+- `EventForceCancelledEvent` ★ — `EventService.forceCancel` (Action A 강제취소: admin / payment(SellerRefund·AdminRefund), ADMIN/SELLER 모두)
+- `EventSaleStoppedEvent` — `EventService.updateEvent` `status=CANCELLED` 분기 (Action B 판매 중지, 환불 없음)
 - `RefundStockDoneEvent` — `StockRestoreConsumer` 처리 성공
 - `RefundStockFailedEvent` — `StockRestoreConsumer` 처리 실패
 

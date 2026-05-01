@@ -132,7 +132,7 @@
 | GET | `/internal/events/ended` | `EventInternalController#getEndedEventsByDate` | 종료된 이벤트 (settlement) |
 | POST | `/internal/events/popular` ★ | `EventInternalController#getPopularEvents` | 인기 이벤트 |
 | PATCH | `/internal/events/stock-adjustments` ★ | `EventInternalController#adjustStockBulk` | delta 부호별 일괄 재고 차감/복원 (락 순서 고정) |
-| PATCH | `/internal/events/{eventId}/force-cancel` | `EventInternalController#forceCancel` | admin 호출, `event.force-cancelled` Outbox 발행 |
+| PATCH | `/internal/events/{eventId}/force-cancel` | `EventInternalController#forceCancel` | admin / payment(SellerRefund·AdminRefund) 호출, `X-User-Role`(ADMIN/SELLER) 분기. `event.force-cancelled` Outbox 발행 |
 
 ---
 

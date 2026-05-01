@@ -37,7 +37,7 @@
 | Event Internal | GET | `/internal/events/ended` | `EventInternalController#getEndedEventsByDate` | settlement | 종료된 이벤트 |
 | Event Internal | POST | `/internal/events/popular` ★ | `EventInternalController#getPopularEvents` | ai | 인기 이벤트 |
 | Event Internal | PATCH | `/internal/events/stock-adjustments` ★ | `EventInternalController#adjustStockBulk` | commerce (OrderService) | delta 부호별 일괄 재고 차감/복원 (락 순서 고정) |
-| Event Internal | PATCH | `/internal/events/{eventId}/force-cancel` | `EventInternalController#forceCancel` | admin | admin 호출, `event.force-cancelled` Outbox 발행 (`EventService.forceCancel`) |
+| Event Internal | PATCH | `/internal/events/{eventId}/force-cancel` | `EventInternalController#forceCancel` | admin / payment | admin·payment(SellerRefund/AdminRefund) 호출, `X-User-Role`(ADMIN/SELLER) 분기 — SELLER는 본인 이벤트만 가능. `event.force-cancelled` Outbox 발행 (`EventService.forceCancel`) |
 
 ## Kafka
 
@@ -45,8 +45,8 @@
 
 | 토픽 | 분류 | 트리거 | payload |
 |---|---|---|---|
-| `event.force-cancelled` | 1-B Outbox | admin → `EventService.forceCancel` 호출 | `EventForceCancelledEvent` |
-| `event.sale-stopped` | 1-B Outbox | 판매 중지 (`stopSale`) | `EventSaleStoppedEvent` |
+| `event.force-cancelled` | 1-B Outbox | Action A 강제취소 (환불 동반) — admin/payment(SellerRefund/AdminRefund) → `EventService.forceCancel` (ADMIN/SELLER) | `EventForceCancelledEvent` |
+| `event.sale-stopped` | 1-B Outbox | Action B 판매 중지 (환불 없음) — `EventService.updateEvent` `status=CANCELLED` 분기. 컨슈머 0건(향후 audit) | `EventSaleStoppedEvent` |
 | `refund.stock.done` / `refund.stock.failed` | 1-B Outbox | Stock 복구 처리 성공/실패 (`StockRestoreConsumer`) | `RefundStockDoneEvent` / `RefundStockFailedEvent` |
 | `action.log` (VIEW / DETAIL_VIEW / DWELL_TIME) | 1-C fire-and-forget | EventService 내부 — | `ActionLogDomainEvent` |
 
@@ -74,7 +74,8 @@
 ### 피호출 (REST)
 
 - commerce: `validatePurchase`, `adjustStockBulk` ★, `getBulkEventInfo`, `getSingleEventInfo`, `getEventsBySellerForSettlement`
-- admin: `forceCancel`
+- admin: `forceCancel` (ADMIN role)
+- payment: `forceCancel` (Refund Saga — SellerRefund/AdminRefund, ADMIN/SELLER role)
 - settlement: `getEndedEventsByDate`, `getEventsBySellerForSettlement`
 - ai: `getPopularEvents` ★
 

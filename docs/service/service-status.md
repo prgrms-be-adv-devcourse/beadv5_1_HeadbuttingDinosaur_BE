@@ -8,7 +8,7 @@
 ## admin / AdminEventServiceImpl
 
 - `getEventList`: get event list 기능을 제공.
-- `forceCancel`: force cancel 기능을 제공.
+- `forceCancel`: Event 모듈 `/internal/events/{eventId}/force-cancel` 호출 (ADMIN role) + AdminActionHistory 저장. Event 측이 `event.force-cancelled` Outbox 발행.
 
 ## admin / AdminSellerService
 

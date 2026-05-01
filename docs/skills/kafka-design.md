@@ -86,8 +86,8 @@ Kafka 관련 코드의 **계층 배치·네이밍·Lombok·테스트·보안·PR
 | `payment.failed` | Payment | `PaymentService.confirmPayment()` | PG 승인 실패 또는 내부 검증 실패 시 |
 | `ticket.issue-failed` | Commerce | `TicketService.issueTicket()` | 결제 성공 후 티켓 발급 실패 감지 시 |
 | `refund.completed` | Payment (Orchestrator) | `RefundSagaOrchestrator.completeRefund()` | Saga 마지막 단계 완료 후 Outbox 발행 |
-| `event.force-cancelled` | Event | `EventService.forceCancel()` | Admin 강제 취소 API 호출 시 |
-| `event.sale-stopped` | Event | `EventService.stopSale()` | Admin/Seller 판매 중지 API 호출 시 |
+| `event.force-cancelled` | Event | `EventService.forceCancel()` | Action A 강제취소 (환불 동반) — admin / payment(SellerRefund·AdminRefund) → ADMIN/SELLER role 모두 |
+| `event.sale-stopped` | Event | `EventService.updateEvent()` `status=CANCELLED` 분기 | Action B 판매 중지 (환불 없음) — Seller 측 단순 판매 중단. 컨슈머 0건(향후 audit 자리) |
 | `refund.requested` | Commerce | `RefundFanoutService.fanout()` | `event.force-cancelled` 수신 → 대상 orderId별 fan-out 발행 |
 | `refund.order.cancel` | Payment (Orchestrator) | `RefundSagaOrchestrator.start()` / `onTicketFailed()` | Saga 시작 또는 Ticket 취소 실패 보상 시 |
 | `refund.ticket.cancel` | Payment (Orchestrator) | `RefundSagaOrchestrator.onOrderDone()` | Order 취소 완료 수신 시 |
