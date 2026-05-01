@@ -1,0 +1,250 @@
+{
+  "module": "member",
+  "endpointCount": 27,
+  "endpoints": [
+    {
+      "module": "member",
+      "controller": "AuthController",
+      "method": "oauthSignUpOrLogin",
+      "httpMethod": "POST",
+      "path": "/api/auth/google-signup",
+      "summary": "oauth sign up or login",
+      "source": "member/src/main/java/com/devticket/member/presentation/controller/AuthController.java"
+    },
+    {
+      "module": "member",
+      "controller": "AuthController",
+      "method": "login",
+      "httpMethod": "POST",
+      "path": "/api/auth/login",
+      "summary": "login",
+      "source": "member/src/main/java/com/devticket/member/presentation/controller/AuthController.java"
+    },
+    {
+      "module": "member",
+      "controller": "AuthController",
+      "method": "logout",
+      "httpMethod": "POST",
+      "path": "/api/auth/logout",
+      "summary": "logout",
+      "source": "member/src/main/java/com/devticket/member/presentation/controller/AuthController.java"
+    },
+    {
+      "module": "member",
+      "controller": "AuthController",
+      "method": "reissue",
+      "httpMethod": "POST",
+      "path": "/api/auth/reissue",
+      "summary": "reissue",
+      "source": "member/src/main/java/com/devticket/member/presentation/controller/AuthController.java"
+    },
+    {
+      "module": "member",
+      "controller": "AuthController",
+      "method": "signup",
+      "httpMethod": "POST",
+      "path": "/api/auth/signup",
+      "summary": "signup",
+      "source": "member/src/main/java/com/devticket/member/presentation/controller/AuthController.java"
+    },
+    {
+      "module": "member",
+      "controller": "AuthController",
+      "method": "socialLogin",
+      "httpMethod": "POST",
+      "path": "/api/auth/social/google",
+      "summary": "social login",
+      "source": "member/src/main/java/com/devticket/member/presentation/controller/AuthController.java"
+    },
+    {
+      "module": "member",
+      "controller": "MemberController",
+      "method": "health",
+      "httpMethod": "GET",
+      "path": "/api/members/health",
+      "summary": "Member 서비스 헬스 체크",
+      "source": "member/src/main/java/com/devticket/member/presentation/controller/MemberController.java"
+    },
+    {
+      "module": "member",
+      "controller": "SellerApplicationController",
+      "method": "apply",
+      "httpMethod": "POST",
+      "path": "/api/seller-applications",
+      "summary": "apply",
+      "source": "member/src/main/java/com/devticket/member/presentation/controller/SellerApplicationController.java"
+    },
+    {
+      "module": "member",
+      "controller": "SellerApplicationController",
+      "method": "getMyApplication",
+      "httpMethod": "GET",
+      "path": "/api/seller-applications/me",
+      "summary": "get my application",
+      "source": "member/src/main/java/com/devticket/member/presentation/controller/SellerApplicationController.java"
+    },
+    {
+      "module": "member",
+      "controller": "TechStackController",
+      "method": "getTechStacks",
+      "httpMethod": "GET",
+      "path": "/api/tech-stacks",
+      "summary": "기술 스택 목록 조회",
+      "source": "member/src/main/java/com/devticket/member/presentation/controller/TechStackController.java"
+    },
+    {
+      "module": "member",
+      "controller": "UserController",
+      "method": "withdraw",
+      "httpMethod": "DELETE",
+      "path": "/api/users/me",
+      "summary": "withdraw",
+      "source": "member/src/main/java/com/devticket/member/presentation/controller/UserController.java"
+    },
+    {
+      "module": "member",
+      "controller": "UserController",
+      "method": "getProfile",
+      "httpMethod": "GET",
+      "path": "/api/users/me",
+      "summary": "get profile",
+      "source": "member/src/main/java/com/devticket/member/presentation/controller/UserController.java"
+    },
+    {
+      "module": "member",
+      "controller": "UserController",
+      "method": "updateProfile",
+      "httpMethod": "PATCH",
+      "path": "/api/users/me",
+      "summary": "update profile",
+      "source": "member/src/main/java/com/devticket/member/presentation/controller/UserController.java"
+    },
+    {
+      "module": "member",
+      "controller": "UserController",
+      "method": "changePassword",
+      "httpMethod": "PATCH",
+      "path": "/api/users/me/password",
+      "summary": "change password",
+      "source": "member/src/main/java/com/devticket/member/presentation/controller/UserController.java"
+    },
+    {
+      "module": "member",
+      "controller": "UserController",
+      "method": "createProfile",
+      "httpMethod": "POST",
+      "path": "/api/users/profile",
+      "summary": "create profile",
+      "source": "member/src/main/java/com/devticket/member/presentation/controller/UserController.java"
+    },
+    {
+      "module": "member",
+      "controller": "InternalMemberController",
+      "method": "searchMembers",
+      "httpMethod": "GET",
+      "path": "/internal/members",
+      "summary": "관리자 회원 목록 조회",
+      "source": "member/src/main/java/com/devticket/member/presentation/controller/InternalMemberController.java"
+    },
+    {
+      "module": "member",
+      "controller": "InternalMemberController",
+      "method": "getMemberInfoBatch",
+      "httpMethod": "GET",
+      "path": "/internal/members/batch",
+      "summary": "get member info batch",
+      "source": "member/src/main/java/com/devticket/member/presentation/controller/InternalMemberController.java"
+    },
+    {
+      "module": "member",
+      "controller": "InternalMemberController",
+      "method": "getSellerApplications",
+      "httpMethod": "GET",
+      "path": "/internal/members/seller-applications",
+      "summary": "판매자 신청 목록 조회",
+      "source": "member/src/main/java/com/devticket/member/presentation/controller/InternalMemberController.java"
+    },
+    {
+      "module": "member",
+      "controller": "InternalMemberController",
+      "method": "decideSellerApplication",
+      "httpMethod": "PATCH",
+      "path": "/internal/members/seller-applications/{applicationId}",
+      "summary": "decide seller application",
+      "source": "member/src/main/java/com/devticket/member/presentation/controller/InternalMemberController.java"
+    },
+    {
+      "module": "member",
+      "controller": "InternalMemberController",
+      "method": "getSellerId",
+      "httpMethod": "GET",
+      "path": "/internal/members/sellers",
+      "summary": "판매자 ID 목록 조회",
+      "source": "member/src/main/java/com/devticket/member/presentation/controller/InternalMemberController.java"
+    },
+    {
+      "module": "member",
+      "controller": "InternalMemberController",
+      "method": "getMemberInfo",
+      "httpMethod": "GET",
+      "path": "/internal/members/{userId}",
+      "summary": "get member info",
+      "source": "member/src/main/java/com/devticket/member/presentation/controller/InternalMemberController.java"
+    },
+    {
+      "module": "member",
+      "controller": "InternalMemberController",
+      "method": "getMemberRole",
+      "httpMethod": "GET",
+      "path": "/internal/members/{userId}/role",
+      "summary": "get member role",
+      "source": "member/src/main/java/com/devticket/member/presentation/controller/InternalMemberController.java"
+    },
+    {
+      "module": "member",
+      "controller": "InternalMemberController",
+      "method": "updateMemberRole",
+      "httpMethod": "PATCH",
+      "path": "/internal/members/{userId}/role",
+      "summary": "update member role",
+      "source": "member/src/main/java/com/devticket/member/presentation/controller/InternalMemberController.java"
+    },
+    {
+      "module": "member",
+      "controller": "InternalMemberController",
+      "method": "getSellerInfo",
+      "httpMethod": "GET",
+      "path": "/internal/members/{userId}/seller-info",
+      "summary": "get seller info",
+      "source": "member/src/main/java/com/devticket/member/presentation/controller/InternalMemberController.java"
+    },
+    {
+      "module": "member",
+      "controller": "InternalMemberController",
+      "method": "getMemberStatus",
+      "httpMethod": "GET",
+      "path": "/internal/members/{userId}/status",
+      "summary": "get member status",
+      "source": "member/src/main/java/com/devticket/member/presentation/controller/InternalMemberController.java"
+    },
+    {
+      "module": "member",
+      "controller": "InternalMemberController",
+      "method": "updateMemberStatus",
+      "httpMethod": "PATCH",
+      "path": "/internal/members/{userId}/status",
+      "summary": "update member status",
+      "source": "member/src/main/java/com/devticket/member/presentation/controller/InternalMemberController.java"
+    },
+    {
+      "module": "member",
+      "controller": "InternalMemberController",
+      "method": "getUserTechStacks",
+      "httpMethod": "GET",
+      "path": "/internal/members/{userId}/tech-stacks",
+      "summary": "get user tech stacks",
+      "source": "member/src/main/java/com/devticket/member/presentation/controller/InternalMemberController.java"
+    }
+  ],
+  "notes": []
+}

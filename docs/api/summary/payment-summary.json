@@ -1,0 +1,205 @@
+{
+  "module": "payment",
+  "endpointCount": 22,
+  "endpoints": [
+    {
+      "module": "payment",
+      "controller": "AdminRefundController",
+      "method": "cancelAdminEvent",
+      "httpMethod": "POST",
+      "path": "/api/admin/events/{eventId}/cancel",
+      "summary": "cancel admin event",
+      "source": "payment/src/main/java/com/devticket/payment/refund/presentation/controller/AdminRefundController.java"
+    },
+    {
+      "module": "payment",
+      "controller": "PaymentController",
+      "method": "confirm",
+      "httpMethod": "POST",
+      "path": "/api/payments/confirm",
+      "summary": "PG 결제 승인",
+      "source": "payment/src/main/java/com/devticket/payment/payment/presentation/controller/PaymentController.java"
+    },
+    {
+      "module": "payment",
+      "controller": "PaymentController",
+      "method": "fail",
+      "httpMethod": "POST",
+      "path": "/api/payments/fail",
+      "summary": "PG 결제 실패 처리",
+      "source": "payment/src/main/java/com/devticket/payment/payment/presentation/controller/PaymentController.java"
+    },
+    {
+      "module": "payment",
+      "controller": "PaymentController",
+      "method": "readyPayment",
+      "httpMethod": "POST",
+      "path": "/api/payments/ready",
+      "summary": "ready payment",
+      "source": "payment/src/main/java/com/devticket/payment/payment/presentation/controller/PaymentController.java"
+    },
+    {
+      "module": "payment",
+      "controller": "RefundController",
+      "method": "getRefundList",
+      "httpMethod": "GET",
+      "path": "/api/refunds",
+      "summary": "get refund list",
+      "source": "payment/src/main/java/com/devticket/payment/refund/presentation/controller/RefundController.java"
+    },
+    {
+      "module": "payment",
+      "controller": "RefundController",
+      "method": "getRefundInfo",
+      "httpMethod": "GET",
+      "path": "/api/refunds/info",
+      "summary": "get refund info",
+      "source": "payment/src/main/java/com/devticket/payment/refund/presentation/controller/RefundController.java"
+    },
+    {
+      "module": "payment",
+      "controller": "RefundController",
+      "method": "refundOrder",
+      "httpMethod": "POST",
+      "path": "/api/refunds/orders/{orderId}",
+      "summary": "refund order",
+      "source": "payment/src/main/java/com/devticket/payment/refund/presentation/controller/RefundController.java"
+    },
+    {
+      "module": "payment",
+      "controller": "RefundController",
+      "method": "refundPgTicket",
+      "httpMethod": "POST",
+      "path": "/api/refunds/pg/{ticketId}",
+      "summary": "refund pg ticket",
+      "source": "payment/src/main/java/com/devticket/payment/refund/presentation/controller/RefundController.java"
+    },
+    {
+      "module": "payment",
+      "controller": "RefundController",
+      "method": "getRefundDetail",
+      "httpMethod": "GET",
+      "path": "/api/refunds/{refundId}",
+      "summary": "get refund detail",
+      "source": "payment/src/main/java/com/devticket/payment/refund/presentation/controller/RefundController.java"
+    },
+    {
+      "module": "payment",
+      "controller": "SellerRefundController",
+      "method": "cancelSellerEvent",
+      "httpMethod": "POST",
+      "path": "/api/seller/events/{eventId}/cancel",
+      "summary": "cancel seller event",
+      "source": "payment/src/main/java/com/devticket/payment/refund/presentation/controller/SellerRefundController.java"
+    },
+    {
+      "module": "payment",
+      "controller": "SellerRefundController",
+      "method": "getSellerRefundListByEventId",
+      "httpMethod": "GET",
+      "path": "/api/seller/refunds/events/{eventId}",
+      "summary": "get seller refund list by event id",
+      "source": "payment/src/main/java/com/devticket/payment/refund/presentation/controller/SellerRefundController.java"
+    },
+    {
+      "module": "payment",
+      "controller": "WalletController",
+      "method": "getBalance",
+      "httpMethod": "GET",
+      "path": "/api/wallet",
+      "summary": "예치금 잔액 조회",
+      "source": "payment/src/main/java/com/devticket/payment/wallet/presentation/controller/WalletController.java"
+    },
+    {
+      "module": "payment",
+      "controller": "WalletController",
+      "method": "charge",
+      "httpMethod": "POST",
+      "path": "/api/wallet/charge",
+      "summary": "예치금 충전 시작",
+      "source": "payment/src/main/java/com/devticket/payment/wallet/presentation/controller/WalletController.java"
+    },
+    {
+      "module": "payment",
+      "controller": "WalletController",
+      "method": "confirmCharge",
+      "httpMethod": "POST",
+      "path": "/api/wallet/charge/confirm",
+      "summary": "예치금 충전 승인",
+      "source": "payment/src/main/java/com/devticket/payment/wallet/presentation/controller/WalletController.java"
+    },
+    {
+      "module": "payment",
+      "controller": "WalletController",
+      "method": "failCharge",
+      "httpMethod": "PATCH",
+      "path": "/api/wallet/charge/{chargeId}/fail",
+      "summary": "예치금 충전 실패 처리",
+      "source": "payment/src/main/java/com/devticket/payment/wallet/presentation/controller/WalletController.java"
+    },
+    {
+      "module": "payment",
+      "controller": "WalletController",
+      "method": "getTransactions",
+      "httpMethod": "GET",
+      "path": "/api/wallet/transactions",
+      "summary": "예치금 거래 내역 조회",
+      "source": "payment/src/main/java/com/devticket/payment/wallet/presentation/controller/WalletController.java"
+    },
+    {
+      "module": "payment",
+      "controller": "WalletController",
+      "method": "withdraw",
+      "httpMethod": "POST",
+      "path": "/api/wallet/withdraw",
+      "summary": "예치금 출금 요청",
+      "source": "payment/src/main/java/com/devticket/payment/wallet/presentation/controller/WalletController.java"
+    },
+    {
+      "module": "payment",
+      "controller": "MockCommerceController",
+      "method": "getOrderItemByTicketId",
+      "httpMethod": "GET",
+      "path": "/internal/order-items/by-ticket/{ticketId}",
+      "summary": "get order item by ticket id",
+      "source": "payment/src/main/java/com/devticket/payment/mock/MockCommerceController.java"
+    },
+    {
+      "module": "payment",
+      "controller": "MockCommerceController",
+      "method": "getOrderInfo",
+      "httpMethod": "GET",
+      "path": "/internal/orders/{orderId}",
+      "summary": "get order info",
+      "source": "payment/src/main/java/com/devticket/payment/mock/MockCommerceController.java"
+    },
+    {
+      "module": "payment",
+      "controller": "PaymentInternalController",
+      "method": "getPaymentByOrderId",
+      "httpMethod": "GET",
+      "path": "/internal/payments/by-order/{orderId}",
+      "summary": "get payment by order id",
+      "source": "payment/src/main/java/com/devticket/payment/payment/presentation/controller/PaymentInternalController.java"
+    },
+    {
+      "module": "payment",
+      "controller": "WalletInternalController",
+      "method": "depositFromSettlement",
+      "httpMethod": "POST",
+      "path": "/internal/wallet/settlement-deposit",
+      "summary": "deposit from settlement",
+      "source": "payment/src/main/java/com/devticket/payment/wallet/presentation/controller/WalletInternalController.java"
+    },
+    {
+      "module": "payment",
+      "controller": "MockCommerceController",
+      "method": "mockCharge",
+      "httpMethod": "POST",
+      "path": "/mock/wallet/charge",
+      "summary": "mock charge",
+      "source": "payment/src/main/java/com/devticket/payment/mock/MockCommerceController.java"
+    }
+  ],
+  "notes": []
+}
