@@ -4,7 +4,7 @@
 
 관리자 진입점 모듈 — 회원/판매자/이벤트/정산/TechStack 통합 관리.
 
-★ 요구사항:
+★ 요구사항 :
 - 매월 정산 — `runSettlement` 진입점
 - 벡터DB — TechStack CRUD + ES 임베딩 동기화
 
@@ -18,12 +18,12 @@
 | Seller | GET | `/api/admin/seller-applications` | `AdminSellerController#getSellerApplicationList` | 관리자 | 판매자 신청 리스트 조회 |
 | Seller | PATCH | `/api/admin/seller-applications/{applicationId}` | `AdminSellerController#decideApplication` | 관리자 | 판매자 신청 승인/반려 |
 | Settlement | GET | `/api/admin/settlements` | `AdminSettlementController#getAdminSettlementList` | 관리자 | 관리자 정산 내역 조회 |
-| Settlement | POST | `/api/admin/settlements/run` ★ | `AdminSettlementController#runSettlement` | 관리자 | (#7) settlement 모듈 측 `SettlementAdminController#runSettlement` 위임 |
-| TechStack | GET | `/api/admin/techstacks` ★ | `TechStackController#getTechStacks` | 관리자 | (§2 벡터DB) TechStack 전체 조회 |
-| TechStack | POST | `/api/admin/techstacks` ★ | `TechStackController#createTechStack` | 관리자 | (§2 벡터DB) TechStack 생성 (OpenAI embedding 트리거) |
-| TechStack | POST | `/api/admin/techstacks/reindex` ★ | `TechStackController#reindexEmptyEmbeddings` | 관리자 | (§2 벡터DB) 비어있는 embedding 재계산 (배치 트리거) |
-| TechStack | DELETE | `/api/admin/techstacks/{id}` ★ | `TechStackController#deleteTechStack` | 관리자 | (§2 벡터DB) TechStack 삭제 |
-| TechStack | PUT | `/api/admin/techstacks/{id}` ★ | `TechStackController#updateTechStack` | 관리자 | (§2 벡터DB) TechStack 수정 |
+| Settlement | POST | `/api/admin/settlements/run` ★ | `AdminSettlementController#runSettlement` | 관리자 | settlement 모듈 측 `SettlementAdminController#runSettlement` 위임 |
+| TechStack | GET | `/api/admin/techstacks` ★ | `TechStackController#getTechStacks` | 관리자 | TechStack 전체 조회 |
+| TechStack | POST | `/api/admin/techstacks` ★ | `TechStackController#createTechStack` | 관리자 | TechStack 생성 (OpenAI embedding 트리거) |
+| TechStack | POST | `/api/admin/techstacks/reindex` ★ | `TechStackController#reindexEmptyEmbeddings` | 관리자 | 비어있는 embedding 재계산 (배치 트리거) |
+| TechStack | DELETE | `/api/admin/techstacks/{id}` ★ | `TechStackController#deleteTechStack` | 관리자 | TechStack 삭제 |
+| TechStack | PUT | `/api/admin/techstacks/{id}` ★ | `TechStackController#updateTechStack` | 관리자 | TechStack 수정 |
 | Users | GET | `/api/admin/users` | `AdminUsersController#getUsers` | 관리자 | 회원 목록 조회 |
 | Users | GET | `/api/admin/users/{userId}` | `AdminUsersController#getUserDetail` | 관리자 | 회원 상세 조회 |
 | Users | PATCH | `/api/admin/users/{userId}/role` | `AdminUsersController#updateUserRole` | 관리자 | 회원 권한 변경 |
@@ -33,7 +33,7 @@
 
 | 영역 | HTTP | Path | Controller#Method | 호출 주체 | 설명 |
 |---|---|---|---|---|---|
-| TechStack Internal | GET | `/internal/admin/tech-stacks` ★ | `InternalTechStackController#getTechStacks` | ai 모듈 | (§2 벡터DB) ai 측 `TechStackEmbeddingRepository` 가 기술 스택 임베딩 조회 시 호출 |
+| TechStack Internal | GET | `/internal/admin/tech-stacks` ★ | `InternalTechStackController#getTechStacks` | ai 모듈 | ai 측 `TechStackEmbeddingRepository` 가 기술 스택 임베딩 조회 시 호출 |
 
 ## Kafka
 
@@ -53,16 +53,16 @@
 |---|---|---|
 | event | `forceCancel` (`PATCH /internal/events/{eventId}/force-cancel`) | 관리자 강제취소 |
 | member | `searchMembers`, `getMemberInfo`, `updateMemberRole`, `updateMemberStatus`, `getSellerApplications`, `decideSellerApplication` | 회원/판매자 관리 |
-| settlement | `getSettlements`, `runSettlement` ★ (#7) | 정산 조회/실행 |
-| 외부 | OpenAI Embedding ★ (§2 벡터DB) | TechStack 임베딩 생성 |
-| 외부 | Elasticsearch ★ (§2 벡터DB) | TechStack ES 동기화 |
+| settlement | `getSettlements`, `runSettlement` ★ | 정산 조회/실행 |
+| 외부 | OpenAI Embedding ★ | TechStack 임베딩 생성 |
+| 외부 | Elasticsearch ★ | TechStack ES 동기화 |
 
 ### 피호출 (REST)
 
-- ai: `getTechStacks` (`/internal/admin/tech-stacks`) ★ (§2 벡터DB)
+- ai: `getTechStacks` (`/internal/admin/tech-stacks`) ★
 - 외부 (관리자 클라이언트) — 외부 API 표 참조
 
 
 ## 신규 인프라
 
-- **TechStack ES 동기화** ★ (§2 벡터DB): `TechStackEsEventListener` + `TechStackEsRepository` + `TechStackEsRepositoryImpl` — admin 측 도메인 이벤트 → ES 인덱스 동기화 (in-process `@EventListener` 기반)
+- **TechStack ES 동기화** ★: `TechStackEsEventListener` + `TechStackEsRepository` + `TechStackEsRepositoryImpl` — admin 측 도메인 이벤트 → ES 인덱스 동기화 (in-process `@EventListener` 기반)

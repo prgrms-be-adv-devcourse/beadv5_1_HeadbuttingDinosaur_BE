@@ -20,12 +20,12 @@
 | GET | `/api/admin/seller-applications` | `AdminSellerController#getSellerApplicationList` | 판매자 신청 리스트 조회 |
 | PATCH | `/api/admin/seller-applications/{applicationId}` | `AdminSellerController#decideApplication` | 판매자 신청 승인/반려 |
 | GET | `/api/admin/settlements` | `AdminSettlementController#getAdminSettlementList` | 관리자 정산 내역 조회 |
-| POST | `/api/admin/settlements/run` ★ | `AdminSettlementController#runSettlement` | (#7) 정산 프로세스 실행 |
-| GET | `/api/admin/techstacks` ★ | `TechStackController#getTechStacks` | (§2 벡터DB) TechStack 전체 조회 |
-| POST | `/api/admin/techstacks` ★ | `TechStackController#createTechStack` | (§2 벡터DB) TechStack 생성 |
-| POST | `/api/admin/techstacks/reindex` ★ | `TechStackController#reindexEmptyEmbeddings` | (§2 벡터DB) 비어있는 embedding 재계산 |
-| DELETE | `/api/admin/techstacks/{id}` ★ | `TechStackController#deleteTechStack` | (§2 벡터DB) TechStack 삭제 |
-| PUT | `/api/admin/techstacks/{id}` ★ | `TechStackController#updateTechStack` | (§2 벡터DB) TechStack 수정 |
+| POST | `/api/admin/settlements/run` ★ | `AdminSettlementController#runSettlement` | 정산 프로세스 실행 |
+| GET | `/api/admin/techstacks` ★ | `TechStackController#getTechStacks` | TechStack 전체 조회 |
+| POST | `/api/admin/techstacks` ★ | `TechStackController#createTechStack` | TechStack 생성 |
+| POST | `/api/admin/techstacks/reindex` ★ | `TechStackController#reindexEmptyEmbeddings` | 비어있는 embedding 재계산 |
+| DELETE | `/api/admin/techstacks/{id}` ★ | `TechStackController#deleteTechStack` | TechStack 삭제 |
+| PUT | `/api/admin/techstacks/{id}` ★ | `TechStackController#updateTechStack` | TechStack 수정 |
 | GET | `/api/admin/users` | `AdminUsersController#getUsers` | 회원 목록 조회 |
 | GET | `/api/admin/users/{userId}` | `AdminUsersController#getUserDetail` | 회원 상세 조회 |
 | PATCH | `/api/admin/users/{userId}/role` | `AdminUsersController#updateUserRole` | 회원 권한 변경 |
@@ -35,7 +35,7 @@
 
 | HTTP | Path | Controller#Method | 설명 |
 |---|---|---|---|
-| GET | `/internal/admin/tech-stacks` ★ | `InternalTechStackController#getTechStacks` | (§2 벡터DB) ai 모듈이 기술 스택 임베딩 조회 시 호출 |
+| GET | `/internal/admin/tech-stacks` ★ | `InternalTechStackController#getTechStacks` | ai 모듈이 기술 스택 임베딩 조회 시 호출 |
 
 ---
 
@@ -45,7 +45,7 @@
 
 | HTTP | Path | Controller#Method | 설명 |
 |---|---|---|---|
-| POST | `/internal/ai/recommendation` ★ | `RecommendationController#recommend` | (#10, §2 AI 추천 + 벡터DB) 사용자 추천 이벤트 ID 목록 반환 (`recommendByUserVector`, `UserVector` 부재 시 `recommendByColdStart` 폴백) |
+| POST | `/internal/ai/recommendation` ★ | `RecommendationController#recommend` | 사용자 추천 이벤트 ID 목록 반환 (`recommendByUserVector`, `UserVector` 부재 시 `recommendByColdStart` 폴백) |
 
 > ⚠ 패키지: 본 모듈만 `org.example.ai.*` (다른 모듈은 `com.devticket.*`) — 명명 일관성 정정은 후속 트랙.
 
@@ -61,9 +61,9 @@
 
 | HTTP | Path | Controller#Method | 설명 |
 |---|---|---|---|
-| GET | `/health` ★ | `GatewayHealthController#health` | (§2 MSA + Gateway) gateway 라우팅 헬스 체크 |
+| GET | `/health` ★ | `GatewayHealthController#health` | gateway 라우팅 헬스 체크 |
 
-> 본 모듈은 **라우팅 전용**. 비즈니스 endpoint 0건. JWT 검증 / Rate Limit / OAuth 진입점 등은 `infrastructure/security` filter chain 으로 처리 ★ (§2 JWT + OAuth — `modules/apigateway.md` 참조).
+> 본 모듈은 **라우팅 전용**. 비즈니스 endpoint 0건. JWT 검증 / Rate Limit / OAuth 진입점 등은 `infrastructure/security` filter chain 으로 처리 ★.
 
 ---
 
@@ -73,12 +73,12 @@
 
 | HTTP | Path | Controller#Method | 설명 |
 |---|---|---|---|
-| POST | `/api/cart/items` ★ | `CartController#addToCart` | (#3) 장바구니 아이템 추가 |
+| POST | `/api/cart/items` ★ | `CartController#addToCart` | 장바구니 아이템 추가 |
 | GET | `/api/cart` | `CartController#getCart` | 내 장바구니 조회 |
 | PATCH | `/api/cart/items/{cartItemId}` | `CartController#updateCartItemQuantity` | 장바구니 수량 증감 |
 | DELETE | `/api/cart/items/{cartItemId}` | `CartController#deleteCartItem` | 장바구니 단건 삭제 |
 | DELETE | `/api/cart` | `CartController#deleteCartItemAll` | 장바구니 전체 삭제 |
-| POST | `/api/orders` ★ | `OrderController#createOrderByCart` | (#4) 장바구니 기반 주문 생성 + 재고 차감 |
+| POST | `/api/orders` ★ | `OrderController#createOrderByCart` | 장바구니 기반 주문 생성 + 재고 차감 |
 | GET | `/api/orders/{orderId}/status` | `OrderController#getOrderStatus` | 주문 상태 폴링 (`CREATED → PAYMENT_PENDING`) |
 | GET | `/api/orders/{orderId}` | `OrderController#getOrderDetail` | 주문 상세 조회 |
 | PATCH | `/api/orders/{orderId}/cancel` | `OrderController#cancelOrder` | 결제 전 주문 취소 + 재고 복구 |
@@ -106,9 +106,9 @@
 
 | HTTP | Path | Controller#Method | 설명 |
 |---|---|---|---|
-| GET | `/api/events` ★ | `EventController#getEventList` | (§2 ES 검색) 권한별 공개 이벤트 페이지 조회 (viewCount/category 포함, saleStartAt 기준 정렬) |
-| GET | `/api/events/{eventId}` ★ | `EventController#getEvent` | (§2 ES 검색) 이벤트 단건 상세 + 조회수 증가 |
-| GET | `/api/events/user/recommendations` ★ | `EventController#getRecommendations` | (#9, #10, §2 AI 추천) ai 모듈 위임 + try-catch 폴백 격리 |
+| GET | `/api/events` ★ | `EventController#getEventList` | 권한별 공개 이벤트 페이지 조회 (viewCount/category 포함, saleStartAt 기준 정렬) |
+| GET | `/api/events/{eventId}` ★ | `EventController#getEvent` | 이벤트 단건 상세 + 조회수 증가 |
+| GET | `/api/events/user/recommendations` ★ | `EventController#getRecommendations` | ai 모듈 위임 + try-catch 폴백 격리 |
 | POST | `/api/events/{eventId}/dwell` | `DwellController#reportDwell` | 체류시간 보고 (`action.log` 1-C 발행) |
 | GET | `/api/seller/events` | `SellerEventController#getSellerEvents` | 판매자 이벤트 목록 |
 | POST | `/api/seller/events` | `SellerEventController#createEvent` | 판매자 이벤트 등록 |
@@ -128,15 +128,15 @@
 | GET | `/internal/events/by-seller/{sellerId}` | `EventInternalController#getEventsBySeller` | 판매자 이벤트 목록 |
 | GET | `/internal/events/by-seller/{sellerId}/settlement` | `EventInternalController#getEventsBySellerForSettlement` | 정산 기간 이벤트 |
 | GET | `/internal/events/ended` | `EventInternalController#getEndedEventsByDate` | 종료된 이벤트 (settlement) |
-| POST | `/internal/events/popular` ★ | `EventInternalController#getPopularEvents` | (§2 AI 추천 보강) 인기 이벤트 |
-| PATCH | `/internal/events/stock-adjustments` ★ | `EventInternalController#adjustStockBulk` | (#11) delta 부호별 일괄 재고 차감/복원 (락 순서 고정) |
+| POST | `/internal/events/popular` ★ | `EventInternalController#getPopularEvents` | 인기 이벤트 |
+| PATCH | `/internal/events/stock-adjustments` ★ | `EventInternalController#adjustStockBulk` | delta 부호별 일괄 재고 차감/복원 (락 순서 고정) |
 | PATCH | `/internal/events/{eventId}/force-cancel` | `EventInternalController#forceCancel` | admin 호출, `event.force-cancelled` Outbox 발행 |
 
 ---
 
 ## 6. gateway
 
-본 디렉토리는 **존재하지 않음**. 라우팅/필터 코드는 `apigateway` 모듈에 통합되어 있다 (§3 참조).
+본 디렉토리는 **존재하지 않음**. 라우팅/필터 코드는 `apigateway` 모듈에 통합되어 있다.
 
 ---
 
@@ -145,7 +145,7 @@
 본 모듈은 **Java 가 아닌 별도 스택** (`fastify-log/` 디렉토리, TypeScript). 본 자동 자산 범위 외.
 
 - 수신 이벤트 / 저장 / 조회 명세는 `docs/kafka/actionLog.md` 참조
-- 1-C `action.log` (CART_ADD / CART_REMOVE / VIEW / DETAIL_VIEW / DWELL_TIME 등) + 1-B `payment.completed` ★ (#4 — PURCHASE INSERT) 수신
+- 1-C `action.log` (CART_ADD / CART_REMOVE / VIEW / DETAIL_VIEW / DWELL_TIME 등) + 1-B `payment.completed` ★ 수신
 - HTTP endpoint 노출 없음 (Kafka consumer 기반, ai 모듈이 `LogServiceClient.getRecentActionLog` REST 호출 1건 ★ — §2 AI 추천 입력)
 
 ---
@@ -157,11 +157,11 @@
 | HTTP | Path | Controller#Method | 설명 |
 |---|---|---|---|
 | POST | `/api/auth/signup` | `AuthController#signup` | 일반 회원가입 |
-| POST | `/api/auth/login` ★ | `AuthController#login` | (§2 JWT) 일반 로그인 |
+| POST | `/api/auth/login` ★ | `AuthController#login` | 일반 로그인 |
 | POST | `/api/auth/logout` | `AuthController#logout` | 로그아웃 |
-| POST | `/api/auth/reissue` ★ | `AuthController#reissue` | (§2 JWT) 토큰 재발급 |
-| POST | `/api/auth/social/google` ★ | `AuthController#socialLogin` | (§2 OAuth) Google OAuth 로그인 |
-| POST | `/api/auth/google-signup` ★ | `AuthController#oauthSignUpOrLogin` | (§2 OAuth) Google OAuth 회원가입 + 자동 로그인 |
+| POST | `/api/auth/reissue` ★ | `AuthController#reissue` | 토큰 재발급 |
+| POST | `/api/auth/social/google` ★ | `AuthController#socialLogin` | Google OAuth 로그인 |
+| POST | `/api/auth/google-signup` ★ | `AuthController#oauthSignUpOrLogin` | Google OAuth 회원가입 + 자동 로그인 |
 | GET | `/api/members/health` | `MemberController#health` | Member 서비스 헬스 체크 |
 | GET | `/api/users/me` | `UserController#getProfile` | 내 프로필 조회 |
 | POST | `/api/users/profile` | `UserController#createProfile` | 프로필 생성 |
@@ -184,8 +184,8 @@
 | GET | `/internal/members/{userId}/status` | `InternalMemberController#getMemberStatus` | 상태 조회 |
 | PATCH | `/internal/members/{userId}/status` | `InternalMemberController#updateMemberStatus` | 상태 변경 |
 | GET | `/internal/members/{userId}/seller-info` | `InternalMemberController#getSellerInfo` | 판매자 정보 조회 |
-| GET | `/internal/members/{userId}/tech-stacks` ★ | `InternalMemberController#getUserTechStacks` | (#9, §2 AI 추천 + 벡터DB) 사용자 기술스택 (ai 호출) |
-| GET | `/internal/members/sellers` ★ | `InternalMemberController#getSellerId` | (#7) 판매자 ID 목록 |
+| GET | `/internal/members/{userId}/tech-stacks` ★ | `InternalMemberController#getUserTechStacks` | 사용자 기술스택 (ai 호출) |
+| GET | `/internal/members/sellers` ★ | `InternalMemberController#getSellerId` | 판매자 ID 목록 |
 | GET | `/internal/members/seller-applications` | `InternalMemberController#getSellerApplications` | 판매자 신청 목록 (admin 호출) |
 | PATCH | `/internal/members/seller-applications/{applicationId}` | `InternalMemberController#decideSellerApplication` | 판매자 신청 승인/반려 (admin 호출) |
 
@@ -197,9 +197,9 @@
 
 | HTTP | Path | Controller#Method | 설명 |
 |---|---|---|---|
-| POST | `/api/payments/ready` ★ | `PaymentController#readyPayment` | (#4) 결제수단별(PG/WALLET/WALLET_PG) Payment 생성 |
-| POST | `/api/payments/confirm` ★ | `PaymentController#confirm` | (#4) PG 승인 + `payment.completed` Outbox 발행 |
-| POST | `/api/payments/fail` ★ | `PaymentController#fail` | (#4) PG 실패 + WALLET_PG 예치금 복구 + `payment.failed` Outbox 발행 |
+| POST | `/api/payments/ready` ★ | `PaymentController#readyPayment` | 결제수단별(PG/WALLET/WALLET_PG) Payment 생성 |
+| POST | `/api/payments/confirm` ★ | `PaymentController#confirm` | PG 승인 + `payment.completed` Outbox 발행 |
+| POST | `/api/payments/fail` ★ | `PaymentController#fail` | PG 실패 + WALLET_PG 예치금 복구 + `payment.failed` Outbox 발행 |
 | GET | `/api/refunds` | `RefundController#getRefundList` | 환불 목록 |
 | GET | `/api/refunds/info` | `RefundController#getRefundInfo` | 환불 정보 |
 | GET | `/api/refunds/{refundId}` | `RefundController#getRefundDetail` | 환불 상세 |
@@ -220,7 +220,7 @@
 | HTTP | Path | Controller#Method | 설명 |
 |---|---|---|---|
 | GET | `/internal/payments/by-order/{orderId}` | `PaymentInternalController#getPaymentByOrderId` | 주문 ID 로 결제 조회 |
-| POST | `/internal/wallet/settlement-deposit` ★ | `WalletInternalController#depositFromSettlement` | (#7) 정산금 → 판매자 예치금 입금 (settlement 호출) |
+| POST | `/internal/wallet/settlement-deposit` ★ | `WalletInternalController#depositFromSettlement` | 정산금 → 판매자 예치금 입금 (settlement 호출) |
 
 ---
 
@@ -231,14 +231,14 @@
 | HTTP | Path | Controller#Method | 설명 |
 |---|---|---|---|
 | GET | `/api/admin/settlements` | `SettlementAdminController#getSettlements` | 관리자 정산서 페이지 조회 |
-| POST | `/api/admin/settlements/run` ★ | `SettlementAdminController#runSettlement` | (#7) 정산 프로세스 실행 (`createSettlementFromItems` 위임) |
-| POST | `/api/admin/settlements/create-from-items` ★ | `SettlementAdminController#createSettlementFromItems` | (#7) SettlementItem 기반 월별 Batch 로 정산서 생성 |
+| POST | `/api/admin/settlements/run` ★ | `SettlementAdminController#runSettlement` | 정산 프로세스 실행 (`createSettlementFromItems` 위임) |
+| POST | `/api/admin/settlements/create-from-items` ★ | `SettlementAdminController#createSettlementFromItems` | SettlementItem 기반 월별 Batch 로 정산서 생성 |
 | GET | `/api/admin/settlements/{settlementId}` | `SettlementAdminController#getSettlementDetail` | 정산서 상세 |
 | POST | `/api/admin/settlements/{settlementId}/cancel` | `SettlementAdminController#cancelSettlement` | 정산서 취소 |
-| POST | `/api/admin/settlements/{settlementId}/payment` ★ | `SettlementAdminController#processPayment` | (#7) Payment 측 예치금 전환 호출 + Settlement / 이월건 PAID 전이 |
-| GET | `/api/admin/settlements/revenues/{yearMonth}` ★ | `SettlementAdminController#getMonthlyRevenue` | (#7) 관리자 월별 수익 조회 (PathVariable `YearMonth`) |
-| POST | `/api/admin/settlements/batch/daily` ★ | `BatchController#launchDailyJob` | (#7) 일별 정산대상 수집 배치 수동 실행 |
-| POST | `/api/admin/settlements/batch/monthly` ★ | `BatchController#launchMonthlyJob` | (#7) 월별 정산서 생성 배치 수동 실행 |
+| POST | `/api/admin/settlements/{settlementId}/payment` ★ | `SettlementAdminController#processPayment` | Payment 측 예치금 전환 호출 + Settlement / 이월건 PAID 전이 |
+| GET | `/api/admin/settlements/revenues/{yearMonth}` ★ | `SettlementAdminController#getMonthlyRevenue` | 관리자 월별 수익 조회 (PathVariable `YearMonth`) |
+| POST | `/api/admin/settlements/batch/daily` ★ | `BatchController#launchDailyJob` | 일별 정산대상 수집 배치 수동 실행 |
+| POST | `/api/admin/settlements/batch/monthly` ★ | `BatchController#launchMonthlyJob` | 월별 정산서 생성 배치 수동 실행 |
 | GET | `/api/seller/settlements/{yearMonth}` | `SettlementController#getSettlementByPeriod` | 판매자 월별 조회 (`yearMonth: 6자리`) |
 | GET | `/api/seller/settlements/preview` | `SettlementController#getSettlementPreview` | 판매자 당월 예상 미리보기 |
 | GET | `/api/test/settlement-target/preview` | `SettlementController#previewSettlementTarget` | 테스트용 정산대상 미리보기 |

@@ -933,7 +933,7 @@ UNIQUE KEY: processed_message INSERT 중복 방지
 [Commerce] ticket.issue-failed 소비
     → Order 상태 CANCELLED 전이
 [Payment] ticket.issue-failed 소비
-    → RefundSagaOrchestrator.start() → 환불 Orchestration 진행 (§9-3 참조)
+    → RefundSagaOrchestrator.start() → 환불 Orchestration 진행
 ```
 
 ### 보상 이벤트 원칙
@@ -966,7 +966,7 @@ sequenceDiagram
     Note over Orchestrator: refund.requested 수신<br/>SagaState(ORDER_CANCELLING) 저장
 
     Orchestrator-->>Commerce: refund.order.cancel
-    Commerce->>Commerce: ⚠️ Order 상태 처리 (§4-1 미결 — 하단 경로 분기 참조)
+    Commerce->>Commerce: ⚠️ Order 상태 처리
     Note over Commerce: §4-1 미결: 옵션A=REFUND_PENDING 전이, 옵션B=상태 전이 없이 done 발행<br/>ticket.issue-failed 경로에서는 이미 CANCELLED 상태 → 멱등 스킵
     Commerce-->>Orchestrator: refund.order.done
 
@@ -1124,7 +1124,7 @@ topic: event.force-cancelled  → DLT: event.force-cancelled.DLT
 - [x] ✅ Payment 엔티티 `approve()` / `fail()` / `cancel()` / `refund()` 내부에 `validateTransition()` 가드 호출 추가 완료
 
 **미구현**
-- [ ] Consumer 순서 역전 3분류 처리 구현 (§5)
+- [ ] Consumer 순서 역전 3분류 처리 구현
 - [ ] `RefundSagaOrchestrator` 클래스 신규 생성, `saga_state` 테이블 및 `SagaStateRepository` 구현
 - [ ] Orchestrator `start()` / `onOrderDone()` / `onTicketDone()` / `onStockDone()` / `onOrderFailed()` / `onTicketFailed()` / `onStockFailed()` 구현
 - [ ] Orchestrator Consumer groupId 등록 (`payment-refund.requested` 외 6개, 상세: §9-3) + dedup 적용

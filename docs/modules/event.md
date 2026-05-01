@@ -6,7 +6,7 @@
 
 이벤트(상품) 도메인 관리 (등록 / 조회 / 수정 / 강제취소) + 재고 (단건 / 일괄 차감 / 복구) + 이벤트 상태 자동 전환 스케줄러 (DRAFT → ON_SALE → SALE_ENDED → ENDED) + ES 검색 인덱싱 (ES 장애 시 DB 폴백) + Kafka 발행 (강제취소 / 판매중지 / 보상 saga 일부) + Kafka 소비 (결제 실패 / 주문 취소 / 환불 → 재고 복구).
 
-★ 요구사항:
+★ 요구사항 :
 - 동시 구매 시 재고 초과 방지 — 비관적 락 + 낙관적 락 + REST `adjustStockBulk` + Kafka 보상
 - ElasticSearch 상품 검색 — `EventService.getEventList` ES 우선 + JPA 재조회 + dense_vector kNN
 
@@ -27,9 +27,9 @@
 
 | 메서드 | 경로 | Controller | Service 1줄 |
 |---|---|---|---|
-| GET | `/api/events` ★ | `EventController.getEventList` | (§2 ES 검색) 권한별 공개 가능 상태로 이벤트 목록을 페이지 조회한다 (응답에 `viewCount`, `category` 포함; 검색 키워드 없을 때 `saleStartAt` 기준 정렬) |
-| GET | `/api/events/{eventId}` ★ | `EventController.getEvent` | (§2 ES 검색) 이벤트 단건 상세 조회 + 조회수 증가 |
-| GET | `/api/events/user/recommendations` ★ | `EventController.getRecommendations` | (#9, #10, §2 AI 추천) ai 모듈 위임 + try-catch 폴백으로 격리 |
+| GET | `/api/events` ★ | `EventController.getEventList` | 권한별 공개 가능 상태로 이벤트 목록을 페이지 조회한다 (응답에 `viewCount`, `category` 포함; 검색 키워드 없을 때 `saleStartAt` 기준 정렬) |
+| GET | `/api/events/{eventId}` ★ | `EventController.getEvent` | 이벤트 단건 상세 조회 + 조회수 증가 |
+| GET | `/api/events/user/recommendations` ★ | `EventController.getRecommendations` | ai 모듈 위임 + try-catch 폴백으로 격리 |
 | POST | `/api/events/{eventId}/dwell` | `DwellController.reportDwell` | 체류시간 보고 — `action.log` 1-C 발행 |
 | GET | `/api/seller/events` | `SellerEventController.getSellerEvents` | 판매자 이벤트 목록 |
 | POST | `/api/seller/events` | `SellerEventController.createEvent` | 판매자 이벤트 등록 |
@@ -51,8 +51,8 @@
 | GET | `/internal/events/by-seller/{sellerId}` | `getEventsBySeller` | admin / seller 측 | 판매자 이벤트 목록 |
 | GET | `/internal/events/by-seller/{sellerId}/settlement` | `getEventsBySellerForSettlement` | settlement | 정산 기간 이벤트 |
 | GET | `/internal/events/ended` | `getEndedEventsByDate` | settlement | 종료된 이벤트 |
-| POST | `/internal/events/popular` ★ | `getPopularEvents` | ai | (§2 AI 추천 보강) 인기 이벤트 |
-| PATCH | `/internal/events/stock-adjustments` ★ | `adjustStockBulk` | commerce (OrderService) | (#11) delta 부호별 일괄 재고 차감/복원을 원자적으로 처리한다 (락 순서 고정) |
+| POST | `/internal/events/popular` ★ | `getPopularEvents` | ai | 인기 이벤트 |
+| PATCH | `/internal/events/stock-adjustments` ★ | `adjustStockBulk` | commerce (OrderService) | delta 부호별 일괄 재고 차감/복원을 원자적으로 처리한다 (락 순서 고정) |
 | PATCH | `/internal/events/{eventId}/force-cancel` | `forceCancel` | admin | admin 호출, `event.force-cancelled` Outbox 발행 |
 
 ## 4. Kafka
@@ -64,7 +64,7 @@
 | `event.force-cancelled` | 1-B Outbox | admin → `EventService.forceCancel` 호출 시 |
 | `event.sale-stopped` | 1-B Outbox | 판매 중지 (`stopSale`) |
 | `refund.stock.done` / `refund.stock.failed` | 1-B Outbox | Stock 복구 처리 성공/실패 시 (`StockRestoreConsumer`) |
-| `action.log` (VIEW / DETAIL_VIEW / DWELL_TIME) | 1-C fire-and-forget | EventService 내부, `ActionLogKafkaPublisher.publish` (#9 AI 추천 입력) |
+| `action.log` (VIEW / DETAIL_VIEW / DWELL_TIME) | 1-C fire-and-forget | EventService 내부, `ActionLogKafkaPublisher.publish` |
 
 ### Outbox 발행 패턴 (afterCommit 직접 발행 + 스케줄러 fallback)
 
@@ -87,7 +87,7 @@
 
 | 토픽 | 처리 메서드 | 처리 내용 | 멱등성 |
 |---|---|---|---|
-| `payment.failed` ★ | `StockRestoreService.restoreStockForPaymentFailed` | (#11) `payment.failed` 수신, 정렬-비관락 후 재고를 일괄 복구한다 | dedup |
+| `payment.failed` ★ | `StockRestoreService.restoreStockForPaymentFailed` | `payment.failed` 수신, 정렬-비관락 후 재고를 일괄 복구한다 | dedup |
 | `order.cancelled` | `OrderCancelledService.restoreStockForOrderCancelled` | `order.cancelled` 수신, 정렬-비관락 후 재고를 일괄 복구한다 | dedup |
 | `refund.completed` | `RefundCompletedService.recordRefundCompleted` | 통계 기록 (cancelledQuantity 카운터 누적) | dedup |
 | `refund.stock.restore` | `RefundStockRestoreService.handleRefundStockRestore` | `refund.stock.restore` 수신, 환불 보상으로 재고를 복구한다 | dedup |
@@ -106,17 +106,17 @@
 
 - **REST 호출**:
   - member: `getNickname` (EventService.getEvent — 판매자 닉네임 조회), `getMemberInfo` (판매자 검증)
-  - ai: `aiClient.getRecommendedEventIds` ★ (#10 격리 — try-catch 폴백)
-  - 외부: OpenAI (embedding) ★ (§2 벡터DB), Elasticsearch (이벤트 검색 인덱싱) ★ (§2 ES), AWS S3 (이미지 업로드)
+  - ai: `aiClient.getRecommendedEventIds` ★
+  - 외부: OpenAI (embedding) ★, Elasticsearch (이벤트 검색 인덱싱) ★, AWS S3 (이미지 업로드)
 - **Kafka 구독**: commerce 발행(`order.cancelled`), payment 발행(`payment.failed` ★, `refund.completed`, `refund.stock.restore`)
 
 ### 피의존 모듈 (호출됨 / 구독됨)
 
 - **REST 피호출**:
-  - commerce: `validatePurchase`, `adjustStockBulk` ★ (#11), `getBulkEventInfo`, `getSingleEventInfo`, `getEventsBySellerForSettlement`
+  - commerce: `validatePurchase`, `adjustStockBulk` ★, `getBulkEventInfo`, `getSingleEventInfo`, `getEventsBySellerForSettlement`
   - admin: `forceCancel`
   - settlement: `getEndedEventsByDate`, `getEventsBySellerForSettlement`
-  - ai: `getPopularEvents` ★ (§2 AI 추천 보강)
+  - ai: `getPopularEvents` ★
 - **Kafka 피구독**: commerce(`event.force-cancelled` 수신 → RefundFanoutService), payment(`event.force-cancelled`, `event.sale-stopped`, `refund.stock.done`/`failed` 수신)
 
 ### 신규 인프라 / 구조 (참고)

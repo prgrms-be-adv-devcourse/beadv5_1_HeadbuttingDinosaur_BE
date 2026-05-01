@@ -4,7 +4,7 @@
 
 presentation/dto 34건 + Kafka payload 23건 (모듈 중 최다). Cart/Order/Ticket + Refund Saga 보상 흐름.
 
-## Cart — Request / Response ★ (#3 장바구니 추가)
+## Cart — Request / Response ★
 
 ### CartItemRequest (record) ★
 - source: `commerce/.../cart/presentation/dto/req/CartItemRequest.java`
@@ -53,7 +53,7 @@ presentation/dto 34건 + Kafka payload 23건 (모듈 중 최다). Cart/Order/Tic
 - source: `commerce/.../cart/presentation/dto/res/CartClearResponse.java`
 - 필드: `deletedCount` (int)
 
-## Order — Request / Response (사용자) ★ (#4 예치금 구매)
+## Order — Request / Response (사용자) ★
 
 ### CartOrderRequest (record) ★
 - source: `commerce/.../order/presentation/dto/req/CartOrderRequest.java`
@@ -112,8 +112,8 @@ presentation/dto 34건 + Kafka payload 23건 (모듈 중 최다). Cart/Order/Tic
 `commerce/src/main/java/com/devticket/commerce/common/messaging/event/**`
 
 ### 결제 / 주문 후속 (3종)
-- `PaymentCompletedEvent` ★ (#4) — payment 발행, commerce 수신 (PAID 전이)
-- `PaymentFailedEvent` ★ (#4) — payment 발행, commerce 수신 (FAILED 전이)
+- `PaymentCompletedEvent` ★ — payment 발행, commerce 수신 (PAID 전이)
+- `PaymentFailedEvent` ★ — payment 발행, commerce 수신 (FAILED 전이)
 - `OrderCancelledEvent` — commerce 발행 (`OrderExpirationCancelService`)
 - `TicketIssueFailedEvent` — commerce 자체 발행 + 자체 재수신 (티켓 발급 실패)
 
@@ -134,7 +134,7 @@ presentation/dto 34건 + Kafka payload 23건 (모듈 중 최다). Cart/Order/Tic
 - `RefundStockRestoreEvent` — payment 발행 → event 수신
 - `RefundStockDoneEvent`, `RefundStockFailedEvent` — event 발행 → payment 수신
 
-### Action Log ★ (#9 AI 추천 입력) (1-C, 2종)
+### Action Log ★ (1-C, 2종)
 - `ActionLogDomainEvent` — commerce 도메인 표현
 - `ActionLogEvent` — Kafka 1-C 발행 message (CartService)
 

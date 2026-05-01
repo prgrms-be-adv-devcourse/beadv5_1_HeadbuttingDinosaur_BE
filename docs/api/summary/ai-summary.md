@@ -3,7 +3,7 @@
 > ★ = 기능 요구사항 + 기술스택 (`requirements-check.md` §1 / §2)
 > ⚠ 패키지: `org.example.ai.*` (다른 모듈은 `com.devticket.*`) — 명명 일관성 정정은 후속 트랙.
 
-★ 요구사항:
+★ 요구사항 :
 - 사용자 맞춤 AI 추천 시스템
 - AI 중단 시 구매 정상 (격리) — 호출 주체(event 모듈) 측 try-catch 폴백 진입점
 - AI 추천 시스템 / 벡터DB 문서 검색
@@ -16,7 +16,7 @@
 
 | HTTP | Path | Controller#Method | 호출 주체 | 설명 |
 |---|---|---|---|---|
-| POST | `/internal/ai/recommendation` ★ | `RecommendationController#recommend` | event 모듈의 `/api/events/user/recommendations` 위임 | (#10, §2 AI 추천 + 벡터DB) `recommendByUserVector` 호출 → `UserVector` 부재 시 `recommendByColdStart` 폴백 |
+| POST | `/internal/ai/recommendation` ★ | `RecommendationController#recommend` | event 모듈의 `/api/events/user/recommendations` 위임 | `recommendByUserVector` 호출 → `UserVector` 부재 시 `recommendByColdStart` 폴백 |
 
 ## Kafka
 
@@ -26,11 +26,11 @@
 
 | 호출 대상 | 메서드 | 용도 |
 |---|---|---|
-| member | `getUserTechStack` (`MemberServiceClient`) ★ | (§2 벡터DB) 콜드스타트 — 사용자 기술스택 임베딩 조회 |
-| event | `getPopularEvents` (`EventServiceClient`) ★ | (§2 AI 추천 보강) 폴백/보강용 인기 이벤트 |
-| log | `getRecentActionLog` (`LogServiceClient`) ★ | (§2 AI 추천 입력) RecentVectorService 입력 — 최근 행동 로그 |
-| Elasticsearch | KNN 검색 (`ElasticsearchClient`) ★ | (§2 벡터DB) 정규화 벡터 → 후보 이벤트 |
-| `TechStackEmbeddingRepository` ★ | 벡터 저장소 | (§2 벡터DB) admin 모듈 흐름이 임베딩 산출, ai 는 조회만 |
+| member | `getUserTechStack` (`MemberServiceClient`) ★ | 콜드스타트 — 사용자 기술스택 임베딩 조회 |
+| event | `getPopularEvents` (`EventServiceClient`) ★ | 폴백/보강용 인기 이벤트 |
+| log | `getRecentActionLog` (`LogServiceClient`) ★ | RecentVectorService 입력 — 최근 행동 로그 |
+| Elasticsearch | KNN 검색 (`ElasticsearchClient`) ★ | 정규화 벡터 → 후보 이벤트 |
+| `TechStackEmbeddingRepository` ★ | 벡터 저장소 | admin 모듈 흐름이 임베딩 산출, ai 는 조회만 |
 
 
 ## 핵심 컴포넌트
@@ -39,8 +39,3 @@
 - **행동 벡터 갱신**: `VectorService` (클릭/환불/카트/네거티브 가중치 누적)
 - **최근 활동 벡터 재계산**: `RecentVectorService` + Spring Batch (`RecentVectorJobConfig` + `RecentVectorScheduler`)
 
-## ⚠ 미결 / 후속
-
-- ServiceOverview §3 ai MEDIUM 3건 1줄 요약 미처리 (`recommendByUserVector` / `recommendByColdStart` / `searchKnn`)
-- K8s HPA 미설정 ★ (§2 K8s — ServiceOverview §5 ⚠1)
-- 패키지 네이밍 일관성 (`org.example.ai.*`)

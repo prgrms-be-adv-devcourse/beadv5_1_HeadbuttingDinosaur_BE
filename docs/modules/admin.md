@@ -26,12 +26,12 @@
 | GET | `/api/admin/seller-applications` | `AdminSellerController.getSellerApplications` | member 측 위임 |
 | PATCH | `/api/admin/seller-applications/{applicationId}` | `AdminSellerController.decideSellerApplication` | 승인/반려 |
 | GET | `/api/admin/settlements` | `AdminSettlementController.getSettlements` | settlement 측 위임 |
-| POST | `/api/admin/settlements/run` ★ | `AdminSettlementController.runSettlement` | (#7) settlement 측 정산 실행 위임 |
+| POST | `/api/admin/settlements/run` ★ | `AdminSettlementController.runSettlement` | settlement 측 정산 실행 위임 |
 | GET | `/api/admin/users` | `AdminUsersController.getUsers` | member 위임 |
 | GET | `/api/admin/users/{userId}` | `AdminUsersController.getUserDetail` | member 위임 |
 | PATCH | `/api/admin/users/{userId}/status` | `AdminUsersController.updateUserStatus` | member 위임 |
 | PATCH | `/api/admin/users/{userId}/role` | `AdminUsersController.updateUserRole` | member 위임 |
-| POST/PUT/DELETE/GET | `/api/admin/techstacks/**` ★ | `TechStackController` | (§2 벡터DB) 기술 스택 CRUD + reindex (OpenAI 임베딩 → ES 인덱싱) |
+| POST/PUT/DELETE/GET | `/api/admin/techstacks/**` ★ | `TechStackController` | 기술 스택 CRUD + reindex (OpenAI 임베딩 → ES 인덱싱) |
 
 **대상 구분**: 관리자만(`/api/admin/**`). gateway 에서 `admin-service` 라우팅 (`/api/admin/**` → admin 서버, application.yml 라우트 가장 마지막).
 
@@ -39,7 +39,7 @@
 
 | 메서드 | 경로 | Controller | 호출 주체 | 비고 |
 |---|---|---|---|---|
-| GET | `/internal/admin/tech-stacks` ★ | `InternalTechStackController.getTechStacks` | (ai 등 다른 모듈) | (§2 벡터DB) 기술 스택 마스터 목록 |
+| GET | `/internal/admin/tech-stacks` ★ | `InternalTechStackController.getTechStacks` | (ai 등 다른 모듈) | 기술 스택 마스터 목록 |
 
 > admin 이 외부 진입점이므로 internal 엔드포인트는 1건만 존재. 대부분 흐름은 `admin → 다른 모듈` 로 호출되는 단방향.
 
@@ -57,7 +57,7 @@
 
 ### Spring `@EventListener` (in-process)
 
-`TechStackEsEventListener` 가 admin 자체 도메인 이벤트(`TechStackCreatedEvent`/`TechStackUpdatedEvent`/`TechStackDeletedEvent`) 를 수신해 Elasticsearch 인덱스 동기화 — (§2 벡터DB) 임베딩 저장 흐름.
+`TechStackEsEventListener` 가 admin 자체 도메인 이벤트(`TechStackCreatedEvent`/`TechStackUpdatedEvent`/`TechStackDeletedEvent`) 를 수신해 Elasticsearch 인덱스 동기화 — 임베딩 저장 흐름.
 
 ## 5. DTO
 
@@ -75,13 +75,13 @@
 
 - **REST 호출**:
   - event: `forceCancel` (`PATCH /internal/events/{eventId}/force-cancel`) — 강제취소 시 `X-User-Id`, `X-User-Role` 헤더 전달
-  - settlement: `runSettlement` ★ (#7), `getSettlements`
+  - settlement: `runSettlement` ★, `getSettlements`
   - member: `searchMembers`, `updateMemberStatus`, `updateMemberRole`, `getSellerApplications`, `decideSellerApplication`
-  - 외부: OpenAI Embedding (TechStack 임베딩), Elasticsearch (TechStack 인덱싱) — (§2 벡터DB)
+  - 외부: OpenAI Embedding (TechStack 임베딩), Elasticsearch (TechStack 인덱싱) —
 - **Kafka 구독**: 없음
 
 ### 피의존 모듈 (호출됨 / 구독됨)
 
 - **REST 피호출**:
-  - ai: `getTechStacks` (`/internal/admin/tech-stacks`) — (§2 벡터DB) 기술 스택 임베딩 조회
+  - ai: `getTechStacks` (`/internal/admin/tech-stacks`) — 기술 스택 임베딩 조회
 - **Kafka 피구독**: 없음

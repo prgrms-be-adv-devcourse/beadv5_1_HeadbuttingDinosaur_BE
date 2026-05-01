@@ -4,7 +4,7 @@
 
 이벤트(상품) 도메인 + 재고 + 상태 자동 전환 스케줄러(DRAFT→ON_SALE→SALE_ENDED→ENDED) + ES 검색 인덱싱.
 
-★ 요구사항:
+★ 요구사항 :
 - 동시 구매 시 재고 초과 방지 — `adjustStockBulk` (락 순서 고정) + 비관/낙관 락
 - AI 격리 — `EventRecommendationService` 가 ai 호출 + try-catch 폴백
 - ElasticSearch 상품 검색 — `EventService.getEventList` ES 우선 + JPA 재조회 + dense_vector kNN
@@ -13,9 +13,9 @@
 
 | 영역 | HTTP | Path | Controller#Method | 호출 주체 | 설명 |
 |---|---|---|---|---|---|
-| Event | GET | `/api/events` ★ | `EventController#getEventList` | 사용자 | (§2 ES 검색) 권한별 공개 이벤트 페이지 조회 (viewCount/category 포함, saleStartAt 기준 정렬) |
-| Event | GET | `/api/events/{eventId}` ★ | `EventController#getEvent` | 사용자 | (§2 ES 검색) 이벤트 단건 상세 + 조회수 증가 |
-| Event | GET | `/api/events/user/recommendations` ★ | `EventController#getRecommendations` | 사용자 | (#9, #10, §2 AI 추천) ai 모듈 위임 + try-catch 폴백 격리 |
+| Event | GET | `/api/events` ★ | `EventController#getEventList` | 사용자 | 권한별 공개 이벤트 페이지 조회 (viewCount/category 포함, saleStartAt 기준 정렬) |
+| Event | GET | `/api/events/{eventId}` ★ | `EventController#getEvent` | 사용자 | 이벤트 단건 상세 + 조회수 증가 |
+| Event | GET | `/api/events/user/recommendations` ★ | `EventController#getRecommendations` | 사용자 | ai 모듈 위임 + try-catch 폴백 격리 |
 | Dwell | POST | `/api/events/{eventId}/dwell` | `DwellController#reportDwell` | 사용자 | 체류시간 보고 (`action.log` 1-C 발행) |
 | Seller Event | GET | `/api/seller/events` | `SellerEventController#getSellerEvents` | 판매자 | 판매자 이벤트 목록 |
 | Seller Event | POST | `/api/seller/events` | `SellerEventController#createEvent` | 판매자 | 판매자 이벤트 등록 (member API 검증) |
@@ -35,8 +35,8 @@
 | Event Internal | GET | `/internal/events/by-seller/{sellerId}` | `EventInternalController#getEventsBySeller` | admin / seller | 판매자 이벤트 목록 |
 | Event Internal | GET | `/internal/events/by-seller/{sellerId}/settlement` | `EventInternalController#getEventsBySellerForSettlement` | settlement | 정산 기간 이벤트 |
 | Event Internal | GET | `/internal/events/ended` | `EventInternalController#getEndedEventsByDate` | settlement | 종료된 이벤트 |
-| Event Internal | POST | `/internal/events/popular` ★ | `EventInternalController#getPopularEvents` | ai | (§2 AI 추천 보강) 인기 이벤트 |
-| Event Internal | PATCH | `/internal/events/stock-adjustments` ★ | `EventInternalController#adjustStockBulk` | commerce (OrderService) | (#11) delta 부호별 일괄 재고 차감/복원 (락 순서 고정) |
+| Event Internal | POST | `/internal/events/popular` ★ | `EventInternalController#getPopularEvents` | ai | 인기 이벤트 |
+| Event Internal | PATCH | `/internal/events/stock-adjustments` ★ | `EventInternalController#adjustStockBulk` | commerce (OrderService) | delta 부호별 일괄 재고 차감/복원 (락 순서 고정) |
 | Event Internal | PATCH | `/internal/events/{eventId}/force-cancel` | `EventInternalController#forceCancel` | admin | admin 호출, `event.force-cancelled` Outbox 발행 (`EventService.forceCancel`) |
 
 ## Kafka
@@ -48,13 +48,13 @@
 | `event.force-cancelled` | 1-B Outbox | admin → `EventService.forceCancel` 호출 | `EventForceCancelledEvent` |
 | `event.sale-stopped` | 1-B Outbox | 판매 중지 (`stopSale`) | `EventSaleStoppedEvent` |
 | `refund.stock.done` / `refund.stock.failed` | 1-B Outbox | Stock 복구 처리 성공/실패 (`StockRestoreConsumer`) | `RefundStockDoneEvent` / `RefundStockFailedEvent` |
-| `action.log` (VIEW / DETAIL_VIEW / DWELL_TIME) | 1-C fire-and-forget | EventService 내부 — (#9 AI 추천 입력) | `ActionLogDomainEvent` |
+| `action.log` (VIEW / DETAIL_VIEW / DWELL_TIME) | 1-C fire-and-forget | EventService 내부 — | `ActionLogDomainEvent` |
 
 ### 수신 (Consumer)
 
 | 토픽 | 처리 메서드 | 처리 내용 | 멱등성 |
 |---|---|---|---|
-| `payment.failed` ★ | `StockRestoreService#restoreStockForPaymentFailed` | (#11) 정렬-비관락 후 재고 일괄 복구 | dedup |
+| `payment.failed` ★ | `StockRestoreService#restoreStockForPaymentFailed` | 정렬-비관락 후 재고 일괄 복구 | dedup |
 | `order.cancelled` | `OrderCancelledService#restoreStockForOrderCancelled` | 정렬-비관락 후 재고 일괄 복구 | dedup |
 | `refund.completed` | `RefundCompletedService#recordRefundCompleted` | 통계 기록 (cancelledQuantity 카운터 누적) | dedup |
 | `refund.stock.restore` | `RefundStockRestoreService#handleRefundStockRestore` | 환불 보상으로 재고 복구 | dedup |
@@ -68,15 +68,15 @@
 ### 호출 (REST)
 
 - member: `getNickname` (`EventService.getEvent` — 판매자 닉네임 조회), `getMemberInfo` (판매자 검증)
-- ai: `aiClient.getRecommendedEventIds` ★ (#10 격리 — try-catch 폴백)
-- 외부: OpenAI (embedding) ★ (§2 벡터DB), Elasticsearch (이벤트 검색 인덱싱) ★ (§2 ES), AWS S3 (이미지 업로드)
+- ai: `aiClient.getRecommendedEventIds` ★
+- 외부: OpenAI (embedding) ★, Elasticsearch (이벤트 검색 인덱싱) ★, AWS S3 (이미지 업로드)
 
 ### 피호출 (REST)
 
-- commerce: `validatePurchase`, `adjustStockBulk` ★ (#11), `getBulkEventInfo`, `getSingleEventInfo`, `getEventsBySellerForSettlement`
+- commerce: `validatePurchase`, `adjustStockBulk` ★, `getBulkEventInfo`, `getSingleEventInfo`, `getEventsBySellerForSettlement`
 - admin: `forceCancel`
 - settlement: `getEndedEventsByDate`, `getEventsBySellerForSettlement`
-- ai: `getPopularEvents` ★ (§2 AI 추천 보강)
+- ai: `getPopularEvents` ★
 
 
 ## EventStatus enum + 상태 전환

@@ -54,17 +54,17 @@
 ### UserTechStackRequest / UserTechStackResponse (record) ★
 - source: `ai/src/main/java/org/example/ai/infrastructure/external/dto/req/UserTechStackRequest.java`
 - 호출 대상: `member` 모듈 `getUserTechStack` (`/internal/members/{userId}/tech-stacks`)
-- 용도: (#9, §2 벡터DB) 콜드스타트 시 사용자 기술스택 임베딩 조회
+- 용도: 콜드스타트 시 사용자 기술스택 임베딩 조회
 
 ### PopularEventListRequest / PopularEventListResponse (record) ★
 - source: `ai/src/main/java/org/example/ai/infrastructure/external/dto/req/PopularEventListRequest.java`
 - 호출 대상: `event` 모듈 `getPopularEvents` (`/internal/events/popular`)
-- 용도: (§2 AI 추천 보강) 폴백 / 보강용 인기 이벤트 후보
+- 용도: 폴백 / 보강용 인기 이벤트 후보
 
 ### ActionLogRequest / ActionLogResponse (record) ★
 - source: `ai/src/main/java/org/example/ai/infrastructure/external/dto/req/ActionLogRequest.java`
 - 호출 대상: `log` 모듈 `getRecentActionLog` (Fastify 측 endpoint)
-- 용도: (#9, §2 AI 추천 입력) 사용자 최근 행동 로그 조회 (RecentVectorService 입력)
+- 용도: 사용자 최근 행동 로그 조회 (RecentVectorService 입력)
 
 ## Kafka payload
 

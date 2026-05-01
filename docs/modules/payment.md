@@ -6,7 +6,7 @@
 
 결제 처리 (PG / WALLET / WALLET_PG 복합 분기) + 환불 처리 + 지갑(예치금) 관리(충전·출금·정산금 입금·환불 복구).
 
-★ 요구사항:
+★ 요구사항 :
 - 장바구니 → 예치금 구매 — WALLET / WALLET_PG 결제 흐름
 - 매월 정산 — `WalletInternalController.depositFromSettlement` (정산금 → 판매자 예치금 입금)
 
@@ -21,9 +21,9 @@
 
 | 메서드 | 경로 | Controller | Service 1줄 |
 |---|---|---|---|
-| POST | `/api/payments/ready` ★ | `PaymentController.readyPayment` | (#4) 주문 검증 후 결제수단별(PG/WALLET/WALLET_PG) Payment 를 생성한다 |
-| POST | `/api/payments/confirm` ★ | `PaymentController.confirm` | (#4) PG 승인 후 Payment APPROVED + `payment.completed` Outbox 를 발행한다 |
-| POST | `/api/payments/fail` ★ | `PaymentController.fail` | (#4) PG 실패 반영 + WALLET_PG 면 예치금 복구 + `payment.failed` Outbox 를 발행한다 |
+| POST | `/api/payments/ready` ★ | `PaymentController.readyPayment` | 주문 검증 후 결제수단별(PG/WALLET/WALLET_PG) Payment 를 생성한다 |
+| POST | `/api/payments/confirm` ★ | `PaymentController.confirm` | PG 승인 후 Payment APPROVED + `payment.completed` Outbox 를 발행한다 |
+| POST | `/api/payments/fail` ★ | `PaymentController.fail` | PG 실패 반영 + WALLET_PG 면 예치금 복구 + `payment.failed` Outbox 를 발행한다 |
 | GET | `/api/wallet` | `WalletController.getBalance` | 예치금 잔액 조회 |
 | POST | `/api/wallet/charge` | `WalletController.charge` | 예치금 충전 시작 |
 | POST | `/api/wallet/charge/confirm` | `WalletController.confirmCharge` | 예치금 충전 승인 |
@@ -39,7 +39,7 @@
 | 메서드 | 경로 | Controller | 호출 주체 | 비고 |
 |---|---|---|---|---|
 | GET | `/internal/payments/by-order/{orderId}` | `PaymentInternalController.getPaymentByOrderId` | (commerce 등) | 주문 ID 로 결제 조회 |
-| POST | `/internal/wallet/settlement-deposit` ★ | `WalletInternalController.depositFromSettlement` | settlement | (#7) 정산금 → 판매자 예치금 입금 |
+| POST | `/internal/wallet/settlement-deposit` ★ | `WalletInternalController.depositFromSettlement` | settlement | 정산금 → 판매자 예치금 입금 |
 
 ## 4. Kafka
 
@@ -47,8 +47,8 @@
 
 | 이벤트 | 분류 | 트리거 |
 |---|---|---|
-| `payment.completed` ★ | 1-B Outbox | (#4) PG 승인 성공 (`confirmPgPayment`) 또는 WALLET 결제 완료 (`processWalletPayment`) |
-| `payment.failed` ★ | 1-B Outbox | (#4) PG 실패 / 검증 실패 (`failPgPayment`) |
+| `payment.completed` ★ | 1-B Outbox | PG 승인 성공 (`confirmPgPayment`) 또는 WALLET 결제 완료 (`processWalletPayment`) |
+| `payment.failed` ★ | 1-B Outbox | PG 실패 / 검증 실패 (`failPgPayment`) |
 | `refund.completed` | 1-B Outbox | Refund Saga 마지막 단계 완료 (Orchestrator) |
 | `refund.order.cancel` / `refund.ticket.cancel` | 1-B Outbox | Saga 시작 또는 보상 트리거 |
 | `refund.stock.restore` | 1-B Outbox | Ticket 취소 완료 수신 시 |
@@ -105,6 +105,6 @@
 ### 피의존 모듈 (호출됨 / 구독됨)
 
 - **REST 피호출**:
-  - settlement: `POST /internal/wallet/settlement-deposit` ★ (#7) → `depositFromSettlement`
+  - settlement: `POST /internal/wallet/settlement-deposit` ★ → `depositFromSettlement`
   - commerce: `getPaymentByOrderId`
 - **Kafka 피구독**: commerce(`payment.completed` ★ / `payment.failed` ★ / `refund.*`), event(`payment.failed` ★, `refund.completed`, `refund.stock.restore`), log(`payment.completed` ★ — PURCHASE INSERT)

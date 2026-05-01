@@ -144,7 +144,7 @@ sequenceDiagram
 
     Commerce->>Commerce: Order CANCELLED 전이
     Note over Payment: ticket.issue-failed 수신 → RefundSagaOrchestrator.start()
-    Note over Payment,Commerce,Event: 환불 Orchestration 플로우 진행 (§2-7 참조)
+    Note over Payment,Commerce,Event: 환불 Orchestration 플로우 진행
     Note over Commerce: refund.order.cancel 수신 시 이미 CANCELLED → 멱등 스킵 후 refund.order.done 발행
 
     Payment-->>Commerce: refund.completed
@@ -172,7 +172,7 @@ sequenceDiagram
     Commerce-->>Orchestrator: refund.requested (N건 fan-out)
 
     Note over Orchestrator: 건별 RefundSagaOrchestrator.start()
-    Note over Orchestrator: → 환불 Orchestration 플로우 진입 (§2-7 참조)
+    Note over Orchestrator: → 환불 Orchestration 플로우 진입
 ```
 
 ### 2-6. 운영 취소 이벤트 — event.sale-stopped
@@ -201,7 +201,7 @@ sequenceDiagram
     participant Event
 
     Note over Orchestrator: 진입점 A: refund.requested 수신 (event.force-cancelled fan-out 경로)
-    Note over Orchestrator: 진입점 B: ticket.issue-failed 직접 진입 (§2-4 참조)
+    Note over Orchestrator: 진입점 B: ticket.issue-failed 직접 진입
     Note over Orchestrator: SagaState ORDER_CANCELLING 저장
 
     Orchestrator-->>Commerce: refund.order.cancel
@@ -376,8 +376,8 @@ sequenceDiagram
   - ~~`expires_at DATETIME`~~ **폐기** — `BaseEntity.updated_at` 재활용으로 대체 (`PAYMENT_PENDING` 진입 시각 기준, `OrderExpirationScheduler`). `created_at` 기준은 `stock.deducted` 지연 시 결제 시간 단축 문제 발생 → 폐기
   - [x] ✅ `version BIGINT` — 낙관적 락 (`@Version`)
 - [x] ✅ `Order` 엔티티 인덱스 추가: `(user_id, cart_hash)` — `idx_order_user_cart_hash` 구현 완료 (2026-04-19)
-- [x] ✅ `CartItem` 엔티티 UNIQUE 제약 추가: `(cart_id, event_id)` — `uk_cart_item_cart_event` 구현 완료 (#416, 2026-04-19) — 광클 동시성 방어 + A안 매칭 차감 단순화
-- [x] ✅ `Order.create()` 수정: 초기 status `CREATED`로 설정 완료 (`Order.java:111`). *`expires_at` 컬럼은 폐기 — `BaseEntity.updated_at` 재활용 방식으로 전환됨 (#4-2 참조)*
+- [x] ✅ `CartItem` 엔티티 UNIQUE 제약 추가: `(cart_id, event_id)` — `uk_cart_item_cart_event` 구현 완료 — 광클 동시성 방어 + A안 매칭 차감 단순화
+- [x] ✅ `Order.create()` 수정: 초기 status `CREATED`로 설정 완료 (`Order.java:111`). *`expires_at` 컬럼은 폐기 — `BaseEntity.updated_at` 재활용 방식으로 전환됨*
 - [x] ✅ `outbox` 테이블 신규 생성 — JPA `@Entity` 추가 시 ddl-auto 자동 생성
 - [x] ✅ `processed_message` 테이블 신규 생성 — JPA `@Entity` 추가 시 ddl-auto 자동 생성
 - [x] ✅ `shedlock` 테이블 생성 — 운영 DB 수동 CREATE (소스 트리 `schema.sql` 미포함)

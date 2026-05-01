@@ -803,7 +803,7 @@ common/
 
 - `MessageDeduplicationService`의 `isDuplicate()` → `markProcessed()` 호출 순서는 반드시 §3-6 규칙을 따른다
 - `OutboxService.save()`는 비즈니스 Service 메서드 내부(`@Transactional` 경계 안)에서 호출한다
-- `OutboxEventProducer`에서 `X-Message-Id` 헤더 세팅을 빠뜨리면 Consumer dedup이 깨진다 (§3-5 참조)
+- `OutboxEventProducer`에서 `X-Message-Id` 헤더 세팅을 빠뜨리면 Consumer dedup이 깨진다
 - 각 서비스별 Consumer 클래스는 `common`이 아닌 해당 서비스 모듈에 위치한다
 
 ---
