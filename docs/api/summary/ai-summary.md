@@ -50,4 +50,4 @@
 - 패키지 네이밍 일관성 (`org.example.ai.*`)
 - `KafkaConfig` / Kafka starter 의존성 정리
 
-> 이전 자동 자산(`api-summary.md`) 의 `/test/kafka` (`KafkaTestController#send`) entry 는 코드 검증 결과 **존재하지 않는 클래스** — 자동 파서 잡음 (`docs/api/api-overview.md §부록 #5` 정정).
+> 이전 자동 자산(폐기된 `api-summary.md`) 의 `/test/kafka` (`KafkaTestController#send`) entry 는 코드 검증 결과 **존재하지 않는 클래스** — 자동 파서 잡음 (`docs/api/api-overview.md §부록 #5` 정정).

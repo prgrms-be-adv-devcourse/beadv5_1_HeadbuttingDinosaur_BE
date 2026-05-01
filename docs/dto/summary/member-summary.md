@@ -120,5 +120,5 @@
 ## ⚠ 미결 / 후속
 
 - TechStack 이관 완료 (member → admin) 후 잔존 `TechStackController` (조회만) — 추후 admin 측으로 통합 가능성
-- 자동 자산 (dto-overview.md/dto-summary.md) 가 member 모듈을 미커버 — 본 페이지가 1차 자료
-- 일부 record 의 정확한 필드 정의는 dto-summary.md 의 member 섹션 (line 873~) 또는 코드 직접 확인
+- 이전 자동 자산이 member 모듈을 미커버했음 — 본 페이지(`dto/summary/member-summary.md`) 가 1차 자료. `dto-overview.md` 는 9 모듈 통합 인덱스로 재작성됨.
+- 일부 record 의 정확한 필드 정의는 코드 (`member/.../presentation/dto/{req,res}/**`) 직접 확인

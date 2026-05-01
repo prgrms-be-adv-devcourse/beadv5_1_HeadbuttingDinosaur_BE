@@ -20,7 +20,7 @@
 
 ## 2. 외부 API
 
-상세는 [api/api-summary.md](../api/api-summary.md) §event 섹션 참조 (총 22개, External 10 + Internal 12). ★ 핵심 플로우 발췌:
+상세는 [api/summary/event-summary.md](../api/summary/event-summary.md) 참조 (총 22개, External 10 + Internal 12). ★ 핵심 플로우 발췌:
 
 | 메서드 | 경로 | Controller | Service 1줄 (1줄 초안) |
 |---|---|---|---|

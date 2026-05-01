@@ -91,7 +91,7 @@
 ### AdminSettlementDetailResponse (record)
 - source: `settlement/.../infrastructure/external/dto/AdminSettlementDetailResponse.java`
 
-> 위 3종은 dto-summary.md 에 미등재 (자동 파서 누락 가능성) — 코드 검증 필요.
+> 위 3종은 이전 자동 자산에 미등재 (자동 파서 누락) — 코드 검증으로 추가 표기.
 
 ## Spring Batch step 입출력
 
@@ -126,7 +126,7 @@
 
 ## ⚠ 미결 / 후속
 
-- `MonthlyRevenueResponse` (36b33e9b 신규) 자동 파서 미반영 — `dto-summary.md` 갱신 후속
+- `MonthlyRevenueResponse` (36b33e9b 신규) 이전 자동 파서 미반영 — 본 페이지에 수동 정정 통합 완료
 - Spring Batch step 입출력 (`SellerSettlementData` / `SettlementResult`) 자동 파서 미커버 — `presentation/dto` 외 디렉토리라 자동 누락
 - `SettlementResult` deprecated 검토 (Spring Batch 전환 후 사용처 확인)
 - `SettlementItemProcessor` 의 하드코드 `FEE_RATE = 0.05` 잔존 (기존 파일 삭제 후 신규 Processor 로 위치 재검토)

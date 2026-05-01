@@ -89,7 +89,7 @@
 
 ### InternalOrderTicketsResponse (record)
 - source: `commerce/.../order/presentation/dto/res/InternalOrderTicketsResponse.java`
-- ⚠ 호출자 0건 (`getOrderTickets` endpoint dto-summary.md 등재됐으나 코드 부재 — `docs/api/api-overview.md §부록 #8` 정정 참조)
+- ⚠ 호출자 0건 (`getOrderTickets` endpoint 가 이전 자동 자산에 등재됐으나 코드 부재 — `docs/api/api-overview.md §부록 #8` 정정 참조)
 
 ### InternalSettlementDataResponse (record)
 - source: `commerce/.../order/presentation/dto/res/InternalSettlementDataResponse.java`

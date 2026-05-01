@@ -15,7 +15,7 @@
 
 ## 2. 외부 API
 
-상세는 [api/api-summary.md](../api/api-summary.md) §settlement 섹션 참조. ★ 핵심 플로우 발췌:
+상세는 [api/summary/settlement-summary.md](../api/summary/settlement-summary.md) 참조. ★ 핵심 플로우 발췌:
 
 | 메서드 | 경로 | Controller | 비고 |
 |---|---|---|---|
@@ -34,16 +34,16 @@
 
 > ⚠ 컨트롤러명 변경(6eab2dab): `InternalSettlementController` → `SettlementAdminController`. path는 `/api/admin/settlements`로 외부 형태 유지.
 >
-> ⚠ 자동 자산 드리프트 (수요일 일관성 검증 결과 — `docs/standards/docs-parser-standard.md §신규 변경 미반영`):
-> - `api-summary.md` settlement 섹션에 신규 API 3건(`/revenues/{yearMonth}`, `/batch/daily`, `/batch/monthly`) 미등재 (36b33e9b, b368f4af 코드 추가)
-> - `api-summary.md` L154-158 컨트롤러 표기가 옛 클래스명(`InternalSettlementController`) — 6eab2dab 미반영
-> - 본 페이지(settlement.md §2)가 코드 기준 정확. 자동 자산 회귀는 발표 후 회고 트랙.
+> ⚠ 자동 자산 드리프트 정정 이력 (`docs/standards/docs-parser-standard.md §신규 변경 미반영` 참조):
+> - 이전 자동 파서가 settlement 신규 API 3건(`/revenues/{yearMonth}`, `/batch/daily`, `/batch/monthly`) 미등재 + 컨트롤러 표기 옛 클래스명(`InternalSettlementController`) 사용 — 36b33e9b, b368f4af, 6eab2dab 미반영
+> - ✅ 본 페이지 §2 표 + `api/summary/settlement-summary.md` 가 코드 기준 정확 (수동 정정 통합본)
+> - 이전 `api-summary.md/json` 자동 자산은 폐기. 회귀 시점 가이드는 `docs/standards/docs-parser-standard.md` 참조.
 
 **대상 구분**: 관리자(`/api/admin/settlements/**`, `/api/admin/settlements/batch/**`), 판매자(`/api/seller/settlements/**`), 테스트(`/api/test/**`).
 
 ## 3. 내부 API (다른 서비스가 호출)
 
-**없음**. settlement 모듈은 `/internal/**` prefix 엔드포인트 0개. api-summary.md §settlement에 internal 항목 없음.
+**없음**. settlement 모듈은 `/internal/**` prefix 엔드포인트 0개.
 
 > ⚠ 참고: admin 모듈의 `RestClientSettlementInternalClientImpl`은 `/internal/settlements/run` 경로로 호출하는 코드를 가지고 있으나, settlement 측 실제 컨트롤러 매핑은 `@RequestMapping("/api/admin/settlements")` (`SettlementAdminController.java:24`, 6eab2dab로 클래스명 변경). gateway에 `/api/admin/settlements/**` 라우팅 추가됨(753ec396)으로 외부 접근 경로는 일관됨. 운영 환경의 internal 호출 정합성은 별도 확인 필요(이번 P5 범위 외).
 

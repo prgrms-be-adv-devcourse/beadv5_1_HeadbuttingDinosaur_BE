@@ -12,26 +12,34 @@ event/member 모듈이 service-status.md에 빠진 원인.
 
 ## 모듈 커버리지 누락 (⚠ 미해결, 발표 후 회고)
 
-수요일 일관성 검증(CLAUDE.md §7) 결과 `docs/api/api-overview.md` 와 `docs/dto/dto-overview.md` 가 **commerce 모듈만 단독 커버**, `docs/api/api-summary.md` 는 **log 모듈 누락** 확인.
+수요일 일관성 검증(CLAUDE.md §7) 결과 자동 파서 산출물이 다음과 같이 모듈 커버리지 미흡으로 확인됨.
 
-| 자동 자산 | 라인 수 | 커버 모듈 | 누락 모듈 |
-|---|---|---|---|
-| `api-overview.md` | 37 | commerce 만 (Cart/Order/Ticket) | event, payment, settlement, member, admin, gateway, log, ai (8개) |
-| `dto-overview.md` | 295 | commerce 만 (Cart/Order/Ticket/Internal) | event, payment, settlement, member, admin, gateway, log, ai (8개) |
-| `api-summary.md` | (8개 모듈) | admin, ai, apigateway, commerce, event, member, payment, settlement | log |
+| 자동 자산 (이전) | 라인 수 | 커버 모듈 | 누락 모듈 | 후속 처리 |
+|---|---|---|---|---|
+| `api-overview.md` (이전) | 37 | commerce 만 (Cart/Order/Ticket) | event, payment, settlement, member, admin, gateway, log, ai (8개) | ✅ 9 모듈 통합 인덱스로 수동 재작성 |
+| `dto-overview.md` (이전) | 295 | commerce 만 | 8 모듈 | ✅ 9 모듈 통합 인덱스로 수동 재작성 |
+| `api-summary.md` (폐기됨) | (8개 모듈) | admin, ai, apigateway, commerce, event, member, payment, settlement | log | ✅ 폐기 — `docs/api/summary/{module}-summary.md` × 9 으로 분리 |
+| `dto-summary.md` (폐기됨) | 1514 (7개 모듈) | admin, ai, commerce, event, member, payment, settlement | apigateway, log | ✅ 폐기 — `docs/dto/summary/{module}-summary.md` × 9 로 분리 |
 
-발표 전 우회: 모듈 페이지(`docs/modules/*.md`)에 ★ 핵심 발췌 표 + Spring 어노테이션 기반 수동 정리. 자동 자산 drift 는 모듈 페이지에서 ⚠ 마커로만 노출, 자동 수정 금지(CLAUDE.md §8).
+새 구조:
+- `docs/api/api-overview.md` (9 모듈 통합 인덱스) + `docs/api/summary/{module}-summary.md` × 9 (모듈별 깊이)
+- `docs/dto/dto-overview.md` (9 모듈 통합 인덱스) + `docs/dto/summary/{module}-summary.md` × 9 (모듈별 깊이)
 
-## 신규 변경 미반영 (수동 수정 권장 항목, ⚠ 미해결)
+자동 파서 자체 수정은 발표 후 회고 트랙. 자동 자산 drift 는 모듈 페이지에서 ⚠ 마커로만 노출, 자동 수정 금지(CLAUDE.md §8).
 
-수요일 검증 시점 기준 자동 자산이 따라가지 못한 항목.
+## 신규 변경 미반영 → 수동 정정 통합 (✅ 완료)
 
-| 자동 자산 | 미반영 항목 | 모듈 페이지 위치 |
+수요일 검증 시점 기준 자동 자산이 따라가지 못한 항목들. 폐기된 `api-summary.md/json`, `dto-summary.md/json` 의 drift 는 새 구조(`api-overview.md` + `summary/`) 에서 수동 정정 통합 완료.
+
+| 정정 내용 | 근거 | 통합 위치 |
 |---|---|---|
-| `api-overview.md` L29-30 | commerce dead REST 2건(`/internal/orders/{orderId}/payment-completed`, `/payment-failed`) 잔존 — b9be8434로 코드 제거됨 | `commerce.md` §3 ✅ 정리 완료로 이미 표기 |
-| `api-summary.md` L59-60 | 동일 (commerce dead REST 2건 잔존) | `commerce.md` §3 |
-| `api-summary.md` settlement 섹션 | settlement 신규 API 3건(`/api/admin/settlements/revenues/{yearMonth}`, `/batch/daily`, `/batch/monthly`) 미등재 — 36b33e9b/b368f4af 코드 추가 | `settlement.md` §2 (이미 신규 표기 + ★신규 마커) |
-| `api-summary.md` L154-158 | settlement 컨트롤러 클래스명 옛버전(`InternalSettlementController`) — 6eab2dab로 `SettlementAdminController` 로 변경됨 | `settlement.md` §2 끝 ⚠ 마커 + §6 신규 인프라 |
-| `dto-overview.md` (event 미커버) | `InternalPurchaseValidationResponse.sellerId` 추가(00247431) 검증 불가 | `event.md` §5 |
+| commerce dead REST 2건(`/internal/orders/{orderId}/payment-completed`, `/payment-failed`) 제거 | b9be8434 | `api-overview.md §부록 #1`, `commerce.md` §3 |
+| settlement 신규 API 3건(`/revenues/{yearMonth}`, `/batch/daily`, `/batch/monthly`) 추가 | 36b33e9b, b368f4af | `api-overview.md §부록 #2`, `summary/settlement-summary.md` |
+| settlement 컨트롤러 클래스명 `InternalSettlementController` → `SettlementAdminController` | 6eab2dab | `api-overview.md §부록 #3`, 모든 settlement entry |
+| event `InternalPurchaseValidationResponse.sellerId` 추가 표기 | 00247431 | `api-overview.md §부록 #4`, `event-summary.md`, `dto/summary/event-summary.md` |
+| ai `KafkaTestController#send` 잡음 제거 (코드 부재 검증) | — | `api-overview.md §부록 #5` |
+| log 모듈 → Fastify/TS 별도 스택 안내 | — | `api-overview.md §부록 #6` |
+| commerce `PATCH /internal/tickets/{ticketId}/refund-completed` 등재 + footer 정정 | `InternalOrderController.java:80-84` | `api-overview.md §부록 #8` |
+| admin `runSettlement` 본문 dead 표기 | `AdminSettlementController.java:42-45` | `api-overview.md §부록 #9` |
 
-이 표는 자동 생성기 재실행 시 1차 회귀 검증용으로 유지한다.
+자동 파서 회귀 시 위 항목들을 재정정 가이드로 사용한다.

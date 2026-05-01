@@ -22,7 +22,7 @@
 
 ## 다른 모듈에서의 호출
 
-ai 모듈이 `LogServiceClient.getRecentActionLog` 로 REST 호출 — 사용자 최근 행동 로그 조회. 단 Java 측에서 본 endpoint 의 매핑이 자동 파서에 잡히지 않아 `api-summary.md` 의 log 섹션은 누락 상태 (정당 — 별도 스택).
+ai 모듈이 `LogServiceClient.getRecentActionLog` 로 REST 호출 — 사용자 최근 행동 로그 조회. Java 자동 파서는 Fastify route 매핑을 추출하지 못하므로 본 endpoint 는 자동 자산 미커버 (정당 — 별도 스택).
 
 > 관련 ⚠: `docs/standards/docs-parser-standard.md §모듈 커버리지 누락` 의 "log 누락" 항목 — Fastify route 정의는 별도 운영.
 
