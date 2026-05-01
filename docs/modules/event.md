@@ -5,7 +5,13 @@
 
 ## 1. 모듈 책임
 
-이벤트(상품) 도메인 관리 (등록 / 조회 / 수정 / 강제취소) + 재고 (단건 / 일괄 차감 / 복구) + Kafka 발행 (강제취소 / 판매중지 / 보상 saga 일부) + Kafka 소비 (결제 실패 / 주문 취소 / 환불 → 재고 복구).
+이벤트(상품) 도메인 관리 (등록 / 조회 / 수정 / 강제취소) + 재고 (단건 / 일괄 차감 / 복구) + 이벤트 상태 자동 전환 스케줄러 (DRAFT → ON_SALE → SALE_ENDED → ENDED, acb0d0f6) + ES 검색 인덱싱 (ES 장애 시 DB 폴백, b15482d3) + Kafka 발행 (강제취소 / 판매중지 / 보상 saga 일부) + Kafka 소비 (결제 실패 / 주문 취소 / 환불 → 재고 복구).
+
+**EventStatus enum (코드 기준)**: `DRAFT`, `ON_SALE`, `SOLD_OUT`, `SALE_ENDED`, `ENDED` (acb0d0f6 추가 — 행사 종료), `CANCELLED`, `FORCE_CANCELLED`. 자동 전환 메서드는 `EventService.expireSaleEvents` / `endEvents` / `promoteDraftEvents` (각 `@Scheduled(fixedDelay=60000)`).
+
+**ENDED 처리 정책**:
+- 추천 제외 (914f87ac — `EventRecommendationService` 제외 목록에 ENDED 포함)
+- 환불 보상 재고 복구 시 정책적 스킵 (0f441eb5 — 행사 종료 후엔 재고 의미 없음, 예외 대신 정상 종료)
 
 **위임 (담당 안 함)**:
 - 회원 / 판매자 정보 → member 모듈 (REST `getNickname` 등)
@@ -18,7 +24,7 @@
 
 | 메서드 | 경로 | Controller | Service 1줄 (1줄 초안) |
 |---|---|---|---|
-| GET | `/api/events` ★ | `EventController.getEventList` | 권한별 공개 가능 상태로 이벤트 목록을 페이지 조회한다 |
+| GET | `/api/events` ★ | `EventController.getEventList` | 권한별 공개 가능 상태로 이벤트 목록을 페이지 조회한다 (응답에 `viewCount` f8205e31, `category` 94f061eb 포함; 검색 키워드 없을 때 `saleStartAt` 기준 정렬 e816be23/10d950bf) |
 | GET | `/api/events/{eventId}` ★ | `EventController.getEvent` | 이벤트 단건 상세 조회 + 조회수 증가한다 |
 | GET | `/api/events/user/recommendations` | `EventController.getRecommendations` | (ai 모듈 위임 추정, MEDIUM) |
 | POST | `/api/events/{eventId}/dwell` | `DwellController.reportDwell` | (체류시간 보고, LOW — action.log 1-C 발행) |
@@ -38,7 +44,7 @@
 | GET | `/internal/events` | `getEvents` | admin | (관리자 조회, MEDIUM) |
 | GET | `/internal/events/{eventId}` | `getEventInfo` | commerce / payment / settlement | (단건 조회, MEDIUM) |
 | POST | `/internal/events/bulk` | `getBulkEventInfo` | commerce | (일괄 조회, MEDIUM) |
-| GET | `/internal/events/{eventId}/validate-purchase` ★ | `validatePurchase` | commerce (CartService) | 구매 가능 여부를 검증하고 결과/불가 사유를 반환한다 |
+| GET | `/internal/events/{eventId}/validate-purchase` ★ | `validatePurchase` | commerce (CartService) | 구매 가능 여부를 검증하고 결과/불가 사유 + `sellerId`(00247431) 를 반환한다 |
 | GET | `/internal/events/by-seller/{sellerId}` | `getEventsBySeller` | (admin / seller 측) | (판매자 이벤트 목록, MEDIUM) |
 | GET | `/internal/events/by-seller/{sellerId}/settlement` | `getEventsBySellerForSettlement` | settlement | (정산 기간 이벤트, MEDIUM) |
 | GET | `/internal/events/ended` | `getEndedEventsByDate` | settlement | (종료된 이벤트, MEDIUM) |
@@ -74,8 +80,8 @@
 
 상세는 [dto/dto-overview.md](../dto/dto-overview.md) event 섹션 참조. 핵심 발췌:
 
-- **Event**: `EventDetailResponse`, `EventListRequest/Response`, `SellerEventCreateRequest/Response`, `SellerEventDetailResponse`, `SellerEventSummaryResponse`, `SellerEventUpdateRequest/Response`
-- **Internal**: `InternalEventInfoResponse`, `InternalBulkEventInfoRequest/Response`, `InternalPurchaseValidationResponse`, `InternalSellerEventsResponse`, `InternalStockOperationResponse`, `InternalStockAdjustmentResponse`, `InternalBulkStockAdjustmentRequest`, `InternalEndedEventsResponse`, `InternalStockDeductRequest`, `InternalStockRestoreRequest`, `PurchaseUnavailableReason`
+- **Event**: `EventDetailResponse`, `EventListRequest/Response`(viewCount/category 추가 — f8205e31/94f061eb), `SellerEventCreateRequest/Response`, `SellerEventDetailResponse`, `SellerEventSummaryResponse`, `SellerEventUpdateRequest/Response`(이벤트 수정 DTO `@NotNull`/`@NotBlank` 제거 — 판매 중지 검증 우회, caf0407a; 썸네일 1장 제한 90416566)
+- **Internal**: `InternalEventInfoResponse`, `InternalBulkEventInfoRequest/Response`, `InternalPurchaseValidationResponse`(`sellerId` 추가 — 00247431), `InternalSellerEventsResponse`, `InternalStockOperationResponse`, `InternalStockAdjustmentResponse`, `InternalBulkStockAdjustmentRequest`, `InternalEndedEventsResponse`, `InternalStockDeductRequest`, `InternalStockRestoreRequest`, `PurchaseUnavailableReason`
 - **Kafka payload**: `EventForceCancelledEvent`, `EventSaleStoppedEvent`, `OrderCancelledEvent`, `PaymentFailedEvent`, `RefundCompletedEvent`, `RefundStockDoneEvent`, `RefundStockFailedEvent`, `RefundStockRestoreEvent`, `ActionLogEvent`, `ActionLogDomainEvent`
 
 ## 6. 의존성
@@ -101,5 +107,12 @@
 - `EventInternalService.deductStock` — 단건 REST 활성, 현재 호출자 0건 (active path는 `adjustStockBulk`).
 - `EventInternalService.restoreStock` — 동일.
 - 추가 인라인: 수신 이벤트 `order.cancelled`이 kafka-design §3 line 71 표 미등재 (패턴 C 드리프트, ServiceOverview §4-4).
+
+### 신규 인프라/구조 변경 (참고)
+
+- `ElasticsearchSyncService` 분리 (b15482d3) — ES 장애 시 DB 폴백 경로 활성화. 스케줄러의 `expireSaleEvents`/`endEvents`/`promoteDraftEvents`는 전이 직후 `syncToElasticsearch(event)`를 호출해 ES 문서 동기화.
+- ES 문서에 `saleStartAt` 추가 + DB 폴백 정렬 기준 통일 (10d950bf), DB 폴백 N+1 개선 (09f0bc2b).
+- `GlobalExceptionHandler`에 클라이언트 단절(Connection reset 포함) 예외 핸들러 분리 (c422418f, 53a9b5c6) — SSE/long-poll 비정상 종료 시 ERROR 로그 폭주 방지.
+- `EventService.createEvent`에 판매자 유효성 검증 추가 (3bb878e3 — member API 호출).
 
 처리 계획 상세: [ServiceOverview.md §4-1](../ServiceOverview.md) (dead REST), §4-4 (드리프트) 참조.

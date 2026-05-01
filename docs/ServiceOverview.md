@@ -90,17 +90,16 @@ flowchart TB
 
 ### commerce (★ 상품선택 / 결제완료 후속 / 환불 saga 시작)
 
-- **상태**: 🟡 (HIGH 16건 1줄 요약 완료. 마커 3건 잔존 — dead REST 2 + stub 1)
+- **상태**: 🟡 (HIGH 16건 1줄 요약 완료. 마커 1건 잔존 — stub 1; dead REST 2건은 b9be8434로 정리 완료)
 - **책임**: 장바구니 / 주문 / 티켓 도메인. 결제완료 후속 처리(PAID 전이 + 티켓 발급 + 카트 분기 삭제). 환불 saga 시작점(RefundFanoutService).
 - **★ 핵심 메서드** (service-status.md HIGH 16건 인용):
   - 장바구니 — CartService: `getCart`, `clearCart`, `updateTicket`, `deleteTicket`
   - 주문 — OrderService: `createOrderByCart`, `getOrderStatus`, `getOrderDetail`, `cancelOrder`
   - 결제완료 consumer — OrderService: `processPaymentCompleted`, `processPaymentFailed`
-  - REST 보조 ⚠ — OrderService: `completeOrder`, `failOrder` (dead REST 가능성)
   - Stub ⚠ — OrderService: `processStockDeducted` (kafka-design §3 line 83 비활성)
   - 티켓 — TicketService: `getTicketList`, `getTicketDetail`, `createTicket`
 - **발행 이벤트** (kafka-design §3 line 70):
-  - 1-B: `ticket.issue-failed`, `refund.requested`(fanout), `refund.order.done`/`failed`, `refund.ticket.done`/`failed`
+  - 1-B: `ticket.issue-failed`, `refund.requested`(fanout, payload에 `totalOrderTickets` 추가 — e3d316ac), `refund.order.done`/`failed`, `refund.ticket.done`/`failed`
   - ⚠ 1-B: `order.cancelled` (코드 활성 — `OrderExpirationCancelService.java:53`. kafka-design §3 line 70 미등재 — 드리프트, 패턴 C)
   - 1-B 비활성: `order.created` (kafka-design §3 line 82 — REST 전환됨)
   - 1-C: `action.log` (CART_ADD / CART_REMOVE)
@@ -114,11 +113,11 @@ flowchart TB
   - 1-B 비활성: `stock.deducted`, `stock.failed` (kafka-design §3 line 83-84)
 - **의존 모듈**:
   - 호출(REST): event(`validatePurchase`, `adjustStockBulk`, `getBulkEventInfo`, `getSingleEventInfo`, `getEventsBySellerForSettlement`), member(`getMemberInfo` — TicketService.getParticipantList)
-  - 피호출(REST): payment(`completePayment`, `failOrder` ⚠ — payment 측 client는 ea44e72로 제거됨, commerce controller endpoint만 잔존), settlement(commerce가 `getSettlementData` 응답 제공 — TicketService.getSettlementData)
-- **⚠ 미결 (모듈 누적 3건, 모두 패턴 B)**:
-  - `OrderService.failOrder`: Payment 측 호출 미사용 (kafka-impl-plan §678)
-  - `OrderService.completeOrder`: 동일
+  - 피호출(REST): payment(`getOrderInfo` 정상 + 환불 saga 폴백 안전망 431b9fe9, `getOrderItemByTicketId`, `getOrderTickets`), settlement(commerce가 `getSettlementData` 응답 제공 — TicketService.getSettlementData)
+- **⚠ 미결 (모듈 누적 1건)**:
   - `OrderService.processStockDeducted`: stock.deducted 비활성 stub
+- **✅ 정리 완료**:
+  - dead REST 2건 — `completeOrder` (`/internal/orders/{orderId}/payment-completed`) + `failOrder` (`/internal/orders/{orderId}/payment-failed`) endpoint 및 동기 처리 메서드 제거(b9be8434). 결제 완료/실패는 Kafka(`payment.completed`/`payment.failed`) 일원화.
 
 ---
 
@@ -136,38 +135,46 @@ flowchart TB
   - 1-B `event.sale-stopped`, `ticket.issue-failed`, `refund.requested`, `refund.order.done`/`failed`, `refund.ticket.done`/`failed`, `refund.stock.done`/`failed`: Refund Saga Orchestrator 보상 흐름
   - ⚠ `event.force-cancelled` 직접 수신 제거 (22762f2). 강제취소 fan-out은 commerce `RefundFanoutService` → `refund.requested` → payment Refund Saga 경로로 일원화. kafka-design §3 line 72 갱신 필요 (드리프트, 패턴 C)
 - **의존 모듈 (호출)**:
-  - commerce: `getOrderInfo`, `getOrdersByEvent` (active)
+  - commerce: `getOrderInfo` (RefundSagaOrchestrator 폴백 안전망 — 정상 트래픽에선 호출 안 됨, 431b9fe9), `getOrdersByEvent` (active)
   - 외부: PG (Toss `pgPaymentClient`)
   - ✅ 정리됨 (ea44e72): `completePayment`, `failOrder` dead client 제거. WalletServiceImpl의 CommerceInternalClient 의존성도 동반 제거
+  - ✅ 단순화 (ea7f7cc9): RefundSagaOrchestrator의 `getOrderInfo` 동기 호출 제거 — `RefundRequestedEvent.totalOrderTickets` 자체완결로 대체
 - **의존 모듈 (피호출)**:
   - settlement: `POST /internal/wallet/settlement-deposit` → `depositFromSettlement`
 - **⚠ 미결**:
   - `WalletServiceImpl` 전용 메서드 3건 (`claimChargeForRecovery`, `revertTopending`, `applyRecoveryResult`): 인터페이스 외 노출 — dto-doc-standard.md "Impl 전용" 분류 적용 필요.
-  - ✅ 정리됨: dead client 2건(ea44e72), processBatchRefund TODO(22762f2).
+  - ✅ 정리됨: dead client 2건(ea44e72), processBatchRefund TODO(22762f2), RefundSagaOrchestrator commerce 동기 호출 정상 경로 제거(ea7f7cc9 + 431b9fe9 폴백 안전망 잔존).
 
 ---
 
 ### settlement (★ 정산완료)
 
-- **상태**: 🟡 (HIGH 4건 1줄 요약 완료. Legacy + 신규 경로 공존 — 마커 1건)
-- **책임**: 정산서 생성(월별 Batch / Legacy 두 경로) + 정산 지급 트리거(판매자 예치금 입금 REST 호출).
-- **★ 핵심 메서드** (service-status.md HIGH 4건):
-  - SettlementInternalService: `runSettlement` ⚠ Legacy, `createSettlementFromItems` (월별 Batch — 신규), `processPayment`
+- **상태**: 🟡 (Spring Batch 전환 완료 — 마커 1건; 컨트롤러명 `SettlementAdminController` 변경, 신규 API 3건)
+- **책임**: 정산서 생성 (Spring Batch — `DailySettlementJob` 일별 정산대상 수집 + `MonthlySettlementJob` 월별 정산서 생성, e521f682) + 정산 지급 트리거(판매자 예치금 입금 REST 호출).
+- **★ 핵심 메서드**:
+  - SettlementAdminService: `createSettlementFromItems` (월별 Batch — 신규), `processPayment`, `getMonthlyRevenue` (36b33e9b 신규)
+  - SettlementInternalService: `runSettlement` ⚠ Legacy (직접 호출 경로는 주석 처리, `runSettlement` 컨트롤러는 신규 경로 위임)
   - SettlementService: `fetchSettlementData`
+  - BatchController (b368f4af): `launchDailyJob`, `launchMonthlyJob` — `JobOperator` 기반 수동 실행
+- **신규 API** (모두 `/api/admin/settlements/**`):
+  - `GET /revenues/{yearMonth}` — 관리자 월별 수익 조회 (36b33e9b)
+  - `POST /batch/daily` — 일별 정산대상 수집 배치 수동 실행 (b368f4af)
+  - `POST /batch/monthly` — 월별 정산서 생성 배치 수동 실행 (b368f4af)
 - **발행 이벤트**: 없음 (kafka-design §3 표 line 70-73에 settlement 행 없음 — Kafka producer 0건).
 - **수신 이벤트**: 없음 (Kafka consumer 0건).
 - **의존 모듈** (전부 REST):
   - 호출(REST): commerce(`getSettlementData`, `getTicketSettlementData`), event(`getEndedEventsByDate`, `getEventsBySellerForSettlement`), member(`getSellerIds` — Legacy `runSettlement` 경로에서), payment(`POST /internal/wallet/settlement-deposit` → payment 측 `depositFromSettlement`)
-  - 피호출(REST): admin(`SettlementInternalClient` → `/internal/settlements`, `/internal/settlements/run`)
+  - 피호출(REST): admin(`SettlementInternalClient` → `/internal/settlements`, `/internal/settlements/run` — settlement 측 path는 `/api/admin/settlements/**`이라 운영 라우팅 정합성 별도 확인 필요)
 - **⚠ 미결 (모듈 누적 1건, 패턴 A)**:
-  - `SettlementInternalService.runSettlement`: Legacy 경로 (코드 주석 line 96 "정산서 생성 (Commerce 직접 호출 방식 - Legacy)"). 신규 경로는 `createSettlementFromItems` (SettlementItem 기반 월별 Batch)이며 동시 활성. admin `AdminSettlementService.runSettlement`이 동일 Legacy 호출 (admin 모듈 마커지만 settlement 책임 영역).
+  - `SettlementInternalService.runSettlement`: Legacy 경로 — 컨트롤러는 신규 경로(`createSettlementFromItems`)로 위임 전환됨(36b33e9b)이나 Legacy 서비스 코드 자체는 잔존. admin `AdminSettlementService.runSettlement`이 동일 Legacy 호출.
 
 ---
 
 ### event (★ 상품선택 / 재고 관리 / 강제취소 발행자)
 
 - **상태**: 🟡 (HIGH 10건 1줄 초안 작성됨. service-status.md에는 미등재 — 도구 issue, `docs/standards/docs-parser-standard.md` 참조. 마커 2건)
-- **책임**: 이벤트(상품) 도메인 관리(등록·조회·수정·강제취소) + 재고(단건/일괄 차감/복구) + Kafka 발행(강제취소 / 판매중지 / 보상 saga 일부) + Kafka 소비(결제 실패 / 주문 취소 / 환불 → 재고 복구).
+- **책임**: 이벤트(상품) 도메인 관리(등록·조회·수정·강제취소) + 재고(단건/일괄 차감/복구) + 이벤트 상태 자동 전환 스케줄러(DRAFT→ON_SALE→SALE_ENDED→ENDED, acb0d0f6) + ES 검색 인덱싱(ES 장애 시 DB 폴백, b15482d3) + Kafka 발행(강제취소 / 판매중지 / 보상 saga 일부) + Kafka 소비(결제 실패 / 주문 취소 / 환불 → 재고 복구).
+- **EventStatus enum**: DRAFT, ON_SALE, SOLD_OUT, SALE_ENDED, **ENDED**(신규, 행사 종료), CANCELLED, FORCE_CANCELLED. ENDED는 추천 제외(914f87ac) + 환불 보상 재고 복구 시 정책적 스킵(0f441eb5).
 - **★ 핵심 메서드** (어제 1줄 초안 10건 인용 — service-status.md 미등재):
   - 외부 API — EventService: `getEvent`, `getEventList`, `forceCancel` ★ (`event.force-cancelled` 발행자)
   - 내부 API — EventInternalService: `validatePurchase`, `deductStock` ⚠, `restoreStock` ⚠, `adjustStockBulk`
@@ -225,17 +232,17 @@ flowchart TB
 - **상태**: 🟡 (HIGH 2건 1줄 요약 완료. 마커 1건 — settlement Legacy 동반 패턴 A)
 - **책임**: 관리자 대시보드 — 이벤트 / 판매자 신청 / 정산 / 사용자 / 기술스택 관리. **공통 패턴: "다른 모듈 REST 호출 + AdminActionHistory(audit log) 저장"** — 모든 변경 액션이 동일 구조 (코드: `AdminEventServiceImpl.forceCancel`, `AdminSettlementServiceImpl.runSettlement` 등).
 - **★ 핵심 메서드** (service-status.md HIGH 2건):
-  - AdminEventService: `forceCancel` ★ (event 측 `forceCancel` 호출 → `event.force-cancelled` 간접 트리거)
+  - AdminEventService: `forceCancel` ★ (event 측 `forceCancel` 호출 → `event.force-cancelled` 간접 트리거). PATCH 호출 시 `X-User-Id`(2642e7fe) + `X-User-Role`(af824777) 헤더 전달, 호출 method/body 정정 완료(3b940227, 검증 테스트 9fb62971).
   - AdminSettlementService: `runSettlement` ⚠ Legacy (settlement 측 Legacy 경로 동반)
 - **발행 이벤트**: 없음 (kafka-design §3 표에 admin 행 없음. admin은 Kafka 비참여, REST 트리거만).
 - **수신 이벤트**: 없음.
 - **의존 모듈 (호출)**:
-  - event: `forceCancel` (`POST /internal/events/{eventId}/force-cancel`)
+  - event: `forceCancel` (`PATCH /internal/events/{eventId}/force-cancel`, `RestClientEventInternalClientImpl`)
   - settlement: `runSettlement` (`POST /internal/settlements/run` ⚠ Legacy), `getSettlements` (`GET /internal/settlements`)
   - member: `searchMembers`, `updateMemberStatus`, `updateMemberRole`, `getSellerApplications`, `decideSellerApplication`
 - **의존 모듈 (피호출)**: 없음 (admin은 외부 진입점, 내부 모듈은 admin을 호출하지 않음).
 - **⚠ 미결 (모듈 누적 1건, 패턴 A)**:
-  - `AdminSettlementService.runSettlement`: settlement 측 Legacy 경로 동반 호출. settlement 측 마커(`SettlementInternalService.runSettlement`)와 같은 사유. 발표 후 정산 경로 통합 시 함께 정리.
+  - `AdminSettlementService.runSettlement`: settlement 측 Legacy 경로 동반 호출. settlement 컨트롤러는 신규 경로(`createSettlementFromItems`)로 위임 전환됨(36b33e9b)이나 admin 호출 endpoint는 그대로라 정리 후 admin client 갱신 필요.
 
 ---
 
