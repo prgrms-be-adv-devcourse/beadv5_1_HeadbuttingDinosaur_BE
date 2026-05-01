@@ -334,7 +334,8 @@ public class EventService {
             throw new BusinessException(EventErrorCode.UNAUTHORIZED_SELLER);
         }
 
-        // 판매중지 분기
+        // 판매 중지 분기 (Action B) — 신규 판매만 차단, 기존 구매자 환불 X.
+        // 환불 동반 강제 취소가 필요하면 forceCancel(...) 호출 (Payment.cancelSellerEvent 경유).
         if (EventStatus.CANCELLED.equals(request.status())) {
             if (!event.canBeCancelled()) {
                 throw new BusinessException(EventErrorCode.CANNOT_CHANGE_STATUS);
@@ -420,42 +421,45 @@ public class EventService {
     }
 
     /**
-     * 어드민 강제 취소 — 이벤트 상태를 FORCE_CANCELLED 로 전이하고 event.force-cancelled Outbox 발행.
-     * Commerce 가 이를 수신해 해당 이벤트의 PAID 주문에 대해 환불 fan-out 을 수행한다.
+     * 강제 취소 (Action A) — 이벤트를 FORCE_CANCELLED 로 전이하고 event.force-cancelled Outbox 발행.
+     * Commerce 가 수신해 해당 이벤트의 PAID 주문에 대해 환불 fan-out 을 수행한다.
+     *
+     * <p>호출자별 권한:
+     * <ul>
+     *   <li>ADMIN — 모든 이벤트 가능 (관리자 권한은 gateway/admin-service 에서 사전 검증)</li>
+     *   <li>SELLER — 본인 이벤트만 가능 (소유권 검증)</li>
+     * </ul>
+     *
+     * <p><b>본 액션은 환불을 동반</b>한다. 단순 신규 판매 중단 (Action B — 기존 구매자 영향 없음)은
+     * {@link #updateEvent} 의 {@code status=CANCELLED} 분기로 호출 (별개 흐름).
      */
     @Transactional
     public void forceCancel(UUID userId, String userRole, UUID eventId, String reason) {
         Event event = eventRepository.findByEventIdWithLock(eventId)
             .orElseThrow(() -> new BusinessException(EventErrorCode.EVENT_NOT_FOUND));
 
-        if("ADMIN".equals(userRole)){
-            event.forceCancel();
-            outboxService.save(
-                event.getEventId().toString(),
-                event.getEventId().toString(),
-                "EVENT_FORCE_CANCELLED",
-                KafkaTopics.EVENT_FORCE_CANCELLED,
-                new EventForceCancelledEvent(event.getEventId(), event.getSellerId(), reason, Instant.now())
-            );
-        }
-        else {
+        // SELLER 는 본인 이벤트만 가능 — ADMIN 은 gateway 에서 사전 검증되므로 도메인 검증 생략
+        if ("SELLER".equals(userRole)) {
             if (!event.getSellerId().equals(userId)) {
                 throw new BusinessException(EventErrorCode.UNAUTHORIZED_SELLER);
             }
-            if (!event.canBeCancelled()) {
-                throw new BusinessException(EventErrorCode.CANNOT_CHANGE_STATUS);
-            }
-
-
-        event.cancel();
-            outboxService.save(
-                event.getEventId().toString(),
-                event.getEventId().toString(),
-                "EVENT_SALE_STOPPED",
-                KafkaTopics.EVENT_SALE_STOPPED,
-                new EventSaleStoppedEvent(event.getEventId(), event.getSellerId(), Instant.now())
-            );
+        } else if (!"ADMIN".equals(userRole)) {
+            // 알 수 없는 role — 방어적 거부
+            throw new BusinessException(EventErrorCode.UNAUTHORIZED_SELLER);
         }
+
+        if (!event.canBeCancelled()) {
+            throw new BusinessException(EventErrorCode.CANNOT_CHANGE_STATUS);
+        }
+
+        event.forceCancel();
+        outboxService.save(
+            event.getEventId().toString(),
+            event.getEventId().toString(),
+            "EVENT_FORCE_CANCELLED",
+            KafkaTopics.EVENT_FORCE_CANCELLED,
+            new EventForceCancelledEvent(event.getEventId(), event.getSellerId(), reason, Instant.now())
+        );
 
         elasticsearchSyncService.sync(event);
     }
