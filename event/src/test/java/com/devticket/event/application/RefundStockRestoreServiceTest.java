@@ -137,11 +137,11 @@ class RefundStockRestoreServiceTest {
     }
 
     @Nested
-    @DisplayName("정책적 스킵")
+    @DisplayName("정책적 스킵 — cancelledQuantity 누적")
     class PolicySkip {
 
         @Test
-        @DisplayName("FORCE_CANCELLED 이벤트는 재고 복구를 스킵하고 그래도 done 을 발행한다")
+        @DisplayName("FORCE_CANCELLED — 재고 복구 스킵 + cancelledQuantity 누적 + done 발행")
         void skip_forceCancelled() {
             ReflectionTestUtils.setField(testEvent, "status", EventStatus.FORCE_CANCELLED);
             eventRepository.saveAndFlush(testEvent);
@@ -153,7 +153,9 @@ class RefundStockRestoreServiceTest {
                 messageId, KafkaTopics.REFUND_STOCK_RESTORE, payload);
 
             Event updated = eventRepository.findByEventId(eventId).orElseThrow();
-            assertThat(updated.getRemainingQuantity()).isEqualTo(95);
+            assertThat(updated.getRemainingQuantity()).isEqualTo(95);          // 재고 복구 안 됨
+            assertThat(updated.getCancelledQuantity()).isEqualTo(5);           // cancelled 누적
+            assertThat(updated.getStatus()).isEqualTo(EventStatus.FORCE_CANCELLED);
             assertThat(processedMessageRepository.existsByMessageId(messageId.toString())).isTrue();
 
             List<Outbox> outboxes = outboxRepository.findAll();
@@ -162,7 +164,7 @@ class RefundStockRestoreServiceTest {
         }
 
         @Test
-        @DisplayName("CANCELLED 이벤트도 재고 복구를 스킵한다")
+        @DisplayName("CANCELLED — 재고 복구 스킵 + cancelledQuantity 누적")
         void skip_cancelled() {
             ReflectionTestUtils.setField(testEvent, "status", EventStatus.CANCELLED);
             eventRepository.saveAndFlush(testEvent);
@@ -175,7 +177,57 @@ class RefundStockRestoreServiceTest {
 
             Event updated = eventRepository.findByEventId(eventId).orElseThrow();
             assertThat(updated.getRemainingQuantity()).isEqualTo(95);
+            assertThat(updated.getCancelledQuantity()).isEqualTo(5);
             assertThat(outboxRepository.findAll()).hasSize(1);
+        }
+
+        @Test
+        @DisplayName("ENDED — 재고 복구 스킵 + cancelledQuantity 누적")
+        void skip_ended() {
+            ReflectionTestUtils.setField(testEvent, "status", EventStatus.ENDED);
+            eventRepository.saveAndFlush(testEvent);
+
+            UUID messageId = UUID.randomUUID();
+            String payload = buildPayload(refundId, orderId, eventId, 3);
+
+            refundStockRestoreService.handleRefundStockRestore(
+                messageId, KafkaTopics.REFUND_STOCK_RESTORE, payload);
+
+            Event updated = eventRepository.findByEventId(eventId).orElseThrow();
+            assertThat(updated.getRemainingQuantity()).isEqualTo(95);
+            assertThat(updated.getCancelledQuantity()).isEqualTo(3);
+        }
+
+        @Test
+        @DisplayName("정상 분기는 cancelledQuantity 변경 없음 — restoreStock 만 호출")
+        void normalRestore_doesNotTouchCancelled() {
+            UUID messageId = UUID.randomUUID();
+            String payload = buildPayload(refundId, orderId, eventId, 5);
+
+            refundStockRestoreService.handleRefundStockRestore(
+                messageId, KafkaTopics.REFUND_STOCK_RESTORE, payload);
+
+            Event updated = eventRepository.findByEventId(eventId).orElseThrow();
+            assertThat(updated.getRemainingQuantity()).isEqualTo(100);
+            assertThat(updated.getCancelledQuantity()).isZero();
+        }
+
+        @Test
+        @DisplayName("동일 messageId 재처리 — cancelledQuantity 도 dedup 으로 1회만 누적")
+        void cancelledQuantity_dedup() {
+            ReflectionTestUtils.setField(testEvent, "status", EventStatus.FORCE_CANCELLED);
+            eventRepository.saveAndFlush(testEvent);
+
+            UUID messageId = UUID.randomUUID();
+            String payload = buildPayload(refundId, orderId, eventId, 5);
+
+            refundStockRestoreService.handleRefundStockRestore(
+                messageId, KafkaTopics.REFUND_STOCK_RESTORE, payload);
+            refundStockRestoreService.handleRefundStockRestore(
+                messageId, KafkaTopics.REFUND_STOCK_RESTORE, payload);
+
+            Event updated = eventRepository.findByEventId(eventId).orElseThrow();
+            assertThat(updated.getCancelledQuantity()).isEqualTo(5);  // 5 + 5 = 10 이 아님 (dedup)
         }
     }
 

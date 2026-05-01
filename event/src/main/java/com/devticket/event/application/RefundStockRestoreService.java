@@ -75,8 +75,11 @@ public class RefundStockRestoreService {
             if (target.getStatus() == EventStatus.CANCELLED
                 || target.getStatus() == EventStatus.FORCE_CANCELLED
                 || target.getStatus() == EventStatus.ENDED) {
-                log.warn("[정책적 스킵] refund 재고 복구 — eventId={}, status={}, refundId={}",
-                    item.eventId(), target.getStatus(), event.refundId());
+                // 종료된 이벤트 — 재고 복구는 스킵하되 cancelledQuantity 는 누적해서
+                // "결제됐다가 영구 환불된 티켓 수" 통계를 보존.
+                target.markCancelledStock(item.quantity());
+                log.warn("[정책적 스킵] refund 재고 복구 — eventId={}, status={}, refundId={}, cancelledQuantity={}",
+                    item.eventId(), target.getStatus(), event.refundId(), target.getCancelledQuantity());
                 continue;
             }
 

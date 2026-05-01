@@ -199,6 +199,19 @@ public class Event extends BaseEntity {
         }
     }
 
+    /**
+     * 종료된 이벤트(CANCELLED / FORCE_CANCELLED / ENDED)의 환불 카운터.
+     * remainingQuantity 는 그대로 두고 cancelledQuantity 만 누적.
+     * 운영 대시보드 / 정산에서 "결제됐다가 영구 환불된 티켓 수" 추적 용도.
+     */
+    public void markCancelledStock(int quantity) {
+        if (quantity < 1) {
+            throw new BusinessException(EventErrorCode.INVALID_STOCK_QUANTITY);
+        }
+        int current = this.cancelledQuantity == null ? 0 : this.cancelledQuantity;
+        this.cancelledQuantity = current + quantity;
+    }
+
     public void expireSale() {
         if ((this.status == EventStatus.ON_SALE || this.status == EventStatus.SOLD_OUT)
                 && LocalDateTime.now().isAfter(this.saleEndAt)) {

@@ -218,5 +218,93 @@ class EventDomainTest {
             assertThat(event.getRemainingQuantity()).isEqualTo(8);
             assertThat(event.getStatus()).isEqualTo(EventStatus.ON_SALE);
         }
+
+        @Test
+        @DisplayName("정상 복원은 cancelledQuantity 를 변경하지 않는다 (자리 비우기 의미)")
+        void normalRestore_doesNotTouchCancelledQuantity() {
+            Event event = onSaleEvent(TOTAL_QUANTITY, MAX_PER_USER);
+            setRemaining(event, 5);
+
+            event.restoreStock(3);
+
+            assertThat(event.getCancelledQuantity()).isZero();
+        }
+    }
+
+    @Nested
+    @DisplayName("markCancelledStock — 종료 이벤트 환불 카운터")
+    class MarkCancelledStockTest {
+
+        @Test
+        @DisplayName("quantity < 1 이면 INVALID_STOCK_QUANTITY")
+        void invalidQuantity() {
+            Event event = onSaleEvent(TOTAL_QUANTITY, MAX_PER_USER);
+
+            assertThatThrownBy(() -> event.markCancelledStock(0))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", EventErrorCode.INVALID_STOCK_QUANTITY);
+        }
+
+        @Test
+        @DisplayName("FORCE_CANCELLED 이벤트 — cancelledQuantity 누적, remainingQuantity 변동 없음")
+        void forceCancelled_accumulates() {
+            Event event = onSaleEvent(TOTAL_QUANTITY, MAX_PER_USER);
+            setStatus(event, EventStatus.FORCE_CANCELLED);
+            setRemaining(event, 6);
+
+            event.markCancelledStock(2);
+
+            assertThat(event.getCancelledQuantity()).isEqualTo(2);
+            assertThat(event.getRemainingQuantity()).isEqualTo(6);
+            assertThat(event.getStatus()).isEqualTo(EventStatus.FORCE_CANCELLED);
+        }
+
+        @Test
+        @DisplayName("CANCELLED 이벤트 — cancelledQuantity 누적, status 유지")
+        void cancelled_accumulates() {
+            Event event = onSaleEvent(TOTAL_QUANTITY, MAX_PER_USER);
+            setStatus(event, EventStatus.CANCELLED);
+            setRemaining(event, 6);
+
+            event.markCancelledStock(3);
+
+            assertThat(event.getCancelledQuantity()).isEqualTo(3);
+            assertThat(event.getRemainingQuantity()).isEqualTo(6);
+        }
+
+        @Test
+        @DisplayName("ENDED 이벤트도 cancelledQuantity 누적 가능 (운영 통계)")
+        void ended_accumulates() {
+            Event event = onSaleEvent(TOTAL_QUANTITY, MAX_PER_USER);
+            setStatus(event, EventStatus.ENDED);
+
+            event.markCancelledStock(1);
+
+            assertThat(event.getCancelledQuantity()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("연속 호출 시 누적된다 (멱등 X — 호출자가 dedup 책임)")
+        void multipleCalls_accumulate() {
+            Event event = onSaleEvent(TOTAL_QUANTITY, MAX_PER_USER);
+            setStatus(event, EventStatus.FORCE_CANCELLED);
+
+            event.markCancelledStock(2);
+            event.markCancelledStock(3);
+
+            assertThat(event.getCancelledQuantity()).isEqualTo(5);
+        }
+
+        @Test
+        @DisplayName("ON_SALE 이벤트에 호출되면 cancelledQuantity 만 증가 (가드 없음 — 호출처 책임)")
+        void onSale_alsoAccumulates() {
+            // RefundStockRestoreService 는 ON_SALE 분기에선 restoreStock 만 호출하므로
+            // 이 메서드가 ON_SALE 에 호출될 일은 없지만, 도메인 자체는 status 가드 없이 단순 증가만 한다.
+            Event event = onSaleEvent(TOTAL_QUANTITY, MAX_PER_USER);
+
+            event.markCancelledStock(1);
+
+            assertThat(event.getCancelledQuantity()).isEqualTo(1);
+        }
     }
 }
