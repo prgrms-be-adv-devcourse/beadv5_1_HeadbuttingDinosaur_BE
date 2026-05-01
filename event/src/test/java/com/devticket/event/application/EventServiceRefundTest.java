@@ -146,23 +146,41 @@ class EventServiceRefundTest {
         }
 
         @Test
-        @DisplayName("판매자가 본인 이벤트를 취소하면 CANCELLED 로 전이하고 event.sale-stopped Outbox 를 발행한다")
-        void forceCancel_seller_publishesSaleStopped() {
+        @DisplayName("판매자가 본인 이벤트를 강제 취소하면 FORCE_CANCELLED 로 전이하고 event.force-cancelled Outbox 를 발행한다 (환불 트리거)")
+        void forceCancel_seller_publishesForceCancel() {
             given(eventRepository.findByEventIdWithLock(eventId)).willReturn(Optional.of(event));
 
-            eventService.forceCancel(sellerId, "SELLER", eventId, null);
+            eventService.forceCancel(sellerId, "SELLER", eventId, "셀러 본인 강제취소");
 
-            assertThat(event.getStatus()).isEqualTo(EventStatus.CANCELLED);
+            assertThat(event.getStatus()).isEqualTo(EventStatus.FORCE_CANCELLED);
             verify(outboxService, times(1)).save(
                 eq(eventId.toString()),
                 eq(eventId.toString()),
-                eq("EVENT_SALE_STOPPED"),
-                eq(KafkaTopics.EVENT_SALE_STOPPED),
-                argThat(payload -> payload instanceof EventSaleStoppedEvent e
+                eq("EVENT_FORCE_CANCELLED"),
+                eq(KafkaTopics.EVENT_FORCE_CANCELLED),
+                argThat(payload -> payload instanceof EventForceCancelledEvent e
                     && e.eventId().equals(eventId)
                     && e.sellerId().equals(sellerId)
+                    && "셀러 본인 강제취소".equals(e.reason())
                     && e.occurredAt() != null)
             );
+            // sale-stopped 는 발행 안 됨 — 강제취소는 force-cancelled 만
+            verify(outboxService, never()).save(
+                any(), any(), eq("EVENT_SALE_STOPPED"), eq(KafkaTopics.EVENT_SALE_STOPPED), any());
+        }
+
+        @Test
+        @DisplayName("알 수 없는 role 은 UNAUTHORIZED_SELLER 로 거부 (방어적)")
+        void forceCancel_unknownRole_rejected() {
+            given(eventRepository.findByEventIdWithLock(eventId)).willReturn(Optional.of(event));
+
+            assertThatThrownBy(() ->
+                eventService.forceCancel(sellerId, "USER", eventId, null))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(EventErrorCode.UNAUTHORIZED_SELLER);
+
+            verify(outboxService, never()).save(any(), any(), any(), any(), any());
         }
 
         @Test
