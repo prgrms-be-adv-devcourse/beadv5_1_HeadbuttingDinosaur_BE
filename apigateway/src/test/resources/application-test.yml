@@ -1,0 +1,21 @@
+jwt:
+  secret-key: test-jwt-secret-key-devticket-2025-must-be-256-bits
+  access-token-ttl: 1800000
+  refresh-token-ttl: 604800000
+
+spring:
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: test-google-client-id
+            client-secret: test-google-client-secret
+            scope: email, profile
+
+services:
+  member:
+    url: http://localhost:8081
+
+oauth2:
+  redirect-uri: http://localhost:13000/oauth/callback

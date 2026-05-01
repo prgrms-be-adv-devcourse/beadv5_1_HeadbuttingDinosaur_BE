@@ -1,0 +1,33 @@
+package com.devticket.commerce.ticket.infrastructure.config;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.client.RestClient;
+
+@Configuration
+public class TicketRestClientConfig {
+
+    //RestClient는 Spring 6.1부터 도입된 인터페이스로,
+    // 실제 구현체는 직접 작성하는 것이 아니라 Spring이 제공하는 Builder를 통해 생성하여 빈(Bean)으로 등록하고 주입받아 사용합니다.
+
+    // 1. Ticket-Event 내부API용 설정
+    @Bean
+    public RestClient ticketToEventRestClient(@Value("${external.event-base-url}") String baseUrl) {
+        return RestClient.builder()
+            .baseUrl(baseUrl)
+            .defaultHeader("Content-Type", "application/json")
+            .build();
+    }
+
+    // 2. Ticket-Member 내부API용 설정
+    @Bean
+    public RestClient ticketToMemberRestClient(@Value("${external.member-base-url}") String baseUrl) {
+        return RestClient.builder()
+            .baseUrl(baseUrl)
+            .defaultHeader("Content-Type", "application/json")
+            .build();
+    }
+
+
+}

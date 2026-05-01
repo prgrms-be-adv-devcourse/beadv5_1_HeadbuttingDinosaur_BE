@@ -1,0 +1,53 @@
+package com.devticket.event.presentation.dto;
+
+import com.devticket.event.domain.enums.EventStatus;
+import com.devticket.event.domain.model.Event;
+import com.devticket.event.domain.model.EventImage;
+import com.devticket.event.domain.model.EventTechStack;
+
+import java.time.LocalDateTime;
+import java.util.Comparator;
+import java.util.List;
+import java.util.UUID;
+
+public record EventListContentResponse(
+    UUID eventId,
+    String title,
+    String thumbnailUrl,
+    String location,
+    LocalDateTime eventDateTime,
+    Integer price,
+    EventStatus status,
+    List<String> techStacks,
+    LocalDateTime saleEndAt,
+    Integer totalQuantity,
+    Integer remainingQuantity,
+    String category,
+    Long viewCount
+) {
+    public static EventListContentResponse from(Event event, Long viewCount) {
+        String thumbnailUrl = event.getEventImages().stream()
+            .min(Comparator.comparingInt(EventImage::getSortOrder))
+            .map(EventImage::getImageUrl)
+            .orElse(null);
+        List<String> techStacks = event.getEventTechStacks().stream()
+            .map(EventTechStack::getTechStackName)
+            .toList();
+        return new EventListContentResponse(
+            event.getEventId(),
+            event.getTitle(),
+            thumbnailUrl,
+            event.getLocation(),
+            event.getEventDateTime(),
+            event.getPrice(),
+            event.getStatus(),
+            techStacks,
+            event.getSaleEndAt(),
+            event.getTotalQuantity(),
+            event.getRemainingQuantity(),
+            event.getCategory().name(),
+            viewCount
+        );
+    }
+
+}
