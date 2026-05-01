@@ -11,6 +11,7 @@ import com.devticket.settlement.domain.repository.FeePolicyRepository;
 import com.devticket.settlement.domain.repository.SettlementItemRepository;
 import com.devticket.settlement.domain.repository.SettlementRepository;
 import com.devticket.settlement.infrastructure.client.SettlementToPaymentClient;
+import com.devticket.settlement.infrastructure.client.SettlementToEventClient;
 import com.devticket.settlement.infrastructure.external.dto.AdminSettlementDetailResponse;
 import com.devticket.settlement.infrastructure.external.dto.AdminSettlementDetailResponse.CarriedInSettlement;
 import com.devticket.settlement.presentation.dto.MonthlyRevenueResponse;
@@ -29,6 +30,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -48,6 +50,7 @@ public class SettlementAdminServiceImpl implements SettlementAdminService {
     private final SettlementToCommerceClient settlementToCommerceClient;
     private final SettlementToPaymentClient settlementToPaymentClient;
     private final SettlementToMemberClient settlementToMemberClient;
+    private final SettlementToEventClient settlementToEventClient;
     private final FeePolicyRepository feePolicyRepository;
     private final SettlementRepository settlementRepository;
     private final SettlementItemRepository settlementItemRepository;
@@ -170,17 +173,20 @@ public class SettlementAdminServiceImpl implements SettlementAdminService {
         Settlement settlement = settlementRepository.findBySettlementId(settlementId)
             .orElseThrow(() -> new BusinessException(SettlementErrorCode.SETTLEMENT_BAD_REQUEST));
 
-        List<EventItemResponse> settlementItems = settlementItemRepository
-            .findBySettlementId(settlementId)
-            .stream()
-            .map(item -> new EventItemResponse(
-                item.getEventId().toString(),
-                "Unknown",
-                item.getSalesAmount(),
-                item.getRefundAmount(),
-                item.getFeeAmount(),
-                item.getSettlementAmount()
-            ))
+        List<SettlementItem> items = settlementItemRepository.findBySettlementId(settlementId);
+        Map<UUID, String> eventTitles = fetchEventTitles(items);
+        List<EventItemResponse> settlementItems = items.stream()
+            .map(item -> {
+                UUID eventUUID = item.getEventUUID();
+                return new EventItemResponse(
+                    eventUUID != null ? eventUUID.toString() : null,
+                    eventTitles.getOrDefault(eventUUID, "Unknown"),
+                    item.getSalesAmount(),
+                    item.getRefundAmount(),
+                    item.getFeeAmount(),
+                    item.getSettlementAmount()
+                );
+            })
             .toList();
 
         // 이 정산서에 이월된 출처 정산서 목록 (역조회)
@@ -420,5 +426,24 @@ public class SettlementAdminServiceImpl implements SettlementAdminService {
     private String normalizeEndDate(String endDate) {
         if (endDate != null && !endDate.isBlank()) return endDate;
         return LocalDate.now().toString();
+    }
+
+    /**
+     * SettlementItem 목록의 eventUUID 를 모아 Event 서비스에 한 번에 조회한다.
+     * 단건 호출(N+1) 대신 1회 호출로 eventTitle 을 채우기 위함.
+     */
+    private Map<UUID, String> fetchEventTitles(List<SettlementItem> items) {
+        if (items.isEmpty()) {
+            return Map.of();
+        }
+        List<UUID> eventUUIDs = items.stream()
+            .map(SettlementItem::getEventUUID)
+            .filter(Objects::nonNull)
+            .distinct()
+            .toList();
+        if (eventUUIDs.isEmpty()) {
+            return Map.of();
+        }
+        return settlementToEventClient.getEventTitles(eventUUIDs);
     }
 }
