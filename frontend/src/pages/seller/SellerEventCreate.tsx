@@ -275,7 +275,7 @@ export function SellerEventEdit() {
         techStacks: d.techStacks.map((t: any) => t.name),
         price: String(d.price),
         totalQuantity: String(d.totalQuantity),
-        maxQuantityPerUser: String(d.maxQuantityPerUser),
+        maxQuantityPerUser: String(d.maxQuantity ?? 1),
         eventDateTime: d.eventDateTime.slice(0, 16),
         saleStartAt: '', saleEndAt: '',
         location: d.location, imageUrls: '',

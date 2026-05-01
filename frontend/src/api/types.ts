@@ -234,12 +234,17 @@ export interface SellerEventDetailResponse {
   price: number;
   totalQuantity: number;
   remainingQuantity: number;
-  maxQuantityPerUser: number;
+  maxQuantity: number;
   eventDateTime: string;
+  saleStartAt?: string;
+  saleEndAt?: string;
   location: string;
   status: string;
+  category?: string;
+  imageUrls?: string[];
   thumbnailUrl?: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface SellerEventUpdateRequest {

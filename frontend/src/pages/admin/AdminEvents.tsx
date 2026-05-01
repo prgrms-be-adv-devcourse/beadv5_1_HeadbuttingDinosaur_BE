@@ -5,11 +5,12 @@ import type { AdminEventItem, SellerApplicationListItem, SettlementItem } from '
 import { useToast } from '../../contexts/ToastContext'
 
 const EVENT_STATUS_MAP: Record<string, { label: string; cls: string }> = {
-  DRAFT:     { label: '초안',    cls: 'badge-gray' },
-  ON_SALE:   { label: '판매중',  cls: 'badge-green' },
-  SOLD_OUT:  { label: '매진',    cls: 'badge-red' },
-  ENDED:     { label: '종료',    cls: 'badge-gray' },
-  CANCELLED: { label: '취소됨',  cls: 'badge-gray' },
+  DRAFT:            { label: '초안',       cls: 'badge-gray' },
+  ON_SALE:          { label: '판매중',     cls: 'badge-green' },
+  SOLD_OUT:         { label: '매진',       cls: 'badge-red' },
+  ENDED:            { label: '종료',       cls: 'badge-gray' },
+  CANCELLED:        { label: '취소됨',     cls: 'badge-gray' },
+  FORCE_CANCELLED:  { label: '강제 취소',  cls: 'badge-red' },
 }
 
 export function AdminEvents() {
@@ -89,7 +90,10 @@ export function AdminEvents() {
                       {new Date(event.eventDateTime).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}
                     </td>
                     <td style={{ textAlign: 'right', fontSize: 13 }}>
-                      {event.totalQuantity} / <span style={{ color: event.remainingQuantity === 0 ? 'var(--danger)' : 'inherit' }}>{event.remainingQuantity}</span>
+                      {(() => {
+                        const remaining = event.status === 'FORCE_CANCELLED' ? 0 : event.remainingQuantity
+                        return <>{event.totalQuantity} / <span style={{ color: remaining === 0 ? 'var(--danger)' : 'inherit' }}>{remaining}</span></>
+                      })()}
                     </td>
                     <td>
                       {event.status === 'ON_SALE' && (

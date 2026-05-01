@@ -5,11 +5,12 @@ import type { SellerEventItem } from '../../api/types'
 import { useToast } from '../../contexts/ToastContext'
 
 const STATUS_MAP: Record<string, { label: string; cls: string }> = {
-  DRAFT:     { label: '초안',    cls: 'badge-gray' },
-  ON_SALE:   { label: '판매중',  cls: 'badge-green' },
-  SOLD_OUT:  { label: '매진',    cls: 'badge-red' },
-  ENDED:     { label: '종료',    cls: 'badge-gray' },
-  CANCELLED: { label: '취소됨',  cls: 'badge-gray' },
+  DRAFT:            { label: '초안',       cls: 'badge-gray' },
+  ON_SALE:          { label: '판매중',     cls: 'badge-green' },
+  SOLD_OUT:         { label: '매진',       cls: 'badge-red' },
+  ENDED:            { label: '종료',       cls: 'badge-gray' },
+  CANCELLED:        { label: '취소됨',     cls: 'badge-gray' },
+  FORCE_CANCELLED:  { label: '강제 취소',  cls: 'badge-red' },
 }
 
 const STATUS_TABS = ['전체', 'ON_SALE', 'ENDED', 'CANCELLED']
@@ -117,7 +118,9 @@ export default function SellerDashboard() {
             <tbody>
               {events.map(event => {
                 const status = STATUS_MAP[event.status] ?? { label: event.status, cls: 'badge-gray' }
-                const sold = event.totalQuantity - event.remainingQuantity
+                const isForceCancelled = event.status === 'FORCE_CANCELLED'
+                const sold = isForceCancelled ? event.totalQuantity : event.totalQuantity - event.remainingQuantity
+                const remaining = isForceCancelled ? 0 : event.remainingQuantity
                 return (
                   <tr key={event.eventId}>
                     <td>
@@ -135,7 +138,7 @@ export default function SellerDashboard() {
                     </td>
                     <td style={{ textAlign: 'right' }}>
                       <span style={{ fontWeight: 600 }}>{sold}</span>
-                      <span style={{ color: 'var(--text-3)' }}> / {event.remainingQuantity}</span>
+                      <span style={{ color: 'var(--text-3)' }}> / {remaining}</span>
                       <div style={{ height: 4, background: 'var(--surface-2)', borderRadius: 99, marginTop: 4, minWidth: 60 }}>
                         <div style={{
                           height: '100%', borderRadius: 99,
@@ -147,7 +150,11 @@ export default function SellerDashboard() {
                     <td>
                       <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                         <Link to={`/seller/events/${event.eventId}`} className="btn btn-ghost btn-sm">상세</Link>
-                        <Link to={`/seller/events/${event.eventId}/edit`} className="btn btn-secondary btn-sm">수정</Link>
+                        {isForceCancelled ? (
+                          <button className="btn btn-secondary btn-sm" disabled>수정</button>
+                        ) : (
+                          <Link to={`/seller/events/${event.eventId}/edit`} className="btn btn-secondary btn-sm">수정</Link>
+                        )}
                         {event.status === 'ON_SALE' && (
                           <button className="btn btn-danger btn-sm" onClick={() => handleStop(event.eventId, event.title)}>중지</button>
                         )}
