@@ -1,7 +1,13 @@
 # log API summary
 
 > ★ = 기능 요구사항 + 기술스택 (`requirements-check.md` §1 / §2)
-> ⚠ **log 모듈은 Fastify/TypeScript 별도 스택** (`fastify-log/` 디렉토리). 자세한 명세는 `docs/kafka/actionLog.md` 참조.
+> ⚠ **log 모듈은 Fastify/TypeScript 별도 스택** (`fastify-log/` 디렉토리). 자세한 명세는 [`docs/skills/actionLog.md`](../../skills/actionLog.md) 참조.
+
+사용자 행동 로그 수집 + recentVector 조회 진입점. Kafka consumer 단방향 흐름 (`action.log` / `payment.completed` 구독 → DB INSERT) + ai 모듈에 REST 응답.
+
+★ 요구사항 :
+- 사용자 맞춤 AI 추천 — `/internal/logs/actions` 진입점 (ai 모듈 recentVector 조회)
+- AI 격리 — log 장애 시에도 결제/주문 흐름 영향 없음 (1-C `action.log` fire-and-forget)
 
 ## 외부 API
 
@@ -30,4 +36,4 @@ ai 모듈이 `LogServiceClient.getRecentActionLog` 로 REST 호출 — 사용자
 
 - 별도 스택 (Node.js + Fastify + TypeScript)
 - Kafka consumer 기반 단방향 흐름
-- 저장소: 별도 운영 (`docs/kafka/actionLog.md` 참조)
+- 저장소: 별도 운영 ([`docs/skills/actionLog.md`](../../skills/actionLog.md) 참조)

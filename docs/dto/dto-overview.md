@@ -1,11 +1,19 @@
 # DTO 전체 개요 (구현 기준 — 9개 모듈)
 
-> 9개 모듈 (admin · ai · apigateway · commerce · event · log · member · payment · settlement) 의 `presentation/dto/**` 와 `**/messaging/event/**` (Kafka payload) Java `record/class` 기준.
-> ⚠ **log** 는 Fastify/TypeScript 별도 스택. 본 문서는 Java DTO 만 커버.
-> ⚠ **apigateway** 는 라우팅 전용 (DTO 0건).
-> ★ = 기능 요구사항 + 기술스택 (`requirements-check.md` §1 / §2).
-> 모듈별 DTO 카탈로그(필드 표 포함 깊이) 는 `docs/dto/summary/{module}-summary.md` 참조.
-> 호출 주체 / Kafka 컨텍스트 / 사용 controller 매핑은 `docs/modules/{module}.md` 참조.
+**대상 모듈** (9개): admin · ai · apigateway · commerce · event · log · member · payment · settlement
+
+**추출 기준**: 각 모듈 `presentation/dto/**` + `**/messaging/event/**` (Kafka payload) 의 Java `record/class`
+
+**표기 규약**
+- ★ = 기능 요구사항 + 기술스택 매핑 항목 (`requirements-check.md` §1 / §2)
+
+**예외 모듈**
+- ⚠ **log** — Fastify/TypeScript 별도 스택. 본 문서는 Java DTO 만 커버
+- ⚠ **apigateway** — 라우팅 전용 (DTO 0건)
+
+**연결 문서**
+- 모듈별 DTO 카탈로그 (필드 표 포함 깊이) — [`docs/dto/summary/{module}-summary.md`](summary/)
+- 호출 주체 / Kafka 컨텍스트 / 사용 controller 매핑 — [`docs/modules/{module}.md`](../modules/)
 
 ---
 

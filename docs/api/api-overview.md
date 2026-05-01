@@ -1,10 +1,19 @@
 # API 전체 개요 (구현 기준 — 9개 모듈)
 
-> 9개 모듈 (admin · ai · apigateway · commerce · event · gateway · log · member · payment · settlement) 의 `*Controller.java` 의 `@RequestMapping` / 메서드 매핑 기반.
-> ⚠ **log** 는 Fastify/TypeScript 별도 스택. 본 문서는 Java 모듈만 커버 — `docs/kafka/actionLog.md` 참조.
-> ⚠ **gateway** 는 라우팅 전용. Java controller 는 health check 1건뿐 (apigateway 모듈에 위치).
-> ★ = 기능 요구사항 + 기술스택 (`requirements-check.md` §1 / §2).
-> 상세 (호출 주체 / Kafka 컨텍스트) 는 `docs/api/summary/{module}-summary.md`, DTO 는 `docs/dto/summary/{module}-summary.md` 참조.
+**대상 모듈** (9개): admin · ai · apigateway · commerce · event · gateway · log · member · payment · settlement
+
+**추출 기준**: 각 모듈 `*Controller.java` 의 `@RequestMapping` / 메서드 매핑
+
+**표기 규약**
+- ★ = 기능 요구사항 + 기술스택 매핑 항목 (`requirements-check.md` §1 / §2)
+
+**예외 모듈**
+- ⚠ **log** — Fastify/TypeScript 별도 스택. 본 문서는 Java 모듈만 커버 → 상세는 [`docs/skills/actionLog.md`](../skills/actionLog.md)
+- ⚠ **gateway** — 라우팅 전용. Java controller 는 health check 1건뿐 (apigateway 모듈에 위치)
+
+**연결 문서**
+- 모듈별 깊이 + 호출 주체 + Kafka 컨텍스트 — [`docs/api/summary/{module}-summary.md`](summary/)
+- DTO — [`docs/dto/summary/{module}-summary.md`](../dto/summary/)
 
 ---
 

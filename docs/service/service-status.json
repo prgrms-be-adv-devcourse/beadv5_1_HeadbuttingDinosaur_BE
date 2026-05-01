@@ -324,22 +324,8 @@
   {
     "module": "commerce",
     "service": "OrderService",
-    "method": "completeOrder",
-    "description": "complete order 기능을 제공",
-    "source": "commerce/src/main/java/com/devticket/commerce/order/application/service/OrderService.java"
-  },
-  {
-    "module": "commerce",
-    "service": "OrderService",
     "method": "createOrderByCart",
     "description": "create order by cart 기능을 제공",
-    "source": "commerce/src/main/java/com/devticket/commerce/order/application/service/OrderService.java"
-  },
-  {
-    "module": "commerce",
-    "service": "OrderService",
-    "method": "failOrder",
-    "description": "fail order 기능을 제공",
     "source": "commerce/src/main/java/com/devticket/commerce/order/application/service/OrderService.java"
   },
   {
@@ -660,8 +646,22 @@
   {
     "module": "payment",
     "service": "WalletChargeTransactionService",
+    "method": "applyRecoveryResult",
+    "description": "apply recovery result 기능을 제공",
+    "source": "payment/src/main/java/com/devticket/payment/wallet/application/service/support/WalletChargeTransactionService.java"
+  },
+  {
+    "module": "payment",
+    "service": "WalletChargeTransactionService",
     "method": "claimChargeForProcessing",
     "description": "claim charge for processing 기능을 제공",
+    "source": "payment/src/main/java/com/devticket/payment/wallet/application/service/support/WalletChargeTransactionService.java"
+  },
+  {
+    "module": "payment",
+    "service": "WalletChargeTransactionService",
+    "method": "claimChargeForRecovery",
+    "description": "claim charge for recovery 기능을 제공",
     "source": "payment/src/main/java/com/devticket/payment/wallet/application/service/support/WalletChargeTransactionService.java"
   },
   {
@@ -694,6 +694,13 @@
   },
   {
     "module": "payment",
+    "service": "WalletChargeTransactionService",
+    "method": "revertToPending",
+    "description": "revert to pending 기능을 제공",
+    "source": "payment/src/main/java/com/devticket/payment/wallet/application/service/support/WalletChargeTransactionService.java"
+  },
+  {
+    "module": "payment",
     "service": "WalletService",
     "method": "charge",
     "description": "charge 기능을 제공",
@@ -744,13 +751,6 @@
   {
     "module": "payment",
     "service": "WalletService",
-    "method": "processBatchRefund",
-    "description": "process batch refund 기능을 제공",
-    "source": "payment/src/main/java/com/devticket/payment/wallet/application/service/WalletService.java"
-  },
-  {
-    "module": "payment",
-    "service": "WalletService",
     "method": "processWalletPayment",
     "description": "process wallet payment 기능을 제공",
     "source": "payment/src/main/java/com/devticket/payment/wallet/application/service/WalletService.java"
@@ -786,22 +786,8 @@
   {
     "module": "payment",
     "service": "WalletServiceImpl",
-    "method": "applyRecoveryResult",
-    "description": "apply recovery result 기능을 제공",
-    "source": "payment/src/main/java/com/devticket/payment/wallet/application/service/WalletServiceImpl.java"
-  },
-  {
-    "module": "payment",
-    "service": "WalletServiceImpl",
     "method": "charge",
     "description": "charge 기능을 제공",
-    "source": "payment/src/main/java/com/devticket/payment/wallet/application/service/WalletServiceImpl.java"
-  },
-  {
-    "module": "payment",
-    "service": "WalletServiceImpl",
-    "method": "claimChargeForRecovery",
-    "description": "claim charge for recovery 기능을 제공",
     "source": "payment/src/main/java/com/devticket/payment/wallet/application/service/WalletServiceImpl.java"
   },
   {
@@ -849,13 +835,6 @@
   {
     "module": "payment",
     "service": "WalletServiceImpl",
-    "method": "processBatchRefund",
-    "description": "process batch refund 기능을 제공",
-    "source": "payment/src/main/java/com/devticket/payment/wallet/application/service/WalletServiceImpl.java"
-  },
-  {
-    "module": "payment",
-    "service": "WalletServiceImpl",
     "method": "processWalletPayment",
     "description": "process wallet payment 기능을 제공",
     "source": "payment/src/main/java/com/devticket/payment/wallet/application/service/WalletServiceImpl.java"
@@ -884,100 +863,107 @@
   {
     "module": "payment",
     "service": "WalletServiceImpl",
-    "method": "revertTopending",
-    "description": "revert topending 기능을 제공",
-    "source": "payment/src/main/java/com/devticket/payment/wallet/application/service/WalletServiceImpl.java"
-  },
-  {
-    "module": "payment",
-    "service": "WalletServiceImpl",
     "method": "withdraw",
     "description": "withdraw 기능을 제공",
     "source": "payment/src/main/java/com/devticket/payment/wallet/application/service/WalletServiceImpl.java"
   },
   {
     "module": "settlement",
-    "service": "SettlementInternalService",
+    "service": "SettlementAdminService",
     "method": "cancelSettlement",
     "description": "cancel settlement 기능을 제공",
-    "source": "settlement/src/main/java/com/devticket/settlement/application/service/SettlementInternalService.java"
+    "source": "settlement/src/main/java/com/devticket/settlement/application/service/SettlementAdminService.java"
   },
   {
     "module": "settlement",
-    "service": "SettlementInternalService",
+    "service": "SettlementAdminService",
     "method": "createSettlementFromItems",
     "description": "create settlement from items 기능을 제공",
-    "source": "settlement/src/main/java/com/devticket/settlement/application/service/SettlementInternalService.java"
+    "source": "settlement/src/main/java/com/devticket/settlement/application/service/SettlementAdminService.java"
   },
   {
     "module": "settlement",
-    "service": "SettlementInternalService",
+    "service": "SettlementAdminService",
+    "method": "getMonthlyRevenue",
+    "description": "get monthly revenue 기능을 제공",
+    "source": "settlement/src/main/java/com/devticket/settlement/application/service/SettlementAdminService.java"
+  },
+  {
+    "module": "settlement",
+    "service": "SettlementAdminService",
     "method": "getSettlementDetail",
     "description": "get settlement detail 기능을 제공",
-    "source": "settlement/src/main/java/com/devticket/settlement/application/service/SettlementInternalService.java"
+    "source": "settlement/src/main/java/com/devticket/settlement/application/service/SettlementAdminService.java"
   },
   {
     "module": "settlement",
-    "service": "SettlementInternalService",
+    "service": "SettlementAdminService",
     "method": "getSettlements",
     "description": "get settlements 기능을 제공",
-    "source": "settlement/src/main/java/com/devticket/settlement/application/service/SettlementInternalService.java"
+    "source": "settlement/src/main/java/com/devticket/settlement/application/service/SettlementAdminService.java"
   },
   {
     "module": "settlement",
-    "service": "SettlementInternalService",
+    "service": "SettlementAdminService",
     "method": "processPayment",
     "description": "process payment 기능을 제공",
-    "source": "settlement/src/main/java/com/devticket/settlement/application/service/SettlementInternalService.java"
+    "source": "settlement/src/main/java/com/devticket/settlement/application/service/SettlementAdminService.java"
   },
   {
     "module": "settlement",
-    "service": "SettlementInternalService",
+    "service": "SettlementAdminService",
     "method": "runSettlement",
     "description": "run settlement 기능을 제공",
-    "source": "settlement/src/main/java/com/devticket/settlement/application/service/SettlementInternalService.java"
+    "source": "settlement/src/main/java/com/devticket/settlement/application/service/SettlementAdminService.java"
   },
   {
     "module": "settlement",
-    "service": "SettlementInternalServiceImpl",
+    "service": "SettlementAdminServiceImpl",
     "method": "cancelSettlement",
     "description": "cancel settlement 기능을 제공",
-    "source": "settlement/src/main/java/com/devticket/settlement/application/service/SettlementInternalServiceImpl.java"
+    "source": "settlement/src/main/java/com/devticket/settlement/application/service/SettlementAdminServiceImpl.java"
   },
   {
     "module": "settlement",
-    "service": "SettlementInternalServiceImpl",
+    "service": "SettlementAdminServiceImpl",
     "method": "createSettlementFromItems",
     "description": "create settlement from items 기능을 제공",
-    "source": "settlement/src/main/java/com/devticket/settlement/application/service/SettlementInternalServiceImpl.java"
+    "source": "settlement/src/main/java/com/devticket/settlement/application/service/SettlementAdminServiceImpl.java"
   },
   {
     "module": "settlement",
-    "service": "SettlementInternalServiceImpl",
+    "service": "SettlementAdminServiceImpl",
+    "method": "getMonthlyRevenue",
+    "description": "get monthly revenue 기능을 제공",
+    "source": "settlement/src/main/java/com/devticket/settlement/application/service/SettlementAdminServiceImpl.java"
+  },
+  {
+    "module": "settlement",
+    "service": "SettlementAdminServiceImpl",
     "method": "getSettlementDetail",
     "description": "get settlement detail 기능을 제공",
-    "source": "settlement/src/main/java/com/devticket/settlement/application/service/SettlementInternalServiceImpl.java"
+    "source": "settlement/src/main/java/com/devticket/settlement/application/service/SettlementAdminServiceImpl.java"
   },
   {
     "module": "settlement",
-    "service": "SettlementInternalServiceImpl",
+    "service": "SettlementAdminServiceImpl",
     "method": "getSettlements",
     "description": "get settlements 기능을 제공",
-    "source": "settlement/src/main/java/com/devticket/settlement/application/service/SettlementInternalServiceImpl.java"
+    "source": "settlement/src/main/java/com/devticket/settlement/application/service/SettlementAdminServiceImpl.java"
   },
   {
     "module": "settlement",
-    "service": "SettlementInternalServiceImpl",
+    "service": "SettlementAdminServiceImpl",
     "method": "processPayment",
     "description": "process payment 기능을 제공",
-    "source": "settlement/src/main/java/com/devticket/settlement/application/service/SettlementInternalServiceImpl.java"
+    "source": "settlement/src/main/java/com/devticket/settlement/application/service/SettlementAdminServiceImpl.java"
   },
   {
     "module": "settlement",
-    "service": "SettlementInternalServiceImpl",
+    "service": "SettlementAdminServiceImpl",
     "method": "runSettlement",
     "description": "run settlement 기능을 제공",
-    "source": "settlement/src/main/java/com/devticket/settlement/application/service/SettlementInternalServiceImpl.java"
+    "source": "settlement/src/main/java/com/devticket/settlement/application/service/SettlementAdminServiceImpl.java"
   },
   {
     "module": "settlement",
