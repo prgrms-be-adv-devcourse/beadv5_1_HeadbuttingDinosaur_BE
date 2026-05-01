@@ -32,20 +32,19 @@
 
 ## 3. 내부 API (다른 서비스가 호출)
 
-prefix: `/internal/orders/**`, `/internal/order-items/**`, `/internal/tickets/**`. 상세는 [api/api-overview.md](../api/api-overview.md) §2 Internal API 표 참조 (총 8개).
+prefix: `/internal/orders/**`, `/internal/order-items/**`, `/internal/tickets/**`. 상세는 [api/api-overview.md](../api/api-overview.md) §2 Internal API 표 참조.
 
 | 메서드 | 경로 | Controller | 호출 주체 | 비고 |
 |---|---|---|---|---|
-| GET | `/internal/orders/{orderId}` | `getOrderInfo` | payment | 결제 시 주문 정보 조회 |
+| GET | `/internal/orders/{orderId}` | `getOrderInfo` | payment | 결제 시 주문 정보 조회 + 환불 saga 폴백 안전망 (431b9fe9) |
 | GET | `/internal/orders/{id}/items` | `getOrderListForSettlement` | settlement | 정산용 주문 항목 |
 | GET | `/internal/orders/settlement-data` | `getSettlementData` | settlement | 판매자 기간 정산 데이터 |
-| POST | `/internal/orders/{orderId}/payment-completed` | `completeOrder` | (payment client는 ea44e72로 제거됨) | ⚠ dead REST — controller endpoint만 잔존, 다음 PR로 제거 예정 |
-| PATCH | `/internal/orders/{orderId}/payment-failed` | `failOrder` | (동일) | ⚠ dead REST — 동일. ea44e72 commit msg에 이 endpoint는 client `POST` vs controller `@PatchMapping`으로 빌드 시점부터 깨졌었음을 명시 |
 | GET | `/internal/order-items/by-ticket/{ticketId}` | `getOrderItemByTicketId` | payment | 티켓 → 주문항목 |
 | GET | `/internal/orders/{orderId}/tickets` | `getOrderTickets` | payment | 환불 산정용 티켓 목록 |
 | POST | `/internal/tickets/settlement-data` | `getSettlementData` (Ticket) | settlement | 티켓 정산 데이터 일괄 |
 
-> ⚠ api-overview.md line 36-37 참고: `/internal/orders/by-event/{eventId}` 주석 처리(미구현). 환불 완료 처리는 HTTP 엔드포인트 없이 Kafka로 이행됨.
+> ✅ 정리 완료 (b9be8434): `/internal/orders/{orderId}/payment-completed` (POST `completeOrder`) 와 `/internal/orders/{orderId}/payment-failed` (PATCH `failOrder`) endpoint 및 동기 처리 메서드 제거. 결제 완료/실패는 Kafka(`payment.completed`/`payment.failed`) 일원화.
+> ⚠ api-overview.md line 36-37 참고: `/internal/orders/by-event/{eventId}` 주석 처리(미구현). 환불 완료 처리도 HTTP 엔드포인트 없이 Kafka(`refund.completed`)로 이행됨 (`InternalOrderController` 말미 주석 참조).
 
 ## 4. Kafka
 
@@ -54,7 +53,7 @@ prefix: `/internal/orders/**`, `/internal/order-items/**`, `/internal/tickets/**
 | 이벤트 | 분류 | 트리거 | 비고 |
 |---|---|---|---|
 | `ticket.issue-failed` | 1-B Outbox | 결제 성공 후 티켓 발급 실패 시 | OrderService.processPaymentCompleted 내부 |
-| `refund.requested` | 1-B Outbox (fanout) | `event.force-cancelled` 수신 → PAID 주문별 fan-out | RefundFanoutService |
+| `refund.requested` | 1-B Outbox (fanout) | `event.force-cancelled` 수신 → PAID 주문별 fan-out | RefundFanoutService. payload에 `totalOrderTickets` (주문 전체 티켓 수) 포함 — Payment 동기 HTTP 호출 제거(e3d316ac). ⚠ kafka-design §3 line 298-311 정의는 구버전(드리프트, 패턴 C — 인용만, 실 필드는 commerce/payment `RefundRequestedEvent.java`) |
 | `refund.order.done` / `refund.order.failed` | 1-B Outbox | RefundOrderService Saga 보상 응답 | |
 | `refund.ticket.done` / `refund.ticket.failed` | 1-B Outbox | RefundTicketService Saga 보상 응답 | |
 | `order.cancelled` | 1-B Outbox | `OrderExpirationCancelService.java:53` | ⚠ kafka-design §3 line 70 미등재 (드리프트, 패턴 C — ServiceOverview §4-4) |
@@ -100,17 +99,18 @@ prefix: `/internal/orders/**`, `/internal/order-items/**`, `/internal/tickets/**
 ### 피의존 모듈 (호출됨 / 구독됨)
 
 - **REST 피호출**:
-  - payment: `getOrderInfo`, `getOrderItemByTicketId`, `getOrderTickets` (active)
-  - payment: `completeOrder`, `failOrder` ⚠ **dead REST** — controller endpoint만 잔존 (payment 측 client는 ea44e72로 제거됨, kafka-impl-plan §678)
+  - payment: `getOrderInfo` (정상 호출 + 환불 saga 폴백 안전망 431b9fe9), `getOrderItemByTicketId`, `getOrderTickets`
   - settlement: `getSettlementData`, `getSettlementData (Ticket)`
 - **Kafka 피구독**:
   - log: `action.log` (1-C, CART_ADD / CART_REMOVE)
   - 환불 saga 보상 흐름은 payment.Orchestrator가 발행자, commerce는 보상 응답 발행 (`refund.order.done` 등)
 
-### ⚠ 미결 (모듈 누적 3건, 모두 패턴 B)
+### ⚠ 미결 (모듈 누적 1건)
 
-- `OrderService.failOrder` — Payment 측 호출 미사용 (kafka-impl-plan §678)
-- `OrderService.completeOrder` — 동일
-- `OrderService.processStockDeducted` — `stock.deducted` 비활성 stub
+- `OrderService.processStockDeducted` — `stock.deducted` 비활성 stub (dedup만 수행 후 종료, kafka-design §3 line 83)
+
+### ✅ 정리 완료 (이전 ⚠ 미결 → 해소)
+
+- `OrderService.completeOrder` / `failOrder` + `/internal/orders/{orderId}/payment-completed` (POST) / `/payment-failed` (PATCH) endpoint — **b9be8434로 제거**. 결제 완료/실패 처리는 Kafka(`payment.completed`/`payment.failed`) 일원화. (이전 dead REST 2건, payment 측 client는 ea44e72로 선제 제거되어 있던 상태였음)
 
 처리 계획 상세: [ServiceOverview.md §4-1, §4-2](../ServiceOverview.md) 참조.

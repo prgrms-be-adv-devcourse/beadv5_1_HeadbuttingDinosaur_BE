@@ -61,10 +61,12 @@
 | ⚠ ~~`event.force-cancelled`~~ | ~~`WalletService.processBatchRefund`~~ | **22762f2로 제거**. 강제취소 fan-out은 commerce.RefundFanoutService → `refund.requested` → payment Saga 경유로 일원화 | — |
 | `event.sale-stopped` | (Saga Orchestrator) | 보상 흐름 | dedup |
 | `ticket.issue-failed` | (Saga Orchestrator) | 결제 환불 처리 | dedup |
-| `refund.requested` | (Saga Orchestrator) | Saga 시작 | dedup |
+| `refund.requested` | `RefundSagaOrchestrator.start` | Saga 시작 — `event.totalOrderTickets()` 우선 사용(ea7f7cc9), 0(구버전 페이로드)이면 commerce `getOrderInfo` 폴백(431b9fe9), 그래도 실패 시 `ticketIds.size()` 최후 폴백 | dedup |
 | `refund.order.done` / `refund.order.failed` | (Orchestrator) | Order 보상 응답 | dedup |
 | `refund.ticket.done` / `refund.ticket.failed` | (Orchestrator) | Ticket 보상 응답 | dedup |
 | `refund.stock.done` / `refund.stock.failed` | (Orchestrator) | Stock 보상 응답 | dedup |
+
+> ⚠ `RefundRequestedEvent` 실 필드는 코드 기준 13개 (`refundId, orderRefundId, orderId, userId, paymentId, paymentMethod, ticketIds, refundAmount, refundRate, wholeOrder, reason, timestamp, totalOrderTickets`). kafka-design §3 line 298-311 정의는 구버전(8 필드)이라 드리프트 — 인용만, 실 정의는 `payment/.../refund/application/saga/event/RefundRequestedEvent.java` 참조.
 
 ## 5. DTO
 
@@ -81,9 +83,10 @@
 ### 의존하는 모듈 (호출 / 구독)
 
 - **REST 호출**:
-  - commerce: `getOrderInfo`, `getOrdersByEvent` (active)
+  - commerce: `getOrderInfo` (`RefundSagaOrchestrator.lookupCommerceTotalTickets` — 구버전 `refund.requested` 페이로드 폴백 안전망, 정상 트래픽에선 호출 안 됨, 431b9fe9), `getOrdersByEvent`
   - 외부: PG (Toss `pgPaymentClient`)
   - ✅ 정리됨 (ea44e72): `completePayment`, `failOrder` dead client 2건 + WalletServiceImpl의 CommerceInternalClient 의존성 제거
+  - ✅ 단순화 (ea7f7cc9): `RefundSagaOrchestrator`가 fan-out 시점에 호출하던 `getOrderInfo` 동기 호출은 `RefundRequestedEvent.totalOrderTickets` 자체완결로 정상 경로에서 제거됨 (안전망만 잔존)
 - **Kafka 구독**: commerce 발행(`refund.completed`, `ticket.issue-failed`, `refund.requested`, `refund.order.done`/`failed`, `refund.ticket.done`/`failed`), event 발행(`event.force-cancelled`, `event.sale-stopped`, `refund.stock.done`/`failed`)
 
 ### 피의존 모듈 (호출됨 / 구독됨)
