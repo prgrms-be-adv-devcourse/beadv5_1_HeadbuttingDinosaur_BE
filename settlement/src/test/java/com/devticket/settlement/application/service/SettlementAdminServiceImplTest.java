@@ -23,13 +23,16 @@ import com.devticket.settlement.domain.repository.FeePolicyRepository;
 import com.devticket.settlement.domain.repository.SettlementItemRepository;
 import com.devticket.settlement.domain.repository.SettlementRepository;
 import com.devticket.settlement.infrastructure.client.SettlementToCommerceClient;
+import com.devticket.settlement.infrastructure.client.SettlementToEventClient;
 import com.devticket.settlement.infrastructure.client.SettlementToMemberClient;
 import com.devticket.settlement.infrastructure.client.SettlementToPaymentClient;
+import com.devticket.settlement.infrastructure.external.dto.AdminSettlementDetailResponse;
 import com.devticket.settlement.presentation.dto.MonthlyRevenueResponse;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -45,6 +48,7 @@ class SettlementAdminServiceImplTest {
     @Mock private SettlementToCommerceClient settlementToCommerceClient;
     @Mock private SettlementToPaymentClient settlementToPaymentClient;
     @Mock private SettlementToMemberClient settlementToMemberClient;
+    @Mock private SettlementToEventClient settlementToEventClient;
     @Mock private FeePolicyRepository feePolicyRepository;
     @Mock private SettlementRepository settlementRepository;
     @Mock private SettlementItemRepository settlementItemRepository;
@@ -53,10 +57,6 @@ class SettlementAdminServiceImplTest {
     private SettlementAdminServiceImpl service;
 
     private final UUID sellerId = UUID.randomUUID();
-
-    // ────────────────────────────────────────────────
-    // createSettlementFromItems
-    // ────────────────────────────────────────────────
 
     @Test
     void createSettlementFromItems_최소금액충족_CONFIRMED생성() {
@@ -105,10 +105,9 @@ class SettlementAdminServiceImplTest {
 
         Settlement saved = captureNewSettlement();
         assertThat(saved.getStatus()).isEqualTo(SettlementStatus.CONFIRMED);
-        assertThat(saved.getFinalSettlementAmount()).isEqualTo(10670); // 4850 + 5820
+        assertThat(saved.getFinalSettlementAmount()).isEqualTo(10670);
         assertThat(saved.getCarriedInAmount()).isEqualTo(5820);
 
-        // 이월된 pending 정산서에 carriedToSettlementId 설정 확인
         assertThat(pending.getCarriedToSettlementId()).isEqualTo(saved.getSettlementId());
         assertThat(pending.getStatus()).isEqualTo(SettlementStatus.PENDING_MIN_AMOUNT);
     }
@@ -130,7 +129,7 @@ class SettlementAdminServiceImplTest {
 
         Settlement saved = captureNewSettlement();
         assertThat(saved.getStatus()).isEqualTo(SettlementStatus.PENDING_MIN_AMOUNT);
-        assertThat(saved.getFinalSettlementAmount()).isEqualTo(7000); // 3000 + 4000
+        assertThat(saved.getFinalSettlementAmount()).isEqualTo(7000);
     }
 
     @Test
@@ -150,7 +149,6 @@ class SettlementAdminServiceImplTest {
 
         service.createSettlementFromItems();
 
-        // 신규 정산서 save + pending의 carriedToSettlementId 업데이트 save = 2회
         verify(settlementRepository, atLeastOnce()).save(any(Settlement.class));
     }
 
@@ -217,10 +215,6 @@ class SettlementAdminServiceImplTest {
 
         verify(settlementItemRepository, never()).saveAll(anyList());
     }
-
-    // ────────────────────────────────────────────────
-    // processPayment
-    // ────────────────────────────────────────────────
 
     @Test
     void processPayment_CONFIRMED_지급성공_PAID처리() {
@@ -311,9 +305,76 @@ class SettlementAdminServiceImplTest {
                 .isEqualTo(SettlementErrorCode.SETTLEMENT_BAD_REQUEST));
     }
 
-    // ────────────────────────────────────────────────
-    // getMonthlyRevenue
-    // ────────────────────────────────────────────────
+    @Test
+    void getSettlementDetail_eventTitle_벌크조회로_채워짐_그리고_eventId는_UUID() {
+        UUID settlementId = UUID.randomUUID();
+        UUID eventUUID1 = UUID.randomUUID();
+        UUID eventUUID2 = UUID.randomUUID();
+
+        Settlement settlement = Settlement.builder()
+            .sellerId(sellerId)
+            .periodStartAt(LocalDateTime.of(2026, 3, 26, 0, 0))
+            .periodEndAt(LocalDateTime.of(2026, 4, 25, 23, 59, 59))
+            .totalSalesAmount(100000)
+            .totalRefundAmount(0)
+            .totalFeeAmount(3000)
+            .finalSettlementAmount(97000)
+            .carriedInAmount(0)
+            .status(SettlementStatus.CONFIRMED)
+            .build();
+
+        SettlementItem item1 = SettlementItem.builder()
+            .orderItemId(UUID.randomUUID())
+            .eventId(1L).eventUUID(eventUUID1).sellerId(sellerId)
+            .salesAmount(50000L).refundAmount(0L).feeAmount(1500L).settlementAmount(48500L)
+            .status(SettlementItemStatus.READY).eventDateTime(LocalDate.now().minusDays(10))
+            .build();
+        SettlementItem item2 = SettlementItem.builder()
+            .orderItemId(UUID.randomUUID())
+            .eventId(2L).eventUUID(eventUUID2).sellerId(sellerId)
+            .salesAmount(50000L).refundAmount(0L).feeAmount(1500L).settlementAmount(48500L)
+            .status(SettlementItemStatus.READY).eventDateTime(LocalDate.now().minusDays(5))
+            .build();
+
+        given(settlementRepository.findBySettlementId(settlementId)).willReturn(Optional.of(settlement));
+        given(settlementItemRepository.findBySettlementId(settlementId)).willReturn(List.of(item1, item2));
+        given(settlementRepository.findByCarriedToSettlementId(settlementId)).willReturn(List.of());
+        given(settlementToEventClient.getEventTitles(anyList()))
+            .willReturn(Map.of(eventUUID1, "이벤트 A", eventUUID2, "이벤트 B"));
+
+        AdminSettlementDetailResponse response = service.getSettlementDetail(settlementId);
+
+        assertThat(response.settlementItems()).hasSize(2);
+        assertThat(response.settlementItems())
+            .extracting("eventTitle")
+            .containsExactlyInAnyOrder("이벤트 A", "이벤트 B");
+        assertThat(response.settlementItems())
+            .extracting("eventId")
+            .containsExactlyInAnyOrder(eventUUID1.toString(), eventUUID2.toString());
+        verify(settlementToEventClient).getEventTitles(anyList());
+    }
+
+    @Test
+    void getSettlementDetail_항목없음_Event서비스_호출안함() {
+        UUID settlementId = UUID.randomUUID();
+        Settlement settlement = Settlement.builder()
+            .sellerId(sellerId)
+            .periodStartAt(LocalDateTime.of(2026, 3, 26, 0, 0))
+            .periodEndAt(LocalDateTime.of(2026, 4, 25, 23, 59, 59))
+            .totalSalesAmount(0).totalRefundAmount(0).totalFeeAmount(0)
+            .finalSettlementAmount(0).carriedInAmount(0)
+            .status(SettlementStatus.PENDING_MIN_AMOUNT)
+            .build();
+
+        given(settlementRepository.findBySettlementId(settlementId)).willReturn(Optional.of(settlement));
+        given(settlementItemRepository.findBySettlementId(settlementId)).willReturn(List.of());
+        given(settlementRepository.findByCarriedToSettlementId(settlementId)).willReturn(List.of());
+
+        AdminSettlementDetailResponse response = service.getSettlementDetail(settlementId);
+
+        assertThat(response.settlementItems()).isEmpty();
+        verify(settlementToEventClient, never()).getEventTitles(anyList());
+    }
 
     @Test
     void getMonthlyRevenue_정상조회_수수료합산반환() {
@@ -354,10 +415,6 @@ class SettlementAdminServiceImplTest {
         assertThat(fromCaptor.getValue()).isEqualTo(LocalDateTime.of(2026, 3, 26, 0, 0, 0));
         assertThat(toCaptor.getValue().toLocalDate()).isEqualTo(java.time.LocalDate.of(2026, 3, 26));
     }
-
-    // ────────────────────────────────────────────────
-    // 헬퍼
-    // ────────────────────────────────────────────────
 
     private SettlementItem buildItem(UUID sellerId, long settlementAmount) {
         return SettlementItem.builder()
