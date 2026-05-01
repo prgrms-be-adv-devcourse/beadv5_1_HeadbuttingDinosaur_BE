@@ -4,7 +4,7 @@
 
 장바구니 / 주문 / 티켓 도메인 + 환불 saga 시작점(`RefundFanoutService`).
 
-★ 요구사항:
+★ 요구사항 :
 - 장바구니 N개 추가 — `CartController.addToCart`
 - 장바구니 → 예치금 구매 — `OrderController.createOrderByCart`, Kafka `payment.completed`/`failed` 후속 처리
 - 동시 구매 시 재고 초과 방지 — event `adjustStockBulk` 호출
@@ -13,12 +13,12 @@
 
 | 영역 | HTTP | Path | Controller#Method | 호출 주체 | 설명 |
 |---|---|---|---|---|---|
-| Cart | POST | `/api/cart/items` ★ | `CartController#addToCart` | 사용자 | (#3) 장바구니 아이템 추가 |
+| Cart | POST | `/api/cart/items` ★ | `CartController#addToCart` | 사용자 | 장바구니 아이템 추가 |
 | Cart | GET | `/api/cart` | `CartController#getCart` | 사용자 | 내 장바구니 조회 |
 | Cart | PATCH | `/api/cart/items/{cartItemId}` | `CartController#updateCartItemQuantity` | 사용자 | 장바구니 수량 증감 |
 | Cart | DELETE | `/api/cart/items/{cartItemId}` | `CartController#deleteCartItem` | 사용자 | 장바구니 단건 삭제 |
 | Cart | DELETE | `/api/cart` | `CartController#deleteCartItemAll` | 사용자 | 장바구니 전체 삭제 |
-| Order | POST | `/api/orders` ★ | `OrderController#createOrderByCart` | 사용자 | (#4) 장바구니 기반 주문 생성 + 재고 차감 (event `adjustStockBulk` 호출) |
+| Order | POST | `/api/orders` ★ | `OrderController#createOrderByCart` | 사용자 | 장바구니 기반 주문 생성 + 재고 차감 (event `adjustStockBulk` 호출) |
 | Order | GET | `/api/orders/{orderId}/status` | `OrderController#getOrderStatus` | 사용자 | 주문 상태 폴링 (`CREATED → PAYMENT_PENDING`) |
 | Order | GET | `/api/orders/{orderId}` | `OrderController#getOrderDetail` | 사용자 | 주문 상세 조회 |
 | Order | PATCH | `/api/orders/{orderId}/cancel` | `OrderController#cancelOrder` | 사용자 | 결제 전 주문 취소 + 재고 복구 |
@@ -49,14 +49,14 @@
 | `refund.order.done` / `refund.order.failed` | 1-B Outbox | `RefundOrderService` Saga 보상 응답 | `RefundOrderDoneEvent` / `RefundOrderFailedEvent` |
 | `refund.ticket.done` / `refund.ticket.failed` | 1-B Outbox | `RefundTicketService` Saga 보상 응답 | `RefundTicketDoneEvent` / `RefundTicketFailedEvent` |
 | `order.cancelled` | 1-B Outbox | `OrderExpirationCancelService.java:53` (결제 전 주문 만료 취소) | `OrderCancelledEvent` |
-| `action.log` (CART_ADD / CART_REMOVE) | 1-C fire-and-forget | `CartService` 내부 — (#9 AI 추천 입력) | `ActionLogDomainEvent` |
+| `action.log` (CART_ADD / CART_REMOVE) | 1-C fire-and-forget | `CartService` 내부 — | `ActionLogDomainEvent` |
 
 ### 수신 (Consumer) — kafka-design §3 line 70
 
 | 토픽 | 처리 메서드 | 처리 내용 | 멱등성 |
 |---|---|---|---|
-| `payment.completed` ★ | `OrderService#processPaymentCompleted` | (#4) PAID 전이 + 티켓 발급 + 카트 분기 삭제 (단일 `@Transactional`) | dedup + canTransitionTo (3분류) |
-| `payment.failed` ★ | `OrderService#processPaymentFailed` | (#4) FAILED 전이 | dedup + canTransitionTo (3분류) |
+| `payment.completed` ★ | `OrderService#processPaymentCompleted` | PAID 전이 + 티켓 발급 + 카트 분기 삭제 (단일 `@Transactional`) | dedup + canTransitionTo (3분류) |
+| `payment.failed` ★ | `OrderService#processPaymentFailed` | FAILED 전이 | dedup + canTransitionTo (3분류) |
 | `event.force-cancelled` | `RefundFanoutService#processEventForceCancelled` | PAID 주문 fanout → `refund.requested` 발행 | dedup |
 | `refund.completed` | `RefundOrderService#processRefundCompleted` | 환불 완료 처리 | dedup |
 | `refund.order.cancel` / `refund.order.compensate` | `RefundOrderService#processOrderRefundCancel` / `processOrderCompensate` | Saga 보상 | dedup |
@@ -71,7 +71,7 @@
 
 ### 호출 (REST)
 
-- event: `validatePurchase`, `adjustStockBulk` ★ (#11), `getBulkEventInfo`, `getSingleEventInfo`, `getEventsBySellerForSettlement`
+- event: `validatePurchase`, `adjustStockBulk` ★, `getBulkEventInfo`, `getSingleEventInfo`, `getEventsBySellerForSettlement`
 - member: `getMemberInfo` (`TicketService.getParticipantList`)
 
 ### 피호출 (REST)

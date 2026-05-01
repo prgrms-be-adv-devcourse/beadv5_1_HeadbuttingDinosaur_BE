@@ -7,10 +7,12 @@
 표준 컬럼 (`summary/{module}-summary.md` 기준):
 
 ```
-영역 | HTTP | Path | Controller#Method | 요청 DTO | 응답 DTO | 호출 주체 | 설명
+영역 | HTTP | Path | Controller#Method | 호출 주체 | 설명
 ```
 
-`api-overview.md` 통합 인덱스는 4-5 컬럼 단축 형식 (`HTTP | Path | Controller#Method | 설명`) 사용.
+`api-overview.md` 통합 인덱스는 4 컬럼 단축 형식 (`HTTP | Path | Controller#Method | 설명`) 사용.
+
+DTO 정보는 별도 자산(`docs/dto/summary/{module}-summary.md`) 이 단일 책임 — API 표에서는 다루지 않는다.
 
 ### 컬럼 작성 규칙
 
@@ -19,9 +21,7 @@
 | 영역 | 모듈 내 도메인 (`Cart`, `Order`, `Ticket`). 내부 API는 `Order Internal` 같이 접미사 |
 | HTTP / 메서드 | HTTP 메서드 대문자 (`GET` / `POST` / `PATCH` / `DELETE`) |
 | 경로 / Path | PathVariable 은 `{중괄호}` 표기. 정규식 제약은 그대로 보존 (예: `/api/seller/settlements/{yearMonth:[0-9]{6}}`) |
-| Controller#Method | `{ClassName}#{methodName}` 형식 (예: `CartController#addToCart`). 통합 인덱스 / summary 양쪽 동일 표기 |
-| 요청 DTO | record 명시. 없으면 `-` (대시) |
-| 응답 DTO | record 명시. void는 `Void`. 페이지네이션은 wrapper DTO (`OrderListResponse` 등) |
+| Controller#Method | `{ClassName}#{methodName}` 형식 (예: `CartController#addToCart`) |
 | 호출 주체 | 내부 API 의 경우 어느 모듈이 호출하는지 (`commerce`, `payment` 등) |
 | 설명 | 한국어 1줄, 25자 권장 (`dto-doc-standard.md §1줄 요약 길이` 참조) |
 
@@ -39,9 +39,9 @@
 - 같은 모듈이어도 외부/내부 prefix 가 다르면 **별도 표** 로 분리 (`summary/{module}-summary.md` 의 `## 외부 API` / `## 내부 API` 패턴).
 - 동일 도메인이 외부/내부 양쪽 노출 시 영역명에 "Internal" 접미사 (예: `Order` vs `Order Internal`).
 
-### 예외 (✅ 정정됨)
+### 예외
 
-- settlement 모듈 컨트롤러는 path 기준 외부(`/api/admin/settlements/**`) 분류. 6eab2dab 로 클래스명 `InternalSettlementController` → `SettlementAdminController` 정정 (path 변경 없음).
+- settlement 모듈 `SettlementAdminController` 는 path 기준 외부(`/api/admin/settlements/**`) 분류 — 클래스명에 "Admin" 접미사가 있어도 path 가 `/api/admin/**` 이면 외부로 본다.
 
 ## 3. 인증 요구 표기
 
@@ -115,7 +115,7 @@
 - **영역명 큐레이션**: 자동은 컨트롤러명 기반 → P5 가 도메인명으로 단축 (`CartController` → `Cart`)
 - **설명 한국어 1줄**: 자동은 영문 placeholder, P5 가 25자 한국어로 큐레이션
 - **미구현 사유**: `notImplemented` 항목의 코드 주석 / PR 인용
-- **인증 컬럼**: 현재 미적용 (§3 ⚠)
+- **인증 컬럼**: 현재 미적용
 - **모듈 페이지 발췌**: `docs/modules/*.md` §2/§3 에 ★ 핵심 플로우 발췌
 
 ## 6. 모듈별 API 표 분리 기준
@@ -123,12 +123,14 @@
 - 9 모듈 통합 인덱스: `api-overview.md` 의 모듈별 ## 섹션
 - 모듈별 깊이 카탈로그: `summary/{module}-summary.md` (외부/내부 + Kafka + 호출 주체 + DTO + 의존성)
 - 모듈 페이지(`docs/modules/{module}.md`) 는 ★ 핵심 플로우 발췌 + summary 링크
-- DTO 컬럼 표기는 record 명만, 상세는 `dto/summary/{module}-summary.md` 링크 (§7 참조)
+- DTO 컬럼 표기는 record 명만, 상세는 `dto/summary/{module}-summary.md` 링크
 
-## 7. DTO 인용 형식
+## 7. DTO 자산 분리
 
-- 표의 요청/응답 DTO 컬럼은 record 이름만 (예: `CartItemRequest`)
-- 상세 필드는 [dto/dto-overview.md](../dto/dto-overview.md) (9 모듈 통합 인덱스) 또는 [dto/summary/{module}-summary.md](../dto/summary/) (모듈별 카탈로그) 참조
+API 표에서는 DTO 컬럼을 다루지 않는다. DTO 는 별도 자산이 단일 책임:
+
+- 9 모듈 통합 인덱스: [dto/dto-overview.md](../dto/dto-overview.md)
+- 모듈별 카탈로그: [dto/summary/{module}-summary.md](../dto/summary/)
 - 모듈 페이지 §5 에서 다음 형식으로 링크: `[dto/summary/{module}-summary.md](../dto/summary/{module}-summary.md) 참조`
 
 ## 8. ⚠ 마커 사용 규칙 (API 관련)

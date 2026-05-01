@@ -2,7 +2,7 @@
 
 > ★ = 기능 요구사항 + 기술스택 (`requirements-check.md` §1 / §2)
 
-(#7 매월 정산) Spring Batch 기반 — DailySettlementJob / MonthlySettlementJob.
+Spring Batch 기반 — DailySettlementJob / MonthlySettlementJob.
 
 ## Presentation Response
 
@@ -73,7 +73,7 @@
 | `feeAmount` | `Long` |
 | `settlementAmount` | `Long` |
 
-### MonthlyRevenueResponse (record) ★ (#7)
+### MonthlyRevenueResponse (record) ★
 - source: `settlement/src/main/java/com/devticket/settlement/presentation/dto/MonthlyRevenueResponse.java`
 - 사용처: `GET /api/admin/settlements/revenues/{yearMonth}` (`SettlementAdminController#getMonthlyRevenue`)
 
@@ -89,7 +89,7 @@
 ### AdminSettlementDetailResponse (record)
 - source: `settlement/.../infrastructure/external/dto/AdminSettlementDetailResponse.java`
 
-## Spring Batch step 입출력 ★ (#7)
+## Spring Batch step 입출력 ★
 
 ### SellerSettlementData (record/class)
 - source: `settlement/.../{batch 패키지}/SellerSettlementData.java`

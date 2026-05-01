@@ -4,7 +4,7 @@
 
 presentation/dto 27건 + Kafka payload 10건. Event/SellerEvent + force-cancel/sale-stopped Outbox + RefundStock 보상.
 
-## External — Event (사용자) ★ (§2 ES 검색)
+## External — Event (사용자) ★
 
 ### EventListRequest (record) ★
 - source: `event/.../presentation/dto/req/EventListRequest.java`
@@ -41,9 +41,9 @@ presentation/dto 27건 + Kafka payload 10건. Event/SellerEvent + force-cancel/s
 - source: `event/.../presentation/dto/req/InternalBulkEventInfoRequest.java`
 - 필드: `eventIds` (List<UUID>)
 
-### InternalBulkStockAdjustmentRequest (record) ★ (#11)
+### InternalBulkStockAdjustmentRequest (record) ★
 - source: `event/.../presentation/dto/req/InternalBulkStockAdjustmentRequest.java`
-- 필드: `adjustments` (List of `eventId`, `delta` 등) — `OrderService` 가 부호별 묶어 호출 (#11 동시성 안전)
+- 필드: `adjustments` (List of `eventId`, `delta` 등) — `OrderService` 가 부호별 묶어 호출
 
 ### InternalStockDeductRequest / InternalStockRestoreRequest (record)
 - source: `event/.../presentation/dto/req/`
@@ -98,10 +98,10 @@ presentation/dto 27건 + Kafka payload 10건. Event/SellerEvent + force-cancel/s
 
 ### 수신 record (참고용) — 6종
 - `OrderCancelledEvent` — commerce 발행 → event 수신 (재고 복구)
-- `PaymentFailedEvent` ★ (#11) — payment 발행 → event 수신 (재고 복구)
+- `PaymentFailedEvent` ★ — payment 발행 → event 수신 (재고 복구)
 - `RefundCompletedEvent` — payment 발행 → event 수신 (통계 기록, cancelledQuantity 누적)
 - `RefundStockRestoreEvent` — payment 발행 → event 수신 (환불 보상 재고 복구)
-- `ActionLogEvent`, `ActionLogDomainEvent` ★ (#9 AI 추천 입력) — 1-C action.log 발행용
+- `ActionLogEvent`, `ActionLogDomainEvent` ★ — 1-C action.log 발행용
 
 > 모든 1-B Outbox 이벤트는 afterCommit 직접 발행 + 스케줄러 fallback 패턴. 상세는 `docs/modules/event.md §4 Outbox 발행 패턴`.
 

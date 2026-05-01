@@ -6,7 +6,7 @@ presentation/dto 40건 (모듈 중 최다) — Auth/User/Seller Application/Tech
 
 ## Auth — Request
 
-### LoginRequest (record) ★ (§2 JWT)
+### LoginRequest (record) ★
 - source: `member/.../auth/presentation/dto/req/LoginRequest.java`
 - 필드: `email`, `password`
 
@@ -14,21 +14,21 @@ presentation/dto 40건 (모듈 중 최다) — Auth/User/Seller Application/Tech
 - source: `member/.../auth/presentation/dto/req/SignupRequest.java`
 - 필드: `email`, `password`, `nickname`, `providerType` 등
 
-### OAuthSignUpOrLoginRequest (record) ★ (§2 OAuth)
+### OAuthSignUpOrLoginRequest (record) ★
 - source: `member/.../auth/presentation/dto/req/OAuthSignUpOrLoginRequest.java`
 - 필드: `googleSubject`, `email`, `name` 등
 
-### SocialLoginRequest (record) ★ (§2 OAuth)
+### SocialLoginRequest (record) ★
 - source: `member/.../auth/presentation/dto/req/SocialLoginRequest.java`
 - 필드: `code` (Google authorization code)
 
-### ReissueRequest (record) ★ (§2 JWT)
+### ReissueRequest (record) ★
 - source: `member/.../auth/presentation/dto/req/ReissueRequest.java`
 - 필드: `refreshToken`
 
 ## Auth — Response
 
-### LoginResponse / SignupResponse / OAuthSignUpOrLoginResponse / SocialLoginResponse / ReissueResponse (record) ★ (§2 JWT/OAuth)
+### LoginResponse / SignupResponse / OAuthSignUpOrLoginResponse / SocialLoginResponse / ReissueResponse (record) ★
 - source: `member/.../auth/presentation/dto/res/`
 - 공통 필드 패턴: `accessToken`, `refreshToken`, `userId`, `role`, (필요 시) `profileCompleted`
 
@@ -94,7 +94,7 @@ presentation/dto 40건 (모듈 중 최다) — Auth/User/Seller Application/Tech
 - source: `member/.../presentation/dto/res/InternalSellerInfoResponse.java`
 - 사용처: event/payment/settlement (판매자 정산 정보 조회)
 
-### InternalUserTechStackResponse (record) ★ (#9, §2 AI 추천 + 벡터DB)
+### InternalUserTechStackResponse (record) ★
 - source: `member/.../presentation/dto/res/InternalUserTechStackResponse.java>`
 - 사용처: ai 콜드스타트 (`MemberServiceClient.getUserTechStack`)
 
@@ -118,7 +118,3 @@ presentation/dto 40건 (모듈 중 최다) — Auth/User/Seller Application/Tech
 
 **없음** (member 모듈은 Kafka 미사용 — kafka-design.md §3 표에 member 행 없음).
 
-## ⚠ 미결 / 후속
-
-- TechStack 이관 완료 (member → admin) 후 잔존 `TechStackController` (조회만) — 추후 admin 측으로 통합 가능성
-- 일부 record 의 정확한 필드 정의는 코드 (`member/.../presentation/dto/{req,res}/**`) 직접 확인

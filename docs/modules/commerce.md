@@ -1,6 +1,6 @@
 # commerce
 
-> ★ = `requirements-check.md §1` 기능 요구사항 5건 (#3, #4, #7, #10, #11) + `§2` 기술스택 6건 (ES / K8s / MSA+Gateway / JWT+OAuth / 벡터DB / AI 추천) 매핑 항목
+> ★ = 기능 요구사항 + 기술스택 (`requirements-check.md` §1 / §2)
 
 ## 1. 모듈 책임
 
@@ -17,11 +17,11 @@
 
 | 메서드 | 경로 | Controller | Service 1줄 |
 |---|---|---|---|
-| POST | `/api/cart/items` ★ | `addToCart` | (#3) 장바구니에 N개 상품을 추가한다 (재담기 시 수량 누적) |
+| POST | `/api/cart/items` ★ | `addToCart` | 장바구니에 N개 상품을 추가한다 (재담기 시 수량 누적) |
 | GET | `/api/cart` | `getCart` | 사용자 장바구니를 조회한다 |
 | PATCH | `/api/cart/items/{cartItemId}` | `updateCartItemQuantity` | 장바구니 아이템 수량을 증감한다 |
 | DELETE | `/api/cart/items/{cartItemId}` | `deleteCartItem` | 장바구니 아이템을 단건 삭제한다 |
-| POST | `/api/orders` ★ | `createOrderByCart` | (#4) 장바구니 기반 주문 생성 + 재고 차감 (event `adjustStockBulk` 호출) |
+| POST | `/api/orders` ★ | `createOrderByCart` | 장바구니 기반 주문 생성 + 재고 차감 (event `adjustStockBulk` 호출) |
 | GET | `/api/orders/{orderId}/status` | `getOrderStatus` | 본인 주문의 상태를 조회한다 |
 | GET | `/api/orders/{orderId}` | `getOrderDetail` | 본인 주문의 상세를 조회한다 |
 | PATCH | `/api/orders/{orderId}/cancel` | `cancelOrder` | 결제 전 주문을 취소하고 재고를 복구한다 |
@@ -80,8 +80,8 @@ prefix: `/internal/orders/**`, `/internal/order-items/**`, `/internal/tickets/**
 
 | 토픽 | 처리 메서드 | 처리 내용 | 멱등성 |
 |---|---|---|---|
-| `payment.completed` ★ | `OrderService.processPaymentCompleted` | (#4) PAID 전이 + 티켓 발급 + 카트 분기 삭제 (단일 `@Transactional`) | dedup + canTransitionTo (3분류) |
-| `payment.failed` ★ | `OrderService.processPaymentFailed` | (#4) FAILED 전이 | dedup + canTransitionTo (3분류) |
+| `payment.completed` ★ | `OrderService.processPaymentCompleted` | PAID 전이 + 티켓 발급 + 카트 분기 삭제 (단일 `@Transactional`) | dedup + canTransitionTo (3분류) |
+| `payment.failed` ★ | `OrderService.processPaymentFailed` | FAILED 전이 | dedup + canTransitionTo (3분류) |
 | `event.force-cancelled` | `RefundFanoutService.processEventForceCancelled` | PAID 주문 fanout → `refund.requested` 발행 | dedup |
 | `refund.completed` | `RefundOrderService.processRefundCompleted` | 환불 완료 처리 | dedup |
 | `refund.order.cancel` / `refund.order.compensate` | `RefundOrderService.processOrderRefundCancel` / `processOrderCompensate` | Saga 보상 | dedup |
@@ -103,7 +103,7 @@ prefix: `/internal/orders/**`, `/internal/order-items/**`, `/internal/tickets/**
 ### 의존하는 모듈 (호출 / 구독)
 
 - **REST 호출**:
-  - event: `validatePurchase`, `adjustStockBulk` ★ (#11), `getBulkEventInfo`, `getSingleEventInfo`, `getEventsBySellerForSettlement`
+  - event: `validatePurchase`, `adjustStockBulk` ★, `getBulkEventInfo`, `getSingleEventInfo`, `getEventsBySellerForSettlement`
   - member: `getMemberInfo` (TicketService.getParticipantList)
 - **Kafka 구독**:
   - payment 발행: `payment.completed` ★, `payment.failed` ★, `refund.completed`, `refund.order.cancel`, `refund.ticket.cancel`, `refund.order.compensate`, `refund.ticket.compensate`

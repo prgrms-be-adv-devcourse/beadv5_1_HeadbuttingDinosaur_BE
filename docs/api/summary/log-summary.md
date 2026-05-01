@@ -12,14 +12,14 @@
 | HTTP | Path | Handler | 호출 주체 | 설명 |
 |---|---|---|---|---|
 | GET | `/health` | `healthRoutes` | 인프라 | health check |
-| GET | `/internal/logs/actions` ★ | `internalLogRoutes` | ai (`X-Internal-Service: ai` 헤더 필수) | (#9, #10, §2 AI 추천 입력) recentVector 조회 — `userId`, `actionTypes`(comma-sep), `days`(1-30, 기본 7) querystring. 응답 상한 5000건 |
+| GET | `/internal/logs/actions` ★ | `internalLogRoutes` | ai (`X-Internal-Service: ai` 헤더 필수) | recentVector 조회 — `userId`, `actionTypes`(comma-sep), `days`(1-30, 기본 7) querystring. 응답 상한 5000건 |
 
 ## Kafka 수신 (consumer 기반 동작)
 
 | 토픽 | 분류 | 처리 내용 |
 |---|---|---|
-| `action.log` | 1-C fire-and-forget | (#9 AI 추천 입력) 전 모듈 발행 — CART_ADD/REMOVE, VIEW, DETAIL_VIEW, DWELL_TIME 등 사용자 행동 로그 INSERT |
-| `payment.completed` ★ | 1-B Outbox | (#4) payment 발행 — PURCHASE 액션 직접 INSERT (action 테이블) |
+| `action.log` | 1-C fire-and-forget | 전 모듈 발행 — CART_ADD/REMOVE, VIEW, DETAIL_VIEW, DWELL_TIME 등 사용자 행동 로그 INSERT |
+| `payment.completed` ★ | 1-B Outbox | payment 발행 — PURCHASE 액션 직접 INSERT (action 테이블) |
 
 ## 다른 모듈에서의 호출
 

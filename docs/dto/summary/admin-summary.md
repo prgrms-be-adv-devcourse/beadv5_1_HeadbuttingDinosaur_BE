@@ -52,13 +52,13 @@ presentation/dto 27건 + Kafka payload 0건. TechStack/회원/판매자/이벤�
 - source: `admin/.../presentation/dto/req/UserStatusRequest.java` — `status` (String)
 
 ### CreateTechStackRequest (record) ★
-- source: `admin/.../presentation/dto/req/CreateTechStackRequest.java` — `name` (String) — (§2 벡터DB)
+- source: `admin/.../presentation/dto/req/CreateTechStackRequest.java` — `name` (String) —
 
 ### UpdateTechStackRequest (record) ★
-- source: `admin/.../presentation/dto/req/UpdateTechStackRequest.java` — `id` (Long), `name` (String) — (§2 벡터DB)
+- source: `admin/.../presentation/dto/req/UpdateTechStackRequest.java` — `id` (Long), `name` (String) —
 
 ### DeleteTechStackRequest (record) ★
-- source: `admin/.../presentation/dto/req/DeleteTechStackRequest.java` — `id` (Long) — (§2 벡터DB)
+- source: `admin/.../presentation/dto/req/DeleteTechStackRequest.java` — `id` (Long) —
 
 ## Response — Dashboard / Action
 
@@ -237,18 +237,18 @@ presentation/dto 27건 + Kafka payload 0건. TechStack/회원/판매자/이벤�
 ## Response — TechStack
 
 ### GetTechStackResponse (record) ★
-- source: `admin/.../presentation/dto/res/GetTechStackResponse.java` — `id` (Long), `name` (String) — (§2 벡터DB)
+- source: `admin/.../presentation/dto/res/GetTechStackResponse.java` — `id` (Long), `name` (String) —
 
 ### CreateTechStackResponse (record) ★
-- source: `admin/.../presentation/dto/res/CreateTechStackResponse.java` — `id` (Long), `name` (String) — (§2 벡터DB)
+- source: `admin/.../presentation/dto/res/CreateTechStackResponse.java` — `id` (Long), `name` (String) —
 
 ### UpdateTechStackResponse (record) ★
-- source: `admin/.../presentation/dto/res/UpdateTechStackResponse.java` — `id` (Long), `name` (String) — (§2 벡터DB)
+- source: `admin/.../presentation/dto/res/UpdateTechStackResponse.java` — `id` (Long), `name` (String) —
 
 ### DeleteTechStackResponse (record) ★
-- source: `admin/.../presentation/dto/res/DeleteTechStackResponse.java` — `id` (Long) — (§2 벡터DB)
+- source: `admin/.../presentation/dto/res/DeleteTechStackResponse.java` — `id` (Long) —
 
-## Domain / Application Event (Spring `@EventListener` 기반, in-process) ★ (§2 벡터DB)
+## Domain / Application Event (Spring `@EventListener` 기반, in-process) ★
 
 admin 모듈은 Kafka 미사용. 단 도메인 이벤트로:
 - `TechStackCreatedEvent`

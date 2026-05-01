@@ -162,7 +162,7 @@
 
 ## 참조 문서
 
-- `kafka-design.md` — 이벤트 DTO 계약, Producer/Consumer 설정 상세 (§6 action.log 예외 설정 포함)
+- `kafka-design.md` — 이벤트 DTO 계약, Producer/Consumer 설정 상세
 - `kafka-impl-plan.md` — 서비스별 구현 체크리스트, Phase 순서
 - `kafka-idempotency-guide.md` — Consumer 멱등성 3중 방어선 상세
 - `front-server-idempotency-guide.md` — HTTP 멱등성 (Idempotency-Key)
