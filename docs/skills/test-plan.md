@@ -5,10 +5,10 @@
 
 - **작성일**: 2026-04-27
 - **연결 문서**:
-  - [requirements-check.md](../requirements-check.md) — 요구사항 검증 결과 (12 / 12 🟢, ⚠ 마커 4건)
-  - [kafka-design.md](kafka-design.md) — 이벤트 계약
-  - [kafka-idempotency-guide.md](kafka-idempotency-guide.md) — Consumer 멱등성 3중 방어선
-  - [settlement-process.md](settlement-process.md) — 정산 / 환불 이월 로직
+ - [requirements-check.md](../requirements-check.md) — 요구사항 검증 결과 (12 / 12, ⚠ 마커 4건)
+ - [kafka-design.md](kafka-design.md) — 이벤트 계약
+ - [kafka-idempotency-guide.md](kafka-idempotency-guide.md) — Consumer 멱등성 3중 방어선
+ - [settlement-process.md](settlement-process.md) — 정산 / 환불 이월 로직
 
 ---
 
@@ -22,14 +22,14 @@
 
 ## 1. P0 — 즉시 보강
 
-### #1. 재고 차감 동시성 테스트 ★ ⚠3
+### #1. 재고 차감 동시성 테스트 ★
 
 - **모듈**: `event`
-- **타깃**: `EventInternalService.adjustStockBulk()` + `Event.deductStock()` (라인 163-184)
+- **타깃**: `EventInternalService.adjustStockBulk()` (라인 ~166) + `Event.deductStock()` (라인 180-201)
 - **시나리오**: CountDownLatch + ExecutorService 50~100 스레드 동시 차감 → 정확히 재고 N개만 성공, 나머지 실패 응답
-- **검증**: 비관적 락(`@Lock(PESSIMISTIC_WRITE)`, EventRepository.java:63-77) + `@Version`(Event.java:91-92)이 실제로 oversell 방어하는지
-- **이유**: requirements-check.md `⚠3`에 명시된 유일한 테스트 갭. 발표에서 "★ #11 동시성 보장"을 주장하려면 이 테스트 1개가 가장 큰 임팩트.
-- **소요**: 30분 ~ 1시간 (Spring Boot Test 인프라 기존 활용)
+- **검증**: 비관적 락(`@Lock(PESSIMISTIC_WRITE)`, `EventRepository.java:83-95` 4건) + `@Version`(`Event.java:91-92`)이 실제로 oversell 방어하는지
+- **현 상태**: `event/src/test/java/.../application/EventInternalServiceConcurrencyTest.java` 가 이미 추가되어 `⚠3` 마커는 해소된 상태. 추가 시나리오(스레드 수 가변 / 다중 이벤트)는 후속.
+- **이유**: requirements-check.md `⚠3`에 명시된 테스트 갭. 발표에서 "★ #11 동시성 보장"을 자동 테스트로 입증.
 
 ---
 
@@ -38,26 +38,26 @@
 ### #2. AI 일반 추천 정상 동작 ★
 
 - **모듈**: `ai`
-- **타깃**: `RecommendationService.recommendByUserVector()` 라인 48-89
+- **타깃**: `RecommendationService.recommendByUserVector()` (라인 ~46 시작)
 - **시나리오**:
-  1. UserVector 4종(preference / cart / recent / negative)이 충분히 채워진 사용자 fixture (`logWeightSum >= 20`)
-  2. `recommendByUserVector(request)` 호출
-  3. 응답 검증: 정확히 5개 eventId 반환 + cosine 점수 내림차순 정렬
-  4. 가중합(0.5 / 0.3 / 0.2) → 정규화 → kNN 30개 → cosine 재정렬(0.45 / 0.25 / 0.25 / -0.15) → top 5 흐름 통과
+ 1. UserVector 4종(preference / cart / recent / negative)이 충분히 채워진 사용자 fixture (`logWeightSum >= 20`)
+ 2. `recommendByUserVector(request)` 호출
+ 3. 응답 검증: 정확히 5개 eventId 반환 + cosine 점수 내림차순 정렬
+ 4. 가중합(0.5 / 0.3 / 0.2) → 정규화 → kNN 30개 → cosine 재정렬(0.45 / 0.25 / 0.25 / -0.15) → top 5 흐름 통과
 - **이유**: 요구사항 #9 "사용자 맞춤 AI 추천"의 직접 입증. 분기 테스트(P2 #7)는 우회 검증이라, 발표에서 "AI 추천이 동작한다"를 주장하려면 happy path 자동 테스트가 핵심.
 - **소요**: 30분 ~ 1시간
 
 ### #3. 재고 차감 후 Order 저장 실패 → 보상 ★
 
 - **모듈**: `commerce`
-- **타깃**: `OrderService.java:651-657` `compensateStock()`
+- **타깃**: `OrderService.java:633-639` `compensateStock()`
 - **시나리오**: 재고 차감 성공 → DB 장애 등으로 Order 저장 실패 → `compensateStock()` 호출되어 재고 복원
 - **이유**: TX1(검증) — HTTP 차감 — TX2(저장) 사이 분산 트랜잭션 누수 가능 지점. ★ #11과 함께 결제 성공 후 가장 위험한 구간.
 
 ### #4. 환불 멱등성 (`refund.completed` 중복 처리) ★
 
 - **모듈**: `payment`
-- **타깃**: `WalletEventConsumer.consumeEventCancelled` (kafka-design.md 라인 698 참조)
+- **타깃**: `WalletEventConsumer.consumeRefundCompleted` (dedup 마킹 전용 — 잔액 복구는 `RefundSagaOrchestrator`가 `refund.stock.done` 수신 후 `WalletService.restoreBalance` 직접 호출)
 - **시나리오**: 동일 `refundId`로 `refund.completed` 이벤트 2회 수신 → 1회만 잔액 복원
 - **검증**: kafka-idempotency-guide.md의 3중 방어선(Inbox + DB unique + state guard)이 실제 동작
 - **이유**: 환불은 매출 직격, 중복 처리 시 예치금 부풀리기 가능
@@ -65,11 +65,11 @@
 ### #5. 정산 환불 이월 체인 ★
 
 - **모듈**: `settlement`
-- **타깃**: `SettlementInternalServiceImpl.processSellerSettlement()` 라인 307-352
+- **타깃**: `SettlementAdminServiceImpl.processSellerSettlement()` 라인 331-376
 - **시나리오**:
-  1. 월 정산 1회 → `PENDING_MIN_AMOUNT` 정산서 생성
-  2. 다음 달 정산 시 `carriedInAmount` 합산 + `carriedToSettlementId` 체인 설정
-  3. 지급 시 원본 + 이월 정산서 양쪽 모두 PAID 상태 전환
+ 1. 월 정산 1회 → `PENDING_MIN_AMOUNT` 정산서 생성
+ 2. 다음 달 정산 시 `carriedInAmount` 합산 + `carriedToSettlementId` 체인 설정
+ 3. 지급 시 원본 + 이월 정산서 양쪽 모두 PAID 상태 전환
 - **이유**: settlement-process.md 핵심 로직, 환불 → 정산 정합성 직접 영향
 
 ### #6. `payment.failed` Consumer 멱등성
@@ -88,16 +88,16 @@
 - **모듈**: `ai`
 - **타깃**: `RecommendationService.java:48-89` (일반) / `:94-155` (콜드스타트)
 - **시나리오**:
-  - `logWeightSum < 20` → 콜드스타트 진입
-  - kNN 결과 5개 미만 → 인기 이벤트 보충 폴백
+ - `logWeightSum < 20` → 콜드스타트 진입
+ - kNN 결과 5개 미만 → 인기 이벤트 보충 폴백
 - **이유**: 분기 검증, 단위 테스트로 충분. P1 #2(happy path)와 묶으면 AI 추천 전 시나리오 커버
 
 ### #8. ES `EventDocument` ↔ AI kNN 계약
 
 - **모듈**: 통합 (event ↔ ai)
 - **타깃**:
-  - `EventDocument.java:25` 주석 (PR #540 계약): `eventId` / `embedding` / `status` 필드
-  - `RecommendationService.searchKnn()` includes
+ - `EventDocument.java:25` 주석 (PR #540 계약): `eventId` / `embedding` / `status` 필드
+ - `RecommendationService.searchKnn()` includes
 - **시나리오**: event가 색인 → ai가 `eventId` 추출 + status=ON_SALE 필터 동작
 - **이유**: 필드명 변경 시 무성 실패 가장 위험한 지점 (Kafka 외 ES도 모듈 간 공유 채널)
 
@@ -106,9 +106,9 @@
 - **모듈**: `member` + `apigateway`
 - **타깃**: `JwtTokenProvider` (발급) + `JwtAuthenticationFilter.java:1-149` (검증)
 - **시나리오**:
-  - 정상 토큰 → 검증 통과 + 헤더 주입(X-User-Id 등)
-  - 만료 토큰 → 401
-  - 변조 토큰 → 401
+ - 정상 토큰 → 검증 통과 + 헤더 주입(X-User-Id 등)
+ - 만료 토큰 → 401
+ - 변조 토큰 → 401
 
 ### #10. `event.force-cancelled` 발행 시 ES 상태 동기화
 
@@ -142,8 +142,8 @@
 ### B. 4~5시간 (균형, 발표 핵심 메시지 커버)
 - P0 #1 + P1 #2 (AI) + P1 #4 (환불) + P1 #5 (정산)
 - 발표 효과:
-  - 재고 동시성(★ #11) + AI 추천(★ #9) + 환불 멱등성 + 정산 이월(★ #7)
-  - 핵심 플로우 + 핵심 셀링 포인트(AI) 모두 자동 검증
+ - 재고 동시성(★ #11) + AI 추천(★ #9) + 환불 멱등성 + 정산 이월(★ #7)
+ - 핵심 플로우 + 핵심 셀링 포인트(AI) 모두 자동 검증
 
 ### C. 1일 (이상적)
 - B + P1 #3 (보상) + P1 #6 (Consumer 멱등성)
@@ -157,9 +157,9 @@
 - **PR 제목**: `[test]({module}): {description}` (예: `[test](event): 재고 차감 동시성 테스트 추가`)
 - **커밋 단위**: 테스트 파일 단위 분리
 - **PR 본문**:
-  - 추가한 테스트 케이스 목록
-  - 검증 대상 (이 문서의 #N 참조)
-  - 실행 결과 스크린샷 또는 로그 발췌
+ - 추가한 테스트 케이스 목록
+ - 검증 대상 (이 문서의 #N 참조)
+ - 실행 결과 스크린샷 또는 로그 발췌
 
 ---
 

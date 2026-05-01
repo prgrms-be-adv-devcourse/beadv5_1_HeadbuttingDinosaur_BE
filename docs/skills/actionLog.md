@@ -22,17 +22,17 @@
 CREATE SCHEMA IF NOT EXISTS log;
 
 CREATE TABLE log.action_log (
-  id                 BIGSERIAL       PRIMARY KEY,
-  user_id            UUID            NOT NULL,
-  event_id           UUID,
-  action_type        VARCHAR(20)     NOT NULL,
-  search_keyword     VARCHAR(255),
-  stack_filter       VARCHAR(255),
-  dwell_time_seconds INT,
-  quantity           INT,
-  total_amount       BIGINT,
-  created_at         TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
-  updated_at         TIMESTAMPTZ     NOT NULL DEFAULT NOW()
+ id         BIGSERIAL    PRIMARY KEY,
+ user_id      UUID      NOT NULL,
+ event_id      UUID,
+ action_type    VARCHAR(20)   NOT NULL,
+ search_keyword   VARCHAR(255),
+ stack_filter    VARCHAR(255),
+ dwell_time_seconds INT,
+ quantity      INT,
+ total_amount    BIGINT,
+ created_at     TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+ updated_at     TIMESTAMPTZ   NOT NULL DEFAULT NOW()
 );
 -- 인덱스: user_id / event_id / action_type / created_at
 ```
@@ -41,8 +41,8 @@ CREATE TABLE log.action_log (
 
 ```ts
 export enum ActionType {
-  VIEW, DETAIL_VIEW, CART_ADD, CART_REMOVE,
-  PURCHASE, DWELL_TIME, REFUND,
+ VIEW, DETAIL_VIEW, CART_ADD, CART_REMOVE,
+ PURCHASE, DWELL_TIME, REFUND,
 }
 ```
 
@@ -50,15 +50,15 @@ export enum ActionType {
 
 ```ts
 export interface ActionLogMessage {
-  userId: string;
-  eventId?: string | null;
-  actionType: string;
-  searchKeyword?: string | null;
-  stackFilter?: string | null;
-  dwellTimeSeconds?: number | null;
-  quantity?: number | null;
-  totalAmount?: number | null;
-  timestamp: string;
+ userId: string;
+ eventId?: string | null;
+ actionType: string;
+ searchKeyword?: string | null;
+ stackFilter?: string | null;
+ dwellTimeSeconds?: number | null;
+ quantity?: number | null;
+ totalAmount?: number | null;
+ timestamp: string;
 }
 ```
 
@@ -66,7 +66,7 @@ export interface ActionLogMessage {
 
 | 항목 | 값 |
 |---|---|
-| 구독 토픽 | **`action.log`** + **`payment.completed`** (PURCHASE 처리용 — §3 참조, ✅ 구독 완료 2026-04-21) |
+| 구독 토픽 | **`action.log`** + **`payment.completed`** (PURCHASE 처리용 — §3 참조, 구독 완료 2026-04-21) |
 | GroupId | `log-group` |
 | ClientId | `devticket-log` |
 | AutoCommit | `false` (수동 offset commit) |
@@ -164,11 +164,11 @@ export interface ActionLogMessage {
 - 시점: `payment.completed` Kafka 메시지 소비 시
 - 처리: **Kafka 재발행 없이 Consumer 내부에서 `log.action_log`에 직접 INSERT**
 - 필드 매핑 (구현 확정):
-  - `userId`, `eventId`(= `orderItems[i].eventId`), `actionType="PURCHASE"`, `timestamp` — 필수
-  - `quantity` = `orderItems[i].quantity` (각 OrderItem의 수량 그대로 저장)
-  - `totalAmount`:
-    - **단건 주문** (`orderItems.length == 1`): `payment.completed.totalAmount` 그대로 저장
-    - **다건 주문** (`orderItems.length > 1`): `null` 저장 — 레코드별 전액 중복 방지 (SUM 쿼리 부풀림 회피)
+ - `userId`, `eventId`(= `orderItems[i].eventId`), `actionType="PURCHASE"`, `timestamp` — 필수
+ - `quantity` = `orderItems[i].quantity` (각 OrderItem의 수량 그대로 저장)
+ - `totalAmount`:
+  - **단건 주문** (`orderItems.length == 1`): `payment.completed.totalAmount` 그대로 저장
+  - **다건 주문** (`orderItems.length > 1`): `null` 저장 — 레코드별 전액 중복 방지 (SUM 쿼리 부풀림 회피)
 - Fan-out: `orderItems` 배열 길이만큼 PURCHASE 레코드 N개 INSERT (원자적 다중 INSERT — `repository/action-log.repository.ts:insertActionLogs`)
 - **매출 집계 한계**: `SUM(total_amount)` 쿼리는 **단건 주문 매출만 합산**. 정확한 결제 매출 총합은 Payment `payment.total_amount`에서 집계해야 함. Log `action_log`는 AI 행동분석 (이벤트별 구매 빈도·시퀀스) 전용
 - 근거: ① 셀프 루프 오버헤드 제거 ② "DB 저장은 Log 서비스 Consumer 단계에서만" 정책 일관성 ③ 매출 KPI 직결 → `acks=0` 중간 손실 리스크 회피 (상류 `payment.completed`는 Outbox + dedup 보장됨)
@@ -180,10 +180,10 @@ export interface ActionLogMessage {
 > 선행 조건: **Phase 3(7-A/7-B 결제 Producer) + Phase 4(8/9 결제 결과 Consumer) 완료** — `payment.completed` payload 스펙이 확정된 상태에서 착수.
 > DB/DTO 신규 변경 없음 — **Producer 트랙 한정** V2 마이그레이션 불필요.
 
-### ① Log 서비스 확장 (최우선) — ✅ 구현 완료 (2026-04-21)
+### ① Log 서비스 확장 (최우선) (2026-04-21)
 
 - **작업**: `payment.completed` 토픽 **추가 구독** → Consumer 내부에서 PURCHASE 레코드 `log.action_log` **직접 INSERT** (Kafka 재발행 없음 — §2 #12)
-- **완료 반영**: kafka-impl-plan.md §3-4 체크리스트 5항 전부 `[x] ✅`
+- **완료 반영**: kafka-impl-plan.md §3-4 체크리스트 5항 전부 `[x] `
 - **구현 위치**: `fastify-log/src/consumer/action-log.consumer.ts` (`dispatchMessage` topic 분기), `src/service/payment-completed.service.ts` (outbox unwrap + PURCHASE 매핑), `src/repository/action-log.repository.ts` (원자적 다중 INSERT)
 - **Consumer 선 구축 이유**: Producer 구현 시 즉시 E2E 검증 가능 + 매출 KPI 직결(§2 #12) — 파이프라인 먼저 안정화
 
@@ -217,14 +217,14 @@ export interface ActionLogMessage {
 **구현 정책 고정값 (추가 결정 사항)**
 
 - **설정값 소스 = 코드 Map 하드코딩** (환경별 yml 분기 금지)
-  - 근거: §2 #5·#14 확정값. 정책 이원화 시 운영에서 `acks=all`로 오설정 위험
-  - 예외: `bootstrap-servers`만 `@Value` 공유 (기존 Kafka 설정과 동일)
+ - 근거: §2 #5·#14 확정값. 정책 이원화 시 운영에서 `acks=all`로 오설정 위험
+ - 예외: `bootstrap-servers`만 `@Value` 공유 (기존 Kafka 설정과 동일)
 - **Value Serializer = `StringSerializer` + `ObjectMapper` 수동 직렬화**
-  - 근거: Consumer(Fastify/kafkajs)와 wire format 일치 — Java↔Node 이종 스택 상호운용성
-  - `JsonSerializer` 사용 시 `__TypeId__` 헤더 자동 삽입 → kafkajs 파싱 혼란 (끌 수 있으나 설정 누락 리스크)
-  - 전 서비스 공통 패턴 (Payment `OutboxEventProducer` 등)과 일관
-  - **반드시 `JacksonConfig`의 `@Primary ObjectMapper` 주입 사용** (`JavaTimeModule` + `WRITE_DATES_AS_TIMESTAMPS=false` 적용된 `Instant` 직렬화 보장)
-  - `JsonProcessingException` 캐치 시 **로깅만, 예외 전파 금지** (at-most-once 정책 일관)
+ - 근거: Consumer(Fastify/kafkajs)와 wire format 일치 — Java↔Node 이종 스택 상호운용성
+ - `JsonSerializer` 사용 시 `__TypeId__` 헤더 자동 삽입 → kafkajs 파싱 혼란 (끌 수 있으나 설정 누락 리스크)
+ - 전 서비스 공통 패턴 (Payment `OutboxEventProducer` 등)과 일관
+ - **반드시 `JacksonConfig`의 `@Primary ObjectMapper` 주입 사용** (`JavaTimeModule` + `WRITE_DATES_AS_TIMESTAMPS=false` 적용된 `Instant` 직렬화 보장)
+ - `JsonProcessingException` 캐치 시 **로깅만, 예외 전파 금지** (at-most-once 정책 일관)
 
 **Bean 등록 샘플 (Java · Spring Boot)**
 
@@ -232,30 +232,30 @@ export interface ActionLogMessage {
 @Configuration
 public class ActionLogKafkaProducerConfig {
 
-    @Value("${spring.kafka.bootstrap-servers}")
-    private String bootstrapServers;
+  @Value("${spring.kafka.bootstrap-servers}")
+  private String bootstrapServers;
 
-    @Bean
-    public ProducerFactory<String, String> actionLogProducerFactory() {
-        Map<String, Object> props = new HashMap<>();
-        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
-        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
-        props.put(ProducerConfig.ACKS_CONFIG, "0");                        // fire-and-forget
-        props.put(ProducerConfig.RETRIES_CONFIG, 0);
-        props.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, false);
-        props.put(ProducerConfig.LINGER_MS_CONFIG, 10);
-        props.put(ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION, 5);
-        props.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, "none");
-        return new DefaultKafkaProducerFactory<>(props);
-    }
+  @Bean
+  public ProducerFactory<String, String> actionLogProducerFactory() {
+    Map<String, Object> props = new HashMap<>();
+    props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+    props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+    props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+    props.put(ProducerConfig.ACKS_CONFIG, "0");            // fire-and-forget
+    props.put(ProducerConfig.RETRIES_CONFIG, 0);
+    props.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, false);
+    props.put(ProducerConfig.LINGER_MS_CONFIG, 10);
+    props.put(ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION, 5);
+    props.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, "none");
+    return new DefaultKafkaProducerFactory<>(props);
+  }
 
-    @Bean("actionLogKafkaTemplate")
-    public KafkaTemplate<String, String> actionLogKafkaTemplate(
-        @Qualifier("actionLogProducerFactory") ProducerFactory<String, String> pf
-    ) {
-        return new KafkaTemplate<>(pf);
-    }
+  @Bean("actionLogKafkaTemplate")
+  public KafkaTemplate<String, String> actionLogKafkaTemplate(
+    @Qualifier("actionLogProducerFactory") ProducerFactory<String, String> pf
+  ) {
+    return new KafkaTemplate<>(pf);
+  }
 }
 ```
 
@@ -284,12 +284,12 @@ public class ActionLogKafkaProducerConfig {
 **권장 구현 패턴** (Spring)
 ```
 API 핸들러 — @Transactional 내부 비즈니스 처리
-    ↓
+  ↓
 ApplicationEventPublisher.publishEvent(ActionLogDomainEvent)
-    ↓
+  ↓
 @TransactionalEventListener(phase = AFTER_COMMIT) + @Async
-    ↓
-actionLogKafkaTemplate.send("action.log", userId, ActionLogEvent)  // fire-and-forget
+  ↓
+actionLogKafkaTemplate.send("action.log", userId, ActionLogEvent) // fire-and-forget
 ```
 - `AFTER_COMMIT`: 비즈니스 트랜잭션 성공 커밋 후에만 발행 (실패 시 발행 안 됨)
 - `@Async`: API 응답 지연 제로 — 별도 스레드풀 필요 시 `@EnableAsync` + `TaskExecutor` Bean
@@ -300,15 +300,15 @@ actionLogKafkaTemplate.send("action.log", userId, ActionLogEvent)  // fire-and-f
 1) Spring 내부용 도메인 이벤트 (Kafka DTO와 분리 — 레이어 경계 보존)
 ```java
 public record ActionLogDomainEvent(
-    UUID userId,
-    UUID eventId,                 // VIEW는 null
-    ActionType actionType,
-    String searchKeyword,         // nullable
-    String stackFilter,           // nullable
-    Integer dwellTimeSeconds,     // DWELL_TIME 외 null
-    Integer quantity,             // nullable
-    Long totalAmount,             // nullable
-    Instant timestamp
+  UUID userId,
+  UUID eventId,         // VIEW는 null
+  ActionType actionType,
+  String searchKeyword,     // nullable
+  String stackFilter,      // nullable
+  Integer dwellTimeSeconds,   // DWELL_TIME 외 null
+  Integer quantity,       // nullable
+  Long totalAmount,       // nullable
+  Instant timestamp
 ) {}
 ```
 
@@ -318,22 +318,22 @@ public record ActionLogDomainEvent(
 @Service
 public class EventQueryService {
 
-    private final EventRepository eventRepository;
-    private final ApplicationEventPublisher eventPublisher;
+  private final EventRepository eventRepository;
+  private final ApplicationEventPublisher eventPublisher;
 
-    @Transactional(readOnly = true)
-    public EventListResponse getEventList(UUID userId, EventListRequest req) {
-        List<Event> events = eventRepository.search(req);
+  @Transactional(readOnly = true)
+  public EventListResponse getEventList(UUID userId, EventListRequest req) {
+    List<Event> events = eventRepository.search(req);
 
-        // 도메인 이벤트 발행 — Kafka 발행은 커밋 후 리스너에서 처리
-        eventPublisher.publishEvent(new ActionLogDomainEvent(
-            userId, null, ActionType.VIEW,
-            req.getSearchKeyword(), req.getStackFilter(),
-            null, null, null, Instant.now()
-        ));
+    // 도메인 이벤트 발행 — Kafka 발행은 커밋 후 리스너에서 처리
+    eventPublisher.publishEvent(new ActionLogDomainEvent(
+      userId, null, ActionType.VIEW,
+      req.getSearchKeyword(), req.getStackFilter(),
+      null, null, null, Instant.now()
+    ));
 
-        return EventListResponse.from(events);
-    }
+    return EventListResponse.from(events);
+  }
 }
 ```
 
@@ -344,53 +344,53 @@ public class EventQueryService {
 @RequiredArgsConstructor
 public class ActionLogKafkaPublisher {
 
-    @Qualifier("actionLogKafkaTemplate")
-    private final KafkaTemplate<String, String> actionLogKafkaTemplate;
-    private final ObjectMapper objectMapper;   // @Primary Bean (JacksonConfig)
+  @Qualifier("actionLogKafkaTemplate")
+  private final KafkaTemplate<String, String> actionLogKafkaTemplate;
+  private final ObjectMapper objectMapper;  // @Primary Bean (JacksonConfig)
 
-    // DB 미접근 리스너 — @Transactional 불요 (at-most-once 발행 전용).
-    // 기존 도메인 리스너(예: StockStatusChangedListener의 @Transactional(REQUIRES_NEW)) 패턴과 의도적 차이.
-    //
-    // fallbackExecution=true 필수 이유:
-    //   @TransactionalEventListener 기본값(false)에서는 트랜잭션 밖 publishEvent 호출 시 리스너가 조용히 무시됨.
-    //   DWELL_TIME Controller처럼 @Transactional 없이 publishEvent 호출하는 경우(DB 접근 없음)에도 발행을 보장하기 위해 true.
-    //   트랜잭션 있으면 AFTER_COMMIT, 없으면 즉시 실행 — 양쪽 케이스 모두 커버.
-    @Async
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
-    public void publish(ActionLogDomainEvent domain) {
-        try {
-            String payload = objectMapper.writeValueAsString(toKafkaEvent(domain));
-            actionLogKafkaTemplate.send(
-                "action.log",
-                domain.userId().toString(),     // Partition Key = userId
-                payload                          // plain JSON string (kafkajs 호환)
-            );
-        } catch (JsonProcessingException e) {
-            // 직렬화 실패 — 로깅만, 예외 전파 금지 (at-most-once)
-            log.warn("action.log 직렬화 실패: actionType={}, userId={}",
-                domain.actionType(), domain.userId(), e);
-        } catch (Exception e) {
-            // 발행 실패 허용 — 비즈니스 응답에 영향 없음
-            log.warn("action.log 발행 실패: actionType={}, userId={}",
-                domain.actionType(), domain.userId(), e);
-        }
+  // DB 미접근 리스너 — @Transactional 불요 (at-most-once 발행 전용).
+  // 기존 도메인 리스너(예: StockStatusChangedListener의 @Transactional(REQUIRES_NEW)) 패턴과 의도적 차이.
+  //
+  // fallbackExecution=true 필수 이유:
+  //  @TransactionalEventListener 기본값(false)에서는 트랜잭션 밖 publishEvent 호출 시 리스너가 조용히 무시됨.
+  //  DWELL_TIME Controller처럼 @Transactional 없이 publishEvent 호출하는 경우(DB 접근 없음)에도 발행을 보장하기 위해 true.
+  //  트랜잭션 있으면 AFTER_COMMIT, 없으면 즉시 실행 — 양쪽 케이스 모두 커버.
+  @Async
+  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
+  public void publish(ActionLogDomainEvent domain) {
+    try {
+      String payload = objectMapper.writeValueAsString(toKafkaEvent(domain));
+      actionLogKafkaTemplate.send(
+        "action.log",
+        domain.userId().toString(),   // Partition Key = userId
+        payload             // plain JSON string (kafkajs 호환)
+      );
+    } catch (JsonProcessingException e) {
+      // 직렬화 실패 — 로깅만, 예외 전파 금지 (at-most-once)
+      log.warn("action.log 직렬화 실패: actionType={}, userId={}",
+        domain.actionType(), domain.userId(), e);
+    } catch (Exception e) {
+      // 발행 실패 허용 — 비즈니스 응답에 영향 없음
+      log.warn("action.log 발행 실패: actionType={}, userId={}",
+        domain.actionType(), domain.userId(), e);
     }
+  }
 
-    // Kafka DTO 매핑 — Publisher(application 계층) 내부 유지로 AGENTS.md §2.2 의존 방향 준수.
-    // Kafka DTO record(ActionLogEvent)가 도메인 이벤트(ActionLogDomainEvent)를 역방향 import하지 않도록 분리.
-    private static ActionLogEvent toKafkaEvent(ActionLogDomainEvent domain) {
-        return new ActionLogEvent(
-            domain.userId(),
-            domain.eventId(),
-            domain.actionType(),
-            domain.searchKeyword(),
-            domain.stackFilter(),
-            domain.dwellTimeSeconds(),
-            domain.quantity(),
-            domain.totalAmount(),
-            domain.timestamp()
-        );
-    }
+  // Kafka DTO 매핑 — Publisher(application 계층) 내부 유지로 AGENTS.md §2.2 의존 방향 준수.
+  // Kafka DTO record(ActionLogEvent)가 도메인 이벤트(ActionLogDomainEvent)를 역방향 import하지 않도록 분리.
+  private static ActionLogEvent toKafkaEvent(ActionLogDomainEvent domain) {
+    return new ActionLogEvent(
+      domain.userId(),
+      domain.eventId(),
+      domain.actionType(),
+      domain.searchKeyword(),
+      domain.stackFilter(),
+      domain.dwellTimeSeconds(),
+      domain.quantity(),
+      domain.totalAmount(),
+      domain.timestamp()
+    );
+  }
 }
 ```
 
@@ -407,16 +407,16 @@ public class ActionLogKafkaPublisher {
 
 **작업 순서 팁**: VIEW → DETAIL_VIEW → DWELL_TIME (트래픽 큰 순)
 
-**DWELL_TIME 전용 신규 API 엔드포인트 — ✅ 구현 완료**
+**DWELL_TIME 전용 신규 API 엔드포인트**
 
-> 구현 완료 — `event/.../presentation/controller/DwellController.java` (`POST /api/events/{eventId}/dwell`) + `event/.../presentation/dto/DwellRequest.java` (record + `@NotNull @Positive`). Controller 가 `ApplicationEventPublisher.publishEvent(ActionLogDomainEvent)` 만 호출, 비로그인 시 skip + `204 No Content` 반환.
+> — `event/.../presentation/controller/DwellController.java` (`POST /api/events/{eventId}/dwell`) + `event/.../presentation/dto/DwellRequest.java` (record + `@NotNull @Positive`). Controller 가 `ApplicationEventPublisher.publishEvent(ActionLogDomainEvent)` 만 호출, 비로그인 시 skip + `204 No Content` 반환.
 >
-> **AI팀 수집 필요성 컨펌 완료 (2026-04-21)** — DWELL_TIME은 단순 조회(`VIEW`/`DETAIL_VIEW`)로 측정 불가능한 관심도·이탈 예측·전환 가능성 추정의 핵심 신호. 구현 확정.
+> **AI팀 수집 필요성 컨펌 (2026-04-21)** — DWELL_TIME은 단순 조회(`VIEW`/`DETAIL_VIEW`)로 측정 불가능한 관심도·이탈 예측·전환 가능성 추정의 핵심 신호. 구현 확정.
 
 - **경로 예시**: `POST /api/events/{eventId}/dwell` (프론트 스펙 합의 결과 우선)
 - **Request Body**: `{ dwellTimeSeconds: Integer }` (eventId는 Path Variable, userId는 인증 추출)
-  - **Bean Validation 필수**: `DwellRequest` record의 `dwellTimeSeconds` 필드에 `@NotNull @Positive` 적용, Controller 파라미터에 `@Valid` 부여
-  - 근거: `acks=0` + Consumer dedup 미적용 정책상 Producer validation이 `log.action_log.dwell_time_seconds` 오염 방지의 **최종 방어선** (null·음수 요청 선 차단)
+ - **Bean Validation 필수**: `DwellRequest` record의 `dwellTimeSeconds` 필드에 `@NotNull @Positive` 적용, Controller 파라미터에 `@Valid` 부여
+ - 근거: `acks=0` + Consumer dedup 미적용 정책상 Producer validation이 `log.action_log.dwell_time_seconds` 오염 방지의 **최종 방어선** (null·음수 요청 선 차단)
 - **응답**: `204 No Content` (로그성 — body 불필요)
 - **Controller 구조**: 얇은 Controller → `ApplicationEventPublisher.publishEvent(ActionLogDomainEvent)` 호출만. **트랜잭션 불요, 기존 Publisher 재사용**
 - **비로그인 처리**: `X-User-Id` 미전달 시 → **발행 skip + `204 No Content` 반환** (`getEventList` / `getEvent` 등 `get*` 비로그인 정책과 일관. `userId` 필수 필드 누락 방지 + AI팀 수집 정책 일관성)
@@ -475,17 +475,17 @@ public class ActionLogKafkaPublisher {
 
 ```
 [Phase 3~4 완료]
-      ↓
-  ① Log 서비스 확장 ✅ (payment.completed 구독 + PURCHASE INSERT)
-      ↓
-  ② Event/Commerce 전용 Bean 분리 (각 모듈 내)
-      ↓
-  ┌───┴───┐
-  ③ Event    ④ Commerce    ← 병렬 가능
-  (3종)      (2종)
-  └───┬───┘
-      ↓
-  ⑤ 통합 검증 (Bean 격리 / Outbox 미개입 / E2E / 부하)
+   ↓
+ ① Log 서비스 확장 (payment.completed 구독 + PURCHASE INSERT)
+   ↓
+ ② Event/Commerce 전용 Bean 분리 (각 모듈 내)
+   ↓
+ ┌───┴───┐
+ ③ Event  ④ Commerce  ← 병렬 가능
+ (3종)   (2종)
+ └───┬───┘
+   ↓
+ ⑤ 통합 검증 (Bean 격리 / Outbox 미개입 / E2E / 부하)
 ```
 
 **모듈별 상세 체크리스트 위치**
@@ -529,7 +529,7 @@ public class ActionLogKafkaPublisher {
 
 - Event PR과 Commerce PR은 **독립** — 서로 의존 없음, 병렬 머지 가능
 - 각 PR은 머지 전 **기존 Outbox Producer 경로 무회귀** 확인 필수 (Saga 테스트 Green, 기존 비즈니스 이벤트 DLT 전략 정상 동작)
-- 양쪽 머지 완료 후 **공통 부하 테스트 / 크로스 모듈 E2E** 가 필요하면 별도 후속 트랙으로 진행
+- 양쪽 후 **공통 부하 테스트 / 크로스 모듈 E2E** 가 필요하면 별도 후속 트랙으로 진행
 
 **완료 조건 (각 모듈 PR 공통)**
 
@@ -547,7 +547,7 @@ public class ActionLogKafkaPublisher {
 >
 > **상위 원칙:** 본 엔드포인트는 통신 경계 3분류 중 **1-A Sync HTTP** (내부 서비스 간 조회). `kafka-sync-async-policy.md §1-A` 참조.
 >
-> 교차검증: AI팀 답변 수신 완료 (2026-04-24) — `LogServiceClient.java:21-34` / `ActionLogResponse.java:10-14` / `RecentVectorScheduler` / `RecommendationService.java:L165, L258` 근거
+> 교차검증: AI팀 답변 수신 (2026-04-24) — `LogServiceClient.java:21-34` / `ActionLogResponse.java:10-14` / `RecentVectorScheduler` / `RecommendationService.java:L165, L258` 근거
 
 ---
 
@@ -572,10 +572,10 @@ public class ActionLogKafkaPublisher {
 
 ```json
 {
-  "userId": "uuid-string",
-  "logs": [
-    { "eventId": "uuid-string", "actionType": "VIEW", "dwellTimeSeconds": null }
-  ]
+ "userId": "uuid-string",
+ "logs": [
+  { "eventId": "uuid-string", "actionType": "VIEW", "dwellTimeSeconds": null }
+ ]
 }
 ```
 
@@ -620,9 +620,9 @@ public class ActionLogKafkaPublisher {
 
 ### 5.4 보안 (Internal API 접근 제어)
 
-- **Gateway 차단 전제 — 실존 확인 완료 (2026-04-24)**
-  - `origin/develop/gateway` · `apigateway/.../RoutePolicy.java`에 `INTERNAL_PATTERNS = /internal/**` 정의
-  - Gateway Route 라우팅 테이블에 `/internal/**` 항목 없음 → 외부 진입 차단 상태
+- **Gateway 차단 전제 — 실존 (2026-04-24)**
+ - `origin/develop/gateway` · `apigateway/.../RoutePolicy.java`에 `INTERNAL_PATTERNS = /internal/**` 정의
+ - Gateway Route 라우팅 테이블에 `/internal/**` 항목 없음 → 외부 진입 차단 상태
 - **Fastify 이중 방어**: `onRequest` hook에서 `X-Internal-Service` 헤더 검증 — AGENTS.md §7.2 준수
 - **allowlist (초기)**: `ai`
 - **향후 강화 여지**: mTLS / HMAC 서명 / 토큰 회전 (필요 시 별도 트랙)
@@ -633,13 +633,13 @@ public class ActionLogKafkaPublisher {
 
 ```sql
 SELECT event_id AS "eventId",
-       action_type AS "actionType",
-       dwell_time_seconds AS "dwellTimeSeconds"
+    action_type AS "actionType",
+    dwell_time_seconds AS "dwellTimeSeconds"
 FROM log.action_log
 WHERE user_id = $1
-  AND action_type = ANY($2::text[])
-  AND created_at >= NOW() - ($3::int || ' days')::INTERVAL
-  AND event_id IS NOT NULL
+ AND action_type = ANY($2::text[])
+ AND created_at >= NOW() - ($3::int || ' days')::INTERVAL
+ AND event_id IS NOT NULL
 ORDER BY created_at DESC
 LIMIT 5000;
 ```
@@ -658,12 +658,12 @@ LIMIT 5000;
 - `CREATE INDEX CONCURRENTLY idx_action_log_user_created ON log.action_log (user_id, created_at DESC)`
 - 기존 단일 인덱스(`user_id` / `action_type` / `created_at`)는 **유지** (타 쿼리 패턴 대비)
 - 실행 주체: 수동 DDL — 배포 후 DB 접속하여 실행
-  ```bash
-  psql -h <host> -p <port> -U <user> -d <database> -f fastify-log/sql/V2__add_user_created_index.sql
-  ```
-  - `CONCURRENTLY` 사용으로 운영 중 테이블 쓰기 락 없음
-  - 트랜잭션 블록 내 실행 금지 (`CONCURRENTLY` 제약)
-  - 재실행 안전 (`IF NOT EXISTS`)
+ ```bash
+ psql -h <host> -p <port> -U <user> -d <database> -f fastify-log/sql/V2__add_user_created_index.sql
+ ```
+ - `CONCURRENTLY` 사용으로 운영 중 테이블 쓰기 락 없음
+ - 트랜잭션 블록 내 실행 금지 (`CONCURRENTLY` 제약)
+ - 재실행 안전 (`IF NOT EXISTS`)
 
 **예상 성능 (보수적 목표)**
 
@@ -698,15 +698,15 @@ LIMIT 5000;
 - [ ] null `event_id` 선제 제외 회귀 테스트 (VIEW row 중 `event_id=null` 삽입 → 응답 제외 확인)
 - [ ] 기존 `insertActionLogs` 테스트와 데이터 격리 확인 (`beforeEach` TRUNCATE 또는 트랜잭션 롤백 패턴)
 - [ ] V2 인덱스 수동 DDL 실행 절차 — §5.5 실행 명령 블록 참조
-- [ ] AI팀 교차 확인 완료 후 이슈 본문 최종안 합의
+- [ ] AI팀 교차 후 이슈 본문 최종안 합의
 
 ### 5.7 변경 이력·컨펌
 
 | 일자 | 내용 | 상태 |
 |---|---|---|
 | 2026-04-24 | §5 신설 — AI 조회 엔드포인트 계약 명문화 | PO 컨펌 대기 |
-| 2026-04-24 | AI팀 교차검증 완료 — `LogServiceClient` 스펙 / `ActionLogEntry.eventId` 암묵 nullable / 스케줄러 cron / fallback(`getOrEmpty`) 확인 | ✅ |
-| 2026-04-24 | 포트 방향 결정 — Log 8086 유지 (gateway `application.yml:57` `log-service` 라우팅이 8086, fastify-log `env.ts:35` PORT 기본값 8086 — 코드·라우팅 일치) | ✅ 확정 |
+| 2026-04-24 | AI팀 교차검증 — `LogServiceClient` 스펙 / `ActionLogEntry.eventId` 암묵 nullable / 스케줄러 cron / fallback(`getOrEmpty`) 확인 | |
+| 2026-04-24 | 포트 방향 결정 — Log 8086 유지 (gateway `application.yml:57` `log-service` 라우팅이 8086, fastify-log `env.ts:35` PORT 기본값 8086 — 코드·라우팅 일치) | 확정 |
 | — | AI 측 `ActionLogResponse`에 `@JsonIgnoreProperties(ignoreUnknown=true)` 선행 추가 권장 — 응답 필드 향후 확장 시 역직렬화 안정성 확보 | AI팀 작업 (별개 PR) |
 | — | AI 측 `eventId null skip` 방어 로직 추가 권장 — 서버 필터와 이중 방어 | AI팀 작업 (별개 PR) |
 
@@ -718,8 +718,8 @@ LIMIT 5000;
 - **PO 결정**: Q1 `actorType` = **(A) 미추가** / Q2 `sessionId` = **(C) 제외**
 - **아키텍트 결정**: PURCHASE = **Kafka 재발행 없이 Consumer가 `log.action_log` 직접 INSERT**
 - **DB 스키마·DTO 변경 없음** — 단, AI 조회 엔드포인트(§5)용 **V2 복합 인덱스 추가** (`(user_id, created_at DESC)`)
-- Log 서비스는 이미 **Fastify 스택으로 구현 완료** → 신규 구축 아닌 **확장** (`payment.completed` 추가 구독 ✅ + §5 AI 조회 엔드포인트 신설 예정)
-- 진행 시점: **본 스코프(Phase 3~4) 완료 후** — 현재 Phase 3~4 코어 완료
+- Log 서비스는 이미 **Fastify 스택으로** → 신규 구축 아닌 **확장** (`payment.completed` 추가 구독 + §5 AI 조회 엔드포인트 신설 예정)
+- 진행 시점: **본 스코프(Phase 3~4) 완료 후** — 현재 Phase 3~4 코어
 - 이후 **두 트랙 병렬 가능** (공유 선행 조건 없음):
-  - (a) §5 AI 조회 엔드포인트 — Log 서비스 단독 PR
-  - (b) §4 Phase 5 Producer — Event·Commerce 각 모듈 PR (병렬 머지 가능)
+ - (a) §5 AI 조회 엔드포인트 — Log 서비스 단독 PR
+ - (b) §4 Phase 5 Producer — Event·Commerce 각 모듈 PR (병렬 머지 가능)

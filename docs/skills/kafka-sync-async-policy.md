@@ -51,10 +51,10 @@
 - **성격**: 서비스 간 **상태 전파가 트랜잭션과 원자적이어야 하는** 이벤트
 - **전제**: 최종적 일관성, 실패 시 자동 재시도/보상, 메시지 손실 불허
 - **설정** (`kafka-design.md` §6 기준):
-  - Producer: `acks=all`, `enable.idempotence=true`, `retries=3`
-  - Outbox 패턴 필수 — 비즈니스 로직 + `outboxService.save()` **단일 `@Transactional` 경계**
-  - `X-Message-Id` 헤더 필수 (Consumer dedup용)
-  - Consumer: `AckMode=MANUAL`, ExponentialBackOff(2→4→8초, 3회), DLT
+ - Producer: `acks=all`, `enable.idempotence=true`, `retries=3`
+ - Outbox 패턴 필수 — 비즈니스 로직 + `outboxService.save()` **단일 `@Transactional` 경계**
+ - `X-Message-Id` 헤더 필수 (Consumer dedup용)
+ - Consumer: `AckMode=MANUAL`, ExponentialBackOff(2→4→8초, 3회), DLT
 - **멱등성**: `processed_message` + `canTransitionTo()` + `@Version` 3중 방어 (상세: `kafka-idempotency-guide.md`)
 - **예시**: `order.created`, `stock.deducted`, `stock.failed`, `payment.completed`, `payment.failed`, `ticket.issue-failed`, `refund.*`, `event.force-cancelled`, `event.sale-stopped`
 
@@ -62,10 +62,10 @@
 - **성격**: 사용자 행동 로그, **손실 허용**, 비즈니스 트랜잭션과 무관
 - **전제**: API 응답 지연 제로, 재시도·DLT 운영 오버헤드 제거
 - **설정** (`kafka-design.md` §6 action.log 예외 설정 / `actionLog.md`):
-  - Producer: `acks=0`, `retries=0`, `enable.idempotence=false`
-  - Outbox **미사용**, 트랜잭션 경계 **밖** 비동기 발행
-  - `X-Message-Id` 헤더 미사용
-  - 전용 `ActionLogKafkaProducerConfig` Bean **분리** (기존 Producer Bean과 공유 금지)
+ - Producer: `acks=0`, `retries=0`, `enable.idempotence=false`
+ - Outbox **미사용**, 트랜잭션 경계 **밖** 비동기 발행
+ - `X-Message-Id` 헤더 미사용
+ - 전용 `ActionLogKafkaProducerConfig` Bean **분리** (기존 Producer Bean과 공유 금지)
 - **멱등성**: 불필요 (dedup 미적용, at-most-once)
 - **예시**: `VIEW`, `DETAIL_VIEW`, `DWELL_TIME`, `CART_ADD`, `CART_REMOVE`, `PURCHASE`
 
