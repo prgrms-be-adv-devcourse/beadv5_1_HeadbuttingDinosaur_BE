@@ -1,6 +1,5 @@
 # commerce
 
-> 본 페이지는 ServiceOverview.md §3 commerce 섹션의 확장판입니다.
 > ★ = `requirements-check.md §1` 기능 요구사항 5건 (#3, #4, #7, #10, #11) + `§2` 기술스택 6건 (ES / K8s / MSA+Gateway / JWT+OAuth / 벡터DB / AI 추천) 매핑 항목
 
 ## 1. 모듈 책임

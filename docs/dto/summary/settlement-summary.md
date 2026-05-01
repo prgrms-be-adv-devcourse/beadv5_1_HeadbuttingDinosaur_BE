@@ -1,7 +1,8 @@
 # settlement DTO summary
 
-> 본 문서는 `docs/dto/dto-overview.md §9 settlement` 의 깊이 확장판.
-> Spring Batch 기반 (e521f682) — DailySettlementJob / MonthlySettlementJob.
+> ★ = 기능 요구사항 + 기술스택 (`requirements-check.md` §1 / §2)
+
+(#7 매월 정산) Spring Batch 기반 — DailySettlementJob / MonthlySettlementJob.
 
 ## Presentation Response
 
@@ -72,12 +73,9 @@
 | `feeAmount` | `Long` |
 | `settlementAmount` | `Long` |
 
-### MonthlyRevenueResponse (record) ★신규
+### MonthlyRevenueResponse (record) ★ (#7)
 - source: `settlement/src/main/java/com/devticket/settlement/presentation/dto/MonthlyRevenueResponse.java`
-- 추가 시점: 36b33e9b
 - 사용처: `GET /api/admin/settlements/revenues/{yearMonth}` (`SettlementAdminController#getMonthlyRevenue`)
-
-> ⚠ 자동 파서 미커버 (회귀 시점 이후 추가). 필드는 `MonthlyRevenueResponse.java` 직접 확인 필요.
 
 ## Internal / Admin 표면
 
@@ -91,17 +89,11 @@
 ### AdminSettlementDetailResponse (record)
 - source: `settlement/.../infrastructure/external/dto/AdminSettlementDetailResponse.java`
 
-> 위 3종은 이전 자동 자산에 미등재 (자동 파서 누락) — 코드 검증으로 추가 표기.
-
-## Spring Batch step 입출력
+## Spring Batch step 입출력 ★ (#7)
 
 ### SellerSettlementData (record/class)
 - source: `settlement/.../{batch 패키지}/SellerSettlementData.java`
-- 용도: `MonthlySettlementReader` → `MonthlySettlementProcessor` 입출력 (e521f682)
-
-### SettlementResult (record/class)
-- source: `settlement/.../{batch 패키지}/SettlementResult.java`
-- ⚠ deprecated 가능성 — Spring Batch 전환에서 기존 `SettlementItemProcessor` 가 삭제됨. 신규 `MonthlySettlementProcessor`/`MonthlySettlementWriter` 기준 사용처 재검토 필요(ServiceOverview §4-5 ⚠4).
+- 용도: `MonthlySettlementReader` → `MonthlySettlementProcessor` 입출력
 
 ## Client req/res (settlement → 외부 호출용)
 
@@ -124,9 +116,3 @@
 
 **없음** — settlement 모듈은 Kafka 미사용.
 
-## ⚠ 미결 / 후속
-
-- `MonthlyRevenueResponse` (36b33e9b 신규) 이전 자동 파서 미반영 — 본 페이지에 수동 정정 통합 완료
-- Spring Batch step 입출력 (`SellerSettlementData` / `SettlementResult`) 자동 파서 미커버 — `presentation/dto` 외 디렉토리라 자동 누락
-- `SettlementResult` deprecated 검토 (Spring Batch 전환 후 사용처 확인)
-- `SettlementItemProcessor` 의 하드코드 `FEE_RATE = 0.05` 잔존 (기존 파일 삭제 후 신규 Processor 로 위치 재검토)

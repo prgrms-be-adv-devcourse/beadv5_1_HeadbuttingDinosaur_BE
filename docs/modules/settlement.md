@@ -1,14 +1,13 @@
 # settlement
 
-> 본 페이지는 ServiceOverview.md §3 settlement 섹션의 확장판입니다.
-> ★ = `requirements-check.md §1` 기능 요구사항 5건 (#3, #4, #7, #10, #11) + `§2` 기술스택 6건 매핑 항목
+> ★ = 기능 요구사항 + 기술스택 (`requirements-check.md` §1 / §2)
 
 ## 1. 모듈 책임 ★
 
 정산서 생성 (Spring Batch — `DailySettlementJob` 일별 정산대상 수집 + `MonthlySettlementJob` 월별 정산서 생성) + 정산 지급 트리거 (판매자 예치금 입금 REST 호출).
 
-★ 매핑:
-- (#7) 매월 정산 (수수료 차감 + 환불 이월) — Spring Batch 기반 정산서 생성 + payment 측 예치금 전환
+★ 요구사항:
+- 매월 정산 (수수료 차감 + 환불 이월) — Spring Batch 기반 정산서 생성 + payment 측 예치금 전환
 
 > **Spring Scheduling → Spring Batch 전환**: 기존 `@Scheduled` 단일 흐름(SettlementItemReader/Processor/Writer)을 두 개의 Job (Daily/Monthly)으로 분리하고 `JobOperator` 기반 수동 트리거 API(`BatchController`) 추가. `SettlementScheduler` 는 Job 실행 trigger 역할로 단순화. 테스트 편의로 자동 실행은 yml 에서 끔.
 

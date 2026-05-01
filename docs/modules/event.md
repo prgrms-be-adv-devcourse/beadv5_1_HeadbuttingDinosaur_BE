@@ -1,15 +1,14 @@
 # event
 
-> 본 페이지는 ServiceOverview.md §3 event 섹션의 확장판입니다.
-> ★ = `requirements-check.md §1` 기능 요구사항 5건 (#3, #4, #7, #10, #11) + `§2` 기술스택 6건 매핑 항목
+> ★ = 기능 요구사항 + 기술스택 (`requirements-check.md` §1 / §2)
 
 ## 1. 모듈 책임
 
 이벤트(상품) 도메인 관리 (등록 / 조회 / 수정 / 강제취소) + 재고 (단건 / 일괄 차감 / 복구) + 이벤트 상태 자동 전환 스케줄러 (DRAFT → ON_SALE → SALE_ENDED → ENDED) + ES 검색 인덱싱 (ES 장애 시 DB 폴백) + Kafka 발행 (강제취소 / 판매중지 / 보상 saga 일부) + Kafka 소비 (결제 실패 / 주문 취소 / 환불 → 재고 복구).
 
-★ 매핑:
-- (#11) 동시 구매 시 재고 초과 방지 — 비관적 락 + 낙관적 락 + REST `adjustStockBulk` + Kafka 보상
-- (§2) ElasticSearch 상품 검색 — `EventService.getEventList` ES 우선 + JPA 재조회 + dense_vector kNN
+★ 요구사항:
+- 동시 구매 시 재고 초과 방지 — 비관적 락 + 낙관적 락 + REST `adjustStockBulk` + Kafka 보상
+- ElasticSearch 상품 검색 — `EventService.getEventList` ES 우선 + JPA 재조회 + dense_vector kNN
 
 **EventStatus enum**: `DRAFT`, `ON_SALE`, `SOLD_OUT`, `SALE_ENDED`, `ENDED`, `CANCELLED`, `FORCE_CANCELLED`. 자동 전환 메서드: `EventService.expireSaleEvents` / `endEvents` / `promoteDraftEvents` (각 `@Scheduled(fixedDelay=60000)`).
 

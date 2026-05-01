@@ -1,24 +1,24 @@
 # event DTO summary
 
-> 본 문서는 `docs/dto/dto-overview.md §5 event` 의 깊이 확장판.
-> presentation/dto 27건 + Kafka payload 10건. Event/SellerEvent + force-cancel/sale-stopped Outbox + RefundStock 보상.
+> ★ = 기능 요구사항 + 기술스택 (`requirements-check.md` §1 / §2)
 
-## External — Event (사용자)
+presentation/dto 27건 + Kafka payload 10건. Event/SellerEvent + force-cancel/sale-stopped Outbox + RefundStock 보상.
 
-### EventListRequest (record)
+## External — Event (사용자) ★ (§2 ES 검색)
+
+### EventListRequest (record) ★
 - source: `event/.../presentation/dto/req/EventListRequest.java`
-- 정렬 기준 변경 (`saleStartAt`) — e816be23, 10d950bf
 
 | 필드명 | 타입 | 비고 |
 |---|---|---|
 | `keyword` | `String` | 검색어 (없을 때 saleStartAt 정렬) |
-| `category` | `String` | 카테고리 필터 (94f061eb) |
+| `category` | `String` | 카테고리 필터 |
 | `status` | `String` | EventStatus 필터 |
 | `page`, `size` | `Integer` | 페이지네이션 |
 
-### EventListResponse (record)
+### EventListResponse (record) ★
 - source: `event/.../presentation/dto/res/EventListResponse.java`
-- 추가: `viewCount` (f8205e31), `category` (94f061eb)
+- 필드: `viewCount`, `category` 등
 
 ### EventDetailResponse (record) ★
 - source: `event/.../presentation/dto/res/EventDetailResponse.java`
@@ -30,7 +30,7 @@
 
 ### SellerEventUpdateRequest (record)
 - source: `event/.../presentation/dto/req/SellerEventUpdateRequest.java`
-- 변경: `@NotNull`/`@NotBlank` 제거 (caf0407a — 판매 중지 검증 우회), 썸네일 1장 제한 (90416566)
+- 판매 중지 검증 우회를 위해 `@NotNull`/`@NotBlank` 제거. 썸네일 1장 제한.
 
 ### SellerEventDetailResponse / SellerEventCreateResponse / SellerEventUpdateResponse / SellerEventSummaryResponse (record)
 - source: `event/.../presentation/dto/res/`
@@ -41,13 +41,12 @@
 - source: `event/.../presentation/dto/req/InternalBulkEventInfoRequest.java`
 - 필드: `eventIds` (List<UUID>)
 
-### InternalBulkStockAdjustmentRequest (record)
+### InternalBulkStockAdjustmentRequest (record) ★ (#11)
 - source: `event/.../presentation/dto/req/InternalBulkStockAdjustmentRequest.java`
-- 필드: `adjustments` (List of `eventId`, `delta` 등) — `OrderService` 가 부호별 묶어 호출
+- 필드: `adjustments` (List of `eventId`, `delta` 등) — `OrderService` 가 부호별 묶어 호출 (#11 동시성 안전)
 
 ### InternalStockDeductRequest / InternalStockRestoreRequest (record)
 - source: `event/.../presentation/dto/req/`
-- ⚠ 단건 REST 호출자 0건 (active path 는 `adjustStockBulk`)
 
 ## Internal — Response
 
@@ -59,16 +58,15 @@
 - source: `event/.../presentation/dto/res/InternalBulkEventInfoResponse.java`
 - 사용처: commerce `getBulkEventInfo` 응답
 
-### InternalPurchaseValidationResponse (record) ★
+### InternalPurchaseValidationResponse (record)
 - source: `event/.../presentation/dto/res/InternalPurchaseValidationResponse.java`
 - 사용처: commerce CartService `validatePurchase` 응답
-- ★ `sellerId` 필드 추가 (00247431)
 
 | 필드명 | 타입 |
 |---|---|
 | `purchasable` | `boolean` |
 | `unavailableReason` | `PurchaseUnavailableReason` (enum, nullable) |
-| `sellerId` | `UUID` ★ 추가 (00247431) |
+| `sellerId` | `UUID` |
 | `eventId` | `UUID` |
 | `pricePerUnit` | `int` |
 
@@ -99,26 +97,20 @@
 - `RefundStockFailedEvent` — `StockRestoreConsumer` 처리 실패
 
 ### 수신 record (참고용) — 6종
-- `OrderCancelledEvent` — commerce 발행 → event 수신 (재고 복구). ⚠ kafka-design §3 line 71 미등재 (드리프트)
-- `PaymentFailedEvent` — payment 발행 → event 수신 (재고 복구)
-- `RefundCompletedEvent` — payment 발행 → event 수신 (통계 기록, cancelledQuantity 누적 3d4a20c3)
+- `OrderCancelledEvent` — commerce 발행 → event 수신 (재고 복구)
+- `PaymentFailedEvent` ★ (#11) — payment 발행 → event 수신 (재고 복구)
+- `RefundCompletedEvent` — payment 발행 → event 수신 (통계 기록, cancelledQuantity 누적)
 - `RefundStockRestoreEvent` — payment 발행 → event 수신 (환불 보상 재고 복구)
-- `ActionLogEvent`, `ActionLogDomainEvent` — 1-C action.log 발행용
+- `ActionLogEvent`, `ActionLogDomainEvent` ★ (#9 AI 추천 입력) — 1-C action.log 발행용
 
-> 모든 1-B Outbox 이벤트는 afterCommit 직접 발행 + 스케줄러 fallback 패턴 (07d22cd3). 상세는 `docs/modules/event.md §4 Outbox 발행 패턴`.
+> 모든 1-B Outbox 이벤트는 afterCommit 직접 발행 + 스케줄러 fallback 패턴. 상세는 `docs/modules/event.md §4 Outbox 발행 패턴`.
 
 ## EventStatus enum + PaymentMethod enum
 
 ### EventStatus (코드 기준)
-- 값: `DRAFT`, `ON_SALE`, `SOLD_OUT`, `SALE_ENDED`, `ENDED` (acb0d0f6 추가), `CANCELLED`, `FORCE_CANCELLED`
+- 값: `DRAFT`, `ON_SALE`, `SOLD_OUT`, `SALE_ENDED`, `ENDED`, `CANCELLED`, `FORCE_CANCELLED`
 - 자동 전환: `EventService.expireSaleEvents` / `endEvents` / `promoteDraftEvents` (`@Scheduled(fixedDelay=60000)`)
 
 ### PaymentMethod (event 모듈 정의 — RefundCompletedEvent.paymentMethod 역직렬화용)
 - source: `event/src/main/java/com/devticket/event/domain/enums/PaymentMethod.java`
-- 값: `WALLET`, `PG`, `WALLET_PG` (✅ f3f61b55 — payment 측 정합성 확보)
-
-## ⚠ 미결 / 후속
-
-- `order.cancelled` 토픽 kafka-design §3 line 71 미등재 (드리프트, 패턴 C)
-- 단건 stock REST DTO 호출자 0건 (`InternalStockDeductRequest`/`InternalStockRestoreRequest`)
-- 이전 자동 자산이 event 모듈을 미커버했음 — 본 페이지(`dto/summary/event-summary.md`) 가 1차 자료. `dto-overview.md` 는 9 모듈 통합 인덱스로 재작성됨.
+- 값: `WALLET`, `PG`, `WALLET_PG`

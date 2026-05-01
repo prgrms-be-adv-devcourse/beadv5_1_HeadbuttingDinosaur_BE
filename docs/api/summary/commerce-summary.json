@@ -175,7 +175,6 @@
     }
   ],
   "notes": [
-    "dead REST 2건 (completeOrder POST / failOrder PATCH) 제거 (b9be8434).",
-    "completeRefund (PATCH /internal/tickets/{ticketId}/refund-completed) 등재 — 이전 자동 자산 누락분."
+    "dead REST 2건 (completeOrder POST / failOrder PATCH) 제거 (b9be8434)."
   ]
 }

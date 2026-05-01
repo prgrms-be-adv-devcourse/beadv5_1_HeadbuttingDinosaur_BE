@@ -1,17 +1,16 @@
 # ai
 
-> 본 페이지는 ServiceOverview.md §3 ai 섹션의 확장판입니다.
-> ★ = `requirements-check.md §1` 기능 요구사항 5건 (#3, #4, #7, #10, #11) + `§2` 기술스택 6건 매핑 항목
+> ★ = 기능 요구사항 + 기술스택 (`requirements-check.md` §1 / §2)
 > ⚠ 패키지 네이밍: 본 모듈만 `org.example.ai.*` (다른 모듈은 `com.devticket.*`).
 
 ## 1. 모듈 책임 ★
 
 벡터 기반 이벤트 추천. 사용자 기술스택 임베딩(콜드스타트) + 행동 벡터(선호/카트/체류/환불) 합성으로 선호 벡터를 도출하고, Elasticsearch KNN 으로 후보 이벤트를 조회한 뒤 재정렬해 추천 목록을 반환한다.
 
-★ 매핑:
-- (#9) 사용자 맞춤 AI 추천 시스템
-- (#10) AI 중단 시 구매 정상 (격리) — `AiClient` try-catch 폴백 진입점이 호출 주체(event 모듈) 측
-- (§2) AI 추천 시스템 / 벡터DB 문서 검색
+★ 요구사항:
+- 사용자 맞춤 AI 추천 시스템
+- AI 중단 시 구매 정상 (격리) — `AiClient` try-catch 폴백 진입점이 호출 주체(event 모듈) 측
+- AI 추천 시스템 / 벡터DB 문서 검색
 
 **구성 요소**:
 - 추천 산출(`RecommendationService`): `recommendByUserVector` (정상 경로) / `recommendByColdStart` (`UserVector` 없을 때 기술스택 임베딩 사용) / `searchKnn` (ES KNN 호출)
