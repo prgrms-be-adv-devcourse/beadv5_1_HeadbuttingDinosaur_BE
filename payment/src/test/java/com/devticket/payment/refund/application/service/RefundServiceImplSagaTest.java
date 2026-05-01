@@ -92,6 +92,7 @@ class RefundServiceImplSagaTest {
         given(commerceInternalClient.getOrderItemInfoByTicketId(anyString())).willReturn(orderItem);
         given(eventInternalClient.getEventInfo(eventId)).willReturn(eventInfo);
         given(paymentRepository.findByOrderId(orderId)).willReturn(Optional.of(payment));
+        given(refundTicketRepository.existsByTicketIdAndStatusIn(eq(ticketId), any())).willReturn(false);
         given(orderRefundRepository.findByOrderId(orderId)).willReturn(Optional.empty());
         given(orderRefundRepository.save(any(OrderRefund.class))).willAnswer(inv -> inv.getArgument(0));
         given(refundRepository.save(any(Refund.class))).willAnswer(inv -> inv.getArgument(0));
@@ -398,7 +399,7 @@ class RefundServiceImplSagaTest {
 
             service.cancelSellerEvent(sellerId, eventId, "sold-out");
 
-            verify(eventInternalClient).forceCancel(eventId, "sold-out");
+            verify(eventInternalClient).forceCancel(eventId, sellerId, "SELLER", "sold-out");
         }
 
         @Test
@@ -411,7 +412,7 @@ class RefundServiceImplSagaTest {
 
             assertThatThrownBy(() -> service.cancelSellerEvent(sellerId, eventId, "reason"))
                 .isInstanceOf(RefundException.class);
-            verify(eventInternalClient, never()).forceCancel(any(), any());
+            verify(eventInternalClient, never()).forceCancel(any(), any(), any(), any());
         }
 
         @Test
@@ -421,7 +422,7 @@ class RefundServiceImplSagaTest {
 
             service.cancelAdminEvent(adminId, eventId, "policy-violation");
 
-            verify(eventInternalClient).forceCancel(eventId, "policy-violation");
+            verify(eventInternalClient).forceCancel(eventId, adminId, "ADMIN", "policy-violation");
             // admin 은 이벤트 소유권을 조회하지 않는다
             verify(eventInternalClient, never()).getEventInfo(any());
         }

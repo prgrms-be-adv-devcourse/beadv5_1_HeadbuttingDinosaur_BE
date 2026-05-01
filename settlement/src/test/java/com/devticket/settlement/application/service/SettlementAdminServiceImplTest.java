@@ -25,8 +25,10 @@ import com.devticket.settlement.domain.repository.SettlementRepository;
 import com.devticket.settlement.infrastructure.client.SettlementToCommerceClient;
 import com.devticket.settlement.infrastructure.client.SettlementToMemberClient;
 import com.devticket.settlement.infrastructure.client.SettlementToPaymentClient;
+import com.devticket.settlement.presentation.dto.MonthlyRevenueResponse;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -38,7 +40,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
-class SettlementInternalServiceImplTest {
+class SettlementAdminServiceImplTest {
 
     @Mock private SettlementToCommerceClient settlementToCommerceClient;
     @Mock private SettlementToPaymentClient settlementToPaymentClient;
@@ -48,7 +50,7 @@ class SettlementInternalServiceImplTest {
     @Mock private SettlementItemRepository settlementItemRepository;
 
     @InjectMocks
-    private SettlementInternalServiceImpl service;
+    private SettlementAdminServiceImpl service;
 
     private final UUID sellerId = UUID.randomUUID();
 
@@ -307,6 +309,50 @@ class SettlementInternalServiceImplTest {
             .isInstanceOf(BusinessException.class)
             .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
                 .isEqualTo(SettlementErrorCode.SETTLEMENT_BAD_REQUEST));
+    }
+
+    // ────────────────────────────────────────────────
+    // getMonthlyRevenue
+    // ────────────────────────────────────────────────
+
+    @Test
+    void getMonthlyRevenue_정상조회_수수료합산반환() {
+        YearMonth yearMonth = YearMonth.of(2026, 4);
+        given(settlementRepository.sumFeeAmountByPeriodStartAt(any(LocalDateTime.class), any(LocalDateTime.class)))
+            .willReturn(150_000L);
+
+        MonthlyRevenueResponse response = service.getMonthlyRevenue(yearMonth);
+
+        assertThat(response.yearMonth()).isEqualTo("2026-04");
+        assertThat(response.periodStartAt()).isEqualTo("2026-03-26");
+        assertThat(response.periodEndAt()).isEqualTo("2026-04-25");
+        assertThat(response.totalFeeAmount()).isEqualTo(150_000L);
+    }
+
+    @Test
+    void getMonthlyRevenue_해당월_정산서없음_0반환() {
+        YearMonth yearMonth = YearMonth.of(2026, 4);
+        given(settlementRepository.sumFeeAmountByPeriodStartAt(any(LocalDateTime.class), any(LocalDateTime.class)))
+            .willReturn(0L);
+
+        MonthlyRevenueResponse response = service.getMonthlyRevenue(yearMonth);
+
+        assertThat(response.totalFeeAmount()).isEqualTo(0L);
+    }
+
+    @Test
+    void getMonthlyRevenue_periodStartAt_계산_검증() {
+        YearMonth yearMonth = YearMonth.of(2026, 4);
+        ArgumentCaptor<LocalDateTime> fromCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
+        ArgumentCaptor<LocalDateTime> toCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
+        given(settlementRepository.sumFeeAmountByPeriodStartAt(any(LocalDateTime.class), any(LocalDateTime.class)))
+            .willReturn(0L);
+
+        service.getMonthlyRevenue(yearMonth);
+
+        verify(settlementRepository).sumFeeAmountByPeriodStartAt(fromCaptor.capture(), toCaptor.capture());
+        assertThat(fromCaptor.getValue()).isEqualTo(LocalDateTime.of(2026, 3, 26, 0, 0, 0));
+        assertThat(toCaptor.getValue().toLocalDate()).isEqualTo(java.time.LocalDate.of(2026, 3, 26));
     }
 
     // ────────────────────────────────────────────────

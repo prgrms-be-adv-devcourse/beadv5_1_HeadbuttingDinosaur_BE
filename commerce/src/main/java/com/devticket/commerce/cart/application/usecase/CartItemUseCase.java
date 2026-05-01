@@ -8,8 +8,8 @@ import java.util.UUID;
 public interface CartItemUseCase {
 
     // 장바구니 티켓 수량 변경
-    CartItemQuantityResponse updateTicket(UUID userId, Long cartItemId, CartItemQuantityRequest request);
+    CartItemQuantityResponse updateTicket(UUID userId, UUID cartItemId, CartItemQuantityRequest request);
 
-    CartItemDeleteResponse deleteTicket(UUID userId, Long cartItemId);
+    CartItemDeleteResponse deleteTicket(UUID userId, UUID cartItemId);
 
 }

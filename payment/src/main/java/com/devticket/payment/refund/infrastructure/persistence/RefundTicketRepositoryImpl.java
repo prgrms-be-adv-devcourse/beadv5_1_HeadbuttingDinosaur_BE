@@ -1,6 +1,7 @@
 package com.devticket.payment.refund.infrastructure.persistence;
 
 import com.devticket.payment.refund.domain.model.RefundTicket;
+import com.devticket.payment.refund.domain.enums.RefundTicketStatus;
 import com.devticket.payment.refund.domain.repository.RefundTicketRepository;
 import java.util.List;
 import java.util.UUID;
@@ -29,7 +30,17 @@ public class RefundTicketRepositoryImpl implements RefundTicketRepository {
     }
 
     @Override
-    public boolean existsByTicketId(UUID ticketId) {
-        return jpa.existsByTicketId(ticketId);
+    public boolean existsByTicketIdAndStatusIn(UUID ticketId, List<RefundTicketStatus> statuses) {
+        return jpa.existsByTicketIdAndStatusIn(ticketId, statuses);
+    }
+
+    @Override
+    public void markFailedByRefundId(UUID refundId) {
+        jpa.updateStatusByRefundId(refundId, RefundTicketStatus.ACTIVE, RefundTicketStatus.FAILED);
+    }
+
+    @Override
+    public void markCompletedByRefundId(UUID refundId) {
+        jpa.updateStatusByRefundId(refundId, RefundTicketStatus.ACTIVE, RefundTicketStatus.COMPLETED);
     }
 }

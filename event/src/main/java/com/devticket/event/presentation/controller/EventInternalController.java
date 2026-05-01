@@ -16,9 +16,6 @@ import com.devticket.event.presentation.dto.internal.InternalStockAdjustmentResp
 import com.devticket.event.presentation.dto.internal.InternalEventInfoResponse;
 import com.devticket.event.presentation.dto.internal.InternalPurchaseValidationResponse;
 import com.devticket.event.presentation.dto.internal.InternalSellerEventsResponse;
-import com.devticket.event.presentation.dto.internal.InternalStockDeductRequest;
-import com.devticket.event.presentation.dto.internal.InternalStockOperationResponse;
-import com.devticket.event.presentation.dto.internal.InternalStockRestoreRequest;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
@@ -32,6 +29,7 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -108,32 +106,6 @@ public class EventInternalController {
     }
 
     /**
-     * API 5: 단건 재고 차감
-     * Pessimistic Lock 적용 — 동시 요청 직렬화
-     */
-    @PostMapping("/{eventId}/deduct-stock")
-    public ResponseEntity<SuccessResponse<InternalStockOperationResponse>> deductStock(
-        @PathVariable UUID eventId,
-        @RequestBody @Valid InternalStockDeductRequest request) {
-        return ResponseEntity.ok(SuccessResponse.success(
-            eventInternalService.deductStock(eventId, request.quantity())
-        ));
-    }
-
-    /**
-     * API 6: 단건 재고 복원
-     * Pessimistic Lock 적용 — 동시 요청 직렬화
-     */
-    @PostMapping("/{eventId}/restore-stock")
-    public ResponseEntity<SuccessResponse<InternalStockOperationResponse>> restoreStock(
-        @PathVariable UUID eventId,
-        @RequestBody @Valid InternalStockRestoreRequest request) {
-        return ResponseEntity.ok(SuccessResponse.success(
-            eventInternalService.restoreStock(eventId, request.quantity())
-        ));
-    }
-
-    /**
      * API 7: 판매자별 이벤트 목록 조회
      * status=null이면 전체 상태 반환 (Settlement 정산 집계 지원)
      */
@@ -176,9 +148,11 @@ public class EventInternalController {
      */
     @PatchMapping("/{eventId}/force-cancel")
     public ResponseEntity<Void> forceCancel(
+        @RequestHeader("X-User-Id") UUID userId,
+        @RequestHeader("X-User-Role") String userRole,
         @PathVariable UUID eventId,
         @RequestBody @Valid InternalEventForceCancelRequest request) {
-        eventService.forceCancel(eventId, request.reason());
+        eventService.forceCancel(userId, userRole, eventId, request.reason());
         return ResponseEntity.noContent().build();
     }
 

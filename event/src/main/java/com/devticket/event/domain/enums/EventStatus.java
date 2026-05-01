@@ -10,6 +10,7 @@ public enum EventStatus {
     ON_SALE("판매 중"),
     SOLD_OUT("매진"),
     SALE_ENDED("판매 종료"),
+    ENDED("행사 종료"),
     CANCELLED("취소됨(판매자)"),
     FORCE_CANCELLED("강제 취소됨(어드민)");
 

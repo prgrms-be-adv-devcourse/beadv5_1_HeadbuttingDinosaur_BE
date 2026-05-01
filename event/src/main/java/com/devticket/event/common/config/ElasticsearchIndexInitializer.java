@@ -3,7 +3,7 @@ package com.devticket.event.common.config;
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch._types.FieldValue;
 import co.elastic.clients.elasticsearch._types.SortOrder;
-import com.devticket.event.application.EventService;
+import com.devticket.event.application.ElasticsearchSyncService;
 import com.devticket.event.domain.enums.EventStatus;
 import com.devticket.event.domain.model.Event;
 import com.devticket.event.infrastructure.persistence.EventRepository;
@@ -30,17 +30,17 @@ import org.springframework.stereotype.Component;
 public class ElasticsearchIndexInitializer {
 
     private static final List<EventStatus> ACTIVE_STATUSES =
-        List.of(EventStatus.DRAFT, EventStatus.ON_SALE, EventStatus.SOLD_OUT);
+        List.of(EventStatus.DRAFT, EventStatus.ON_SALE, EventStatus.SOLD_OUT, EventStatus.SALE_ENDED);
 
     private static final List<EventStatus> TERMINATED_STATUSES =
-        List.of(EventStatus.CANCELLED, EventStatus.FORCE_CANCELLED);
+        List.of(EventStatus.ENDED, EventStatus.CANCELLED, EventStatus.FORCE_CANCELLED);
 
     private static final int BATCH_SIZE = 50;
 
     private final ElasticsearchOperations elasticsearchOperations;
     private final ElasticsearchClient esClient;
     private final EventRepository eventRepository;
-    private final EventService eventService;
+    private final ElasticsearchSyncService elasticsearchSyncService;
 
     @Async
     @EventListener(ApplicationReadyEvent.class)
@@ -163,7 +163,7 @@ public class ElasticsearchIndexInitializer {
             List<Event> events = eventRepository.findAllWithDetailsByEventIdIn(batch);
             for (Event event : events) {
                 try {
-                    eventService.syncToElasticsearch(event);
+                    elasticsearchSyncService.sync(event);
                     count++;
                 } catch (Exception e) {
                     log.warn("{} eventId: {}", errorLogPrefix, event.getEventId(), e);

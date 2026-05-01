@@ -21,6 +21,7 @@ import com.devticket.payment.refund.domain.exception.RefundException;
 import com.devticket.payment.refund.domain.model.OrderRefund;
 import com.devticket.payment.refund.domain.model.Refund;
 import com.devticket.payment.refund.domain.model.RefundTicket;
+import com.devticket.payment.refund.domain.enums.RefundTicketStatus;
 import com.devticket.payment.refund.domain.repository.OrderRefundRepository;
 import com.devticket.payment.refund.domain.repository.RefundRepository;
 import com.devticket.payment.refund.domain.repository.RefundTicketRepository;
@@ -124,7 +125,8 @@ public class RefundServiceImpl implements RefundService {
 
         UUID ticketUuid = UUID.fromString(ticketId);
 
-        if (refundTicketRepository.existsByTicketId(ticketUuid)) {
+        if (refundTicketRepository.existsByTicketIdAndStatusIn(
+                ticketUuid, List.of(RefundTicketStatus.ACTIVE, RefundTicketStatus.COMPLETED))) {
             throw new RefundException(RefundErrorCode.REFUND_ALREADY_IN_PROGRESS);
         }
 
@@ -285,7 +287,7 @@ public class RefundServiceImpl implements RefundService {
     // Helpers
     // =========================================================
 
-    // ticket_id UNIQUE 제약 위반인지 확인 — 다른 제약 위반(NOT NULL 등)과 구분
+    // ticket_id partial unique index 위반인지 확인 — 다른 제약 위반(NOT NULL 등)과 구분
     // 원인 체인을 끝까지 순회: Spring이 PersistenceException으로 한 번 더 래핑하는 환경 대응
     // contains 사용: H2는 constraint name에 테이블·컬럼 정보가 붙어 오는 경우가 있음
     private boolean isTicketUniqueViolation(DataIntegrityViolationException e) {
@@ -294,11 +296,10 @@ public class RefundServiceImpl implements RefundService {
             if (t instanceof ConstraintViolationException cve) {
                 String name = cve.getConstraintName();
                 if (name != null) {
-                    return name.toLowerCase().contains("uk_refund_ticket_ticket_id");
+                    return name.toLowerCase().contains("uk_refund_ticket_active");
                 }
-                // constraint name을 추출하지 못한 경우 메시지로 fallback
                 String msg = cve.getMessage();
-                return msg != null && msg.toLowerCase().contains("uk_refund_ticket_ticket_id");
+                return msg != null && msg.toLowerCase().contains("uk_refund_ticket_active");
             }
             t = t.getCause();
         }
@@ -351,7 +352,7 @@ public class RefundServiceImpl implements RefundService {
         }
 
         // 2) Event 서비스에 force-cancel 호출 — 내부적으로 상태 전이 + Kafka event.force-cancelled 발행
-        eventInternalClient.forceCancel(eventId, reason);
+        eventInternalClient.forceCancel(eventId, sellerId, "SELLER", reason);
 
         log.info("[Seller Cancel] 이벤트 강제 취소 요청 완료 — eventId={}, sellerId={}, reason={}",
             eventId, sellerId, reason);
@@ -360,7 +361,7 @@ public class RefundServiceImpl implements RefundService {
     @Override
     public void cancelAdminEvent(UUID adminId, UUID eventId, String reason) {
         // 소유권 검증 없음 — admin 권한은 게이트웨이/admin-service 에서 사전 검증됐다고 가정
-        eventInternalClient.forceCancel(eventId, reason);
+        eventInternalClient.forceCancel(eventId, adminId, "ADMIN", reason);
 
         log.info("[Admin Cancel] 이벤트 강제 취소 요청 완료 — eventId={}, adminId={}, reason={}",
             eventId, adminId, reason);

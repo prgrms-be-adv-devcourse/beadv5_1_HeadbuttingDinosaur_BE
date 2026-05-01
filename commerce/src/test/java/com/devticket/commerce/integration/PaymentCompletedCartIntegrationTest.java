@@ -165,7 +165,7 @@ class PaymentCompletedCartIntegrationTest {
 
         given(eventClient.getValidateEventStatus(any(), any(), anyInt()))
                 .willReturn(new InternalPurchaseValidationResponse(
-                        eventId, Boolean.TRUE, null, 10, "이벤트-race", 10_000));
+                        eventId, UUID.randomUUID(), Boolean.TRUE, null, 10, "이벤트-race", 10_000));
 
         int threadCount = 4;
         ExecutorService executor = Executors.newFixedThreadPool(threadCount);

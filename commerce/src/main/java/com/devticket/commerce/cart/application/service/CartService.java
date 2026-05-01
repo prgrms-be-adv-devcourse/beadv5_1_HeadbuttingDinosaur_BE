@@ -21,6 +21,8 @@ import com.devticket.commerce.cart.presentation.dto.res.CartResponse;
 import com.devticket.commerce.common.exception.BusinessException;
 import com.devticket.commerce.common.messaging.event.ActionLogDomainEvent;
 import com.devticket.commerce.common.messaging.event.ActionType;
+import com.devticket.commerce.ticket.domain.enums.TicketStatus;
+import com.devticket.commerce.ticket.domain.repository.TicketRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -39,6 +41,7 @@ public class CartService implements CartUseCase, CartItemUseCase {
 
     private final CartRepository cartRepository;
     private final CartItemRepository cartItemRepository;
+    private final TicketRepository ticketRepository;
     private final EventClient eventClient;
     private final TransactionTemplate transactionTemplate;
     private final ApplicationEventPublisher eventPublisher;
@@ -54,14 +57,27 @@ public class CartService implements CartUseCase, CartItemUseCase {
 
     @Override
     public CartItemResponse save(UUID userId, CartItemRequest request) {
-        //외부 API 호출 및 정책 검증 : Event서비스호출, 상품의 구매가능상태,구매가능 수량 등 검증
-        InternalPurchaseValidationResponse event = eventClient.getValidateEventStatus(request.eventId(), userId,
-            request.quantity());
+        // 이벤트 상태 및 재고 검증 (새 요청 수량 기준 — 재고는 이미 구매분이 차감된 값)
+        InternalPurchaseValidationResponse event = eventClient.getValidateEventStatus(
+            request.eventId(), userId, request.quantity());
         handlePurchaseValidationError(event);
 
-        //DB 작업 : 장바구니 확보와 장바구니에 아이템 담기 로직을 한개 트랜잭션 단위로 묶음.
-        //Cart와 CartItem -> 객체참조x, 연관관계 매핑 없이 식별자참조.
+        if (userId.equals(event.sellerId())) {
+            throw new BusinessException(CartErrorCode.SELLER_CANNOT_PURCHASE_OWN_EVENT);
+        }
+
+        // Cart와 CartItem -> 객체참조x, 연관관계 매핑 없이 식별자참조.
         Cart cart = findOrCreateCart(userId);
+
+        // 1인당 구매 한도 검증: 장바구니 수량 + 구매 완료 수량 + 새 요청 수량
+        int existingCartQty = cartItemRepository.findByCartIdAndEventId(cart.getId(), request.eventId())
+            .map(CartItem::getQuantity)
+            .orElse(0);
+        int issuedTicketCount = ticketRepository.countByUserIdAndEventIdAndStatus(
+            userId, request.eventId(), TicketStatus.ISSUED);
+        if (existingCartQty + issuedTicketCount + request.quantity() > event.maxQuantity()) {
+            throw new BusinessException(CartErrorCode.EXCEED_MAX_PURCHASE);
+        }
 
         CartItem cartItem = transactionTemplate.execute(status -> {
             CartItem item = addOrUpdateCartItem(cart.getId(), request);
@@ -71,7 +87,6 @@ public class CartService implements CartUseCase, CartItemUseCase {
             return item;
         });
 
-        //응답데이터 구성
         return CartItemResponse.of(cart, cartItem, event.title(), event.price());
     }
 
@@ -119,11 +134,11 @@ public class CartService implements CartUseCase, CartItemUseCase {
     // 장바구니 아이템 갯수 증감
     @Override
     @Transactional
-    public CartItemQuantityResponse updateTicket(UUID userId, Long cartItemId, CartItemQuantityRequest request) {
+    public CartItemQuantityResponse updateTicket(UUID userId, UUID cartItemId, CartItemQuantityRequest request) {
         // 장바구니 가져오기 — Cart 없으면 ITEM_NOT_FOUND (#416)
         Cart cart = getCartOrThrowItemNotFound(userId);
         // 장바구니 아이템 가져오기
-        CartItem cartItem = getCartItemById(cartItemId);
+        CartItem cartItem = getCartItemByCartItemId(cartItemId);
 
         // 변경 후 수량
         int newQuantity = cartItem.getQuantity() + request.quantity();
@@ -138,6 +153,13 @@ public class CartService implements CartUseCase, CartItemUseCase {
             newQuantity);
         // Event 구매 가능 검증 - 2) Event의 구매 가능 상태 확인
         handlePurchaseValidationError(event);
+
+        // 1인당 구매 한도 검증: 변경 후 장바구니 수량 + 구매 완료 수량 (newQuantity는 이미 기존 장바구니 수량 포함)
+        int issuedTicketCount = ticketRepository.countByUserIdAndEventIdAndStatus(
+            userId, cartItem.getEventId(), TicketStatus.ISSUED);
+        if (newQuantity + issuedTicketCount > event.maxQuantity()) {
+            throw new BusinessException(CartErrorCode.EXCEED_MAX_PURCHASE);
+        }
 
         cartItem.addQuantity(request.quantity());
 
@@ -157,11 +179,11 @@ public class CartService implements CartUseCase, CartItemUseCase {
     // 장바구니 아이템 삭제
     @Override
     @Transactional
-    public CartItemDeleteResponse deleteTicket(UUID userId, Long cartItemId) {
+    public CartItemDeleteResponse deleteTicket(UUID userId, UUID cartItemId) {
         // 장바구니 가져오기 — Cart 없으면 ITEM_NOT_FOUND (#416)
         Cart cart = getCartOrThrowItemNotFound(userId);
         // 장바구니 아이템 가져오기
-        CartItem cartItem = getCartItemById(cartItemId);
+        CartItem cartItem = getCartItemByCartItemId(cartItemId);
 
         // 장바구니 아이템이 유저의 장바구니 아이템인가 확인 예외
         if (!cartItem.getCartId().equals(cart.getId())) {
@@ -277,9 +299,9 @@ public class CartService implements CartUseCase, CartItemUseCase {
             .orElseThrow(() -> new BusinessException(CartErrorCode.ITEM_NOT_FOUND));
     }
 
-    // 장바구니 아이템 존재 유무 확인
-    private CartItem getCartItemById(Long cartItemId) {
-        return cartItemRepository.findById(cartItemId)
+    // 장바구니 아이템 존재 유무 확인 — 외부 노출 식별자(UUID) 기준 조회
+    private CartItem getCartItemByCartItemId(UUID cartItemId) {
+        return cartItemRepository.findByCartItemId(cartItemId)
             .orElseThrow(() -> new BusinessException(CartErrorCode.ITEM_NOT_FOUND));
     }
 

@@ -26,5 +26,4 @@ logs/
 ### Docker ###
 docker-compose.override.yml
 
-### log 파일 ###
 spring-logs/

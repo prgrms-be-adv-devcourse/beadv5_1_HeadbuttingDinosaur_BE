@@ -50,6 +50,11 @@ kafka:
     delivery-timeout-ms: 8000
     send-timeout-ms: 10000
 
+# 테스트 환경 — Scheduler fallback 빠르게 동작하도록 단축 (운영: 60s/5s)
+outbox:
+  poll-interval-ms: 1000
+  publish-grace-seconds: 0
+
 service:
   member:
     url: http://member:8081

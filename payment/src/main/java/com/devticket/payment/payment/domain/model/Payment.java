@@ -118,6 +118,20 @@ public class Payment extends BaseEntity {
         상태 변경 메서드
        ======================= */
 
+    /**
+     * READY 상태인 Payment를 다른 결제수단/금액으로 재초기화.
+     * status / paymentId / orderId / userId 는 보존, 결제 정보만 갱신.
+     */
+    public void resetForRetry(PaymentMethod method, Integer amount, Integer walletAmount, Integer pgAmount) {
+        if (this.status != PaymentStatus.READY) {
+            throw new PaymentException(PaymentErrorCode.INVALID_STATUS_TRANSITION);
+        }
+        this.paymentMethod = method;
+        this.amount = amount;
+        this.walletAmount = walletAmount != null ? walletAmount : 0;
+        this.pgAmount = pgAmount != null ? pgAmount : 0;
+    }
+
     public void approve(String paymentKey) {
         validateTransition(PaymentStatus.SUCCESS);
         this.paymentKey = paymentKey;

@@ -35,6 +35,12 @@ kafka-producer:
   delivery-timeout-ms: 8000
   send-timeout-ms: 10000
 
+# 테스트는 grace period을 0으로 두어 스케줄러 fallback 경로를 즉시 검증할 수 있도록 한다.
+# 폴링 주기도 짧게 둬 OutboxSchedulerIntegrationTest의 10초 awaitility 안에 픽업되도록 한다.
+outbox:
+  publish-grace-seconds: 0
+  poll-interval-ms: 3000
+
 server:
   port: 8085
 

@@ -26,4 +26,7 @@ public interface CartItemRepository {
 
     // 장바구니 아이템 조회
     Optional<CartItem> findById(Long cartItemId);
+
+    // 외부 식별자(UUID)로 장바구니 아이템 조회
+    Optional<CartItem> findByCartItemId(UUID cartItemId);
 }
