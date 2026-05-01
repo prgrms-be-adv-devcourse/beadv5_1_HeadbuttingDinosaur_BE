@@ -33,6 +33,11 @@
 | GET | `/api/test/settlement-target/preview` | `SettlementController.previewSettlementTarget` | (테스트용 정산대상 수집 미리보기) |
 
 > ⚠ 컨트롤러명 변경(6eab2dab): `InternalSettlementController` → `SettlementAdminController`. path는 `/api/admin/settlements`로 외부 형태 유지.
+>
+> ⚠ 자동 자산 드리프트 (수요일 일관성 검증 결과 — `docs/standards/docs-parser-standard.md §신규 변경 미반영`):
+> - `api-summary.md` settlement 섹션에 신규 API 3건(`/revenues/{yearMonth}`, `/batch/daily`, `/batch/monthly`) 미등재 (36b33e9b, b368f4af 코드 추가)
+> - `api-summary.md` L154-158 컨트롤러 표기가 옛 클래스명(`InternalSettlementController`) — 6eab2dab 미반영
+> - 본 페이지(settlement.md §2)가 코드 기준 정확. 자동 자산 회귀는 발표 후 회고 트랙.
 
 **대상 구분**: 관리자(`/api/admin/settlements/**`, `/api/admin/settlements/batch/**`), 판매자(`/api/seller/settlements/**`), 테스트(`/api/test/**`).
 
