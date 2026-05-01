@@ -62,12 +62,6 @@
 - ai: `getTechStacks` (`/internal/admin/tech-stacks`) ★ (§2 벡터DB)
 - 외부 (관리자 클라이언트) — 외부 API 표 참조
 
-## DTO 발췌
-
-- **Request**: `AdminDecideSellerApplicationRequest`, `AdminUserSearchRequest`, `AdminUserUpdateRoleRequest`, `AdminUserPenalizeRequest`, `AdminEventSearchRequest`, `AdminForceCancelEventRequest`, `AdminSettlementSearchRequest`, `CreateTechStackRequest`, `UpdateTechStackRequest`, `DeleteTechStackRequest`
-- **Response**: `AdminDashboardResponse`, `AdminActionHistorySummary`, `AdminEventListResponse`, `AdminEventResponse`, `EventCancelResponse`, `AdminSettlementListResponse`, `SettlementResponse` (admin 표면용), `AdminUserListResponse`, `InternalMemberDetailResponse`, `InternalMemberPageResponse`, `SellerApplicationListResponse`, `GetTechStackResponse`, `CreateTechStackResponse`, `UpdateTechStackResponse`, `DeleteTechStackResponse`
-
-> DTO 필드 표 / source 경로 깊이: `docs/dto/summary/admin-summary.md`
 
 ## 신규 인프라
 

@@ -32,13 +32,6 @@
 | Elasticsearch | KNN 검색 (`ElasticsearchClient`) ★ | (§2 벡터DB) 정규화 벡터 → 후보 이벤트 |
 | `TechStackEmbeddingRepository` ★ | 벡터 저장소 | (§2 벡터DB) admin 모듈 흐름이 임베딩 산출, ai 는 조회만 |
 
-## DTO 발췌
-
-- **Presentation**: `RecommendationRequest`, `RecommendationResponse`
-- **Domain**: `UserVector` (preference/cart/recent/negative 4종 벡터 + `userId`)
-- **External (client req/res)**: member 호출용 `UserTechStackRequest/Response`, event 호출용 `PopularEventListRequest/Response`, log 호출용 `ActionLogRequest/Response`
-
-> DTO 필드 표 / source 경로 깊이: `docs/dto/summary/ai-summary.md`
 
 ## 핵심 컴포넌트
 

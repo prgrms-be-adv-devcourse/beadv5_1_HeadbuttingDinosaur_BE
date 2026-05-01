@@ -84,11 +84,3 @@
 - 구독 (다른 모듈 발행): payment(`payment.completed` ★ / `payment.failed` ★ / `refund.*`), event(`event.force-cancelled`), 자체 발행분 재수신(`ticket.issue-failed`)
 - 피구독 (commerce 발행): log(`action.log` CART_ADD/REMOVE)
 
-## DTO 발췌
-
-- **Cart**: `CartItemRequest`, `CartItemQuantityRequest`, `CartItemResponse`, `CartResponse`, `CartItemQuantityResponse`, `CartItemDeleteResponse`, `CartClearResponse`
-- **Order**: `CartOrderRequest`, `OrderListRequest`, `OrderResponse`, `OrderListResponse`, `OrderStatusResponse`, `OrderDetailResponse`, `OrderCancelResponse`, `InternalOrderInfoResponse`, `InternalOrderItemResponse`, `InternalOrderItemsResponse`, `InternalOrderTicketsResponse`, `InternalSettlementDataResponse`
-- **Ticket**: `TicketRequest`, `TicketListRequest`, `SellerEventParticipantListRequest`, `TicketResponse`, `TicketDetailResponse`, `TicketListResponse`, `SellerEventParticipantResponse`, `SellerEventParticipantListResponse`, `InternalTicketSettlementDataResponse`, `InternalTicketSettlementItemResponse`
-- **Kafka payload (23건)**: `PaymentCompletedEvent`, `PaymentFailedEvent`, `OrderCancelledEvent`, `TicketIssueFailedEvent`, `EventForceCancelledEvent`, `RefundRequestedEvent`, Refund Saga 보상 6종 (`RefundOrderDone/Failed/Cancel/Compensate`, `RefundTicketDone/Failed/Cancel/Compensate`), Refund 수신 4종 (`RefundCompletedEvent`, `RefundOrderCancelEvent`, `RefundTicketCancelEvent`, `RefundStockRestoreEvent`), `ActionLogDomainEvent`, `ActionLogEvent` 등
-
-> DTO 필드 표 / source 경로 깊이: `docs/dto/summary/commerce-summary.md`

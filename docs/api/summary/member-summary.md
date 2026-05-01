@@ -67,12 +67,3 @@
 - commerce, event, payment: 회원/판매자 정보 조회
 - settlement: `getSellerIds` ★ (#7)
 
-## DTO 발췌
-
-- **Auth**: `LoginRequest`, `SignupRequest`, `OAuthSignUpOrLoginRequest`, `SocialLoginRequest`, `ReissueRequest` / `LoginResponse`, `SignupResponse`, `OAuthSignUpOrLoginResponse`, `SocialLoginResponse`, `ReissueResponse`
-- **User Profile**: `CreateProfileRequest`, `UpdateProfileRequest`, `ChangePasswordRequest` / `ProfileResponse`, `WithdrawResponse`
-- **Seller Application**: `SellerApplicationRequest` / `SellerApplicationResponse`, `MySellerApplicationResponse`
-- **TechStack 조회**: `TechStackListResponse`
-- **Internal**: `InternalMemberInfoResponse`, `InternalMemberStatusResponse`, `InternalMemberRoleResponse`, `InternalSellerInfoResponse`, `InternalUserTechStackResponse`, `InternalSellerApplicationResponse`, `InternalDecideSellerApplicationResponse`, `InternalUpdateStatusResponse`, `InternalUpdateRoleResponse`, `InternalPagedMemberResponse`, `InternalMemberSearchRequest`
-
-> DTO 필드 표 / source 경로 깊이: `docs/dto/summary/member-summary.md`
