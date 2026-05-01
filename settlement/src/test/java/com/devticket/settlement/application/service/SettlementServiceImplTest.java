@@ -3,8 +3,11 @@ package com.devticket.settlement.application.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 import com.devticket.settlement.common.exception.BusinessException;
 import com.devticket.settlement.common.exception.CommonErrorCode;
@@ -21,6 +24,7 @@ import com.devticket.settlement.presentation.dto.SettlementPeriodResponse;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -178,6 +182,43 @@ class SettlementServiceImplTest {
 
         assertThat(result.carriedInAmount()).isEqualTo(4850);
         assertThat(result.finalSettlementAmount()).isEqualTo(4850);
+    }
+
+    @Test
+    void getSettlementPreview_eventTitle_벌크조회_1회만_호출() {
+        UUID eventUUID1 = UUID.randomUUID();
+        UUID eventUUID2 = UUID.randomUUID();
+
+        SettlementItem item1 = SettlementItem.builder()
+            .orderItemId(UUID.randomUUID())
+            .eventId(1L).eventUUID(eventUUID1).sellerId(sellerId)
+            .salesAmount(50000L).refundAmount(0L).feeAmount(1500L).settlementAmount(48500L)
+            .status(SettlementItemStatus.READY).eventDateTime(LocalDate.now().minusDays(10))
+            .build();
+        SettlementItem item2 = SettlementItem.builder()
+            .orderItemId(UUID.randomUUID())
+            .eventId(2L).eventUUID(eventUUID2).sellerId(sellerId)
+            .salesAmount(30000L).refundAmount(0L).feeAmount(900L).settlementAmount(29100L)
+            .status(SettlementItemStatus.READY).eventDateTime(LocalDate.now().minusDays(5))
+            .build();
+
+        given(settlementItemRepository.findBySellerIdAndStatusAndEventDateTimeBetween(
+            eq(sellerId), eq(SettlementItemStatus.READY), any(LocalDate.class), any(LocalDate.class)))
+            .willReturn(List.of(item1, item2));
+        given(settlementRepository.findBySellerIdAndStatusAndCarriedToSettlementIdIsNull(
+            sellerId, SettlementStatus.PENDING_MIN_AMOUNT))
+            .willReturn(List.of());
+        given(settlementToEventClient.getEventTitles(anyList()))
+            .willReturn(Map.of(eventUUID1, "이벤트 A", eventUUID2, "이벤트 B"));
+
+        SettlementPeriodResponse result = settlementServiceImpl.getSettlementPreview(sellerId);
+
+        assertThat(result.settlementItems()).hasSize(2);
+        assertThat(result.settlementItems())
+            .extracting("eventTitle")
+            .containsExactlyInAnyOrder("이벤트 A", "이벤트 B");
+        // N+1 제거 검증: 항목이 2건이어도 Event 서비스 호출은 1회
+        verify(settlementToEventClient, times(1)).getEventTitles(anyList());
     }
 
     @Test
