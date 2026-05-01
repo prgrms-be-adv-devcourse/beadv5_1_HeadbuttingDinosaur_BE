@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -75,7 +76,8 @@ public class SettlementServiceImpl implements SettlementService {
         List<SettlementItem> settlementItems = settlementItemRepository.findBySettlementId(
             settlement.getSettlementId());
 
-        return toResponse(settlement, settlementItems);
+        Map<UUID, String> eventTitles = fetchEventTitles(settlementItems);
+        return toResponse(settlement, settlementItems, eventTitles);
     }
 
     /**
@@ -236,10 +238,11 @@ public class SettlementServiceImpl implements SettlementService {
     private SettlementPeriodResponse toSettlementPeriodResponse(Settlement settlement) {
         log.debug("[toSettlementPeriodResponse] SettlementItem 조회 시작 - settlementId={}",
             settlement.getSettlementId());
-        List<EventItemResponse> items = settlementItemRepository
-            .findBySettlementId(settlement.getSettlementId())
-            .stream()
-            .map(this::toResponse)
+        List<SettlementItem> settlementItems = settlementItemRepository
+            .findBySettlementId(settlement.getSettlementId());
+        Map<UUID, String> eventTitles = fetchEventTitles(settlementItems);
+        List<EventItemResponse> items = settlementItems.stream()
+            .map(item -> toResponse(item, eventTitles))
             .toList();
         log.debug("[toSettlementPeriodResponse] SettlementItem 조회 완료 - {}건", items.size());
         return new SettlementPeriodResponse(
@@ -272,8 +275,9 @@ public class SettlementServiceImpl implements SettlementService {
 
         long finalSettlementAmount = newSettlementAmount + carriedInAmount;
 
+        Map<UUID, String> eventTitles = fetchEventTitles(readyItems);
         List<EventItemResponse> items = readyItems.stream()
-            .map(this::toResponse)
+            .map(item -> toResponse(item, eventTitles))
             .toList();
 
         return new SettlementPeriodResponse(
@@ -305,9 +309,10 @@ public class SettlementServiceImpl implements SettlementService {
         );
     }
 
-    private SellerSettlementDetailResponse toResponse(Settlement settlement, List<SettlementItem> settlementItems) {
+    private SellerSettlementDetailResponse toResponse(Settlement settlement,
+        List<SettlementItem> settlementItems, Map<UUID, String> eventTitles) {
         List<EventItemResponse> eventItems = settlementItems.stream()
-            .map(this::toResponse)
+            .map(item -> toResponse(item, eventTitles))
             .toList();
 
         return new SellerSettlementDetailResponse(
@@ -324,14 +329,35 @@ public class SettlementServiceImpl implements SettlementService {
         );
     }
 
-    private EventItemResponse toResponse(SettlementItem settlementItem) {
+    private EventItemResponse toResponse(SettlementItem settlementItem, Map<UUID, String> eventTitles) {
+        UUID eventUUID = settlementItem.getEventUUID();
+        String title = eventTitles.getOrDefault(eventUUID, "Unknown");
         return new EventItemResponse(
-            settlementItem.getEventId().toString(),
-            "Unknown",
+            eventUUID != null ? eventUUID.toString() : null,
+            title,
             settlementItem.getSalesAmount(),
             settlementItem.getRefundAmount(),
             settlementItem.getFeeAmount(),
             settlementItem.getSettlementAmount()
         );
+    }
+
+    /**
+     * SettlementItem 목록에서 eventUUID 를 모아 Event 서비스에 일괄 조회한다.
+     * 항목별 단건 호출(N+1) 대신 1회 호출로 eventTitle 을 채운다.
+     */
+    private Map<UUID, String> fetchEventTitles(List<SettlementItem> settlementItems) {
+        if (settlementItems.isEmpty()) {
+            return Map.of();
+        }
+        List<UUID> eventUUIDs = settlementItems.stream()
+            .map(SettlementItem::getEventUUID)
+            .filter(Objects::nonNull)
+            .distinct()
+            .toList();
+        if (eventUUIDs.isEmpty()) {
+            return Map.of();
+        }
+        return settlementToEventClient.getEventTitles(eventUUIDs);
     }
 }
