@@ -42,36 +42,7 @@
   },
   "totalEndpointCount": 120,
   "notes": [
-    "이전 api-overview.json (commerce-only) 폐기 — 본 형식으로 9 모듈 통합.",
-    "이전 api-summary.json 폐기 — 모듈별 docs/api/summary/{module}-summary.json 으로 분리.",
     "log 모듈은 Fastify/TS 별도 스택, Java endpointCount 0 정당.",
     "apigateway 는 라우팅 전용, health check 1건만 보유."
-  ],
-  "corrections": [
-    {
-      "id": 1,
-      "summary": "commerce dead REST 2건 (payment-completed POST, payment-failed PATCH) 제거",
-      "evidence": "b9be8434"
-    },
-    {
-      "id": 2,
-      "summary": "settlement 신규 API 3건 (revenues/{yearMonth}, batch/daily, batch/monthly) 추가",
-      "evidence": "36b33e9b, b368f4af"
-    },
-    {
-      "id": 3,
-      "summary": "settlement 컨트롤러 클래스명 InternalSettlementController → SettlementAdminController",
-      "evidence": "6eab2dab"
-    },
-    {
-      "id": 4,
-      "summary": "ai 의 KafkaTestController#send 잡음 제거 (코드 부재)",
-      "evidence": "code verification"
-    },
-    {
-      "id": 5,
-      "summary": "commerce refund-completed (PATCH /internal/tickets/{ticketId}/refund-completed) 등재",
-      "evidence": "InternalOrderController.java:80-84"
-    }
   ]
 }

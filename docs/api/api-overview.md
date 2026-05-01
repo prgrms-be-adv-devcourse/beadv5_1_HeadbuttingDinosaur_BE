@@ -3,7 +3,7 @@
 > 9개 모듈 (admin · ai · apigateway · commerce · event · gateway · log · member · payment · settlement) 의 `*Controller.java` 의 `@RequestMapping` / 메서드 매핑 기반.
 > ⚠ **log** 는 Fastify/TypeScript 별도 스택. 본 문서는 Java 모듈만 커버 — `docs/kafka/actionLog.md` 참조.
 > ⚠ **gateway** 는 라우팅 전용. Java controller 는 health check 1건뿐 (apigateway 모듈에 위치).
-> ★ = `requirements-check.md §1` 기능 요구사항 5건 (#3, #4, #7, #10, #11) + `§2` 기술스택 6건 매핑 항목.
+> ★ = 기능 요구사항 + 기술스택 (`requirements-check.md` §1 / §2).
 > 상세 (호출 주체 / Kafka 컨텍스트) 는 `docs/api/summary/{module}-summary.md`, DTO 는 `docs/dto/summary/{module}-summary.md` 참조.
 
 ---

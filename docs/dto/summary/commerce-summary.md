@@ -1,11 +1,12 @@
 # commerce DTO summary
 
-> 본 문서는 `docs/dto/dto-overview.md §4 commerce` 의 깊이 확장판.
-> presentation/dto 34건 + Kafka payload 23건 (모듈 중 최다). Cart/Order/Ticket + Refund Saga 보상 흐름.
+> ★ = 기능 요구사항 + 기술스택 (`requirements-check.md` §1 / §2)
 
-## Cart — Request / Response
+presentation/dto 34건 + Kafka payload 23건 (모듈 중 최다). Cart/Order/Ticket + Refund Saga 보상 흐름.
 
-### CartItemRequest (record)
+## Cart — Request / Response ★ (#3 장바구니 추가)
+
+### CartItemRequest (record) ★
 - source: `commerce/.../cart/presentation/dto/req/CartItemRequest.java`
 
 | 필드명 | 타입 |
@@ -52,7 +53,7 @@
 - source: `commerce/.../cart/presentation/dto/res/CartClearResponse.java`
 - 필드: `deletedCount` (int)
 
-## Order — Request / Response (사용자)
+## Order — Request / Response (사용자) ★ (#4 예치금 구매)
 
 ### CartOrderRequest (record) ★
 - source: `commerce/.../order/presentation/dto/req/CartOrderRequest.java`
@@ -89,7 +90,6 @@
 
 ### InternalOrderTicketsResponse (record)
 - source: `commerce/.../order/presentation/dto/res/InternalOrderTicketsResponse.java`
-- ⚠ 호출자 0건 (`getOrderTickets` endpoint 가 이전 자동 자산에 등재됐으나 코드 부재 — `docs/api/api-overview.md §부록 #8` 정정 참조)
 
 ### InternalSettlementDataResponse (record)
 - source: `commerce/.../order/presentation/dto/res/InternalSettlementDataResponse.java`
@@ -112,16 +112,16 @@
 `commerce/src/main/java/com/devticket/commerce/common/messaging/event/**`
 
 ### 결제 / 주문 후속 (3종)
-- `PaymentCompletedEvent` ★ — payment 발행, commerce 수신 (PAID 전이)
-- `PaymentFailedEvent` ★ — payment 발행, commerce 수신 (FAILED 전이)
-- `OrderCancelledEvent` — commerce 발행 (`OrderExpirationCancelService`). ⚠ kafka-design §3 line 70 미등재 (드리프트)
+- `PaymentCompletedEvent` ★ (#4) — payment 발행, commerce 수신 (PAID 전이)
+- `PaymentFailedEvent` ★ (#4) — payment 발행, commerce 수신 (FAILED 전이)
+- `OrderCancelledEvent` — commerce 발행 (`OrderExpirationCancelService`)
 - `TicketIssueFailedEvent` — commerce 자체 발행 + 자체 재수신 (티켓 발급 실패)
 
-### Refund Saga 시작점 (1종)
+### Refund Saga 시작점
 - `EventForceCancelledEvent` — event 발행, commerce 수신 (RefundFanoutService 시작)
-- `RefundRequestedEvent` ★ — commerce 발행 (fanout)
+- `RefundRequestedEvent` — commerce 발행 (fanout)
   - **13 필드** (`refundId, orderRefundId, orderId, userId, paymentId, paymentMethod, ticketIds, refundAmount, refundRate, wholeOrder, reason, timestamp, totalOrderTickets`)
-  - ⚠ `kafka-design.md §3 line 298-311` 정의(8 필드) 와 드리프트 — 실 정의는 `commerce/payment` 의 `RefundRequestedEvent.java` (★ `totalOrderTickets` 추가 — 31fa70ba/e3d316ac/ea7f7cc9)
+  - 실 정의는 `commerce/payment` 의 `RefundRequestedEvent.java`
 
 ### Refund Saga 보상 응답 (commerce 발행 6종)
 - `RefundOrderCancelEvent`, `RefundTicketCancelEvent` — saga 시작 (payment 가 발행)
@@ -134,14 +134,8 @@
 - `RefundStockRestoreEvent` — payment 발행 → event 수신
 - `RefundStockDoneEvent`, `RefundStockFailedEvent` — event 발행 → payment 수신
 
-### Action Log (1-C, 2종)
+### Action Log ★ (#9 AI 추천 입력) (1-C, 2종)
 - `ActionLogDomainEvent` — commerce 도메인 표현
 - `ActionLogEvent` — Kafka 1-C 발행 message (CartService)
 
-> 모든 1-B Outbox 이벤트는 afterCommit 직접 발행 + 스케줄러 fallback 패턴 (5c966831/df63cc2b/a2878f16). 상세는 `docs/modules/commerce.md §4 Outbox 발행 패턴`.
-
-## ⚠ 미결 / 후속
-
-- `RefundRequestedEvent` 13 필드 vs kafka-design 8 필드 드리프트 — kafka-design 갱신 보류 (CLAUDE.md §8 "kafka-design 재작성 금지", 패턴 C)
-- `OrderCancelledEvent` kafka-design §3 line 70 미등재 (드리프트)
-- `InternalOrderTicketsResponse` 호출자 0건 (`getOrderTickets` endpoint 코드 부재)
+> 모든 1-B Outbox 이벤트는 afterCommit 직접 발행 + 스케줄러 fallback 패턴. 상세는 `docs/modules/commerce.md §4 Outbox 발행 패턴`.

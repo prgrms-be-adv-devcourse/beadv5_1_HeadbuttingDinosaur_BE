@@ -848,7 +848,5 @@
       "source": "event/src/main/java/com/devticket/event/presentation/dto/SellerEventUpdateResponse.java"
     }
   ],
-  "notes": [
-    "InternalPurchaseValidationResponse.sellerId 추가 (00247431) — 이전 자동 자산 검증 불가, 코드 검증으로 표기."
-  ]
+  "notes": []
 }

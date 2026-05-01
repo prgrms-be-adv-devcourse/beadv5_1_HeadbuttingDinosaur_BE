@@ -222,7 +222,5 @@
       "source": "settlement/src/main/java/com/devticket/settlement/presentation/dto/SettlementTargetPreviewResponse.java"
     }
   ],
-  "notes": [
-    "MonthlyRevenueResponse 신규 추가 (36b33e9b) — 이전 자동 파서 미반영."
-  ]
+  "notes": []
 }

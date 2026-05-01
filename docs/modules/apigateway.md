@@ -1,15 +1,14 @@
 # apigateway
 
-> 본 페이지는 ServiceOverview.md §3 apigateway 섹션의 확장판입니다.
-> ★ = `requirements-check.md §1` 기능 요구사항 5건 (#3, #4, #7, #10, #11) + `§2` 기술스택 6건 매핑 항목
+> ★ = 기능 요구사항 + 기술스택 (`requirements-check.md` §1 / §2)
 
 ## 1. 모듈 책임 ★
 
 JWT 검증 + 라우팅 + Rate Limit + 권한 검사 + 내부 API 차단 + OAuth 진입점/콜백. **비즈니스 로직 없음** — Spring Cloud Gateway(WebFlux) 기반 filter chain 전용.
 
-★ 매핑:
-- (§2) MSA + API Gateway — 8개 모듈 라우팅 (member/event/commerce/payment/settlement/log/admin/ai 의 외부 path 통합)
-- (§2) 트래픽 분산 + 보안 (JWT, OAuth) — `JwtAuthenticationFilter` + Google OAuth flow + `RoleAuthorizationFilter`
+★ 요구사항:
+- MSA + API Gateway — 8개 모듈 라우팅 (member/event/commerce/payment/settlement/log/admin/ai 의 외부 path 통합)
+- 트래픽 분산 + 보안 (JWT, OAuth) — `JwtAuthenticationFilter` + Google OAuth flow + `RoleAuthorizationFilter`
 
 **위임 (담당 안 함)**:
 - OAuth 토큰 검증·회원 등록 → member 모듈 (`OAuthSuccessHandler`가 OAuth flow 완료 후 member 측 `internalOAuthSignUpOrLogin` 호출 위임)

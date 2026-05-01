@@ -1,11 +1,12 @@
 # member DTO summary
 
-> 본 문서는 `docs/dto/dto-overview.md §7 member` 의 깊이 확장판.
-> presentation/dto 40건 (모듈 중 최다) — Auth/User/Seller Application/TechStack 조회/Internal.
+> ★ = 기능 요구사항 + 기술스택 (`requirements-check.md` §1 / §2)
+
+presentation/dto 40건 (모듈 중 최다) — Auth/User/Seller Application/TechStack 조회/Internal.
 
 ## Auth — Request
 
-### LoginRequest (record)
+### LoginRequest (record) ★ (§2 JWT)
 - source: `member/.../auth/presentation/dto/req/LoginRequest.java`
 - 필드: `email`, `password`
 
@@ -13,23 +14,23 @@
 - source: `member/.../auth/presentation/dto/req/SignupRequest.java`
 - 필드: `email`, `password`, `nickname`, `providerType` 등
 
-### OAuthSignUpOrLoginRequest (record)
+### OAuthSignUpOrLoginRequest (record) ★ (§2 OAuth)
 - source: `member/.../auth/presentation/dto/req/OAuthSignUpOrLoginRequest.java`
 - 필드: `googleSubject`, `email`, `name` 등
 
-### SocialLoginRequest (record)
+### SocialLoginRequest (record) ★ (§2 OAuth)
 - source: `member/.../auth/presentation/dto/req/SocialLoginRequest.java`
 - 필드: `code` (Google authorization code)
 
-### ReissueRequest (record)
+### ReissueRequest (record) ★ (§2 JWT)
 - source: `member/.../auth/presentation/dto/req/ReissueRequest.java`
 - 필드: `refreshToken`
 
 ## Auth — Response
 
-### LoginResponse / SignupResponse / OAuthSignUpOrLoginResponse / SocialLoginResponse / ReissueResponse (record)
+### LoginResponse / SignupResponse / OAuthSignUpOrLoginResponse / SocialLoginResponse / ReissueResponse (record) ★ (§2 JWT/OAuth)
 - source: `member/.../auth/presentation/dto/res/`
-- 공통 필드 패턴: `accessToken`, `refreshToken`, `userId`, `role`, (필요 시) `profileCompleted` (구글로그인시 403 에러 코드값 1e7fb78d 관련)
+- 공통 필드 패턴: `accessToken`, `refreshToken`, `userId`, `role`, (필요 시) `profileCompleted`
 
 ## User Profile — Request / Response
 
@@ -93,8 +94,8 @@
 - source: `member/.../presentation/dto/res/InternalSellerInfoResponse.java`
 - 사용처: event/payment/settlement (판매자 정산 정보 조회)
 
-### InternalUserTechStackResponse (record)
-- source: `member/.../presentation/dto/res/InternalUserTechStackResponse.java`
+### InternalUserTechStackResponse (record) ★ (#9, §2 AI 추천 + 벡터DB)
+- source: `member/.../presentation/dto/res/InternalUserTechStackResponse.java>`
 - 사용처: ai 콜드스타트 (`MemberServiceClient.getUserTechStack`)
 
 ### InternalSellerApplicationResponse (record)
@@ -120,5 +121,4 @@
 ## ⚠ 미결 / 후속
 
 - TechStack 이관 완료 (member → admin) 후 잔존 `TechStackController` (조회만) — 추후 admin 측으로 통합 가능성
-- 이전 자동 자산이 member 모듈을 미커버했음 — 본 페이지(`dto/summary/member-summary.md`) 가 1차 자료. `dto-overview.md` 는 9 모듈 통합 인덱스로 재작성됨.
 - 일부 record 의 정확한 필드 정의는 코드 (`member/.../presentation/dto/{req,res}/**`) 직접 확인

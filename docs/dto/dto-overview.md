@@ -3,6 +3,7 @@
 > 9개 모듈 (admin · ai · apigateway · commerce · event · log · member · payment · settlement) 의 `presentation/dto/**` 와 `**/messaging/event/**` (Kafka payload) Java `record/class` 기준.
 > ⚠ **log** 는 Fastify/TypeScript 별도 스택. 본 문서는 Java DTO 만 커버.
 > ⚠ **apigateway** 는 라우팅 전용 (DTO 0건).
+> ★ = 기능 요구사항 + 기술스택 (`requirements-check.md` §1 / §2).
 > 모듈별 DTO 카탈로그(필드 표 포함 깊이) 는 `docs/dto/summary/{module}-summary.md` 참조.
 > 호출 주체 / Kafka 컨텍스트 / 사용 controller 매핑은 `docs/modules/{module}.md` 참조.
 
@@ -120,8 +121,6 @@
 - **Kafka payload (Outbox)**: `PaymentCompletedEvent`, `PaymentFailedEvent`, `RefundCompletedEvent`, `RefundOrderCancelEvent`, `RefundTicketCancelEvent`, `RefundStockRestoreEvent`, `RefundOrderCompensateEvent`, `RefundTicketCompensateEvent`, Saga 내부 record `RefundRequestedEvent` (★ 13 필드)
 - **외부 PG (Toss)**: `PgPaymentConfirmCommand`, `PgPaymentConfirmResult`, `TossPaymentStatusResponse`, `TossErrorResponse`
 
-> ✅ 정리됨 (ea44e72): `CommerceInternalClient` 의 dead 메서드 + 관련 DTO 사용처 제거.
-> ✅ 정리됨 (22762f2): `WalletService.processBatchRefund` dead stub + `InternalEventOrdersResponse` 등 미사용 DTO 의존성 제거.
 
 → 필드 표 / source 경로 깊이: `summary/payment-summary.md`
 
@@ -137,25 +136,6 @@
 - **Client req/res (settlement → 외부 호출용)**: `InternalSettlementDataRequest`, `EventTicketSettlementRequest`, `SettlementDepositRequest`, `InternalSettlementDataResponse`, `CommerceTicketSettlementResponse`, `EventServiceResponse`, `EventTicketSettlementResponse`, `EndedEventResponse`, `InternalEndedEventsData`
 
 > ⚠ `SettlementResult` 은 deprecated 가능성 — Spring Batch 전환(e521f682) 으로 신규 `MonthlySettlementProcessor`/`MonthlySettlementWriter` 사용. 기존 `SettlementItemProcessor` 삭제 + FEE_RATE 처리 위치 재검토(ServiceOverview §4-5 ⚠4).
-> ✅ 신규 (36b33e9b): `MonthlyRevenueResponse` — `GET /api/admin/settlements/revenues/{yearMonth}` 응답.
 
 → 필드 표 / source 경로 깊이: `summary/settlement-summary.md`
 
----
-
-## 부록 — 자동 자산 회귀 검증 / 수동 정정 이력
-
-본 문서 정정 항목 (자동 파서 회귀 시 재정정 가이드). 폐기된 자동 자산: 이전 `dto-overview.md` (commerce-only 295줄), 이전 `dto-summary.md/json` (7 모듈, log/apigateway 누락).
-
-| # | 정정 내용 | 근거 |
-|---|---|---|
-| 1 | commerce-only 295줄 → 9 모듈 통합 인덱스 | 사용자 요청 (api-overview 와 짝) |
-| 2 | event `InternalPurchaseValidationResponse.sellerId` 추가 표기 | 00247431 |
-| 3 | event `EventListResponse` 의 `viewCount` / `category` 추가 표기 | f8205e31, 94f061eb |
-| 4 | commerce `RefundRequestedEvent` 13 필드 명시 (kafka-design 8 필드와 드리프트) | e3d316ac, ea7f7cc9, 31fa70ba |
-| 5 | settlement `MonthlyRevenueResponse` 신규 추가 표기 | 36b33e9b |
-| 6 | payment dead DTO 정리 표기 | ea44e72, 22762f2 |
-| 7 | log 모듈 → Fastify/TS 별도 스택 안내 | `docs/standards/docs-parser-standard.md §모듈 커버리지 누락` |
-| 8 | apigateway → DTO 0건 안내 | 라우팅 전용 |
-
-자동 파서 자체 수정은 발표 후 회고 트랙 (`docs/standards/docs-parser-standard.md §스캔 대상 디렉토리 패턴`).

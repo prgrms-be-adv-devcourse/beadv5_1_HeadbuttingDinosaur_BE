@@ -112,7 +112,6 @@
     }
   ],
   "notes": [
-    "컨트롤러 클래스명 InternalSettlementController → SettlementAdminController 정정 (6eab2dab).",
     "신규 API 3건 추가: getMonthlyRevenue (36b33e9b), launchDailyJob/launchMonthlyJob (b368f4af)."
   ]
 }

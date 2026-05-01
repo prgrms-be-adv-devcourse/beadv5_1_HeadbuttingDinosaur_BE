@@ -1,7 +1,6 @@
 # API 문서화 기준
 
-> `docs/api/` 자산(`api-overview.md`, `api-overview.json`, `summary/{module}-summary.md`)을 큐레이션할 때 따르는 규칙.
-> ⚠ `api-summary.md/json` 은 폐기됨 — 9 모듈 통합 인덱스는 `api-overview.md`, 모듈별 깊이는 `summary/{module}-summary.md` 로 분리됨.
+> `docs/api/` 자산(`api-overview.md`, `api-overview.json`, `summary/{module}-summary.md`) 을 큐레이션할 때 따르는 규칙.
 
 ## 1. API 표 컬럼 순서
 

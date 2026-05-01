@@ -1,15 +1,14 @@
 # payment
 
-> 본 페이지는 ServiceOverview.md §3 payment 섹션의 확장판입니다.
-> ★ = `requirements-check.md §1` 기능 요구사항 5건 (#3, #4, #7, #10, #11) + `§2` 기술스택 6건 매핑 항목
+> ★ = 기능 요구사항 + 기술스택 (`requirements-check.md` §1 / §2)
 
 ## 1. 모듈 책임
 
 결제 처리 (PG / WALLET / WALLET_PG 복합 분기) + 환불 처리 + 지갑(예치금) 관리(충전·출금·정산금 입금·환불 복구).
 
-★ 매핑:
-- (#4) 장바구니 → 예치금 구매 — WALLET / WALLET_PG 결제 흐름
-- (#7) 매월 정산 — `WalletInternalController.depositFromSettlement` (정산금 → 판매자 예치금 입금)
+★ 요구사항:
+- 장바구니 → 예치금 구매 — WALLET / WALLET_PG 결제 흐름
+- 매월 정산 — `WalletInternalController.depositFromSettlement` (정산금 → 판매자 예치금 입금)
 
 **위임 (담당 안 함)**:
 - 주문 상태 관리 → commerce 모듈 (Outbox/Kafka 통지)

@@ -1,7 +1,8 @@
 # payment DTO summary
 
-> 본 문서는 `docs/dto/dto-overview.md §8 payment` 의 깊이 확장판.
-> presentation/dto 25건 + 외부 PG (Toss) DTO. Payment/Wallet/Refund + Outbox payload.
+> ★ = 기능 요구사항 + 기술스택 (`requirements-check.md` §1 / §2)
+
+presentation/dto 25건 + 외부 PG (Toss) DTO. Payment/Wallet/Refund + Outbox payload.
 
 ## Payment — Request
 
@@ -45,7 +46,7 @@
 - source: `payment/.../wallet/presentation/dto/req/WalletWithdrawRequest.java`
 - 필드: `userId`, `amount`, `bankName`, `accountNumber`
 
-### SettlementDepositRequest (record) ★
+### SettlementDepositRequest (record) ★ (#7)
 - source: `payment/.../wallet/presentation/dto/req/SettlementDepositRequest.java`
 - 사용처: settlement `POST /internal/wallet/settlement-deposit` 요청
 - 필드: `sellerId`, `settlementId`, `amount`
@@ -86,8 +87,8 @@
 `payment/src/main/java/com/devticket/payment/.../messaging/event/**` 또는 `payment/.../refund/application/saga/event/**`
 
 ### Producer (8종)
-- `PaymentCompletedEvent` ★ — PG 승인 / WALLET 결제 완료 시
-- `PaymentFailedEvent` ★ — PG 실패 시
+- `PaymentCompletedEvent` ★ (#4) — PG 승인 / WALLET 결제 완료 시
+- `PaymentFailedEvent` ★ (#4) — PG 실패 시
 - `RefundCompletedEvent` — Refund Saga 마지막 단계
 - `RefundOrderCancelEvent` — Saga 시작 (Order 취소 트리거)
 - `RefundTicketCancelEvent` — Saga 시작 (Ticket 취소 트리거)
@@ -96,21 +97,19 @@
 - `RefundTicketCompensateEvent` — 보상 saga (Ticket)
 
 ### Saga 내부 record (1종)
-- `RefundRequestedEvent` ★
+- `RefundRequestedEvent`
   - source: `payment/.../refund/application/saga/event/RefundRequestedEvent.java`
   - **13 필드** (`refundId, orderRefundId, orderId, userId, paymentId, paymentMethod, ticketIds, refundAmount, refundRate, wholeOrder, reason, timestamp, totalOrderTickets`)
-  - ✅ `totalOrderTickets` 자체완결화 (ea7f7cc9) — 정상 경로에서 commerce 동기 호출 제거. 0(구버전)이면 commerce `getOrderInfo` 폴백(431b9fe9), 그래도 실패 시 `ticketIds.size()` 최후 폴백
-  - ⚠ `kafka-design.md §3 line 298-311` 정의(8 필드)와 드리프트
+  - `totalOrderTickets` 자체완결 — 0(구버전)이면 commerce `getOrderInfo` 폴백, 그래도 실패 시 `ticketIds.size()` 최후 폴백
 
 ### Consumer record (참고)
-- `EventForceCancelledEvent` (event 발행) — ⚠ ~~`WalletService.processBatchRefund`~~ 22762f2 로 제거됨. 강제취소 fan-out 은 commerce 경유로 일원화
 - `EventSaleStoppedEvent` (event 발행) — Saga Orchestrator 보상
 - `TicketIssueFailedEvent` (commerce 발행) — 결제 환불 처리
 - `RefundOrderDoneEvent` / `RefundOrderFailedEvent` (commerce 발행) — Order 보상 응답
 - `RefundTicketDoneEvent` / `RefundTicketFailedEvent` (commerce 발행) — Ticket 보상 응답
 - `RefundStockDoneEvent` / `RefundStockFailedEvent` (event 발행) — Stock 보상 응답
 
-> 모든 1-B Outbox 이벤트는 afterCommit 직접 발행 + 스케줄러 fallback 패턴 (057ddf6d/dc383f70). 상세는 `docs/modules/payment.md §4 Outbox 발행 패턴`.
+> 모든 1-B Outbox 이벤트는 afterCommit 직접 발행 + 스케줄러 fallback 패턴. 상세는 `docs/modules/payment.md §4 Outbox 발행 패턴`.
 
 ## 외부 PG (Toss)
 
@@ -138,9 +137,6 @@
 - source: `payment/.../payment/domain/enums/PaymentStatus.java`
 - 값: `READY`, `APPROVED`, `FAILED`, `CANCELLED` 등 (코드 검증 필요)
 
-## ⚠ 미결 / 후속
+## ⚠ 미결
 
 - `WalletServiceImpl` 전용 메서드 3건 DTO (`claimChargeForRecovery`, `revertTopending`, `applyRecoveryResult` 관련 내부 전달 객체) — `dto-doc-standard.md "Impl 전용"` 분류 대상
-- `RefundRequestedEvent` 13 필드 vs kafka-design 8 필드 드리프트 (패턴 C)
-- ✅ 정리됨 (ea44e72): `CommerceInternalClient` dead 메서드 + 관련 DTO 의존성 제거
-- ✅ 정리됨 (22762f2): `WalletService.processBatchRefund` dead stub + `InternalEventOrdersResponse` 등 미사용 DTO 의존성 제거

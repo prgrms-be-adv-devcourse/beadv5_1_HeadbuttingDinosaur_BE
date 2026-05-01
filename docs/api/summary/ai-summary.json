@@ -12,7 +12,5 @@
       "source": "ai/src/main/java/org/example/ai/presentation/controller/RecommendationController.java"
     }
   ],
-  "notes": [
-    "이전 자동 자산에 등재됐던 KafkaTestController#send (/test/kafka) entry 는 코드 부재로 제거 (자동 파서 잡음)."
-  ]
+  "notes": []
 }

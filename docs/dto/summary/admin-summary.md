@@ -1,7 +1,8 @@
 # admin DTO summary
 
-> 본 문서는 `docs/dto/dto-overview.md §1 admin` 의 깊이 확장판.
-> presentation/dto 27건 + Kafka payload 0건. TechStack/회원/판매자/이벤트/정산 관리 DTO.
+> ★ = 기능 요구사항 + 기술스택 (`requirements-check.md` §1 / §2)
+
+presentation/dto 27건 + Kafka payload 0건. TechStack/회원/판매자/이벤트/정산 관리 DTO.
 
 ## Request
 
@@ -50,16 +51,14 @@
 ### UserStatusRequest (record)
 - source: `admin/.../presentation/dto/req/UserStatusRequest.java` — `status` (String)
 
-### CreateTechStackRequest (record)
-- source: `admin/.../presentation/dto/req/CreateTechStackRequest.java` — `name` (String)
+### CreateTechStackRequest (record) ★
+- source: `admin/.../presentation/dto/req/CreateTechStackRequest.java` — `name` (String) — (§2 벡터DB)
 
-### UpdateTechStackRequest (record)
-- source: `admin/.../presentation/dto/req/UpdateTechStackRequest.java` — `id` (Long), `name` (String)
+### UpdateTechStackRequest (record) ★
+- source: `admin/.../presentation/dto/req/UpdateTechStackRequest.java` — `id` (Long), `name` (String) — (§2 벡터DB)
 
-### DeleteTechStackRequest (record)
-- source: `admin/.../presentation/dto/req/DeleteTechStackRequest.java` — `id` (Long)
-
-> ⚠ `AdminForceCancelEventRequest` (헤더 정합 2642e7fe/af824777/3b940227 관련) — 이전 자동 자산 미등재. 코드 직접 확인 필요.
+### DeleteTechStackRequest (record) ★
+- source: `admin/.../presentation/dto/req/DeleteTechStackRequest.java` — `id` (Long) — (§2 벡터DB)
 
 ## Response — Dashboard / Action
 
@@ -237,19 +236,19 @@
 
 ## Response — TechStack
 
-### GetTechStackResponse (record)
-- source: `admin/.../presentation/dto/res/GetTechStackResponse.java` — `id` (Long), `name` (String)
+### GetTechStackResponse (record) ★
+- source: `admin/.../presentation/dto/res/GetTechStackResponse.java` — `id` (Long), `name` (String) — (§2 벡터DB)
 
-### CreateTechStackResponse (record)
-- source: `admin/.../presentation/dto/res/CreateTechStackResponse.java` — `id` (Long), `name` (String)
+### CreateTechStackResponse (record) ★
+- source: `admin/.../presentation/dto/res/CreateTechStackResponse.java` — `id` (Long), `name` (String) — (§2 벡터DB)
 
-### UpdateTechStackResponse (record)
-- source: `admin/.../presentation/dto/res/UpdateTechStackResponse.java` — `id` (Long), `name` (String)
+### UpdateTechStackResponse (record) ★
+- source: `admin/.../presentation/dto/res/UpdateTechStackResponse.java` — `id` (Long), `name` (String) — (§2 벡터DB)
 
-### DeleteTechStackResponse (record)
-- source: `admin/.../presentation/dto/res/DeleteTechStackResponse.java` — `id` (Long)
+### DeleteTechStackResponse (record) ★
+- source: `admin/.../presentation/dto/res/DeleteTechStackResponse.java` — `id` (Long) — (§2 벡터DB)
 
-## Domain / Application Event (Spring `@EventListener` 기반, in-process)
+## Domain / Application Event (Spring `@EventListener` 기반, in-process) ★ (§2 벡터DB)
 
 admin 모듈은 Kafka 미사용. 단 도메인 이벤트로:
 - `TechStackCreatedEvent`
@@ -263,9 +262,3 @@ admin 모듈은 Kafka 미사용. 단 도메인 이벤트로:
 ## Kafka payload
 
 **없음** (Kafka 미사용 — `kafka-design.md §3` 표에 admin 행 없음).
-
-## ⚠ 미결 / 후속
-
-- `AdminForceCancelEventRequest` (헤더 정합 2642e7fe/af824777/3b940227 관련) 자동 파서 미커버 가능성 — 코드 직접 확인 필요
-- `UserListItem` vs `UserListResponse` 사용처 분리 검증
-- TechStack ES 인덱스 동기화 in-process EventListener 기반 (Kafka 아님) 동작 정합성 확인

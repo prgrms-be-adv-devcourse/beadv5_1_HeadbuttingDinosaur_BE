@@ -52,36 +52,7 @@
   "totalPresentationDtoCount": 164,
   "totalKafkaPayloadCount": 33,
   "notes": [
-    "이전 dto-overview.json (commerce-only 31 DTO) 폐기 — 본 형식으로 9 모듈 통합.",
-    "이전 dto-summary.json 폐기 — 모듈별 docs/dto/summary/{module}-summary.json 으로 분리.",
     "Kafka payload (commerce 23 + event 10 = 33) 는 messaging/event/** 하위로 자동 파서 미커버 — count 는 코드 검증 기반 수동 표기.",
     "apigateway / log 는 Java DTO 0건 정당 누락."
-  ],
-  "corrections": [
-    {
-      "id": 1,
-      "summary": "settlement MonthlyRevenueResponse 신규 추가",
-      "evidence": "36b33e9b"
-    },
-    {
-      "id": 2,
-      "summary": "event InternalPurchaseValidationResponse.sellerId 추가 표기",
-      "evidence": "00247431"
-    },
-    {
-      "id": 3,
-      "summary": "event EventListResponse 의 viewCount/category 추가 표기",
-      "evidence": "f8205e31, 94f061eb"
-    },
-    {
-      "id": 4,
-      "summary": "commerce RefundRequestedEvent 13 필드 명시 (kafka-design 8 필드와 드리프트)",
-      "evidence": "31fa70ba, e3d316ac, ea7f7cc9"
-    },
-    {
-      "id": 5,
-      "summary": "payment dead DTO 정리 표기",
-      "evidence": "ea44e72, 22762f2"
-    }
   ]
 }
