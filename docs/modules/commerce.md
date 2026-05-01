@@ -44,6 +44,8 @@ prefix: `/internal/orders/**`, `/internal/order-items/**`, `/internal/tickets/**
 | POST | `/internal/tickets/settlement-data` | `getSettlementData` (Ticket) | settlement | 티켓 정산 데이터 일괄 |
 
 > ✅ 정리 완료 (b9be8434): `/internal/orders/{orderId}/payment-completed` (POST `completeOrder`) 와 `/internal/orders/{orderId}/payment-failed` (PATCH `failOrder`) endpoint 및 동기 처리 메서드 제거. 결제 완료/실패는 Kafka(`payment.completed`/`payment.failed`) 일원화.
+>
+> ⚠ 자동 자산 드리프트: `api-overview.md` L29-30 / `api-summary.md` L59-60 에 위 dead REST 2건이 아직 등재돼 있음. 코드 기준은 본 페이지(이미 제거 완료) 가 정확. 자동 자산 회귀는 `docs/standards/docs-parser-standard.md §신규 변경 미반영` 참조.
 > ⚠ api-overview.md line 36-37 참고: `/internal/orders/by-event/{eventId}` 주석 처리(미구현). 환불 완료 처리도 HTTP 엔드포인트 없이 Kafka(`refund.completed`)로 이행됨 (`InternalOrderController` 말미 주석 참조).
 
 ## 4. Kafka

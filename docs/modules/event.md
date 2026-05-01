@@ -99,7 +99,7 @@
 
 ## 5. DTO
 
-상세는 [dto/dto-overview.md](../dto/dto-overview.md) event 섹션 참조. 핵심 발췌:
+상세는 [dto/dto-overview.md](../dto/dto-overview.md) event 섹션 참조. ⚠ 자동 자산 드리프트: `dto-overview.md` 가 event 모듈을 미커버하므로 본 페이지의 발췌가 사실상 1차 자료(`docs/standards/docs-parser-standard.md §모듈 커버리지 누락` 참조). 특히 `InternalPurchaseValidationResponse.sellerId` 추가(00247431) 는 자동 자산에서 검증 불가 — 본 페이지 §3 / §5 의 표기가 코드 기준 정확. 핵심 발췌:
 
 - **Event**: `EventDetailResponse`, `EventListRequest/Response`(viewCount/category 추가 — f8205e31/94f061eb), `SellerEventCreateRequest/Response`, `SellerEventDetailResponse`, `SellerEventSummaryResponse`, `SellerEventUpdateRequest/Response`(이벤트 수정 DTO `@NotNull`/`@NotBlank` 제거 — 판매 중지 검증 우회, caf0407a; 썸네일 1장 제한 90416566)
 - **Internal**: `InternalEventInfoResponse`, `InternalBulkEventInfoRequest/Response`, `InternalPurchaseValidationResponse`(`sellerId` 추가 — 00247431), `InternalSellerEventsResponse`, `InternalStockOperationResponse`, `InternalStockAdjustmentResponse`, `InternalBulkStockAdjustmentRequest`, `InternalEndedEventsResponse`, `InternalStockDeductRequest`, `InternalStockRestoreRequest`, `PurchaseUnavailableReason`
