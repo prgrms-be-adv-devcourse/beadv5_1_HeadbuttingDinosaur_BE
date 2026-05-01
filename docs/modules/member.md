@@ -1,6 +1,7 @@
 # member
 
 > 본 페이지는 ServiceOverview.md §3 member 섹션의 확장판입니다.
+> ★ = `requirements-check.md §1` 기능 요구사항 5건 (#3, #4, #7, #10, #11) + `§2` 기술스택 6건 매핑 항목
 
 ## 1. 모듈 책임
 
@@ -20,11 +21,11 @@
 | 메서드 | 경로 | Controller | 비고 |
 |---|---|---|---|
 | POST | `/api/auth/signup` | `AuthController.signup` | 이메일/비밀번호 회원가입 |
-| POST | `/api/auth/google-signup` | `AuthController.googleSignup` | Google 정보 기반 추가 가입 |
-| POST | `/api/auth/login` | `AuthController.login` | 로그인 (JWT 발급) |
-| POST | `/api/auth/social/google` | `AuthController.socialGoogle` | apigateway 위임 — OAuth 토큰 검증 후 가입/로그인 |
+| POST | `/api/auth/google-signup` ★ | `AuthController.googleSignup` | (§2 OAuth) Google 정보 기반 추가 가입 |
+| POST | `/api/auth/login` ★ | `AuthController.login` | (§2 JWT) 로그인 (JWT 발급) |
+| POST | `/api/auth/social/google` ★ | `AuthController.socialGoogle` | (§2 OAuth) apigateway 위임 — OAuth 토큰 검증 후 가입/로그인 |
 | POST | `/api/auth/logout` | `AuthController.logout` | 로그아웃 |
-| POST | `/api/auth/reissue` | `AuthController.reissue` | refresh token으로 access token 재발급 |
+| POST | `/api/auth/reissue` ★ | `AuthController.reissue` | (§2 JWT) refresh token으로 access token 재발급 |
 
 ### Users / Mypage / Health
 
@@ -55,7 +56,7 @@ prefix: `/internal/members/**`. JWT 검증 없음 (Tag annotation 명시).
 |---|---|---|---|---|
 | GET | `/internal/members/seller-applications` | `getSellerApplications` | admin | 판매자 신청 목록 |
 | PATCH | `/internal/members/seller-applications/{applicationId}` | `decideSellerApplication` | admin | 승인/반려 |
-| GET | `/internal/members/sellers` ★ | `getSellerId` | settlement | 전체 판매자 ID 목록 (Legacy `runSettlement` 진입점, ServiceOverview §3 settlement) |
+| GET | `/internal/members/sellers` ★ | `getSellerId` | settlement | (#7) 전체 판매자 ID 목록 — 정산 흐름 진입점 |
 | GET | `/internal/members/{userId}` | `getMemberInfo` | commerce (TicketService.getParticipantList) | 닉네임/이메일 등 기본 정보 |
 | GET | `/internal/members/{userId}/status` | `getMemberStatus` | (다른 모듈) | 주문 전 회원 상태 확인 |
 | GET | `/internal/members/{userId}/role` | `getMemberRole` | (다른 모듈) | 역할 확인 |
@@ -64,7 +65,7 @@ prefix: `/internal/members/**`. JWT 검증 없음 (Tag annotation 명시).
 | PATCH | `/internal/members/{userId}/status` | `updateMemberStatus` | admin | 회원 상태 변경 |
 | PATCH | `/internal/members/{userId}/role` | `updateMemberRole` | admin | 역할 변경 |
 | GET | `/internal/members/batch` | `getBatchMembers` | (배치) | 배치 회원 조회 (8fa264c2로 경로 정리) |
-| GET | `/internal/members/{userId}/tech-stacks` ★신규 | `getUserTechStacks` | ai (435fcf70) | AI 추천용 — UserTechStack 조회 후 `AdminInternalClient` 로 이름 매핑하여 `InternalUserTechStackResponse` 반환 |
+| GET | `/internal/members/{userId}/tech-stacks` ★ | `getUserTechStacks` | ai | (#9, §2 AI 추천 + 벡터DB) AI 추천용 — UserTechStack 조회 후 `AdminInternalClient` 로 이름 매핑하여 `InternalUserTechStackResponse` 반환 |
 
 ## 4. Kafka
 
@@ -86,7 +87,7 @@ prefix: `/internal/members/**`. JWT 검증 없음 (Tag annotation 명시).
 - **Internal**:
   - `InternalMemberInfoResponse`, `InternalMemberStatusResponse`, `InternalMemberRoleResponse`, `InternalSellerInfoResponse`, `InternalSellerApplicationResponse`, `InternalDecideSellerApplicationRequest/Response`
   - `InternalPagedMemberResponse`, `InternalUpdateUserStatusRequest`, `InternalUpdateUserRoleRequest`, `InternalUpdateStatusResponse`, `InternalUpdateRoleResponse`
-  - `InternalUserTechStackResponse` (435fcf70 신규 — AI 추천용)
+  - `InternalUserTechStackResponse` (AI 추천용)
 - **TechStack**: `TechStackResponse` (마스터 데이터는 admin 측 `InternalTechStackController`)
 
 ## 6. 의존성
@@ -105,12 +106,10 @@ prefix: `/internal/members/**`. JWT 검증 없음 (Tag annotation 명시).
   - commerce: `getMemberInfo` (TicketService.getParticipantList — 참가자 닉네임/이메일)
   - event: `getNickname` / `getSellerInfo` (EventService.getEvent — 판매자 닉네임)
   - admin: `searchMembers`, `updateMemberStatus`, `updateMemberRole`, `getSellerApplications`, `decideSellerApplication`
-  - settlement: `getSellerIds` (Legacy `runSettlement` 경로)
-  - ai: `getUserTechStacks` (435fcf70, 추천 보조)
+  - settlement: `getSellerIds` ★ (#7)
+  - ai: `getUserTechStacks` ★ (#9, §2 AI 추천)
 - **Kafka 피구독**: 없음.
 
-### ⚠ 미결
+### 상세
 
-없음 (member 자체 메서드에 마커 없음). settlement의 Legacy 마커는 settlement / admin 측에 박혀 있음 — member는 `getSellerIds` 응답만 제공하는 입장.
-
-처리 계획 상세: [ServiceOverview.md §3 member](../ServiceOverview.md) 참조.
+[ServiceOverview.md §3 member](../ServiceOverview.md) 참조.
