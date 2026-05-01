@@ -3,7 +3,7 @@
 > 세미 프로젝트 11개 기능 요구사항 + 최종 프로젝트 기술스택 6개 + 설계원칙 3개에 대한 코드 기반 검증 결과.
 
 - **검증 방법**: 모듈별 controller / service / repository / 매니페스트 직접 확인 (placeholder 인용 금지)
-- **참고 문서**: [api/api-overview.md](api/api-overview.md), [kafka/kafka-design.md](skills/kafka-design.md), [kafka/kafka-sync-async-policy.md](skills/kafka-sync-async-policy.md)
+- **참고 문서**: [api/api-overview.md](../api/api-overview.md), [kafka/kafka-design.md](kafka-design.md), [kafka/kafka-sync-async-policy.md](kafka-sync-async-policy.md)
 
 ## 0. 표기 의미
 
@@ -188,9 +188,3 @@
 - **세미 프로젝트 11개 기능 요구사항: 100% 동작 (11 / 11 🟢)** — 결제 분리·AI 격리에도 호환성 유지
 - **기술스택 6개**: 5개 🟢 + 1개 🟡 (K8s HPA 도입 보류)
 - **설계원칙 3개**: 3개 🟢
-
-### 강조 포인트 (발표용)
-
-1. **재고 동시성 (#11)**: 비관적 락 + 낙관적 락 + Kafka 보상 트랜잭션 다층 방어
-2. **정산 환불 이월 (#7)**: `PENDING_MIN_AMOUNT` 상태 + `carriedToSettlementId` 체인으로 환불 → 정산 정합성 보장
-3. **벡터DB (dense_vector + kNN)**: 가중합 → 정규화 → cosine 재정렬 → 콜드스타트 폴백 4단계

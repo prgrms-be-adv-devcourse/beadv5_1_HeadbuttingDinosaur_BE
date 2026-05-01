@@ -2,7 +2,7 @@
 
 ## 1차 진입점
 
-- **[ServiceOverview.md](service/ServiceOverview.md)** — 멘토용 진입점. 9개 모듈 종합
+- **[ServiceOverview.md](ServiceOverview.md)** — 멘토용 진입점. 9개 모듈 종합
 
 ## 모듈 페이지
 
@@ -34,4 +34,4 @@
 
 ## 검증 결과
 
-- [requirements-check.md](requirements-check.md) — 기능 요구사항 11개 + 기술스택 6개 + 설계원칙 3개 검증
+- [requirements-check.md](skills/requirements-check.md) — 기능 요구사항 11개 + 기술스택 6개 + 설계원칙 3개 검증

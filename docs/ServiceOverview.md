@@ -2,7 +2,7 @@
 
 > **시스템 전체 설계를 한눈에 볼 수 있도록 정리한 통합 문서.**
 >
-> 깊이 추적 시: [`requirements-check.md`](requirements-check.md) · [`api/api-overview.md`](api/api-overview.md) · [`dto/dto-overview.md`](dto/dto-overview.md) · [`skills/kafka-design.md`](skills/kafka-design.md) · `modules/{module}.md`
+> 깊이 추적 시: [`requirements-check.md`](skills/requirements-check.md) · [`api/api-overview.md`](api/api-overview.md) · [`dto/dto-overview.md`](dto/dto-overview.md) · [`skills/kafka-design.md`](skills/kafka-design.md) · `modules/{module}.md`
 
 ---
 
@@ -299,7 +299,7 @@ flowchart LR
 - **Spring Batch**: `SettlementBatchScheduler` — `dailySettlementJob` (매일 00:01) + `monthlySettlementJob` (매월 1일 00:10, `@Scheduled cron="0 10 0 1 * *"`)
 - **수수료**: `FeePolicy` 엔티티 (`fee_policy` 테이블, FeeType.PERCENTAGE, BigDecimal feeValue)
 - **이월 처리**: `finalAmount < 10,000` → `PENDING_MIN_AMOUNT` 상태 + 다음 달 `carriedInAmount` 합산 + `carriedToSettlementId` 체인
-- **의존**: REST 호출 — commerce(getSettlementData), event(getEndedEventsByDate), member, payment(depositFromSettlement)
+- **의존**: REST 호출 — commerce(getSettlementData), event(getEndedEventsByDate, getBulkEventInfo — 정산 응답 `eventTitle` 보강용), member, payment(depositFromSettlement)
 - **요구사항 매핑**: #7 매월 정산 (수수료·환불 이월)
 
 ### 3-6. ai (추천 시스템)
@@ -528,7 +528,7 @@ refund.requested 수신
 
 ## 7. 검증 결과 요약
 
-> 상세는 [`requirements-check.md`](requirements-check.md) — 코드 라인 기반 검증.
+> 상세는 [`requirements-check.md`](skills/requirements-check.md) — 코드 라인 기반 검증.
 
 | 영역 | 결과 |
 |---|---|

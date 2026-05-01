@@ -1,11 +1,11 @@
 # 테스트 보강 계획 (Final Integration)
 
-> [requirements-check.md](../requirements-check.md) 검증 결과를 기반으로 한 모듈별 핵심 테스트 후보 정리.
+> [requirements-check.md](requirements-check.md) 검증 결과를 기반으로 한 모듈별 핵심 테스트 후보 정리.
 > 발표 전 시간 예산에 맞춰 P0 → P1 → P2 순으로 진행.
 
 - **작성일**: 2026-04-27
 - **연결 문서**:
- - [requirements-check.md](../requirements-check.md) — 요구사항 검증 결과 (12 / 12, ⚠ 마커 4건)
+ - [requirements-check.md](requirements-check.md) — 요구사항 검증 결과 (12 / 12, ⚠ 마커 4건)
  - [kafka-design.md](kafka-design.md) — 이벤트 계약
  - [kafka-idempotency-guide.md](kafka-idempotency-guide.md) — Consumer 멱등성 3중 방어선
  - [settlement-process.md](settlement-process.md) — 정산 / 환불 이월 로직
