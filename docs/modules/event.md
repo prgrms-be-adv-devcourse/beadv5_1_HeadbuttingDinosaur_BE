@@ -67,6 +67,27 @@
 | ~~`stock.deducted`~~ | 1-B 비활성 | — | kafka-design §3 line 83 — REST 전환됨 |
 | ~~`stock.failed`~~ | 1-B 비활성 | — | kafka-design §3 line 84 — REST 전환됨 |
 
+### Outbox 발행 패턴 (afterCommit 직접 발행 + 스케줄러 fallback)
+
+위 표의 1-B Outbox 이벤트(`event.force-cancelled`, `event.sale-stopped`, `refund.stock.done`/`failed`)는 commerce/payment 와 동일한 2단계 경로로 처리된다 (1-B Outbox 유지 — `kafka-sync-async-policy.md §1-B`).
+
+1. **afterCommit 직접 발행 — 정상 경로** (`OutboxAfterCommitPublisher`)
+   - 비즈니스 `@Transactional` 안에서 Outbox row 가 `PENDING` 으로 저장된다.
+   - 커밋 직후 `afterCommit` 훅이 별도 executor 스레드로 발행 작업을 위임한다.
+   - 워커 스레드가 `OutboxEventProducer.publish` 호출 후, 별도 `REQUIRES_NEW` 트랜잭션으로 row 를 `SENT` 로 전이한다.
+   - 직접 발행 / `markSent` 어느 단계의 예외도 throw 하지 않고 `warn` 로그만 남긴다 → 비즈니스 TX 는 영향받지 않음.
+2. **OutboxScheduler fallback — 보완 경로**
+   - executor 큐 reject, Kafka 일시 장애, `markSent` 실패, 프로세스 다운 등으로 row 가 `PENDING` 에 남으면 스케줄러가 흡수한다.
+   - 설정(`event/src/main/resources/application.yml`):
+     ```yaml
+     outbox:
+       publish-grace-seconds: 5      # 직접 발행 경로 동작 시간 확보
+       poll-interval-ms: 60000       # fallback 폴링 주기 — 정상 경로가 즉시 처리하므로 보수적으로 설정
+     ```
+   - 중복 발행은 consumer 측 `X-Message-Id` dedup 으로 무해화된다.
+
+근거 커밋: `07d22cd3` (event: afterCommit 직접 발행 + 스케줄러 fallback 전환).
+
 ### 수신 (Consumer) — 코드 기준 (kafka-design §3 line 71과 일부 차이)
 
 | 토픽 | 처리 메서드 | 처리 내용 (1줄 초안) | 멱등성 |
