@@ -3,7 +3,7 @@
 > 세미 프로젝트 11개 기능 요구사항 + 최종 프로젝트 기술스택 6개 + 설계원칙 3개에 대한 코드 기반 검증 결과.
 
 - **검증 방법**: 모듈별 controller / service / repository / 매니페스트 직접 확인 (placeholder 인용 금지)
-- **참고 문서**: [api/api-overview.md](api/api-overview.md), [kafka/kafka-design.md](kafka/kafka-design.md), [kafka/kafka-sync-async-policy.md](kafka/kafka-sync-async-policy.md)
+- **참고 문서**: [api/api-overview.md](api/api-overview.md), [kafka/kafka-design.md](skills/kafka-design.md), [kafka/kafka-sync-async-policy.md](skills/kafka-sync-async-policy.md)
 
 ## 0. 표기 의미
 
@@ -89,7 +89,7 @@
 - 콜드스타트: `:94-155` (weightSum < 20 임계, 테크스택 평균 임베딩 + 인기 이벤트 폴백)
 - UserVector 갱신: `ActionLogConsumer.java:17-32` (`action.log` 토픽 구독)
 
-#### #11. 동시 구매 시 재고 초과 방지 — 🟢
+#### #11. 동시 구매 시 재고 초과 방지 — 🟢 ★
 - 비관적 락: `EventRepository.java:63-77` `@Lock(LockModeType.PESSIMISTIC_WRITE)` on `findByEventIdWithLock()`
 - 낙관적 락: `Event.java:91-92` `@Version private Long version`
 - 재고 차감 도메인: `Event.java:163-184` `deductStock()` / `restoreStock()`
