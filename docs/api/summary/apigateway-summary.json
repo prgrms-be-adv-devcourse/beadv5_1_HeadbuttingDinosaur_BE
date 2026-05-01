@@ -1,0 +1,16 @@
+{
+  "module": "apigateway",
+  "endpointCount": 1,
+  "endpoints": [
+    {
+      "module": "apigateway",
+      "controller": "GatewayHealthController",
+      "method": "health",
+      "httpMethod": "GET",
+      "path": "/health",
+      "summary": "health",
+      "source": "apigateway/src/main/java/com/devticket/apigateway/presentation/GatewayHealthController.java"
+    }
+  ],
+  "notes": []
+}

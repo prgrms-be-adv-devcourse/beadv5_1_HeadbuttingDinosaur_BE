@@ -1,0 +1,854 @@
+{
+  "module": "event",
+  "dtoCount": 29,
+  "dtos": [
+    {
+      "module": "event",
+      "name": "DwellRequest",
+      "kind": "record",
+      "fieldCount": 1,
+      "fields": [
+        {
+          "name": "dwellTimeSeconds",
+          "type": "Integer"
+        }
+      ],
+      "source": "event/src/main/java/com/devticket/event/presentation/dto/DwellRequest.java"
+    },
+    {
+      "module": "event",
+      "name": "EventDetailResponse",
+      "kind": "record",
+      "fieldCount": 17,
+      "fields": [
+        {
+          "name": "eventId",
+          "type": "UUID"
+        },
+        {
+          "name": "sellerId",
+          "type": "UUID"
+        },
+        {
+          "name": "sellerNickname",
+          "type": "String"
+        },
+        {
+          "name": "title",
+          "type": "String"
+        },
+        {
+          "name": "description",
+          "type": "String"
+        },
+        {
+          "name": "location",
+          "type": "String"
+        },
+        {
+          "name": "eventDateTime",
+          "type": "LocalDateTime"
+        },
+        {
+          "name": "saleStartAt",
+          "type": "LocalDateTime"
+        },
+        {
+          "name": "saleEndAt",
+          "type": "LocalDateTime"
+        },
+        {
+          "name": "price",
+          "type": "Integer"
+        },
+        {
+          "name": "totalQuantity",
+          "type": "Integer"
+        },
+        {
+          "name": "remainingQuantity",
+          "type": "Integer"
+        },
+        {
+          "name": "maxQuantity",
+          "type": "Integer"
+        },
+        {
+          "name": "status",
+          "type": "EventStatus"
+        },
+        {
+          "name": "category",
+          "type": "EventCategory"
+        },
+        {
+          "name": "techStacks",
+          "type": "List<TechStackInfo>"
+        },
+        {
+          "name": "imageUrls",
+          "type": "List<String>"
+        }
+      ],
+      "source": "event/src/main/java/com/devticket/event/presentation/dto/EventDetailResponse.java"
+    },
+    {
+      "module": "event",
+      "name": "EventListContentResponse",
+      "kind": "record",
+      "fieldCount": 11,
+      "fields": [
+        {
+          "name": "eventId",
+          "type": "UUID"
+        },
+        {
+          "name": "title",
+          "type": "String"
+        },
+        {
+          "name": "thumbnailUrl",
+          "type": "String"
+        },
+        {
+          "name": "location",
+          "type": "String"
+        },
+        {
+          "name": "eventDateTime",
+          "type": "LocalDateTime"
+        },
+        {
+          "name": "price",
+          "type": "Integer"
+        },
+        {
+          "name": "status",
+          "type": "EventStatus"
+        },
+        {
+          "name": "techStacks",
+          "type": "List<String>"
+        },
+        {
+          "name": "saleEndAt",
+          "type": "LocalDateTime"
+        },
+        {
+          "name": "totalQuantity",
+          "type": "Integer"
+        },
+        {
+          "name": "remainingQuantity",
+          "type": "Integer"
+        }
+      ],
+      "source": "event/src/main/java/com/devticket/event/presentation/dto/EventListContentResponse.java"
+    },
+    {
+      "module": "event",
+      "name": "EventListRequest",
+      "kind": "record",
+      "fieldCount": 5,
+      "fields": [
+        {
+          "name": "keyword",
+          "type": "String"
+        },
+        {
+          "name": "category",
+          "type": "EventCategory"
+        },
+        {
+          "name": "techStacks",
+          "type": "List<Long>"
+        },
+        {
+          "name": "sellerId",
+          "type": "UUID"
+        },
+        {
+          "name": "status",
+          "type": "EventStatus"
+        }
+      ],
+      "source": "event/src/main/java/com/devticket/event/presentation/dto/EventListRequest.java"
+    },
+    {
+      "module": "event",
+      "name": "EventListResponse",
+      "kind": "record",
+      "fieldCount": 5,
+      "fields": [
+        {
+          "name": "content",
+          "type": "List<EventListContentResponse>"
+        },
+        {
+          "name": "page",
+          "type": "int"
+        },
+        {
+          "name": "size",
+          "type": "int"
+        },
+        {
+          "name": "totalElements",
+          "type": "long"
+        },
+        {
+          "name": "totalPages",
+          "type": "int"
+        }
+      ],
+      "source": "event/src/main/java/com/devticket/event/presentation/dto/EventListResponse.java"
+    },
+    {
+      "module": "event",
+      "name": "ImageUploadResponse",
+      "kind": "record",
+      "fieldCount": 1,
+      "fields": [
+        {
+          "name": "imageUrl",
+          "type": "String"
+        }
+      ],
+      "source": "event/src/main/java/com/devticket/event/presentation/dto/ImageUploadResponse.java"
+    },
+    {
+      "module": "event",
+      "name": "InternalAdminEventResponse",
+      "kind": "record",
+      "fieldCount": 7,
+      "fields": [
+        {
+          "name": "eventId",
+          "type": "UUID"
+        },
+        {
+          "name": "title",
+          "type": "String"
+        },
+        {
+          "name": "sellerNickname",
+          "type": "String"
+        },
+        {
+          "name": "status",
+          "type": "String"
+        },
+        {
+          "name": "eventDateTime",
+          "type": "LocalDateTime"
+        },
+        {
+          "name": "totalQuantity",
+          "type": "Integer"
+        },
+        {
+          "name": "remainingQuantity",
+          "type": "Integer"
+        }
+      ],
+      "source": "event/src/main/java/com/devticket/event/presentation/dto/internal/InternalAdminEventResponse.java"
+    },
+    {
+      "module": "event",
+      "name": "InternalBulkEventInfoRequest",
+      "kind": "record",
+      "fieldCount": 1,
+      "fields": [
+        {
+          "name": "eventIds",
+          "type": "List< UUID>"
+        }
+      ],
+      "source": "event/src/main/java/com/devticket/event/presentation/dto/internal/InternalBulkEventInfoRequest.java"
+    },
+    {
+      "module": "event",
+      "name": "InternalBulkEventInfoResponse",
+      "kind": "record",
+      "fieldCount": 1,
+      "fields": [
+        {
+          "name": "events",
+          "type": "List<InternalEventInfoResponse>"
+        }
+      ],
+      "source": "event/src/main/java/com/devticket/event/presentation/dto/internal/InternalBulkEventInfoResponse.java"
+    },
+    {
+      "module": "event",
+      "name": "InternalBulkStockAdjustmentRequest",
+      "kind": "record",
+      "fieldCount": 1,
+      "fields": [
+        {
+          "name": "items",
+          "type": "List<StockAdjustmentItem>"
+        }
+      ],
+      "source": "event/src/main/java/com/devticket/event/presentation/dto/internal/InternalBulkStockAdjustmentRequest.java"
+    },
+    {
+      "module": "event",
+      "name": "InternalEndedEventsResponse",
+      "kind": "record",
+      "fieldCount": 1,
+      "fields": [
+        {
+          "name": "events",
+          "type": "List<EndedEventItem>"
+        }
+      ],
+      "source": "event/src/main/java/com/devticket/event/presentation/dto/internal/InternalEndedEventsResponse.java"
+    },
+    {
+      "module": "event",
+      "name": "InternalEventForceCancelRequest",
+      "kind": "record",
+      "fieldCount": 1,
+      "fields": [
+        {
+          "name": "reason",
+          "type": "String"
+        }
+      ],
+      "source": "event/src/main/java/com/devticket/event/presentation/dto/internal/InternalEventForceCancelRequest.java"
+    },
+    {
+      "module": "event",
+      "name": "InternalEventInfoResponse",
+      "kind": "record",
+      "fieldCount": 12,
+      "fields": [
+        {
+          "name": "eventId",
+          "type": "UUID"
+        },
+        {
+          "name": "sellerId",
+          "type": "UUID"
+        },
+        {
+          "name": "title",
+          "type": "String"
+        },
+        {
+          "name": "price",
+          "type": "Integer"
+        },
+        {
+          "name": "status",
+          "type": "EventStatus"
+        },
+        {
+          "name": "category",
+          "type": "EventCategory"
+        },
+        {
+          "name": "totalQuantity",
+          "type": "Integer"
+        },
+        {
+          "name": "maxQuantity",
+          "type": "Integer"
+        },
+        {
+          "name": "remainingQuantity",
+          "type": "Integer"
+        },
+        {
+          "name": "eventDateTime",
+          "type": "LocalDateTime"
+        },
+        {
+          "name": "saleStartAt",
+          "type": "LocalDateTime"
+        },
+        {
+          "name": "saleEndAt",
+          "type": "LocalDateTime"
+        }
+      ],
+      "source": "event/src/main/java/com/devticket/event/presentation/dto/internal/InternalEventInfoResponse.java"
+    },
+    {
+      "module": "event",
+      "name": "InternalPagedEventResponse",
+      "kind": "record",
+      "fieldCount": 5,
+      "fields": [
+        {
+          "name": "content",
+          "type": "List<InternalAdminEventResponse>"
+        },
+        {
+          "name": "page",
+          "type": "int"
+        },
+        {
+          "name": "size",
+          "type": "int"
+        },
+        {
+          "name": "totalElements",
+          "type": "long"
+        },
+        {
+          "name": "totalPages",
+          "type": "int"
+        }
+      ],
+      "source": "event/src/main/java/com/devticket/event/presentation/dto/internal/InternalPagedEventResponse.java"
+    },
+    {
+      "module": "event",
+      "name": "InternalPopularEventRequest",
+      "kind": "record",
+      "fieldCount": 1,
+      "fields": [
+        {
+          "name": "needed",
+          "type": "int"
+        }
+      ],
+      "source": "event/src/main/java/com/devticket/event/presentation/dto/internal/InternalPopularEventRequest.java"
+    },
+    {
+      "module": "event",
+      "name": "InternalPopularEventResponse",
+      "kind": "record",
+      "fieldCount": 1,
+      "fields": [
+        {
+          "name": "id",
+          "type": "String"
+        }
+      ],
+      "source": "event/src/main/java/com/devticket/event/presentation/dto/internal/InternalPopularEventResponse.java"
+    },
+    {
+      "module": "event",
+      "name": "InternalPurchaseValidationResponse",
+      "kind": "record",
+      "fieldCount": 6,
+      "fields": [
+        {
+          "name": "eventId",
+          "type": "UUID"
+        },
+        {
+          "name": "purchasable",
+          "type": "boolean"
+        },
+        {
+          "name": "reason",
+          "type": "PurchaseUnavailableReason"
+        },
+        {
+          "name": "maxQuantity",
+          "type": "Integer"
+        },
+        {
+          "name": "title",
+          "type": "String"
+        },
+        {
+          "name": "price",
+          "type": "Integer"
+        }
+      ],
+      "source": "event/src/main/java/com/devticket/event/presentation/dto/internal/InternalPurchaseValidationResponse.java"
+    },
+    {
+      "module": "event",
+      "name": "InternalSellerEventsResponse",
+      "kind": "record",
+      "fieldCount": 2,
+      "fields": [
+        {
+          "name": "sellerId",
+          "type": "UUID"
+        },
+        {
+          "name": "events",
+          "type": "List<SellerEventSummary>"
+        }
+      ],
+      "source": "event/src/main/java/com/devticket/event/presentation/dto/internal/InternalSellerEventsResponse.java"
+    },
+    {
+      "module": "event",
+      "name": "InternalStockAdjustmentResponse",
+      "kind": "record",
+      "fieldCount": 1,
+      "fields": [
+        {
+          "name": "results",
+          "type": "List<StockAdjustmentResult>"
+        }
+      ],
+      "source": "event/src/main/java/com/devticket/event/presentation/dto/internal/InternalStockAdjustmentResponse.java"
+    },
+    {
+      "module": "event",
+      "name": "InternalStockDeductRequest",
+      "kind": "record",
+      "fieldCount": 1,
+      "fields": [
+        {
+          "name": "quantity",
+          "type": "Integer"
+        }
+      ],
+      "source": "event/src/main/java/com/devticket/event/presentation/dto/internal/InternalStockDeductRequest.java"
+    },
+    {
+      "module": "event",
+      "name": "InternalStockOperationResponse",
+      "kind": "record",
+      "fieldCount": 4,
+      "fields": [
+        {
+          "name": "id",
+          "type": "UUID"
+        },
+        {
+          "name": "success",
+          "type": "boolean"
+        },
+        {
+          "name": "remainingQuantity",
+          "type": "Integer"
+        },
+        {
+          "name": "eventTitle",
+          "type": "String"
+        }
+      ],
+      "source": "event/src/main/java/com/devticket/event/presentation/dto/internal/InternalStockOperationResponse.java"
+    },
+    {
+      "module": "event",
+      "name": "InternalStockRestoreRequest",
+      "kind": "record",
+      "fieldCount": 1,
+      "fields": [
+        {
+          "name": "quantity",
+          "type": "Integer"
+        }
+      ],
+      "source": "event/src/main/java/com/devticket/event/presentation/dto/internal/InternalStockRestoreRequest.java"
+    },
+    {
+      "module": "event",
+      "name": "RecommendationResponse",
+      "kind": "record",
+      "fieldCount": 1,
+      "fields": [
+        {
+          "name": "events",
+          "type": "List<EventListContentResponse>"
+        }
+      ],
+      "source": "event/src/main/java/com/devticket/event/presentation/dto/RecommendationResponse.java"
+    },
+    {
+      "module": "event",
+      "name": "SellerEventCreateRequest",
+      "kind": "record",
+      "fieldCount": 12,
+      "fields": [
+        {
+          "name": "title",
+          "type": "String"
+        },
+        {
+          "name": "description",
+          "type": "String"
+        },
+        {
+          "name": "location",
+          "type": "String"
+        },
+        {
+          "name": "eventDateTime",
+          "type": "LocalDateTime"
+        },
+        {
+          "name": "saleStartAt",
+          "type": "LocalDateTime"
+        },
+        {
+          "name": "saleEndAt",
+          "type": "LocalDateTime"
+        },
+        {
+          "name": "price",
+          "type": "Integer"
+        },
+        {
+          "name": "totalQuantity",
+          "type": "Integer"
+        },
+        {
+          "name": "maxQuantity",
+          "type": "Integer"
+        },
+        {
+          "name": "category",
+          "type": "EventCategory"
+        },
+        {
+          "name": "techStackIds",
+          "type": "List<Long>"
+        },
+        {
+          "name": "imageUrls",
+          "type": "List<String>"
+        }
+      ],
+      "source": "event/src/main/java/com/devticket/event/presentation/dto/SellerEventCreateRequest.java"
+    },
+    {
+      "module": "event",
+      "name": "SellerEventCreateResponse",
+      "kind": "record",
+      "fieldCount": 4,
+      "fields": [
+        {
+          "name": "eventId",
+          "type": "UUID"
+        },
+        {
+          "name": "sellerId",
+          "type": "UUID"
+        },
+        {
+          "name": "status",
+          "type": "EventStatus"
+        },
+        {
+          "name": "createdAt",
+          "type": "LocalDateTime"
+        }
+      ],
+      "source": "event/src/main/java/com/devticket/event/presentation/dto/SellerEventCreateResponse.java"
+    },
+    {
+      "module": "event",
+      "name": "SellerEventDetailResponse",
+      "kind": "record",
+      "fieldCount": 17,
+      "fields": [
+        {
+          "name": "eventId",
+          "type": "UUID"
+        },
+        {
+          "name": "title",
+          "type": "String"
+        },
+        {
+          "name": "description",
+          "type": "String"
+        },
+        {
+          "name": "location",
+          "type": "String"
+        },
+        {
+          "name": "eventDateTime",
+          "type": "LocalDateTime"
+        },
+        {
+          "name": "saleStartAt",
+          "type": "LocalDateTime"
+        },
+        {
+          "name": "saleEndAt",
+          "type": "LocalDateTime"
+        },
+        {
+          "name": "price",
+          "type": "Integer"
+        },
+        {
+          "name": "totalQuantity",
+          "type": "Integer"
+        },
+        {
+          "name": "remainingQuantity",
+          "type": "Integer"
+        },
+        {
+          "name": "maxQuantity",
+          "type": "Integer"
+        },
+        {
+          "name": "status",
+          "type": "EventStatus"
+        },
+        {
+          "name": "category",
+          "type": "EventCategory"
+        },
+        {
+          "name": "techStacks",
+          "type": "List<TechStackInfo>"
+        },
+        {
+          "name": "imageUrls",
+          "type": "List<String>"
+        },
+        {
+          "name": "createdAt",
+          "type": "LocalDateTime"
+        },
+        {
+          "name": "updatedAt",
+          "type": "LocalDateTime"
+        }
+      ],
+      "source": "event/src/main/java/com/devticket/event/presentation/dto/SellerEventDetailResponse.java"
+    },
+    {
+      "module": "event",
+      "name": "SellerEventSummaryResponse",
+      "kind": "record",
+      "fieldCount": 10,
+      "fields": [
+        {
+          "name": "eventId",
+          "type": "UUID"
+        },
+        {
+          "name": "title",
+          "type": "String"
+        },
+        {
+          "name": "status",
+          "type": "EventStatus"
+        },
+        {
+          "name": "saleEndAt",
+          "type": "LocalDateTime"
+        },
+        {
+          "name": "totalQuantity",
+          "type": "Integer"
+        },
+        {
+          "name": "remainingQuantity",
+          "type": "Integer"
+        },
+        {
+          "name": "soldQuantity",
+          "type": "Integer"
+        },
+        {
+          "name": "cancelledQuantity",
+          "type": "Integer"
+        },
+        {
+          "name": "price",
+          "type": "Integer"
+        },
+        {
+          "name": "totalSalesAmount",
+          "type": "Long"
+        }
+      ],
+      "source": "event/src/main/java/com/devticket/event/presentation/dto/SellerEventSummaryResponse.java"
+    },
+    {
+      "module": "event",
+      "name": "SellerEventUpdateRequest",
+      "kind": "record",
+      "fieldCount": 13,
+      "fields": [
+        {
+          "name": "title",
+          "type": "String"
+        },
+        {
+          "name": "description",
+          "type": "String"
+        },
+        {
+          "name": "location",
+          "type": "String"
+        },
+        {
+          "name": "eventDateTime",
+          "type": "LocalDateTime"
+        },
+        {
+          "name": "saleStartAt",
+          "type": "LocalDateTime"
+        },
+        {
+          "name": "saleEndAt",
+          "type": "LocalDateTime"
+        },
+        {
+          "name": "price",
+          "type": "Integer"
+        },
+        {
+          "name": "totalQuantity",
+          "type": "Integer"
+        },
+        {
+          "name": "maxQuantity",
+          "type": "Integer"
+        },
+        {
+          "name": "category",
+          "type": "EventCategory"
+        },
+        {
+          "name": "techStackIds",
+          "type": "List<Long>"
+        },
+        {
+          "name": "imageUrls",
+          "type": "List<String>"
+        },
+        {
+          "name": "status",
+          "type": "EventStatus"
+        }
+      ],
+      "source": "event/src/main/java/com/devticket/event/presentation/dto/SellerEventUpdateRequest.java"
+    },
+    {
+      "module": "event",
+      "name": "SellerEventUpdateResponse",
+      "kind": "record",
+      "fieldCount": 3,
+      "fields": [
+        {
+          "name": "eventId",
+          "type": "UUID"
+        },
+        {
+          "name": "status",
+          "type": "EventStatus"
+        },
+        {
+          "name": "updatedAt",
+          "type": "LocalDateTime"
+        }
+      ],
+      "source": "event/src/main/java/com/devticket/event/presentation/dto/SellerEventUpdateResponse.java"
+    }
+  ],
+  "notes": [
+    "InternalPurchaseValidationResponse.sellerId 추가 (00247431) — 이전 자동 자산 검증 불가, 코드 검증으로 표기."
+  ]
+}

@@ -1,0 +1,86 @@
+{
+  "module": "ai",
+  "dtoCount": 3,
+  "dtos": [
+    {
+      "module": "ai",
+      "name": "ActionLogMessage",
+      "kind": "record",
+      "fieldCount": 10,
+      "fields": [
+        {
+          "name": "userId",
+          "type": "String"
+        },
+        {
+          "name": "eventId",
+          "type": "String"
+        },
+        {
+          "name": "eventIds",
+          "type": "List<String>"
+        },
+        {
+          "name": "actionType",
+          "type": "String"
+        },
+        {
+          "name": "searchKeyword",
+          "type": "String"
+        },
+        {
+          "name": "stackFilter",
+          "type": "String"
+        },
+        {
+          "name": "dwellTimeSeconds",
+          "type": "Integer"
+        },
+        {
+          "name": "quantity",
+          "type": "Integer"
+        },
+        {
+          "name": "totalAmount",
+          "type": "Long"
+        },
+        {
+          "name": "timestamp",
+          "type": "String"
+        }
+      ],
+      "source": "ai/src/main/java/org/example/ai/presentation/dto/req/ActionLogMessage.java"
+    },
+    {
+      "module": "ai",
+      "name": "RecommendationRequest",
+      "kind": "record",
+      "fieldCount": 1,
+      "fields": [
+        {
+          "name": "userId",
+          "type": "String"
+        }
+      ],
+      "source": "ai/src/main/java/org/example/ai/presentation/dto/req/RecommendationRequest.java"
+    },
+    {
+      "module": "ai",
+      "name": "RecommendationResponse",
+      "kind": "record",
+      "fieldCount": 2,
+      "fields": [
+        {
+          "name": "userId",
+          "type": "String"
+        },
+        {
+          "name": "eventIdList",
+          "type": "List<String>"
+        }
+      ],
+      "source": "ai/src/main/java/org/example/ai/presentation/dto/res/RecommendationResponse.java"
+    }
+  ],
+  "notes": []
+}
