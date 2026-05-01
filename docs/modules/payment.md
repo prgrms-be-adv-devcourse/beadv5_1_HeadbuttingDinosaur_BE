@@ -75,13 +75,14 @@
 
 | 토픽 | 처리 메서드 | 처리 내용 | 멱등성 |
 |---|---|---|---|
-| `refund.completed` | `WalletService.restoreBalance` | 예치금 복구 | dedup (transactionKey) |
-| `event.sale-stopped` | (Saga Orchestrator) | 보상 흐름 | dedup |
+| `refund.completed` | `WalletEventConsumer.consumeRefundCompleted` | dedup 마킹 전용 — 잔액 복구는 `RefundSagaOrchestrator.completeRefund`가 `refund.stock.done` 수신 시 `WalletService.restoreBalance`를 직접 호출 | dedup (`processed_message`) |
 | `ticket.issue-failed` | (Saga Orchestrator) | 결제 환불 처리 | dedup |
 | `refund.requested` | `RefundSagaOrchestrator.start` | Saga 시작 — `event.totalOrderTickets()` 우선 사용, 0이면 commerce `getOrderInfo` 폴백, 그래도 실패 시 `ticketIds.size()` 최후 폴백 | dedup |
 | `refund.order.done` / `refund.order.failed` | (Orchestrator) | Order 보상 응답 | dedup |
 | `refund.ticket.done` / `refund.ticket.failed` | (Orchestrator) | Ticket 보상 응답 | dedup |
 | `refund.stock.done` / `refund.stock.failed` | (Orchestrator) | Stock 보상 응답 | dedup |
+
+> ⚠️ Payment는 `event.force-cancelled` / `event.sale-stopped` 토픽을 직접 구독하지 않는다. fan-out 책임은 Commerce(`RefundFanoutService`) — Commerce가 PAID 주문별 `refund.requested` 발행 → Orchestrator가 수신.
 
 ## 5. DTO
 
@@ -101,7 +102,7 @@
   - commerce: `getOrderInfo` (`RefundSagaOrchestrator.lookupCommerceTotalTickets` — 구버전 페이로드 폴백 안전망)
   - event: `getEventInfo`, `forceCancel` (Refund Saga 보상 흐름)
   - 외부: PG (Toss `pgPaymentClient`)
-- **Kafka 구독**: commerce 발행(`refund.completed`, `ticket.issue-failed`, `refund.requested`, `refund.order.done`/`failed`, `refund.ticket.done`/`failed`), event 발행(`event.force-cancelled`, `event.sale-stopped`, `refund.stock.done`/`failed`)
+- **Kafka 구독**: commerce 발행(`ticket.issue-failed`, `refund.requested`, `refund.order.done`/`failed`, `refund.ticket.done`/`failed`), event 발행(`refund.stock.done`/`failed`), payment 자체 발행(`refund.completed` — `WalletEventConsumer` dedup 마킹)
 
 ### 피의존 모듈 (호출됨 / 구독됨)
 

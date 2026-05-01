@@ -119,7 +119,7 @@
   - payment: `forceCancel` (Refund Saga — SellerRefund/AdminRefund, ADMIN/SELLER role)
   - settlement: `getEndedEventsByDate`, `getEventsBySellerForSettlement`
   - ai: `getPopularEvents` ★
-- **Kafka 피구독**: commerce(`event.force-cancelled` 수신 → RefundFanoutService), payment(`event.force-cancelled`, `event.sale-stopped`, `refund.stock.done`/`failed` 수신)
+- **Kafka 피구독**: commerce(`event.force-cancelled` 수신 → `RefundFanoutService`가 PAID 주문 fan-out → `refund.requested` 발행), payment Orchestrator(`refund.stock.done`/`failed` 수신). Payment는 `event.force-cancelled`/`event.sale-stopped` 직접 구독 안 함 (`WalletEventConsumer.java:30` 주석 — "fan-out 은 Commerce 책임").
 
 ### 신규 인프라 / 구조 (참고)
 
