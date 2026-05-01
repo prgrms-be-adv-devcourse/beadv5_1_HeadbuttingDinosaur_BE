@@ -7,6 +7,8 @@ import com.devticket.payment.payment.application.dto.PgPaymentCancelResult;
 import com.devticket.payment.payment.domain.enums.PaymentMethod;
 import com.devticket.payment.payment.domain.model.Payment;
 import com.devticket.payment.payment.domain.repository.PaymentRepository;
+import com.devticket.payment.payment.infrastructure.client.CommerceInternalClient;
+import com.devticket.payment.payment.infrastructure.client.dto.InternalOrderInfoResponse;
 import com.devticket.payment.payment.infrastructure.external.PgPaymentClient;
 import com.devticket.payment.refund.application.saga.event.RefundOrderCancelEvent;
 import com.devticket.payment.refund.application.saga.event.RefundOrderCompensateEvent;
@@ -56,6 +58,7 @@ public class RefundSagaOrchestrator {
     private final OutboxService outboxService;
     private final PgPaymentClient pgPaymentClient;
     private final WalletService walletService;
+    private final CommerceInternalClient commerceInternalClient;
 
     /**
      * Saga 진입점 — refund.requested 수신 또는 ticket.issue-failed 수신 시 호출. SagaState 생성 + refund.order.cancel 발행.
@@ -66,6 +69,10 @@ public class RefundSagaOrchestrator {
             log.info("[Saga] 중복 start 스킵 — refundId={}", event.refundId());
             return;
         }
+
+        // Commerce fan-out (event.force-cancelled) 경로는 Refund/OrderRefund row 가 아직 없음 — 여기서 멱등 upsert.
+        // 사용자 직접 환불 경로는 RefundServiceImpl 에서 이미 만들어 두므로 findByRefundId 가 비어있지 않아 스킵됨.
+        provisionRefundRecords(event);
 
         SagaState state = SagaState.create(
             event.refundId(),
@@ -447,5 +454,88 @@ public class RefundSagaOrchestrator {
     private SagaState requireState(UUID refundId) {
         return sagaStateRepository.findByRefundId(refundId)
             .orElseThrow(() -> new RefundException(RefundErrorCode.REFUND_NOT_FOUND));
+    }
+
+    /**
+     * Commerce fan-out 경로에서 누락되는 Refund/OrderRefund/RefundTicket 을 멱등 upsert.
+     * 사용자 직접 환불 경로는 RefundServiceImpl 가 미리 만들어두므로 여기서 모두 스킵된다.
+     */
+    private void provisionRefundRecords(RefundRequestedEvent event) {
+        if (refundRepository.findByRefundId(event.refundId()).isPresent()) {
+            return;
+        }
+
+        Payment payment = paymentRepository.findByPaymentId(event.paymentId())
+            .orElseThrow(() -> new RefundException(RefundErrorCode.PAYMENT_NOT_FOUND));
+
+        OrderRefund ledger = orderRefundRepository.findByOrderId(event.orderId())
+            .orElseGet(() -> orderRefundRepository.save(
+                OrderRefund.create(
+                    event.orderId(),
+                    event.userId(),
+                    event.paymentId(),
+                    event.paymentMethod(),
+                    payment.getAmount(),
+                    resolveTotalOrderTickets(event)
+                )
+            ));
+
+        Refund refund = Refund.createWithId(
+            event.refundId(),
+            ledger.getOrderRefundId(),
+            event.orderId(),
+            event.paymentId(),
+            event.userId(),
+            event.refundAmount(),
+            event.refundRate()
+        );
+        refundRepository.save(refund);
+
+        if (event.ticketIds() != null && !event.ticketIds().isEmpty()) {
+            List<RefundTicket> rts = event.ticketIds().stream()
+                .map(tid -> RefundTicket.of(event.refundId(), tid))
+                .toList();
+            refundTicketRepository.saveAll(rts);
+        }
+
+        log.info("[Saga] Refund 레코드 프로비저닝 — refundId={}, orderId={}, amount={}, tickets={}",
+            event.refundId(), event.orderId(), event.refundAmount(),
+            event.ticketIds() == null ? 0 : event.ticketIds().size());
+    }
+
+    /**
+     * totalTickets 산정 — 우선순위:
+     * (1) event.totalOrderTickets > 0 — 빠른 경로 (정상 케이스, HTTP 호출 없음)
+     * (2) Commerce getOrderInfo 의 OrderItem.quantity 합계 — 구버전 메시지/롤링 배포 안전망
+     * (3) ticketIds.size() — Commerce 도 실패 시 최후 폴백 (단, 다중 이벤트 주문에서는 과소계산 가능)
+     *
+     * <p>(2) 는 정상 트래픽에서 호출되지 않음 (Commerce 가 totalOrderTickets 를 채워 발행).
+     * 다만 Payment 가 Commerce 보다 먼저 배포되는 롤링 구간에서 옛 페이로드 (필드 없음 → 0) 가
+     * 들어와도 다중 이벤트 주문 부분 강제취소가 ledger 한도에 걸려 실패하지 않도록 안전망 유지.
+     */
+    private int resolveTotalOrderTickets(RefundRequestedEvent event) {
+        if (event.totalOrderTickets() > 0) {
+            return event.totalOrderTickets();
+        }
+        int commerceTotal = lookupCommerceTotalTickets(event.orderId());
+        if (commerceTotal > 0) {
+            return commerceTotal;
+        }
+        int fallback = event.ticketIds() == null ? 0 : event.ticketIds().size();
+        return Math.max(fallback, 1);
+    }
+
+    private int lookupCommerceTotalTickets(UUID orderId) {
+        try {
+            InternalOrderInfoResponse info = commerceInternalClient.getOrderInfo(orderId);
+            if (info != null && info.orderItems() != null && !info.orderItems().isEmpty()) {
+                return info.orderItems().stream()
+                    .mapToInt(InternalOrderInfoResponse.OrderItem::quantity)
+                    .sum();
+            }
+        } catch (Exception e) {
+            log.warn("[Saga] Commerce orderInfo 조회 실패 — orderId={}, ticketIds.size() 폴백", orderId, e);
+        }
+        return 0;
     }
 }

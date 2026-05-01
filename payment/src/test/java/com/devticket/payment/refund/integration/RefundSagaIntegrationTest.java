@@ -122,7 +122,8 @@ class RefundSagaIntegrationTest {
             100,
             false,
             "integration-test",
-            Instant.now()
+            Instant.now(),
+            1
         );
 
         publishOutbox(
@@ -168,7 +169,7 @@ class RefundSagaIntegrationTest {
             refund.getRefundId(), ledger.getOrderRefundId(), payment.getOrderId(),
             payment.getUserId(), payment.getPaymentId(), payment.getPaymentMethod(),
             List.of(UUID.randomUUID()), payment.getAmount(), 100, false,
-            "integration-test", Instant.now()
+            "integration-test", Instant.now(), 1
         );
         publishOutbox(
             refund.getRefundId().toString(),
