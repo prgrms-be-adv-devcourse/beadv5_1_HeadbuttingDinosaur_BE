@@ -1,6 +1,6 @@
 {
   "module": "admin",
-  "endpointCount": 16,
+  "endpointCount": 17,
   "endpoints": [
     {
       "module": "admin",
@@ -145,6 +145,15 @@
       "path": "/api/admin/users/{userId}/status",
       "summary": "회원 제재 api",
       "source": "admin/src/main/java/com/devticket/admin/presentation/controller/AdminUsersController.java"
+    },
+    {
+      "module": "admin",
+      "controller": "InternalTechStackController",
+      "method": "getTechStacks",
+      "httpMethod": "GET",
+      "path": "/internal/admin/tech-stacks",
+      "summary": "ai 측 TechStackEmbeddingRepository 가 기술 스택 임베딩 조회 시 호출",
+      "source": "admin/src/main/java/com/devticket/admin/presentation/controller/InternalTechStackController.java"
     }
   ],
   "notes": []

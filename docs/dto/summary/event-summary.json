@@ -1,6 +1,6 @@
 {
   "module": "event",
-  "dtoCount": 29,
+  "dtoCount": 27,
   "dtos": [
     {
       "module": "event",
@@ -495,19 +495,6 @@
     },
     {
       "module": "event",
-      "name": "InternalStockDeductRequest",
-      "kind": "record",
-      "fieldCount": 1,
-      "fields": [
-        {
-          "name": "quantity",
-          "type": "Integer"
-        }
-      ],
-      "source": "event/src/main/java/com/devticket/event/presentation/dto/internal/InternalStockDeductRequest.java"
-    },
-    {
-      "module": "event",
       "name": "InternalStockOperationResponse",
       "kind": "record",
       "fieldCount": 4,
@@ -530,19 +517,6 @@
         }
       ],
       "source": "event/src/main/java/com/devticket/event/presentation/dto/internal/InternalStockOperationResponse.java"
-    },
-    {
-      "module": "event",
-      "name": "InternalStockRestoreRequest",
-      "kind": "record",
-      "fieldCount": 1,
-      "fields": [
-        {
-          "name": "quantity",
-          "type": "Integer"
-        }
-      ],
-      "source": "event/src/main/java/com/devticket/event/presentation/dto/internal/InternalStockRestoreRequest.java"
     },
     {
       "module": "event",

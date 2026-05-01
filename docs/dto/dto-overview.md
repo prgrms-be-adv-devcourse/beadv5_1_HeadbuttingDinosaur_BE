@@ -80,7 +80,7 @@
 `event/src/main/java/com/devticket/event/{presentation/dto,infrastructure/external/dto}/**` + `event/.../common/messaging/event/**`
 
 - **External (Event)**: `EventListRequest` (`saleStartAt` 정렬 e816be23/10d950bf), `SellerEventCreateRequest`, `SellerEventUpdateRequest` (`@NotNull` 제거 caf0407a, 썸네일 1장 90416566), `EventDetailResponse`, `EventListResponse` (`viewCount` f8205e31, `category` 94f061eb), `SellerEventDetailResponse`, `SellerEventCreateResponse`, `SellerEventUpdateResponse`, `SellerEventSummaryResponse`
-- **Internal**: `InternalBulkEventInfoRequest`, `InternalBulkStockAdjustmentRequest`, `InternalStockDeductRequest`, `InternalStockRestoreRequest`, `InternalEventInfoResponse`, `InternalBulkEventInfoResponse`, `InternalPurchaseValidationResponse` (★ `sellerId` 추가 — 00247431), `InternalSellerEventsResponse`, `InternalEndedEventsResponse`, `InternalStockOperationResponse`, `InternalStockAdjustmentResponse`, `PurchaseUnavailableReason` (enum)
+- **Internal**: `InternalBulkEventInfoRequest`, `InternalBulkStockAdjustmentRequest`, `InternalEventInfoResponse`, `InternalBulkEventInfoResponse`, `InternalPurchaseValidationResponse`, `InternalSellerEventsResponse`, `InternalEndedEventsResponse`, `InternalStockOperationResponse`, `InternalStockAdjustmentResponse`, `PurchaseUnavailableReason` (enum)
 - **Kafka payload**: 발행 — `EventForceCancelledEvent` (★), `EventSaleStoppedEvent`, `RefundStockDoneEvent`, `RefundStockFailedEvent` / 수신 record — `OrderCancelledEvent`, `PaymentFailedEvent`, `RefundCompletedEvent`, `RefundStockRestoreEvent`, `ActionLogEvent`, `ActionLogDomainEvent`
 
 → 필드 표 / source 경로 깊이: `summary/event-summary.md`
@@ -135,7 +135,6 @@
 - **Spring Batch step 입출력**: `SellerSettlementData`, `SettlementResult` (e521f682 — DailySettlementJob/MonthlySettlementJob)
 - **Client req/res (settlement → 외부 호출용)**: `InternalSettlementDataRequest`, `EventTicketSettlementRequest`, `SettlementDepositRequest`, `InternalSettlementDataResponse`, `CommerceTicketSettlementResponse`, `EventServiceResponse`, `EventTicketSettlementResponse`, `EndedEventResponse`, `InternalEndedEventsData`
 
-> ⚠ `SettlementResult` 은 deprecated 가능성 — Spring Batch 전환(e521f682) 으로 신규 `MonthlySettlementProcessor`/`MonthlySettlementWriter` 사용. 기존 `SettlementItemProcessor` 삭제 + FEE_RATE 처리 위치 재검토(ServiceOverview §4-5 ⚠4).
 
 → 필드 표 / source 경로 깊이: `summary/settlement-summary.md`
 

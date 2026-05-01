@@ -45,9 +45,6 @@ presentation/dto 27건 + Kafka payload 10건. Event/SellerEvent + force-cancel/s
 - source: `event/.../presentation/dto/req/InternalBulkStockAdjustmentRequest.java`
 - 필드: `adjustments` (List of `eventId`, `delta` 등) — `OrderService` 가 부호별 묶어 호출
 
-### InternalStockDeductRequest / InternalStockRestoreRequest (record)
-- source: `event/.../presentation/dto/req/`
-
 ## Internal — Response
 
 ### InternalEventInfoResponse (record)

@@ -23,7 +23,7 @@
 ## admin / AdminSettlementService
 
 - `getSettlementList`: get settlement list 기능을 제공.
-- `runSettlement`: Settlement 측 정산 실행 호출 + admin 이력을 저장한다 ⚠ Legacy 경로 (settlement.runSettlement 동반).
+- `runSettlement`: Settlement 측 정산 실행 호출 + admin 이력을 저장한다.
 
 ## admin / AdminSettlementServiceImpl
 
@@ -98,14 +98,13 @@
 - `getOrderList`: get order list 기능을 제공.
 - `getOrderInfo`: get order info 기능을 제공.
 - `getOrderListForSettlement`: get order list for settlement 기능을 제공.
-- `failOrder`: ⚠ 확인 필요: Payment 측 호출 미사용 (kafka-impl-plan §678). dead REST path 가능성. (payment client는 ea44e72로 제거됨 — controller endpoint만 잔존)
-- `completeOrder`: ⚠ 확인 필요: Payment 측 호출 미사용 (kafka-impl-plan §678). dead REST path 가능성. (payment client는 ea44e72로 제거됨 — controller endpoint만 잔존)
 - `getSettlementData`: get settlement data 기능을 제공.
 - `cancelOrder`: 결제 전 주문을 취소하고 재고를 복구한다 (PAID 차단).
 - `processPaymentCompleted`: `payment.completed` 수신, PAID 전이 + 티켓 발급 + 카트 분기 삭제한다.
 - `processPaymentFailed`: `payment.failed` 수신, FAILED로 전이한다.
-- `processStockDeducted`: ⚠ 확인 필요: stock.deducted 토픽 비활성(kafka-design §3). 본 메서드는 dedup만 수행하는 stub.
+- `processStockDeducted`: stock.deducted 수신 시 dedup 만 수행하는 stub.
 - `getOrderItemByTicketId`: get order item by ticket id 기능을 제공.
+- `getOrderTickets`: 환불 산정용 주문 티켓 목록을 조회한다.
 
 ## commerce / RefundFanoutService
 
@@ -209,16 +208,17 @@
 - `applyRecoveryResult`: apply recovery result 기능을 제공.
 - `depositFromSettlement`: deposit from settlement 기능을 제공.
 
-## settlement / SettlementInternalService
+## settlement / SettlementAdminService
 
 - `getSettlements`: get settlements 기능을 제공.
-- `runSettlement`: Commerce 호출로 판매자별 정산서를 생성한다 ⚠ Legacy 경로 (코드 주석).
+- `runSettlement`: Commerce 호출로 판매자별 정산서를 생성한다 (현 코드는 controller 본문에서 주석 처리, `createSettlementFromItems` 위임).
 - `createSettlementFromItems`: SettlementItem 기반 월별 Batch로 판매자별 정산서를 생성한다.
 - `getSettlementDetail`: get settlement detail 기능을 제공.
 - `cancelSettlement`: cancel settlement 기능을 제공.
 - `processPayment`: Payment 측 예치금 전환 호출 후 Settlement와 이월건을 PAID로 전이한다.
+- `getMonthlyRevenue`: 관리자 월별 수익 조회.
 
-## settlement / SettlementInternalServiceImpl
+## settlement / SettlementAdminServiceImpl
 
 - `getSettlements`: get settlements 기능을 제공.
 - `runSettlement`: run settlement 기능을 제공.
@@ -226,6 +226,7 @@
 - `getSettlementDetail`: get settlement detail 기능을 제공.
 - `cancelSettlement`: cancel settlement 기능을 제공.
 - `processPayment`: process payment 기능을 제공.
+- `getMonthlyRevenue`: get monthly revenue 기능을 제공.
 
 ## settlement / SettlementService
 

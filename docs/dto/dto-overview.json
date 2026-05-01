@@ -24,7 +24,7 @@
       "summaryFile": "docs/dto/summary/commerce-summary.json"
     },
     "event": {
-      "presentationDtoCount": 29,
+      "presentationDtoCount": 27,
       "kafkaPayloadCount": 10,
       "summaryFile": "docs/dto/summary/event-summary.json"
     },
@@ -49,7 +49,7 @@
       "summaryFile": "docs/dto/summary/settlement-summary.json"
     }
   },
-  "totalPresentationDtoCount": 164,
+  "totalPresentationDtoCount": 162,
   "totalKafkaPayloadCount": 33,
   "notes": [
     "Kafka payload (commerce 23 + event 10 = 33) 는 messaging/event/** 하위로 자동 파서 미커버 — count 는 코드 검증 기반 수동 표기.",

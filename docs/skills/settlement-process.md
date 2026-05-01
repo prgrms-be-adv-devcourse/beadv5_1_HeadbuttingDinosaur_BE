@@ -18,38 +18,38 @@
 
 | 문서 개념 | 엔티티 / 컬럼 (`Settlement.java`) | 산출 방식 |
 |---|---|---|
-| `settlementAmount` (당월 순수 정산금) | **단일 컬럼 없음 — 계산값** | `total_sales_amount` − `total_fee_amount` − `total_refund_amount`. 활성 path는 `SettlementInternalServiceImpl.aggregateAmounts(...)` 가 산출 |
-| `carriedInAmount` (이월 합산액) | `carried_in_amount` : `Integer` | 정산서 생성 시 동일 판매자의 `PENDING_MIN_AMOUNT` 정산서 `final_settlement_amount` 값을 채택 (`SettlementInternalServiceImpl.resolveLatestPending` 결과). 이후 변경 없음 |
-| `finalSettlementAmount` (실제 지급금) | `final_settlement_amount` : `Integer` | 활성 path: `(settlementAmount + carriedInAmount)` (`SettlementInternalServiceImpl.processSellerSettlement:319`). 1만원 미달이면 같은 값을 그대로 가지고 `PENDING_MIN_AMOUNT` 상태로 저장되어 다음 달로 이월됨 |
+| `settlementAmount` (당월 순수 정산금) | **단일 컬럼 없음 — 계산값** | `total_sales_amount` − `total_fee_amount` − `total_refund_amount`. `SettlementAdminServiceImpl.aggregateAmounts(...)` (수동 path) / `MonthlySettlementProcessor.process(...)` (Batch path)에서 산출 |
+| `carriedInAmount` (이월 합산액) | `carried_in_amount` : `Integer` | 정산서 생성 시 동일 판매자의 `PENDING_MIN_AMOUNT` 정산서 `final_settlement_amount` 값을 채택 (`SettlementAdminServiceImpl.resolveLatestPending`). 이후 변경 없음 |
+| `finalSettlementAmount` (실제 지급금) | `final_settlement_amount` : `Integer` | `(settlementAmount + carriedInAmount)` (`SettlementAdminServiceImpl.processSellerSettlement:331`). 1만원 미달이면 같은 값을 그대로 가지고 `PENDING_MIN_AMOUNT` 상태로 저장되어 다음 달로 이월됨 |
 | `carriedToSettlementId` | `carried_to_settlement_id` : `UUID` | 이 정산서 금액이 이월된 대상 정산서 ID (`PENDING_MIN_AMOUNT`인 경우 채워짐) |
 | (계산 입력) | `total_sales_amount` : `Integer` | 당월 매출합 |
 | (계산 입력) | `total_refund_amount` : `Integer` | 당월 환불합 |
-| (계산 입력) | `total_fee_amount` : `Integer` | `total_sales_amount × FEE_RATE`. 현재 `FEE_RATE = 0.05` 상수 (`SettlementItemProcessor.java:19` — 향후 `feePolicy` 테이블 도입 예정) |
+| (계산 입력) | `total_fee_amount` : `Integer` | `total_sales_amount × FeePolicy.feeValue / 100`. `FeePolicy` 엔티티(`fee_policy` 테이블, `feeType=PERCENTAGE`, `feeValue: BigDecimal`)에서 정책 조회. 일별 SettlementItem 생성 시점(`DailySettlementProcessor`)에 적용 |
 
-> **두 개의 정산 생성 경로 — Scheduler path가 활성**
+> **정산서 생성 경로 — 단일 흐름, 트리거 2종**
 >
-> 코드에는 정산서 생성 로직이 **두 곳**에 존재합니다. 운영에서 호출되는 것은 `SettlementInternalServiceImpl` 만입니다.
+> Settlement 생성 로직은 본질적으로 동일하며, 호출 트리거에 따라 진입점이 두 군데 존재합니다.
 >
-> | 경로 | 위치 | 호출자 | 1만원 미달 처리 | 이월 처리 |
-> |------|------|--------|----------------|----------|
-> | **활성** | `SettlementInternalServiceImpl.createSettlementFromItems` → `processSellerSettlement` (L146, L307) | `SettlementScheduler.createMonthlySettlement` (`@Scheduled(cron="0 10 0 1 * *")`) + `InternalSettlementController.runSettlement` (관리자 수동 트리거) | `PENDING_MIN_AMOUNT` 상태로 저장 + 다음 달 이월 후보 | `resolveLatestPending` + `carriedInAmount` 합산 + `carriedToSettlementId` 갱신 — 완전 구현 |
-> | **레거시** | `SettlementItemProcessor` (Spring Batch ItemProcessor — `settlementJobConfig.java`) | 현재 Scheduler 미연결, Batch Job 자체 트리거가 별도 등록되지 않음 | `null` 반환 → Settlement row 미생성 | 미반영 (`carriedInAmount = 0` 상태로 저장) |
+> | 트리거 | 진입점 | 처리 클래스 | 비고 |
+> |--------|--------|-------------|------|
+> | **자동(스케줄)** | `SettlementBatchScheduler.launchMonthlySettlementJob` (`@Scheduled(cron="0 10 0 1 * *")`) | Spring Batch `monthlySettlementJob` → `MonthlySettlementProcessor.process(SellerSettlementData)` | 매월 1일 00:10 자동 실행. JobOperator로 Batch Job 시작 |
+> | **수동(관리자)** | `SettlementAdminController.runSettlement` (`POST /api/admin/settlements/run`) / `createSettlementFromItems` (`POST /api/admin/settlements/create-from-items`) | `SettlementAdminServiceImpl.createSettlementFromItems` → `processSellerSettlement` (L148, L331) | 운영 수동 트리거. Batch Job을 거치지 않고 Service 메서드로 직접 처리 |
 >
-> 본 문서의 §"정산서 생성"·§"정산서 취소"·§"지급처리" 흐름은 **활성 path** 기준으로 기술합니다. 레거시 Processor는 추후 정리 대상.
+> 두 경로 모두 동일 정책 적용: `MIN_SETTLEMENT_AMOUNT = 10_000` 상수, `PENDING_MIN_AMOUNT` 이월, `resolveLatestPending` + `carriedToSettlementId` 갱신.
 
 ## 정산대상 데이터 수집 (SettlementItem)
-- 매일 00:01시간에 SettlementItem 생성 Batch작업
-- 전날에 종료된 이벤트를 조회하고 해당 이벤트들의 Ticket데이터를 기반으로 SettlementItem생성
+- `SettlementBatchScheduler.launchDailySettlementJob` (`@Scheduled(cron="0 1 0 * * *")`) — 매일 00:01에 `dailySettlementJob` Batch 시작
+- 전일 종료된 이벤트의 Ticket 데이터를 기반으로 SettlementItem 생성, 수수료는 `FeePolicy`(PERCENTAGE) 정책에 따라 산정
 
 ## 정산서 생성 (Settlement)
-- 매월 1일 00:10시간에 정산서 생성 Batch작업
+- `SettlementBatchScheduler.launchMonthlySettlementJob` (`@Scheduled(cron="0 10 0 1 * *")`) — 매월 1일 00:10에 `monthlySettlementJob` Batch 시작
 - 정산대상 :
    - SettlementItem의 status=READY이고 event_date_time(이벤트개최일)이 전전월 26일 ~ 전월 25일에 해당하는 것.
-- 이월 처리 (`SettlementInternalServiceImpl.processSellerSettlement` 활성 path):
+- 이월 처리 (Batch / 수동 path 공통 — 수동 path는 `SettlementAdminServiceImpl.processSellerSettlement`):
    - 동일 판매자의 `PENDING_MIN_AMOUNT` 정산서를 `resolveLatestPending`으로 조회
    - 그 정산서의 `final_settlement_amount`를 당월 정산서의 `carried_in_amount`로 채택
    - 이월된 정산서의 `carried_to_settlement_id` = 당월 정산서 ID로 설정
-   - 보조: `includeCarryOverSellers` 가 당월 SettlementItem이 없는 PENDING 판매자도 후보에 포함
+   - 보조: `includeCarryOverSellers` 가 당월 SettlementItem이 없는 PENDING 판매자도 후보에 포함 (수동 path)
 - `finalAmount = settlementAmount + carriedInAmount` 계산 후, **`finalAmount >= 1만원`**(`MIN_SETTLEMENT_AMOUNT` 상수) 이면 `CONFIRMED`, 미만이면 `PENDING_MIN_AMOUNT` 상태로 저장
 
 ## 정산서 취소 처리
