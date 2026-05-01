@@ -30,7 +30,7 @@
 |---|---|---|---|---|---|
 | Event Internal | GET | `/internal/events` | `EventInternalController#getEvents` | admin | 관리자 조회 |
 | Event Internal | GET | `/internal/events/{eventId}` | `EventInternalController#getEventInfo` | commerce / payment / settlement | 단건 조회 |
-| Event Internal | POST | `/internal/events/bulk` | `EventInternalController#getBulkEventInfo` | commerce | 일괄 조회 |
+| Event Internal | POST | `/internal/events/bulk` | `EventInternalController#getBulkEventInfo` | commerce / settlement | 일괄 조회 (settlement 는 정산 응답 `eventTitle` 보강용) |
 | Event Internal | GET | `/internal/events/{eventId}/validate-purchase` | `EventInternalController#validatePurchase` | commerce (CartService) | 구매 가능 여부 검증 + `purchasable` / `unavailableReason` / `sellerId` 반환 |
 | Event Internal | GET | `/internal/events/by-seller/{sellerId}` | `EventInternalController#getEventsBySeller` | admin / seller | 판매자 이벤트 목록 |
 | Event Internal | GET | `/internal/events/by-seller/{sellerId}/settlement` | `EventInternalController#getEventsBySellerForSettlement` | settlement | 정산 기간 이벤트 |
@@ -76,7 +76,7 @@
 - commerce: `validatePurchase`, `adjustStockBulk` ★, `getBulkEventInfo`, `getSingleEventInfo`, `getEventsBySellerForSettlement`
 - admin: `forceCancel` (ADMIN role)
 - payment: `forceCancel` (Refund Saga — SellerRefund/AdminRefund, ADMIN/SELLER role)
-- settlement: `getEndedEventsByDate`, `getEventsBySellerForSettlement`
+- settlement: `getEndedEventsByDate`, `getEventsBySellerForSettlement`, `getBulkEventInfo` (정산 응답 `eventTitle` 보강용)
 - ai: `getPopularEvents` ★
 
 

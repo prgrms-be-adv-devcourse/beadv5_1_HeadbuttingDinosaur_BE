@@ -46,7 +46,7 @@
 |---|---|---|---|---|
 | GET | `/internal/events` | `getEvents` | admin | 관리자 조회 |
 | GET | `/internal/events/{eventId}` | `getEventInfo` | commerce / payment / settlement | 단건 조회 |
-| POST | `/internal/events/bulk` | `getBulkEventInfo` | commerce | 일괄 조회 |
+| POST | `/internal/events/bulk` | `getBulkEventInfo` | commerce / settlement | 일괄 조회 (settlement 는 정산 응답 `eventTitle` 보강용) |
 | GET | `/internal/events/{eventId}/validate-purchase` | `validatePurchase` | commerce (CartService) | 구매 가능 여부 검증 + `purchasable` / `unavailableReason` / `sellerId` 반환 |
 | GET | `/internal/events/by-seller/{sellerId}` | `getEventsBySeller` | admin / seller 측 | 판매자 이벤트 목록 |
 | GET | `/internal/events/by-seller/{sellerId}/settlement` | `getEventsBySellerForSettlement` | settlement | 정산 기간 이벤트 |
@@ -117,7 +117,7 @@
   - commerce: `validatePurchase`, `adjustStockBulk` ★, `getBulkEventInfo`, `getSingleEventInfo`, `getEventsBySellerForSettlement`
   - admin: `forceCancel` (ADMIN role)
   - payment: `forceCancel` (Refund Saga — SellerRefund/AdminRefund, ADMIN/SELLER role)
-  - settlement: `getEndedEventsByDate`, `getEventsBySellerForSettlement`
+  - settlement: `getEndedEventsByDate`, `getEventsBySellerForSettlement`, `getBulkEventInfo` (정산 응답 `eventTitle` 보강용)
   - ai: `getPopularEvents` ★
 - **Kafka 피구독**: commerce(`event.force-cancelled` 수신 → `RefundFanoutService`가 PAID 주문 fan-out → `refund.requested` 발행), payment Orchestrator(`refund.stock.done`/`failed` 수신). Payment는 `event.force-cancelled`/`event.sale-stopped` 직접 구독 안 함 (`WalletEventConsumer.java:30` 주석 — "fan-out 은 Commerce 책임").
 

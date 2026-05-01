@@ -58,7 +58,7 @@
 - **Settlement**: `SettlementResponse`, `SellerSettlementDetailResponse`, `SettlementPeriodResponse`, `SettlementTargetPreviewResponse`, `MonthlyRevenueResponse`
 - **Internal**: `InternalSettlementPageResponse`, `InternalSettlementResponse`, `AdminSettlementDetailResponse`, `EventItemResponse`
 - **Batch DTO**: `SellerSettlementData`, `SettlementResult` (Spring Batch step 입출력)
-- **Client req/res (settlement → 외부 호출용)**: `InternalSettlementDataRequest`, `InternalSettlementDataResponse`, `EndedEventResponse`, `EventTicketSettlementResponse`, `SettlementDepositRequest`
+- **Client req/res (settlement → 외부 호출용)**: `InternalSettlementDataRequest`, `InternalSettlementDataResponse`, `EndedEventResponse`, `EventTicketSettlementResponse`, `SettlementDepositRequest`, `InternalBulkEventInfoRequest`, `InternalBulkEventInfoData`, `EventInfoResponse` (정산 응답 `eventTitle` 보강용 — `POST /internal/events/bulk`)
 
 ## 6. 의존성
 
@@ -66,7 +66,7 @@
 
 - **REST 호출** (전부):
   - commerce: `getSettlementData` (Order Internal) ★, `getTicketSettlementData` (Ticket Internal) ★
-  - event: `getEndedEventsByDate` ★, `getEventsBySellerForSettlement` ★
+  - event: `getEndedEventsByDate` ★, `getEventsBySellerForSettlement` ★, `getBulkEventInfo` (정산 응답 `eventTitle` 보강용 — 응답 누락 시 `Unknown` fallback)
   - member: `getSellerIds` ★
   - payment: `POST /internal/wallet/settlement-deposit` ★ → payment 측 `depositFromSettlement`
 - **Kafka 구독**: 없음

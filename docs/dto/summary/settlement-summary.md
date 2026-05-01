@@ -101,6 +101,7 @@ Spring Batch 기반 — DailySettlementJob / MonthlySettlementJob.
 - `InternalSettlementDataRequest` — commerce `getSettlementData` 호출용
 - `EventTicketSettlementRequest` — commerce `getTicketSettlementData` 호출용
 - `SettlementDepositRequest` — payment `depositFromSettlement` 호출용 (★ 정산금 → 예치금)
+- `InternalBulkEventInfoRequest` — event `POST /internal/events/bulk` 호출용 (정산 응답 `eventTitle` 보강)
 
 ### Response
 - `InternalSettlementDataResponse` — commerce 응답
@@ -109,6 +110,8 @@ Spring Batch 기반 — DailySettlementJob / MonthlySettlementJob.
 - `EventTicketSettlementResponse` — event 티켓 정산 응답
 - `EndedEventResponse` — event 종료 이벤트 응답
 - `InternalEndedEventsData` — event 종료 이벤트 wrapper
+- `InternalBulkEventInfoData` — event 일괄 이벤트 정보 wrapper (`{ events: [...] }`, 누락 ID 는 응답에서 빠질 수 있음)
+- `EventInfoResponse` — event 단건 정보 (정산은 `eventId`/`title` 만 매핑)
 
 > source: `settlement/src/main/java/com/devticket/settlement/infrastructure/client/dto/{req,res}/**`
 

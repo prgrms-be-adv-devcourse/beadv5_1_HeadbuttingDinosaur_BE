@@ -141,7 +141,7 @@
 - **Presentation**: `SettlementResponse`, `SellerSettlementDetailResponse`, `SettlementPeriodResponse`, `SettlementTargetPreviewResponse`, `MonthlyRevenueResponse` (36b33e9b 신규), `EventItemResponse`
 - **Internal/Admin 표면**: `InternalSettlementPageResponse`, `InternalSettlementResponse`, `AdminSettlementDetailResponse`
 - **Spring Batch step 입출력**: `SellerSettlementData`, `SettlementResult` (e521f682 — DailySettlementJob/MonthlySettlementJob)
-- **Client req/res (settlement → 외부 호출용)**: `InternalSettlementDataRequest`, `EventTicketSettlementRequest`, `SettlementDepositRequest`, `InternalSettlementDataResponse`, `CommerceTicketSettlementResponse`, `EventServiceResponse`, `EventTicketSettlementResponse`, `EndedEventResponse`, `InternalEndedEventsData`
+- **Client req/res (settlement → 외부 호출용)**: `InternalSettlementDataRequest`, `EventTicketSettlementRequest`, `SettlementDepositRequest`, `InternalBulkEventInfoRequest`, `InternalSettlementDataResponse`, `CommerceTicketSettlementResponse`, `EventServiceResponse`, `EventTicketSettlementResponse`, `EndedEventResponse`, `InternalEndedEventsData`, `InternalBulkEventInfoData`, `EventInfoResponse` (settlement → event `POST /internal/events/bulk` 호출용 — 정산 응답 `eventTitle` 보강)
 
 
 → 필드 표 / source 경로 깊이: `summary/settlement-summary.md`
