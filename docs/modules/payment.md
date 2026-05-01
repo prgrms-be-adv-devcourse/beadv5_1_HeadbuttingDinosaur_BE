@@ -13,7 +13,7 @@
 
 ## 2. 외부 API
 
-상세는 [api/api-summary.md](../api/api-summary.md) §payment 섹션 참조 (총 17개). ★ 핵심 플로우 발췌 + 환불 / 지갑:
+상세는 [api/summary/payment-summary.md](../api/summary/payment-summary.md) 참조 (총 17개). ★ 핵심 플로우 발췌 + 환불 / 지갑:
 
 | 메서드 | 경로 | Controller | Service 1줄 (service-status.md) |
 |---|---|---|---|

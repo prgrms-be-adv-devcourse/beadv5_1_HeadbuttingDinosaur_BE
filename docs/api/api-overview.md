@@ -271,7 +271,7 @@
 
 ## 부록 — 자동 자산 회귀 검증 / 수동 정정 이력
 
-본 문서는 자동 파서 결과(`api-summary.md/json`, 이전 `api-overview.md` commerce-only) 의 누락·드리프트를 다음 항목으로 수동 정정한 결과를 통합한다.
+본 문서는 폐기된 자동 파서 산출물(이전 `api-summary.md/json`, 이전 `api-overview.md` commerce-only) 의 누락·드리프트를 다음 항목으로 수동 정정한 결과를 통합한다.
 
 | # | 정정 내용 | 근거 |
 |---|---|---|

@@ -59,7 +59,7 @@
 ### DeleteTechStackRequest (record)
 - source: `admin/.../presentation/dto/req/DeleteTechStackRequest.java` — `id` (Long)
 
-> ⚠ `AdminForceCancelEventRequest` (헤더 정합 2642e7fe/af824777/3b940227 관련) — dto-summary.md 미등재. 코드 직접 확인 필요.
+> ⚠ `AdminForceCancelEventRequest` (헤더 정합 2642e7fe/af824777/3b940227 관련) — 이전 자동 자산 미등재. 코드 직접 확인 필요.
 
 ## Response — Dashboard / Action
 

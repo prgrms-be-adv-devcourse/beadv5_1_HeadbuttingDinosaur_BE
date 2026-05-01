@@ -13,7 +13,7 @@
 
 ## 2. 외부 API
 
-상세는 [api/api-summary.md](../api/api-summary.md) §member 섹션 참조.
+상세는 [api/summary/member-summary.md](../api/summary/member-summary.md) 참조.
 
 ### Auth
 

@@ -36,7 +36,7 @@
 | `totalAmount` | `Long` |
 | `timestamp` | `String` |
 
-> ⚠ `ActionLogMessage` 는 ai 측에서 일관되게 사용되는 message schema 인지 확인 필요 — `dto-summary.md` 에 단독 등재됐으나 컨트롤러에서 직접 받지 않음. 내부 처리 메시지일 가능성 (Kafka consumer 입력 추정 — 다만 ai 모듈은 Kafka 미사용으로 정합성 ⚠).
+> ⚠ `ActionLogMessage` 는 ai 측에서 일관되게 사용되는 message schema 인지 확인 필요 — 이전 자동 자산에 단독 등재됐으나 컨트롤러에서 직접 받지 않음. 내부 처리 메시지일 가능성 (Kafka consumer 입력 추정 — 다만 ai 모듈은 Kafka 미사용으로 정합성 ⚠).
 
 ## Domain DTO (model)
 

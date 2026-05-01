@@ -16,7 +16,7 @@
 
 ## 2. 외부 API
 
-상세는 [api/api-summary.md](../api/api-summary.md) §admin 섹션 참조. ★ 핵심 플로우 발췌:
+상세는 [api/summary/admin-summary.md](../api/summary/admin-summary.md) 참조. ★ 핵심 플로우 발췌:
 
 | 메서드 | 경로 | Controller | 비고 |
 |---|---|---|---|

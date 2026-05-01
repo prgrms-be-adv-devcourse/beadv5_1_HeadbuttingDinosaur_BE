@@ -121,4 +121,4 @@
 
 - `order.cancelled` 토픽 kafka-design §3 line 71 미등재 (드리프트, 패턴 C)
 - 단건 stock REST DTO 호출자 0건 (`InternalStockDeductRequest`/`InternalStockRestoreRequest`)
-- 자동 자산 (dto-overview.md/dto-summary.md) 가 event 모듈을 미커버 — 본 페이지가 1차 자료
+- 이전 자동 자산이 event 모듈을 미커버했음 — 본 페이지(`dto/summary/event-summary.md`) 가 1차 자료. `dto-overview.md` 는 9 모듈 통합 인덱스로 재작성됨.
