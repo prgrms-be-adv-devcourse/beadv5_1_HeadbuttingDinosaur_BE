@@ -67,7 +67,7 @@ Kafka 관련 코드의 **계층 배치·네이밍·Lombok·테스트·보안·PR
 
 | 서비스 | Producer (발행) | Consumer (소비) |
 |---|---|---|
-| Commerce | `order.created`, `ticket.issue-failed`, `refund.requested` (fan-out), `refund.order.done`, `refund.order.failed`, `refund.ticket.done`, `refund.ticket.failed`, `action.log` (CART_ADD / CART_REMOVE) | `stock.deducted`, `stock.failed`, `payment.completed`, `payment.failed`, `ticket.issue-failed`, `refund.completed`, `event.force-cancelled`, `refund.order.cancel`, `refund.ticket.cancel`, `refund.order.compensate`, `refund.ticket.compensate` |
+| Commerce | `ticket.issue-failed`, `refund.requested` (fan-out), `refund.order.done`, `refund.order.failed`, `refund.ticket.done`, `refund.ticket.failed`, `order.cancelled`, `action.log` (CART_ADD / CART_REMOVE) | `payment.completed`, `payment.failed`, `ticket.issue-failed`, `refund.completed`, `event.force-cancelled`, `refund.order.cancel`, `refund.ticket.cancel`, `refund.order.compensate`, `refund.ticket.compensate` |
 | Event | `stock.deducted`, `stock.failed`, `event.force-cancelled`, `event.sale-stopped`, `refund.stock.done`, `refund.stock.failed`, `action.log` (VIEW / DETAIL_VIEW / DWELL_TIME) | `order.created`, `payment.failed`, `refund.completed`, `refund.stock.restore` |
 | Payment (Orchestrator 포함) | `payment.completed`, `payment.failed`, `refund.completed`, `refund.order.cancel`, `refund.ticket.cancel`, `refund.stock.restore`, `refund.order.compensate`, `refund.ticket.compensate` | `refund.completed` (예치금 복구), `ticket.issue-failed`, `event.force-cancelled`, `event.sale-stopped`, `refund.requested`, `refund.order.done`, `refund.order.failed`, `refund.ticket.done`, `refund.ticket.failed`, `refund.stock.done`, `refund.stock.failed` |
 | **Log** (별도 스택 — Fastify/TS, 상세: [actionLog.md](actionLog.md)) | — (Kafka 재발행 없음, DB INSERT 전용) | `action.log`, `payment.completed` (PURCHASE 직접 INSERT) |
@@ -299,19 +299,25 @@ public record TicketIssueFailedEvent(
 
 ```java
 public record RefundRequestedEvent(
-    UUID refundId,       // Saga 추적 키 — SagaState PK
+    UUID refundId,           // Saga 추적 키 — SagaState PK
+    UUID orderRefundId,      // Payment 가 OrderRefund 원장 upsert (null 시 생성)
     UUID orderId,
     UUID userId,
     UUID paymentId,
     PaymentMethod paymentMethod,  // enum: WALLET | PG | WALLET_PG
+    List<UUID> ticketIds,
     int refundAmount,
+    int refundRate,
+    boolean wholeOrder,
     String reason,
-    Instant timestamp
+    Instant timestamp,
+    int totalOrderTickets    // 주문 전체 티켓 수 — Payment OrderRefund.totalTickets
 ) {}
 ```
 
-> `refundId`는 Orchestrator가 Saga 시작 전 생성 (`UUID.randomUUID()`).
-> Commerce fan-out 시 각 orderId마다 새 `refundId`를 발행한다.
+> `refundId` 는 Orchestrator 가 Saga 시작 전 생성 (`UUID.randomUUID()`).
+> Commerce fan-out 시 각 orderId 마다 새 `refundId` 를 발행한다.
+> `totalOrderTickets` 자체완결 — payload 만으로 Payment 가 OrderRefund 원장 정확히 산정 (commerce 동기 호출 제거).
 
 ### RefundSagaStepEvent (Orchestrator ↔ 각 서비스 공용)
 
@@ -933,7 +939,7 @@ UNIQUE KEY: processed_message INSERT 중복 방지
 [Commerce] ticket.issue-failed 소비
     → Order 상태 CANCELLED 전이
 [Payment] ticket.issue-failed 소비
-    → RefundSagaOrchestrator.start() → 환불 Orchestration 진행 (§9-3 참조)
+    → RefundSagaOrchestrator.start() → 환불 Orchestration 진행
 ```
 
 ### 보상 이벤트 원칙
@@ -966,7 +972,7 @@ sequenceDiagram
     Note over Orchestrator: refund.requested 수신<br/>SagaState(ORDER_CANCELLING) 저장
 
     Orchestrator-->>Commerce: refund.order.cancel
-    Commerce->>Commerce: ⚠️ Order 상태 처리 (§4-1 미결 — 하단 경로 분기 참조)
+    Commerce->>Commerce: ⚠️ Order 상태 처리
     Note over Commerce: §4-1 미결: 옵션A=REFUND_PENDING 전이, 옵션B=상태 전이 없이 done 발행<br/>ticket.issue-failed 경로에서는 이미 CANCELLED 상태 → 멱등 스킵
     Commerce-->>Orchestrator: refund.order.done
 
@@ -1124,7 +1130,7 @@ topic: event.force-cancelled  → DLT: event.force-cancelled.DLT
 - [x] ✅ Payment 엔티티 `approve()` / `fail()` / `cancel()` / `refund()` 내부에 `validateTransition()` 가드 호출 추가 완료
 
 **미구현**
-- [ ] Consumer 순서 역전 3분류 처리 구현 (§5)
+- [ ] Consumer 순서 역전 3분류 처리 구현
 - [ ] `RefundSagaOrchestrator` 클래스 신규 생성, `saga_state` 테이블 및 `SagaStateRepository` 구현
 - [ ] Orchestrator `start()` / `onOrderDone()` / `onTicketDone()` / `onStockDone()` / `onOrderFailed()` / `onTicketFailed()` / `onStockFailed()` 구현
 - [ ] Orchestrator Consumer groupId 등록 (`payment-refund.requested` 외 6개, 상세: §9-3) + dedup 적용

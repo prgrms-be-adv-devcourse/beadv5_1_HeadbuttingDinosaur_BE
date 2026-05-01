@@ -74,7 +74,7 @@ export interface ActionLogMessage {
 
 ### Producer 측 설정 (신규 구현 대상 — Event / Commerce)
 
-> Log 서비스는 Producer 아님 — PURCHASE는 `payment.completed` 수신 후 `log.action_log`에 **직접 INSERT** (§3.1 참조).
+> Log 서비스는 Producer 아님 — PURCHASE는 `payment.completed` 수신 후 `log.action_log`에 **직접 INSERT**.
 
 > 기존 비즈니스 이벤트(`order.created`·`payment.completed` 등)와 **정책이 완전히 다른 별도 Producer 경로** 필요.
 
@@ -178,12 +178,12 @@ export interface ActionLogMessage {
 ## 4. 구현 지시서 (Phase 5 — 본 스코프 잔여)
 
 > 선행 조건: **Phase 3(7-A/7-B 결제 Producer) + Phase 4(8/9 결제 결과 Consumer) 완료** — `payment.completed` payload 스펙이 확정된 상태에서 착수.
-> DB/DTO 신규 변경 없음 — **Producer 트랙 한정** V2 마이그레이션 불필요 (§5 AI 조회 엔드포인트는 별도 V2 인덱스 추가 — §5.5 참조).
+> DB/DTO 신규 변경 없음 — **Producer 트랙 한정** V2 마이그레이션 불필요.
 
 ### ① Log 서비스 확장 (최우선) — ✅ 구현 완료 (2026-04-21)
 
 - **작업**: `payment.completed` 토픽 **추가 구독** → Consumer 내부에서 PURCHASE 레코드 `log.action_log` **직접 INSERT** (Kafka 재발행 없음 — §2 #12)
-- **완료 반영**: kafka-impl-plan.md §3-4 체크리스트 5항 전부 `[x] ✅` (#455)
+- **완료 반영**: kafka-impl-plan.md §3-4 체크리스트 5항 전부 `[x] ✅`
 - **구현 위치**: `fastify-log/src/consumer/action-log.consumer.ts` (`dispatchMessage` topic 분기), `src/service/payment-completed.service.ts` (outbox unwrap + PURCHASE 매핑), `src/repository/action-log.repository.ts` (원자적 다중 INSERT)
 - **Consumer 선 구축 이유**: Producer 구현 시 즉시 E2E 검증 가능 + 매출 KPI 직결(§2 #12) — 파이프라인 먼저 안정화
 
@@ -205,7 +205,7 @@ export interface ActionLogMessage {
 | `compression.type` | `none` |
 | `max.in.flight.requests.per.connection` | `5` |
 
-**Bean 분리 전략** (§2 #13)
+**Bean 분리 전략**
 - 기존 `kafkaTemplate` Bean에 **`@Primary`** 부여
 - 신규 `actionLogKafkaTemplate` Bean 등록 → 주입 시 **`@Qualifier("actionLogKafkaTemplate")`** 명시
 - `NoUniqueBeanDefinitionException` 방지 + 기존 Saga Producer 주입부 무수정(회귀 위험 최소화)
@@ -466,7 +466,7 @@ public class ActionLogKafkaPublisher {
 - [ ] 브로커 일시 장애 시뮬레이션 — Producer 측 로그에만 에러, API는 정상 응답 (at-most-once 손실 허용)
 
 **AI 분석 쿼리 사전 합의** (별개 작업)
-- [ ] `SUM(total_amount)` 단건 매출만 집계되는 한계 재확인 (§3.2) — 정확한 매출은 Payment 조회 필요
+- [ ] `SUM(total_amount)` 단건 매출만 집계되는 한계 재확인 — 정확한 매출은 Payment 조회 필요
 - [ ] 리포트 쿼리(`GROUP BY user_id, event_id`, `DISTINCT ON` 등) 규약 팀 합의
 
 ---
@@ -579,7 +579,7 @@ public class ActionLogKafkaPublisher {
 }
 ```
 
-- `logs[].eventId`: UUID, **non-null 보장** (§5.5 null 필터링 근거)
+- `logs[].eventId`: UUID, **non-null 보장**
 - `logs[].actionType`: ActionType enum 값
 - `logs[].dwellTimeSeconds`: integer \| null (DWELL_TIME 외 null)
 - 로그 없음 시 `logs: []` 반환 — **200** (404 아님)
@@ -714,7 +714,7 @@ LIMIT 5000;
 
 ## 🔑 요약
 
-- **확정 12개** (§2 표 참조) — 구현 반영 / 사용자 지시 / 아키텍트 결정 / **PO 결정** 구분
+- **확정 12개** — 구현 반영 / 사용자 지시 / 아키텍트 결정 / **PO 결정** 구분
 - **PO 결정**: Q1 `actorType` = **(A) 미추가** / Q2 `sessionId` = **(C) 제외**
 - **아키텍트 결정**: PURCHASE = **Kafka 재발행 없이 Consumer가 `log.action_log` 직접 INSERT**
 - **DB 스키마·DTO 변경 없음** — 단, AI 조회 엔드포인트(§5)용 **V2 복합 인덱스 추가** (`(user_id, created_at DESC)`)

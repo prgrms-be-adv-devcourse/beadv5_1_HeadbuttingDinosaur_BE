@@ -1,0 +1,8 @@
+{
+  "module": "apigateway",
+  "dtoCount": 0,
+  "dtos": [],
+  "notes": [
+    "apigateway 는 라우팅 / filter chain 전용. presentation/dto 0건 — 정당 누락."
+  ]
+}

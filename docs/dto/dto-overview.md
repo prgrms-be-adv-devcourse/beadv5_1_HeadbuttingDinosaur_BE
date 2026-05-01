@@ -1,295 +1,140 @@
-# Commerce DTO 문서 (presentation/dto 기준)
+# DTO 전체 개요 (구현 기준 — 9개 모듈)
 
-## Request DTO
+> 9개 모듈 (admin · ai · apigateway · commerce · event · log · member · payment · settlement) 의 `presentation/dto/**` 와 `**/messaging/event/**` (Kafka payload) Java `record/class` 기준.
+> ⚠ **log** 는 Fastify/TypeScript 별도 스택. 본 문서는 Java DTO 만 커버.
+> ⚠ **apigateway** 는 라우팅 전용 (DTO 0건).
+> ★ = 기능 요구사항 + 기술스택 (`requirements-check.md` §1 / §2).
+> 모듈별 DTO 카탈로그(필드 표 포함 깊이) 는 `docs/dto/summary/{module}-summary.md` 참조.
+> 호출 주체 / Kafka 컨텍스트 / 사용 controller 매핑은 `docs/modules/{module}.md` 참조.
 
-### CartItemQuantityRequest
-- 파일: `commerce/src/main/java/com/devticket/commerce/cart/presentation/dto/req/CartItemQuantityRequest.java`
-- 타입: `record`
-- 필드:
-  - `quantity`: `int`
+---
 
-### CartItemRequest
-- 파일: `commerce/src/main/java/com/devticket/commerce/cart/presentation/dto/req/CartItemRequest.java`
-- 타입: `record`
-- 필드:
-  - `eventId`: `UUID`
-  - `quantity`: `int`
+## 모듈별 DTO 분포
 
-### CartOrderRequest
-- 파일: `commerce/src/main/java/com/devticket/commerce/order/presentation/dto/req/CartOrderRequest.java`
-- 타입: `record`
-- 필드:
-  - `cartItemIds`: `List<UUID>`
+| 모듈 | presentation DTO | Kafka payload | 비고 | 깊이 문서 |
+|---|---|---|---|---|
+| admin | 27 | 0 | TechStack ES + 정산 + 회원 관리 DTO | `summary/admin-summary.md` |
+| ai | 3 (+ external 6) | 0 | RecommendationRequest/Response + UserVector + external client DTO | `summary/ai-summary.md` |
+| apigateway | 0 | 0 | 라우팅 전용 | `summary/apigateway-summary.md` |
+| commerce | 34 | **23** | Cart/Order/Ticket + Refund Saga 보상 흐름 + Outbox payloads | `summary/commerce-summary.md` |
+| event | 27 | 10 | Event/SellerEvent + force-cancel/sale-stopped Outbox + RefundStock 보상 | `summary/event-summary.md` |
+| log | 0 | 0 | Fastify/TS 별도 스택 | `summary/log-summary.md` |
+| member | 40 | 0 | Auth/User/Seller/TechStack — 모듈 중 최다 | `summary/member-summary.md` |
+| payment | 25 | 0 | Payment/Wallet/Refund + 외부 PG (Toss) DTO | `summary/payment-summary.md` |
+| settlement | 6 | 0 | Settlement + Spring Batch step 입출력 DTO 최소셋 | `summary/settlement-summary.md` |
 
-### OrderListRequest
-- 파일: `commerce/src/main/java/com/devticket/commerce/order/presentation/dto/req/OrderListRequest.java`
-- 타입: `record`
-- 필드:
-  - `page`: `int`
-  - `size`: `int`
-  - `status`: `String`
+> 총 presentation DTO: 162 / Kafka payload: 33 (commerce + event 분산 — `kafka-design.md §3` 참조)
 
-### OrderRequest
-- 파일: `commerce/src/main/java/com/devticket/commerce/order/presentation/dto/req/OrderRequest.java`
-- 타입: `record`
-- 필드:
-  - `cartItemEventIds`: `List<String>`
+---
 
-### SellerEventParticipantListRequest
-- 파일: `commerce/src/main/java/com/devticket/commerce/ticket/presentation/dto/req/SellerEventParticipantListRequest.java`
-- 타입: `record`
-- 필드:
-  - `page`: `Integer`
-  - `size`: `Integer`
-  - `keyword`: `String`
+## 1. admin
 
-### TicketListRequest
-- 파일: `commerce/src/main/java/com/devticket/commerce/ticket/presentation/dto/req/TicketListRequest.java`
-- 타입: `record`
-- 필드:
-  - `page`: `int`
-  - `size`: `int`
+`admin/src/main/java/com/devticket/admin/presentation/dto/{req,res}/**`
 
-### TicketRequest
-- 파일: `commerce/src/main/java/com/devticket/commerce/ticket/presentation/dto/req/TicketRequest.java`
-- 타입: `record`
-- 필드:
-  - `orderId`: `Long`
+- **Request**: `AdminDecideSellerApplicationRequest`, `AdminUserSearchRequest`, `AdminUserUpdateRoleRequest`, `AdminUserPenalizeRequest`, `AdminEventSearchRequest`, `AdminForceCancelEventRequest` (헤더 정합 2642e7fe/af824777/3b940227), `AdminSettlementSearchRequest`, `CreateTechStackRequest`, `UpdateTechStackRequest`, `DeleteTechStackRequest`
+- **Response**: `AdminDashboardResponse`, `AdminActionHistorySummary`, `AdminEventListResponse`, `AdminEventResponse`, `EventCancelResponse`, `AdminSettlementListResponse`, `SettlementResponse` (admin 표면용 — settlement 측 동명 record 와 별도), `AdminUserListResponse`, `InternalMemberDetailResponse`, `InternalMemberPageResponse`, `SellerApplicationListResponse`, `GetTechStackResponse`, `CreateTechStackResponse`, `UpdateTechStackResponse`, `DeleteTechStackResponse`
 
-## Response DTO
+→ 필드 표 / source 경로 깊이: `summary/admin-summary.md`
 
-### CartClearResponse
-- 파일: `commerce/src/main/java/com/devticket/commerce/cart/presentation/dto/res/CartClearResponse.java`
-- 타입: `record`
-- 필드:
-  - `message`: `String`
+---
 
-### CartItemDeleteResponse
-- 파일: `commerce/src/main/java/com/devticket/commerce/cart/presentation/dto/res/CartItemDeleteResponse.java`
-- 타입: `record`
-- 필드:
-  - `message`: `String`
+## 2. ai (★ 외 트랙)
 
-### CartItemDetail
-- 파일: `commerce/src/main/java/com/devticket/commerce/cart/presentation/dto/res/CartItemDetail.java`
-- 타입: `record`
-- 필드:
-  - `cartItemId`: `UUID`
-  - `eventId`: `UUID`
-  - `eventTitle`: `String`
-  - `price`: `int`
-  - `quantity`: `int`
+`ai/src/main/java/org/example/ai/{presentation/dto,domain/model,infrastructure/external/dto}/**`
 
-### CartItemQuantityResponse
-- 파일: `commerce/src/main/java/com/devticket/commerce/cart/presentation/dto/res/CartItemQuantityResponse.java`
-- 타입: `record`
-- 필드:
-  - `cartItemId`: `String`
-  - `quantity`: `int`
+- **Presentation**: `RecommendationRequest`, `RecommendationResponse`
+- **Domain**: `UserVector` (선호/카트/최근/네거티브 4종 벡터)
+- **External (client req/res)**: member 호출 `UserTechStackRequest/Response`, event 호출 `PopularEventListRequest/Response`, log 호출 `ActionLogRequest/Response`
 
-### CartItemResponse
-- 파일: `commerce/src/main/java/com/devticket/commerce/cart/presentation/dto/res/CartItemResponse.java`
-- 타입: `record`
-- 필드:
-  - `cartId`: `String`
-  - `items`: `List<CartItemDetail>`
-  - `totalAmount`: `long`
+> ⚠ 패키지 일관성: 본 모듈만 `org.example.ai.*` (다른 모듈은 `com.devticket.*`). 명명 정정은 후속 트랙.
 
-### CartResponse
-- 파일: `commerce/src/main/java/com/devticket/commerce/cart/presentation/dto/res/CartResponse.java`
-- 타입: `record`
-- 필드:
-  - `cartId`: `String`
-  - `items`: `List<CartItemDetail>`
-  - `totalAmount`: `int`
+→ 필드 표 / source 경로 깊이: `summary/ai-summary.md`
 
-### InternalOrderInfoResponse
-- 파일: `commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/InternalOrderInfoResponse.java`
-- 타입: `record`
-- 필드:
-  - `id`: `UUID`
-  - `userId`: `UUID`
-  - `orderNumber`: `String`
-  - `paymentMethod`: `String`
-  - `totalAmount`: `Integer`
-  - `status`: `String`
-  - `orderedAt`: `String`
+---
 
-### InternalOrderItemResponse
-- 파일: `commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/InternalOrderItemResponse.java`
-- 타입: `record`
-- 필드:
-  - `id`: `Long`
-  - `orderItemId`: `UUID`
-  - `orderId`: `Long`
-  - `userId`: `UUID`
-  - `eventId`: `UUID`
-  - `price`: `int`
-  - `quantity`: `int`
-  - `subtotalAmount`: `int`
-  - `createdAt`: `LocalDateTime`
-  - `updatedAt`: `LocalDateTime`
+## 3. apigateway
 
-### InternalOrderItemsResponse
-- 파일: `commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/InternalOrderItemsResponse.java`
-- 타입: `record`
-- 필드:
-  - `eventId`: `Long`
-  - `orders`: `List<InternalOrderItemsResponse.OrderItems>`
+**DTO 없음**. 라우팅 / JWT / Rate Limit / OAuth filter 만 담당.
 
-### InternalOrderTicketsResponse
-- 파일: `commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/InternalOrderTicketsResponse.java`
-- 타입: `record`
-- 필드:
-  - `orderId`: `UUID`
-  - `userId`: `UUID`
-  - `paymentId`: `UUID`
-  - `totalAmount`: `int`
-  - `remainingAmount`: `int`
-  - `tickets`: `List<TicketItem>`
-- 중첩 record `TicketItem`: `ticketId: UUID`, `eventId: UUID`, `amount: int`, `status: TicketStatus`
-- 용도: Payment → Commerce 환불 산정용. `remainingAmount`는 status 필터가 `ISSUED`일 때 환불 대상 합계.
+→ `summary/apigateway-summary.md` (placeholder)
 
-### InternalSettlementDataResponse
-- 파일: `commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/InternalSettlementDataResponse.java`
-- 타입: `record`
-- 필드:
-  - `sellerId`: `UUID`
-  - `periodStart`: `String`
-  - `periodEnd`: `String`
-  - `eventSettlements`: `List<EventSettlements>`
+---
 
-### InternalTicketSettlementDataResponse
-- 파일: `commerce/src/main/java/com/devticket/commerce/ticket/presentation/dto/res/InternalTicketSettlementDataResponse.java`
-- 타입: `record`
-- 필드:
-  - `items`: `List<InternalTicketSettlementItemResponse>`
+## 4. commerce
 
-### InternalTicketSettlementItemResponse
-- 파일: `commerce/src/main/java/com/devticket/commerce/ticket/presentation/dto/res/InternalTicketSettlementItemResponse.java`
-- 타입: `record`
-- 필드:
-  - `eventId`: `UUID`
-  - `orderItemId`: `UUID`
-  - `salesAmount`: `Long`
-  - `refundAmount`: `Long`
+`commerce/src/main/java/com/devticket/commerce/{cart,order,ticket}/presentation/dto/**` + `commerce/.../common/messaging/event/**`
 
-### OrderCancelResponse
-- 파일: `commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/OrderCancelResponse.java`
-- 타입: `record`
-- 필드:
-  - `orderId`: `String`
-  - `status`: `String`
-  - `cancelledAt`: `String`
+- **Cart**: `CartItemRequest`, `CartItemQuantityRequest`, `CartItemResponse`, `CartResponse`, `CartItemQuantityResponse`, `CartItemDeleteResponse`, `CartClearResponse`
+- **Order**: `CartOrderRequest`, `OrderListRequest`, `OrderResponse`, `OrderListResponse`, `OrderStatusResponse`, `OrderDetailResponse`, `OrderCancelResponse`, `InternalOrderInfoResponse`, `InternalOrderItemResponse`, `InternalOrderItemsResponse`, `InternalOrderTicketsResponse`, `InternalSettlementDataResponse`
+- **Ticket**: `TicketRequest`, `TicketListRequest`, `SellerEventParticipantListRequest`, `TicketResponse`, `TicketDetailResponse`, `TicketListResponse`, `SellerEventParticipantResponse`, `SellerEventParticipantListResponse`, `InternalTicketSettlementDataResponse`, `InternalTicketSettlementItemResponse`
+- **Kafka payload (Outbox 발행 + 수신 record)**: `PaymentCompletedEvent`, `PaymentFailedEvent`, `OrderCancelledEvent`, `TicketIssueFailedEvent`, `EventForceCancelledEvent`, `RefundRequestedEvent` (★ `totalOrderTickets` 13 필드, e3d316ac), Refund 보상 응답 6종, Refund 수신 4종, `ActionLogDomainEvent`/`ActionLogEvent`
 
-### OrderDetailItemResponse
-- 파일: `commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/OrderDetailItemResponse.java`
-- 타입: `record`
-- 필드:
-  - `eventId`: `UUID`
-  - `eventTitle`: `String`
-  - `quantity`: `int`
-  - `price`: `int`
+> ⚠ `RefundRequestedEvent` 는 `kafka-design.md §3 line 298-311` 정의(8 필드)와 드리프트 — 코드 기준 13 필드. 실 정의는 commerce/payment `RefundRequestedEvent.java` (★ `totalOrderTickets` 포함, 31fa70ba/e3d316ac/ea7f7cc9 스키마 진화).
 
-### OrderDetailResponse
-- 파일: `commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/OrderDetailResponse.java`
-- 타입: `record`
-- 필드:
-  - `orderId`: `UUID`
-  - `status`: `OrderStatus`
-  - `totalAmount`: `int`
-  - `orderItems`: `List<OrderDetailItemResponse>`
-  - `paymentMethod`: `PaymentMethod`
-  - `createdAt`: `LocalDateTime`
+→ 필드 표 / source 경로 깊이: `summary/commerce-summary.md`
 
-### OrderItemsResponse
-- 파일: `commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/OrderItemsResponse.java`
-- 타입: `record`
-- 필드:
-  - `eventId`: `UUID`
-  - `eventTitle`: `String`
-  - `quantity`: `int`
-  - `price`: `int`
+---
 
-### OrderListResponse
-- 파일: `commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/OrderListResponse.java`
-- 타입: `record`
-- 필드:
-  - `orders`: `List<OrderSummary>`
-  - `totalPages`: `int`
-  - `totalElements`: `long`
+## 5. event
 
-### OrderResponse
-- 파일: `commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/OrderResponse.java`
-- 타입: `record`
-- 필드:
-  - `orderId`: `UUID`
-  - `totalAmount`: `Long`
-  - `orderStatus`: `OrderStatus`
-  - `orderItems`: `List<OrderItemsResponse>`
-  - `createdAt`: `LocalDateTime`
+`event/src/main/java/com/devticket/event/{presentation/dto,infrastructure/external/dto}/**` + `event/.../common/messaging/event/**`
 
-### OrderStatusResponse
-- 파일: `commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/OrderStatusResponse.java`
-- 타입: `record`
-- 필드:
-  - `orderId`: `UUID`
-  - `status`: `OrderStatus`
-  - `updatedAt`: `LocalDateTime`
+- **External (Event)**: `EventListRequest` (`saleStartAt` 정렬 e816be23/10d950bf), `SellerEventCreateRequest`, `SellerEventUpdateRequest` (`@NotNull` 제거 caf0407a, 썸네일 1장 90416566), `EventDetailResponse`, `EventListResponse` (`viewCount` f8205e31, `category` 94f061eb), `SellerEventDetailResponse`, `SellerEventCreateResponse`, `SellerEventUpdateResponse`, `SellerEventSummaryResponse`
+- **Internal**: `InternalBulkEventInfoRequest`, `InternalBulkStockAdjustmentRequest`, `InternalEventInfoResponse`, `InternalBulkEventInfoResponse`, `InternalPurchaseValidationResponse`, `InternalSellerEventsResponse`, `InternalEndedEventsResponse`, `InternalStockOperationResponse`, `InternalStockAdjustmentResponse`, `PurchaseUnavailableReason` (enum)
+- **Kafka payload**: 발행 — `EventForceCancelledEvent` (★), `EventSaleStoppedEvent`, `RefundStockDoneEvent`, `RefundStockFailedEvent` / 수신 record — `OrderCancelledEvent`, `PaymentFailedEvent`, `RefundCompletedEvent`, `RefundStockRestoreEvent`, `ActionLogEvent`, `ActionLogDomainEvent`
 
-### OrderSummary
-- 파일: `commerce/src/main/java/com/devticket/commerce/order/presentation/dto/res/OrderSummary.java`
-- 타입: `record`
-- 필드:
-  - `orderId`: `UUID`
-  - `totalAmount`: `int`
-  - `status`: `OrderStatus`
-  - `createdAt`: `LocalDateTime`
+→ 필드 표 / source 경로 깊이: `summary/event-summary.md`
 
-### SellerEventParticipantListResponse
-- 파일: `commerce/src/main/java/com/devticket/commerce/ticket/presentation/dto/res/SellerEventParticipantListResponse.java`
-- 타입: `record`
-- 필드:
-  - `sellerEventParticipantListResponse`: `List<SellerEventParticipantResponse>`
-  - `page`: `int`
-  - `size`: `int`
-  - `totalElements`: `long`
-  - `totalPages`: `int`
+---
 
-### SellerEventParticipantResponse
-- 파일: `commerce/src/main/java/com/devticket/commerce/ticket/presentation/dto/res/SellerEventParticipantResponse.java`
-- 타입: `record`
-- 필드:
-  - `ticketId`: `String`
-  - `orderId`: `String`
-  - `userId`: `String`
-  - `email`: `String`
-  - `purchasedAt`: `String`
-  - `orderNumber`: `String`
+## 6. log (Fastify/TS 별도 스택)
 
-### TicketDetailResponse
-- 파일: `commerce/src/main/java/com/devticket/commerce/ticket/presentation/dto/res/TicketDetailResponse.java`
-- 타입: `record`
-- 필드:
-  - `ticketId`: `UUID`
-  - `eventId`: `UUID`
-  - `eventTitle`: `String`
-  - `eventDateTime`: `String`
-  - `status`: `String`
-  - `issuedAt`: `String`
+본 문서 범위 외. 자세히는 `docs/kafka/actionLog.md` 참조.
 
-### TicketListResponse
-- 파일: `commerce/src/main/java/com/devticket/commerce/ticket/presentation/dto/res/TicketListResponse.java`
-- 타입: `record`
-- 필드:
-  - `totalPages`: `int`
-  - `totalElements`: `Long`
-  - `tickets`: `List<TicketDetailResponse>`
+→ `summary/log-summary.md` (별도 스택 안내)
 
-### TicketResponse
-- 파일: `commerce/src/main/java/com/devticket/commerce/ticket/presentation/dto/res/TicketResponse.java`
-- 타입: `record`
-- 필드:
-  - `orderItemId`: `Long`
-  - `totalCount`: `Integer`
-  - `tickets`: `List<TicketInfo>`
+---
+
+## 7. member
+
+`member/src/main/java/com/devticket/member/presentation/dto/{req,res}/**` + `member/.../external/dto/**`
+
+- **Auth**: `LoginRequest`, `SignupRequest`, `OAuthSignUpOrLoginRequest`, `SocialLoginRequest`, `ReissueRequest` / `LoginResponse`, `SignupResponse`, `OAuthSignUpOrLoginResponse`, `SocialLoginResponse`, `ReissueResponse`
+- **User Profile**: `CreateProfileRequest`, `UpdateProfileRequest`, `ChangePasswordRequest` / `ProfileResponse`, `WithdrawResponse`
+- **Seller Application**: `SellerApplicationRequest` / `SellerApplicationResponse`, `MySellerApplicationResponse`
+- **TechStack 조회**: `TechStackListResponse`
+- **Internal**: `InternalMemberInfoResponse`, `InternalMemberStatusResponse`, `InternalMemberRoleResponse`, `InternalSellerInfoResponse`, `InternalUserTechStackResponse`, `InternalSellerApplicationResponse`, `InternalDecideSellerApplicationResponse`, `InternalUpdateStatusResponse`, `InternalUpdateRoleResponse`, `InternalPagedMemberResponse`, `InternalMemberSearchRequest`
+
+> ⚠ TechStack 본격 관리(`@RequestMapping("/api/admin/techstacks")`) 는 admin 모듈로 이관 완료. member 측은 조회 endpoint 1건(`GET /api/tech-stacks`) 만 잔존.
+
+→ 필드 표 / source 경로 깊이: `summary/member-summary.md`
+
+---
+
+## 8. payment
+
+`payment/src/main/java/com/devticket/payment/{payment,wallet,refund}/presentation/dto/**` + `payment/.../external/**`
+
+- **Payment**: `PaymentReadyRequest`, `PaymentConfirmRequest`, `PaymentFailRequest` / `PaymentReadyResponse`, `PaymentConfirmResponse`, `PaymentFailResponse`, `InternalPaymentInfoResponse`
+- **Wallet**: `WalletChargeRequest`, `WalletChargeConfirmRequest`, `WalletChargeFailRequest`, `WalletWithdrawRequest`, `SettlementDepositRequest` / `WalletChargeResponse`, `WalletChargeConfirmResponse`, `WalletWithdrawResponse`, `WalletBalanceResponse`, `WalletTransactionListResponse`
+- **Refund**: `RefundInfoResponse`, `RefundListResponse`, `RefundDetailResponse`, `SellerRefundListResponse`
+- **Kafka payload (Outbox)**: `PaymentCompletedEvent`, `PaymentFailedEvent`, `RefundCompletedEvent`, `RefundOrderCancelEvent`, `RefundTicketCancelEvent`, `RefundStockRestoreEvent`, `RefundOrderCompensateEvent`, `RefundTicketCompensateEvent`, Saga 내부 record `RefundRequestedEvent` (★ 13 필드)
+- **외부 PG (Toss)**: `PgPaymentConfirmCommand`, `PgPaymentConfirmResult`, `TossPaymentStatusResponse`, `TossErrorResponse`
+
+
+→ 필드 표 / source 경로 깊이: `summary/payment-summary.md`
+
+---
+
+## 9. settlement
+
+`settlement/src/main/java/com/devticket/settlement/presentation/dto/**` + `settlement/.../infrastructure/client/dto/**`
+
+- **Presentation**: `SettlementResponse`, `SellerSettlementDetailResponse`, `SettlementPeriodResponse`, `SettlementTargetPreviewResponse`, `MonthlyRevenueResponse` (36b33e9b 신규), `EventItemResponse`
+- **Internal/Admin 표면**: `InternalSettlementPageResponse`, `InternalSettlementResponse`, `AdminSettlementDetailResponse`
+- **Spring Batch step 입출력**: `SellerSettlementData`, `SettlementResult` (e521f682 — DailySettlementJob/MonthlySettlementJob)
+- **Client req/res (settlement → 외부 호출용)**: `InternalSettlementDataRequest`, `EventTicketSettlementRequest`, `SettlementDepositRequest`, `InternalSettlementDataResponse`, `CommerceTicketSettlementResponse`, `EventServiceResponse`, `EventTicketSettlementResponse`, `EndedEventResponse`, `InternalEndedEventsData`
+
+
+→ 필드 표 / source 경로 깊이: `summary/settlement-summary.md`
+

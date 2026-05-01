@@ -1,0 +1,189 @@
+{
+  "module": "commerce",
+  "endpointCount": 20,
+  "endpoints": [
+    {
+      "module": "commerce",
+      "controller": "CartController",
+      "method": "deleteCartItemAll",
+      "httpMethod": "DELETE",
+      "path": "/api/cart",
+      "summary": "delete cart item all",
+      "source": "commerce/src/main/java/com/devticket/commerce/cart/presentation/controller/CartController.java"
+    },
+    {
+      "module": "commerce",
+      "controller": "CartController",
+      "method": "getCart",
+      "httpMethod": "GET",
+      "path": "/api/cart",
+      "summary": "get cart",
+      "source": "commerce/src/main/java/com/devticket/commerce/cart/presentation/controller/CartController.java"
+    },
+    {
+      "module": "commerce",
+      "controller": "CartController",
+      "method": "addToCart",
+      "httpMethod": "POST",
+      "path": "/api/cart/items",
+      "summary": "add to cart",
+      "source": "commerce/src/main/java/com/devticket/commerce/cart/presentation/controller/CartController.java"
+    },
+    {
+      "module": "commerce",
+      "controller": "CartController",
+      "method": "deleteCartItem",
+      "httpMethod": "DELETE",
+      "path": "/api/cart/items/{cartItemId}",
+      "summary": "delete cart item",
+      "source": "commerce/src/main/java/com/devticket/commerce/cart/presentation/controller/CartController.java"
+    },
+    {
+      "module": "commerce",
+      "controller": "CartController",
+      "method": "updateCartItemQuantity",
+      "httpMethod": "PATCH",
+      "path": "/api/cart/items/{cartItemId}",
+      "summary": "update cart item quantity",
+      "source": "commerce/src/main/java/com/devticket/commerce/cart/presentation/controller/CartController.java"
+    },
+    {
+      "module": "commerce",
+      "controller": "OrderController",
+      "method": "getOrderList",
+      "httpMethod": "GET",
+      "path": "/api/orders",
+      "summary": "본인 주문 목록 페이지 조회",
+      "source": "commerce/src/main/java/com/devticket/commerce/order/presentation/controller/OrderController.java"
+    },
+    {
+      "module": "commerce",
+      "controller": "OrderController",
+      "method": "createOrderByCart",
+      "httpMethod": "POST",
+      "path": "/api/orders",
+      "summary": "create order by cart",
+      "source": "commerce/src/main/java/com/devticket/commerce/order/presentation/controller/OrderController.java"
+    },
+    {
+      "module": "commerce",
+      "controller": "OrderController",
+      "method": "getOrderDetail",
+      "httpMethod": "GET",
+      "path": "/api/orders/{orderId}",
+      "summary": "get order detail",
+      "source": "commerce/src/main/java/com/devticket/commerce/order/presentation/controller/OrderController.java"
+    },
+    {
+      "module": "commerce",
+      "controller": "OrderController",
+      "method": "cancelOrder",
+      "httpMethod": "PATCH",
+      "path": "/api/orders/{orderId}/cancel",
+      "summary": "cancel order",
+      "source": "commerce/src/main/java/com/devticket/commerce/order/presentation/controller/OrderController.java"
+    },
+    {
+      "module": "commerce",
+      "controller": "SellerTicketController",
+      "method": "getParticipantList",
+      "httpMethod": "GET",
+      "path": "/api/seller/events/{eventId}/participants",
+      "summary": "get participant list",
+      "source": "commerce/src/main/java/com/devticket/commerce/ticket/presentation/controller/SellerTicketController.java"
+    },
+    {
+      "module": "commerce",
+      "controller": "TicketController",
+      "method": "getTicketList",
+      "httpMethod": "GET",
+      "path": "/api/tickets",
+      "summary": "get ticket list",
+      "source": "commerce/src/main/java/com/devticket/commerce/ticket/presentation/controller/TicketController.java"
+    },
+    {
+      "module": "commerce",
+      "controller": "TicketController",
+      "method": "createTickets",
+      "httpMethod": "POST",
+      "path": "/api/tickets",
+      "summary": "create tickets",
+      "source": "commerce/src/main/java/com/devticket/commerce/ticket/presentation/controller/TicketController.java"
+    },
+    {
+      "module": "commerce",
+      "controller": "TicketController",
+      "method": "getTicketDetail",
+      "httpMethod": "GET",
+      "path": "/api/tickets/{ticketId}",
+      "summary": "get ticket detail",
+      "source": "commerce/src/main/java/com/devticket/commerce/ticket/presentation/controller/TicketController.java"
+    },
+    {
+      "module": "commerce",
+      "controller": "InternalOrderController",
+      "method": "getOrderItemByTicketId",
+      "httpMethod": "GET",
+      "path": "/internal/order-items/by-ticket/{ticketId}",
+      "summary": "get order item by ticket id",
+      "source": "commerce/src/main/java/com/devticket/commerce/order/presentation/controller/InternalOrderController.java"
+    },
+    {
+      "module": "commerce",
+      "controller": "InternalOrderController",
+      "method": "getSettlementData",
+      "httpMethod": "GET",
+      "path": "/internal/orders/settlement-data",
+      "summary": "get settlement data",
+      "source": "commerce/src/main/java/com/devticket/commerce/order/presentation/controller/InternalOrderController.java"
+    },
+    {
+      "module": "commerce",
+      "controller": "InternalOrderController",
+      "method": "getOrderListForSettlement",
+      "httpMethod": "GET",
+      "path": "/internal/orders/{id}/items",
+      "summary": "get order list for settlement",
+      "source": "commerce/src/main/java/com/devticket/commerce/order/presentation/controller/InternalOrderController.java"
+    },
+    {
+      "module": "commerce",
+      "controller": "InternalOrderController",
+      "method": "getOrderInfo",
+      "httpMethod": "GET",
+      "path": "/internal/orders/{orderId}",
+      "summary": "get order info",
+      "source": "commerce/src/main/java/com/devticket/commerce/order/presentation/controller/InternalOrderController.java"
+    },
+    {
+      "module": "commerce",
+      "controller": "InternalOrderController",
+      "method": "getOrderTickets",
+      "httpMethod": "GET",
+      "path": "/internal/orders/{orderId}/tickets",
+      "summary": "get order tickets",
+      "source": "commerce/src/main/java/com/devticket/commerce/order/presentation/controller/InternalOrderController.java"
+    },
+    {
+      "module": "commerce",
+      "controller": "InternalTicketController",
+      "method": "getSettlementData",
+      "httpMethod": "POST",
+      "path": "/internal/tickets/settlement-data",
+      "summary": "get settlement data",
+      "source": "commerce/src/main/java/com/devticket/commerce/ticket/presentation/controller/InternalTicketController.java"
+    },
+    {
+      "module": "commerce",
+      "controller": "InternalOrderController",
+      "method": "completeRefund",
+      "httpMethod": "PATCH",
+      "path": "/internal/tickets/{ticketId}/refund-completed",
+      "summary": "환불 완료 후 ticket.status REFUNDED 전이 + orderItem.deletedAt 기록 (Refund Saga 호출)",
+      "source": "commerce/src/main/java/com/devticket/commerce/order/presentation/controller/InternalOrderController.java"
+    }
+  ],
+  "notes": [
+    "dead REST 2건 (completeOrder POST / failOrder PATCH) 제거 (b9be8434)."
+  ]
+}

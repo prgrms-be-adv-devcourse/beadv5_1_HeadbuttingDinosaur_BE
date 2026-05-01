@@ -1,0 +1,8 @@
+{
+  "module": "log",
+  "endpointCount": 0,
+  "endpoints": [],
+  "notes": [
+    "log 모듈은 Fastify/TypeScript 별도 스택 (fastify-log/ 디렉토리). 본 json 은 Java 자동 파서 결과 — endpoints 0건 정당."
+  ]
+}
