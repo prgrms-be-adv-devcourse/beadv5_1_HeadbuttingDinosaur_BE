@@ -60,6 +60,28 @@ prefix: `/internal/orders/**`, `/internal/order-items/**`, `/internal/tickets/**
 | `action.log` (CART_ADD / CART_REMOVE) | 1-C fire-and-forget | CartService 내부 (`save`, `clearCart`, `updateTicket`, `deleteTicket`) | |
 | ~~`order.created`~~ | 1-B 비활성 | — | kafka-design §3 line 82 — REST 전환됨 |
 
+### Outbox 발행 패턴 (afterCommit 직접 발행 + 스케줄러 fallback)
+
+위 표의 모든 1-B Outbox 이벤트는 다음 2단계 경로로 처리된다 (1-B Outbox 유지 — `kafka-sync-async-policy.md §1-B`).
+
+1. **afterCommit 직접 발행 — 정상 경로** (`OutboxAfterCommitPublisher`)
+   - 비즈니스 `@Transactional` 안에서 Outbox row 가 `PENDING` 으로 저장된다.
+   - 커밋 직후 `afterCommit` 훅이 `outboxAfterCommitExecutor` (별도 스레드풀) 로 발행 작업을 위임한다.
+   - 워커 스레드가 `OutboxEventProducer.publish` 호출 후, 별도 `REQUIRES_NEW` 트랜잭션(`markSentTxTemplate`)으로 row 를 `SENT` 로 전이한다.
+   - 직접 발행 / `markSent` 어느 단계의 예외도 throw 하지 않고 `warn` 로그만 남긴다 → 비즈니스 TX 는 영향받지 않음.
+2. **OutboxScheduler fallback — 보완 경로**
+   - executor 큐 reject(DiscardPolicy), Kafka 일시 장애, `markSent` 실패, 프로세스 다운 등으로 row 가 `PENDING` 에 남으면 스케줄러가 흡수한다.
+   - 설정(`commerce/src/main/resources/application.yml`):
+     ```yaml
+     devticket:
+       outbox:
+         publish-grace-seconds: 5      # 직접 발행 경로 동작 시간 확보
+         scheduler-delay-ms: 60000     # fallback 폴링 주기 — 정상 경로가 즉시 처리하므로 60초로 완화
+     ```
+   - 중복 발행은 consumer 측 `X-Message-Id` dedup 으로 무해화된다.
+
+근거 커밋: `5c966831` (commerce: afterCommit 직접 발행 + 스케줄러 fallback 구조 전환), `df63cc2b` (executor `@Qualifier` 주입 정합), `a2878f16` (yml `scheduler-delay-ms` 명시화).
+
 ### 수신 (Consumer) — kafka-design §3 line 70
 
 | 토픽 | 처리 메서드 | 처리 내용 | 멱등성 |
