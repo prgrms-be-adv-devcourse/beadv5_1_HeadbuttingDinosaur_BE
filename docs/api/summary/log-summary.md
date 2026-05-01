@@ -25,9 +25,6 @@
 
 ai 모듈이 `LogServiceClient.getRecentActionLog` 로 REST 호출 — 사용자 최근 행동 로그 조회.
 
-## DTO
-
-**Java DTO 없음** (presentation/dto 0건). TypeScript 측 schema 는 `fastify-log/` 디렉토리 참조.
 
 ## 인프라 / 구조
 

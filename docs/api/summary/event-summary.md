@@ -78,13 +78,6 @@
 - settlement: `getEndedEventsByDate`, `getEventsBySellerForSettlement`
 - ai: `getPopularEvents` ★ (§2 AI 추천 보강)
 
-## DTO 발췌
-
-- **External (Event)**: `EventListRequest`, `SellerEventCreateRequest`, `SellerEventUpdateRequest`, `EventDetailResponse`, `EventListResponse`, `SellerEventDetailResponse`, `SellerEventCreateResponse`, `SellerEventUpdateResponse`, `SellerEventSummaryResponse`
-- **Internal**: `InternalBulkEventInfoRequest`, `InternalBulkStockAdjustmentRequest`, `InternalStockDeductRequest`, `InternalStockRestoreRequest`, `InternalEventInfoResponse`, `InternalBulkEventInfoResponse`, `InternalPurchaseValidationResponse`, `InternalSellerEventsResponse`, `InternalEndedEventsResponse`, `InternalStockOperationResponse`, `InternalStockAdjustmentResponse`, `PurchaseUnavailableReason` (enum)
-- **Kafka payload**: 발행 4종 (`EventForceCancelledEvent`, `EventSaleStoppedEvent`, `RefundStockDoneEvent`, `RefundStockFailedEvent`) / 수신 record 6종 (`OrderCancelledEvent`, `PaymentFailedEvent`, `RefundCompletedEvent`, `RefundStockRestoreEvent`, `ActionLogEvent`, `ActionLogDomainEvent`)
-
-> DTO 필드 표 / source 경로 깊이: `docs/dto/summary/event-summary.md`
 
 ## EventStatus enum + 상태 전환
 

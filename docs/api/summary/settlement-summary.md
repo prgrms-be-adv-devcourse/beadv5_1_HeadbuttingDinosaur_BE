@@ -49,14 +49,6 @@ Spring Batch 기반 — `DailySettlementJob` (일별 정산대상 수집) + `Mon
 
 - admin 모듈 → `SettlementInternalClient` (`getSettlements`, `runSettlement` ★)
 
-## DTO 발췌
-
-- **Presentation Response**: `SettlementResponse`, `SellerSettlementDetailResponse`, `SettlementPeriodResponse`, `SettlementTargetPreviewResponse`, `MonthlyRevenueResponse`, `EventItemResponse`
-- **Internal/Admin 표면**: `InternalSettlementPageResponse`, `InternalSettlementResponse`, `AdminSettlementDetailResponse`
-- **Spring Batch step 입출력**: `SellerSettlementData`, `SettlementResult`
-- **Client req/res**: `InternalSettlementDataRequest`, `EventTicketSettlementRequest`, `SettlementDepositRequest`, `InternalSettlementDataResponse`, `CommerceTicketSettlementResponse`, `EventServiceResponse`, `EventTicketSettlementResponse`, `EndedEventResponse`, `InternalEndedEventsData`
-
-> DTO 필드 표 / source 경로 깊이: `docs/dto/summary/settlement-summary.md`
 
 ## 인프라 / 구조
 
