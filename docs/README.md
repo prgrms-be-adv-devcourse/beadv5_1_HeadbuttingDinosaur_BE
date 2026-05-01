@@ -1,7 +1,5 @@
 # DevTicket — 문서 인덱스
 
-> 발표 Q&A 안전망 문서 모음.
-
 ## 1차 진입점
 
 - **[ServiceOverview.md](service/ServiceOverview.md)** — 멘토용 진입점. 9개 모듈 종합
@@ -21,11 +19,11 @@
 
 ## 횡단 설계 (Kafka)
 
-- [kafka/kafka-design.md](kafka/kafka-design.md) — Kafka 토픽 + Saga + ShedLock 횡단 설계
-- [kafka/kafka-sync-async-policy.md](kafka/kafka-sync-async-policy.md) — 1-A / 1-B / 1-C 분류
-- [kafka/kafka-idempotency-guide.md](kafka/kafka-idempotency-guide.md) — 멱등성 3중 방어선
-- [kafka/actionLog.md](kafka/actionLog.md) — Log 모듈 (Fastify/TS)
-- [kafka/kafka-impl-plan.md](kafka/kafka-impl-plan.md) — 구현 진행
+- [kafka/kafka-design.md](skills/kafka-design.md) — Kafka 토픽 + Saga + ShedLock 횡단 설계
+- [kafka/kafka-sync-async-policy.md](skills/kafka-sync-async-policy.md) — 1-A / 1-B / 1-C 분류
+- [kafka/kafka-idempotency-guide.md](skills/kafka-idempotency-guide.md) — 멱등성 3중 방어선
+- [kafka/actionLog.md](skills/actionLog.md) — Log 모듈 (Fastify/TS)
+- [kafka/kafka-impl-plan.md](skills/kafka-impl-plan.md) — 구현 진행
 
 ## 문서화 기준
 

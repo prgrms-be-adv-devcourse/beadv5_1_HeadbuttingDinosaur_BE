@@ -111,4 +111,4 @@ prefix: `/internal/members/**`. JWT 검증 없음 (Tag annotation 명시).
 
 ### 상세
 
-[ServiceOverview.md §3 member](../ServiceOverview.md) 참조.
+[ServiceOverview.md §3 member](../service/ServiceOverview.md) 참조.

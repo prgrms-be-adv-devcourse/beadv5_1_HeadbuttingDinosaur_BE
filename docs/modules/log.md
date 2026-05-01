@@ -16,7 +16,7 @@
 - 결제 처리 자체 → payment 모듈 (log은 단지 PURCHASE 액션을 INSERT)
 - 추천 산출 → ai 모듈 (log은 단지 recentVector 응답 제공)
 
-자세한 설계는 [docs/kafka/actionLog.md](../kafka/actionLog.md) 참조.
+자세한 설계는 [docs/kafka/actionLog.md](../skills/actionLog.md) 참조.
 
 ## 2. 외부 API
 
@@ -29,7 +29,7 @@ routes: `fastify-log/src/route/internal-log.route.ts`, `health.route.ts`.
 | 메서드 | 경로 | 핸들러 | 호출 주체 | 비고 |
 |---|---|---|---|---|
 | GET | `/health` | `healthRoutes` | 인프라 | health check |
-| GET | `/internal/logs/actions` ★ | `internalLogRoutes` | ai | recentVector 조회 — `userId`, `actionTypes`(comma-sep), `days`(1-30, 기본 7) querystring. 응답 상한 5000건 (`RECENT_LOGS_LIMIT`, [docs/kafka/actionLog.md §5.5](../kafka/actionLog.md)) |
+| GET | `/internal/logs/actions` ★ | `internalLogRoutes` | ai | recentVector 조회 — `userId`, `actionTypes`(comma-sep), `days`(1-30, 기본 7) querystring. 응답 상한 5000건 (`RECENT_LOGS_LIMIT`, [docs/kafka/actionLog.md §5.5](../skills/actionLog.md)) |
 
 **인증/권한**: `X-Internal-Service` 헤더 필수. `INTERNAL_SERVICE_ALLOWLIST = {'ai'}`만 통과 (그 외는 401/403).
 
@@ -99,4 +99,4 @@ CREATE TABLE log.action_log (
 
 없음 (정당 누락 외).
 
-처리 계획 상세: [docs/kafka/actionLog.md](../kafka/actionLog.md), [ServiceOverview.md §3 log](../ServiceOverview.md) 참조.
+처리 계획 상세: [docs/kafka/actionLog.md](../skills/actionLog.md), [ServiceOverview.md §3 log](../service/ServiceOverview.md) 참조.
