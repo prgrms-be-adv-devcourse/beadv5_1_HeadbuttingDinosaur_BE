@@ -1,6 +1,6 @@
 {
   "module": "commerce",
-  "endpointCount": 19,
+  "endpointCount": 20,
   "endpoints": [
     {
       "module": "commerce",
@@ -46,6 +46,15 @@
       "path": "/api/cart/items/{cartItemId}",
       "summary": "update cart item quantity",
       "source": "commerce/src/main/java/com/devticket/commerce/cart/presentation/controller/CartController.java"
+    },
+    {
+      "module": "commerce",
+      "controller": "OrderController",
+      "method": "getOrderList",
+      "httpMethod": "GET",
+      "path": "/api/orders",
+      "summary": "본인 주문 목록 페이지 조회",
+      "source": "commerce/src/main/java/com/devticket/commerce/order/presentation/controller/OrderController.java"
     },
     {
       "module": "commerce",

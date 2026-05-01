@@ -79,6 +79,7 @@
 | DELETE | `/api/cart/items/{cartItemId}` | `CartController#deleteCartItem` | 장바구니 단건 삭제 |
 | DELETE | `/api/cart` | `CartController#deleteCartItemAll` | 장바구니 전체 삭제 |
 | POST | `/api/orders` ★ | `OrderController#createOrderByCart` | 장바구니 기반 주문 생성 + 재고 차감 |
+| GET | `/api/orders` | `OrderController#getOrderList` | 본인 주문 목록 페이지 조회 |
 | GET | `/api/orders/{orderId}/status` | `OrderController#getOrderStatus` | 주문 상태 폴링 (`CREATED → PAYMENT_PENDING`) |
 | GET | `/api/orders/{orderId}` | `OrderController#getOrderDetail` | 주문 상세 조회 |
 | PATCH | `/api/orders/{orderId}/cancel` | `OrderController#cancelOrder` | 결제 전 주문 취소 + 재고 복구 |
@@ -95,6 +96,7 @@
 | GET | `/internal/orders/{id}/items` | `InternalOrderController#getOrderListForSettlement` | 정산용 주문 항목 |
 | GET | `/internal/orders/settlement-data` | `InternalOrderController#getSettlementData` | 판매자 기간 정산 데이터 |
 | GET | `/internal/order-items/by-ticket/{ticketId}` | `InternalOrderController#getOrderItemByTicketId` | 티켓 → 주문항목 |
+| GET | `/internal/orders/{orderId}/tickets` | `InternalOrderController#getOrderTickets` | 환불 산정용 주문 티켓 목록 |
 | PATCH | `/internal/tickets/{ticketId}/refund-completed` | `InternalOrderController#completeRefund` | 환불 완료 후 ticket.status `REFUNDED` 전이 + `orderItem.deletedAt` 기록 (Refund Saga 가 호출) |
 | POST | `/internal/tickets/settlement-data` | `InternalTicketController#getSettlementData` | 티켓 정산 데이터 일괄 |
 

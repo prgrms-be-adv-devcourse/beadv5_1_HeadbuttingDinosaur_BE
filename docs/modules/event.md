@@ -106,6 +106,7 @@
 
 - **REST 호출**:
   - member: `getNickname` (EventService.getEvent — 판매자 닉네임 조회), `getMemberInfo` (판매자 검증)
+  - admin: `getTechStacks` ★ (AdminClient — TechStack 마스터 데이터 조회)
   - ai: `aiClient.getRecommendedEventIds` ★
   - 외부: OpenAI (embedding) ★, Elasticsearch (이벤트 검색 인덱싱) ★, AWS S3 (이미지 업로드)
 - **Kafka 구독**: commerce 발행(`order.cancelled`), payment 발행(`payment.failed` ★, `refund.completed`, `refund.stock.restore`)

@@ -16,39 +16,71 @@ DevTicket은 **이커머스 티켓팅 MSA**다. 세미 프로젝트의 모놀리
 
 ---
 
-## 2. 핵심 플로우 (★ 상품선택 → 결제완료 → 정산완료)
+## 2. 요구사항 + 기술 요구사항
 
-> 본 문서에서 ★는 "핵심 사용자 플로우(상품선택→결제완료→정산완료) 직접 항목 + 그 보상/실패 짝(`payment.failed`, `event.force-cancelled`, `refund.*` 등)"을 포함합니다. CLAUDE.md §4 표기 컨벤션을 ServiceOverview 한정으로 광의 해석.
+> ★ = `requirements-check.md §1` 5건 (#3, #4, #7, #10, #11) 매핑 항목.
+> 상세 검증 근거는 [requirements-check.md](requirements-check.md) 참조.
+
+### 2-1. 기능 요구사항 (세미 프로젝트 12개)
+
+| # | 요구사항 | 핵심 구현 위치 |
+|---|---|---|
+| 1 | 회원가입 / 로그인 | member 측 `AuthController` (signup / login / social / google-signup / reissue) + JWT 발급 (`JwtTokenProvider`) |
+| 2-a | 예치금 서버 저장 | payment 측 `Wallet` Entity + `WalletRepository.chargeBalanceAtomic` / `useBalanceAtomic` 원자적 업데이트 + `WalletController` (충전/승인/출금) |
+| 2-b | 장바구니 서버 저장 | commerce 측 `Cart` Entity + `CartService.findOrCreateCart` (user_id 1:1) |
+| 3 ★ | 장바구니에 N개 상품 추가 | commerce 측 `POST /api/cart/items` (`CartController#addToCart`) — `CartItem.addQuantity` 재담기 시 수량 누적 |
+| 4 ★ | 장바구니 상품 → 예치금 구매 | commerce `POST /api/orders` (`createOrderByCart`) → event `adjustStockBulk` → payment `readyPayment / confirm / fail` (PG/WALLET/WALLET_PG 분기) → Kafka `payment.completed` → commerce `processPaymentCompleted` (PAID 전이 + 티켓 발급) |
+| 5 | 판매자 등록 (신청 / 승인) | member 측 `SellerApplicationController.apply` (PENDING) + admin 측 승인 처리 |
+| 6 | 판매자 상품 등록 | event 측 `POST /api/seller/events` (`createEvent`) — 검증 + 저장 + ES 색인 (1536차원 embedding) |
+| 7 ★ | 매월 정산 (수수료 차감 + 환불 이월) | settlement Spring Batch (`DailySettlementJob` + `MonthlySettlementJob`) + `SettlementAdminController.runSettlement` / `processPayment` → payment `WalletInternalController.depositFromSettlement` |
+| 8 | 판매자도 구매 가능 | commerce 전 흐름이 `userId` 만 사용 (UserRole 분기 없음 — 의도적) |
+| 9 | 사용자 맞춤 AI 추천 | ai 측 `RecommendationService` (UserVector 4종 가중합 + 정규화 + kNN + cosine 재정렬) — `recommendByUserVector` / `recommendByColdStart` / `searchKnn` |
+| 10 ★ | AI 중단 시 구매 정상 (격리) | event `EventRecommendationService.aiClient` try-catch 폴백 (실패 시 빈 List 반환). commerce/payment 모듈에 ai 의존성 0건 |
+| 11 ★ | 동시 구매 시 재고 초과 방지 | event `adjustStockBulk` (락 순서 고정 bulk) + 비관적 락(`@Lock(PESSIMISTIC_WRITE)`) + 낙관적 락(`@Version`) + Kafka 보상 (`payment.failed` / `order.cancelled` → 재고 복구) |
+| 12 | 판매자 상품 등록 취소 | event `PATCH /api/seller/events/{eventId}` cancel 분기 + `Event.cancel()` 상태 전이 + `event.sale-stopped` Outbox 발행 + ES 동기화 |
+
+### 2-2. 기술 요구사항 (필수 구현 6개)
+
+| 항목 | 핵심 구현 위치 |
+|---|---|
+| ElasticSearch 상품 검색 | event 측 `EventService.getEventList` ES 우선 검색 + JPA 재조회 (N+1 방지) + dense_vector kNN. `EventDocument` indexName=`event` (1536차원 embedding 포함) |
+| Kubernetes AI 자동 배포 / 스케일링 | (도입 보류) — `cd-*-aws.yml` GitHub Actions k3s 배포 + Actuator/Prometheus 메트릭 노출. HPA 매니페스트는 미적용 |
+| MSA + API Gateway | apigateway 모듈 (Spring Cloud Gateway WebFlux) — 8개 백엔드 모듈 라우트. 포트: member 8081 / event 8082 / commerce 8083 / payment 8084 / settlement 8085 / log 8086 / admin 8087 / ai 8088 |
+| 트래픽 분산 + 보안 (JWT, OAuth) | apigateway `JwtAuthenticationFilter` (JWT 파싱 → `X-User-Id` / `X-User-Email` / `X-User-Role` 헤더 주입) + Spring Security OAuth2 (Google) + `OAuthSuccessHandler` / `OAuthFailureHandler`. 토큰 발급은 member, 검증은 apigateway |
+| 벡터DB 문서 검색 | ES `dense_vector` dims=1536 similarity=cosine + `RecommendationService.searchKnn` (k=30, status=ON_SALE 필터) + OpenAI 임베딩 (`esClient.index()` 직접 저장). 테크스택 임베딩: admin 생성 → ai 읽음 |
+| 사용자 맞춤형 AI 추천 시스템 | ai 측 UserVector 4종 (preference / cart / recent / negative) → 가중합 (0.5 / 0.3 / 0.2) → 정규화 → kNN 30개 → cosine 재정렬 (0.45 / 0.25 / 0.25 / -0.15) → top 5. 콜드스타트는 회원 테크스택 평균 임베딩 → kNN 5개 + 인기 이벤트 보충 |
+
+### 2-3. 핵심 흐름 다이어그램 (참고)
 
 ```mermaid
 flowchart TB
     U(("사용자"))
 
-    subgraph P1["① 상품선택"]
+    subgraph P1["#3 장바구니 추가"]
         direction LR
-        CART["commerce<br/>CartService<br/>(getCart / save / updateTicket)"]
+        CART["commerce<br/>CartController.addToCart"]
         EVT_VAL["event<br/>validatePurchase"]
         CART -- "REST 1-A" --> EVT_VAL
     end
 
-    subgraph P2["② 주문 + 결제완료"]
+    subgraph P2["#4 예치금 구매"]
         direction LR
         ORD["commerce<br/>OrderService.createOrderByCart"]
         EVT_STK["event<br/>adjustStockBulk"]
-        PAY["payment<br/>readyPayment / confirmPgPayment"]
-        CONS["commerce<br/>processPaymentCompleted<br/>(PAID 전이 + 티켓 발급 + 카트 분기 삭제)"]
-        ORD -- "REST 1-A (원자적 bulk)" --> EVT_STK
+        PAY["payment<br/>readyPayment / confirm"]
+        CONS["commerce<br/>processPaymentCompleted"]
+        ORD -- "REST 1-A (원자적 bulk, #11)" --> EVT_STK
         PAY -- "Outbox 1-B<br/>payment.completed" --> CONS
     end
 
-    subgraph P3["③ 정산완료 (월별 Batch)"]
+    subgraph P3["#7 매월 정산"]
         direction LR
         SCHED["스케줄러"]
         SET_CRT["settlement<br/>createSettlementFromItems"]
         SET_PAY["settlement<br/>processPayment"]
         WAL_DEP["payment<br/>WalletService.depositFromSettlement"]
         SCHED --> SET_CRT --> SET_PAY
-        SET_PAY -- "REST 1-A<br/>/internal/wallet/settlement-deposit" --> WAL_DEP
+        SET_PAY -- "REST 1-A" --> WAL_DEP
     end
 
     U --> CART
@@ -60,29 +92,18 @@ flowchart TB
     P2 ~~~ P3
 ```
 
-### 단계별 전송 방식 요약
-
-| 단계 | 호출 / 발행 | 수신 | Transport | 핵심 메서드 |
-|---|---|---|---|---|
-| ① 장바구니 담기 / 검증 | commerce → event | — | **REST 1-A** | event 측 `validatePurchase` |
-| ② 주문 생성 / 재고 차감 | commerce → event | — | **REST 1-A** (원자적 bulk) | event 측 `adjustStockBulk` |
-| ② 결제 준비 / PG 승인 | payment | — | **REST 1-A** (PG 외부 포함) | `readyPayment`, `confirmPgPayment` |
-| ② 결제완료 후속 | payment | commerce, log | **Kafka 1-B (Outbox)** `payment.completed` | commerce 측 `processPaymentCompleted` |
-| ③ 월별 정산서 생성 | 스케줄러 | settlement | (in-process) | `createSettlementFromItems` |
-| ③ 정산금 → 판매자 예치금 | settlement → payment | — | **REST 1-A** | settlement 측 `processPayment`, payment 측 `depositFromSettlement` |
-
-### ★ 핵심 플로우 외 — 보상 흐름 (Kafka 1-B)
+### 2-4. 보상 흐름 (Kafka 1-B)
 
 | 트리거 | 토픽 (kafka-design §3 정식) | 수신 메서드 |
 |---|---|---|
-| 결제 실패 → 재고 복구 | `payment.failed` | event 측 `restoreStockForPaymentFailed` |
+| 결제 실패 → 재고 복구 (#11 보상) | `payment.failed` | event 측 `restoreStockForPaymentFailed` |
 | 주문 취소 → 재고 복구 | `order.cancelled` | event 측 `restoreStockForOrderCancelled` |
 | 이벤트 강제취소 → 환불 fanout | `event.force-cancelled` | commerce 측 `RefundFanoutService.processEventForceCancelled` |
 | 환불 후 재고 복구 | `refund.stock.restore` | event 측 `handleRefundStockRestore` |
 
 > **부수 흐름 — `action.log` (1-C Kafka fire-and-forget)**
-> 모든 모듈에서 사용자 행동/시스템 이벤트를 log 모듈로 비동기 전송.
-> 핵심 플로우와 분리되어 있으며 손실 허용. 자세한 설계는 `docs/kafka/actionLog.md` 참조.
+> 모든 모듈에서 사용자 행동/시스템 이벤트를 log 모듈로 비동기 전송 (#9 AI 추천 입력).
+> 자세한 설계는 `docs/kafka/actionLog.md` 참조.
 
 ---
 

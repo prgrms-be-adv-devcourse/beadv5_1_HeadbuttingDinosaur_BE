@@ -1,6 +1,6 @@
 {
   "module": "event",
-  "endpointCount": 22,
+  "endpointCount": 20,
   "endpoints": [
     {
       "module": "event",
@@ -167,28 +167,10 @@
     {
       "module": "event",
       "controller": "EventInternalController",
-      "method": "deductStock",
-      "httpMethod": "POST",
-      "path": "/internal/events/{eventId}/deduct-stock",
-      "summary": "deduct stock",
-      "source": "event/src/main/java/com/devticket/event/presentation/controller/EventInternalController.java"
-    },
-    {
-      "module": "event",
-      "controller": "EventInternalController",
       "method": "forceCancel",
       "httpMethod": "PATCH",
       "path": "/internal/events/{eventId}/force-cancel",
       "summary": "force cancel",
-      "source": "event/src/main/java/com/devticket/event/presentation/controller/EventInternalController.java"
-    },
-    {
-      "module": "event",
-      "controller": "EventInternalController",
-      "method": "restoreStock",
-      "httpMethod": "POST",
-      "path": "/internal/events/{eventId}/restore-stock",
-      "summary": "restore stock",
       "source": "event/src/main/java/com/devticket/event/presentation/controller/EventInternalController.java"
     },
     {

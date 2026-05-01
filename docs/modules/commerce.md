@@ -22,6 +22,7 @@
 | PATCH | `/api/cart/items/{cartItemId}` | `updateCartItemQuantity` | 장바구니 아이템 수량을 증감한다 |
 | DELETE | `/api/cart/items/{cartItemId}` | `deleteCartItem` | 장바구니 아이템을 단건 삭제한다 |
 | POST | `/api/orders` ★ | `createOrderByCart` | 장바구니 기반 주문 생성 + 재고 차감 (event `adjustStockBulk` 호출) |
+| GET | `/api/orders` | `getOrderList` | 본인 주문 목록을 페이지로 조회한다 |
 | GET | `/api/orders/{orderId}/status` | `getOrderStatus` | 본인 주문의 상태를 조회한다 |
 | GET | `/api/orders/{orderId}` | `getOrderDetail` | 본인 주문의 상세를 조회한다 |
 | PATCH | `/api/orders/{orderId}/cancel` | `cancelOrder` | 결제 전 주문을 취소하고 재고를 복구한다 |
@@ -40,6 +41,7 @@ prefix: `/internal/orders/**`, `/internal/order-items/**`, `/internal/tickets/**
 | GET | `/internal/orders/{id}/items` | `getOrderListForSettlement` | settlement | 정산용 주문 항목 |
 | GET | `/internal/orders/settlement-data` | `getSettlementData` | settlement | 판매자 기간 정산 데이터 |
 | GET | `/internal/order-items/by-ticket/{ticketId}` | `getOrderItemByTicketId` | payment | 티켓 → 주문항목 |
+| GET | `/internal/orders/{orderId}/tickets` | `getOrderTickets` | payment | 환불 산정용 주문 티켓 목록 |
 | PATCH | `/internal/tickets/{ticketId}/refund-completed` | `completeRefund` | payment Refund Saga | 환불 완료 후 ticket.status REFUNDED 전이 + orderItem.deletedAt 기록 |
 | POST | `/internal/tickets/settlement-data` | `getSettlementData` (Ticket) | settlement | 티켓 정산 데이터 일괄 |
 

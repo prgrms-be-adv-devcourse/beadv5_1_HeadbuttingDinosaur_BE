@@ -67,7 +67,7 @@ Kafka 관련 코드의 **계층 배치·네이밍·Lombok·테스트·보안·PR
 
 | 서비스 | Producer (발행) | Consumer (소비) |
 |---|---|---|
-| Commerce | `order.created`, `ticket.issue-failed`, `refund.requested` (fan-out), `refund.order.done`, `refund.order.failed`, `refund.ticket.done`, `refund.ticket.failed`, `action.log` (CART_ADD / CART_REMOVE) | `stock.deducted`, `stock.failed`, `payment.completed`, `payment.failed`, `ticket.issue-failed`, `refund.completed`, `event.force-cancelled`, `refund.order.cancel`, `refund.ticket.cancel`, `refund.order.compensate`, `refund.ticket.compensate` |
+| Commerce | `ticket.issue-failed`, `refund.requested` (fan-out), `refund.order.done`, `refund.order.failed`, `refund.ticket.done`, `refund.ticket.failed`, `order.cancelled`, `action.log` (CART_ADD / CART_REMOVE) | `payment.completed`, `payment.failed`, `ticket.issue-failed`, `refund.completed`, `event.force-cancelled`, `refund.order.cancel`, `refund.ticket.cancel`, `refund.order.compensate`, `refund.ticket.compensate` |
 | Event | `stock.deducted`, `stock.failed`, `event.force-cancelled`, `event.sale-stopped`, `refund.stock.done`, `refund.stock.failed`, `action.log` (VIEW / DETAIL_VIEW / DWELL_TIME) | `order.created`, `payment.failed`, `refund.completed`, `refund.stock.restore` |
 | Payment (Orchestrator 포함) | `payment.completed`, `payment.failed`, `refund.completed`, `refund.order.cancel`, `refund.ticket.cancel`, `refund.stock.restore`, `refund.order.compensate`, `refund.ticket.compensate` | `refund.completed` (예치금 복구), `ticket.issue-failed`, `event.force-cancelled`, `event.sale-stopped`, `refund.requested`, `refund.order.done`, `refund.order.failed`, `refund.ticket.done`, `refund.ticket.failed`, `refund.stock.done`, `refund.stock.failed` |
 | **Log** (별도 스택 — Fastify/TS, 상세: [actionLog.md](actionLog.md)) | — (Kafka 재발행 없음, DB INSERT 전용) | `action.log`, `payment.completed` (PURCHASE 직접 INSERT) |
@@ -299,19 +299,25 @@ public record TicketIssueFailedEvent(
 
 ```java
 public record RefundRequestedEvent(
-    UUID refundId,       // Saga 추적 키 — SagaState PK
+    UUID refundId,           // Saga 추적 키 — SagaState PK
+    UUID orderRefundId,      // Payment 가 OrderRefund 원장 upsert (null 시 생성)
     UUID orderId,
     UUID userId,
     UUID paymentId,
     PaymentMethod paymentMethod,  // enum: WALLET | PG | WALLET_PG
+    List<UUID> ticketIds,
     int refundAmount,
+    int refundRate,
+    boolean wholeOrder,
     String reason,
-    Instant timestamp
+    Instant timestamp,
+    int totalOrderTickets    // 주문 전체 티켓 수 — Payment OrderRefund.totalTickets
 ) {}
 ```
 
-> `refundId`는 Orchestrator가 Saga 시작 전 생성 (`UUID.randomUUID()`).
-> Commerce fan-out 시 각 orderId마다 새 `refundId`를 발행한다.
+> `refundId` 는 Orchestrator 가 Saga 시작 전 생성 (`UUID.randomUUID()`).
+> Commerce fan-out 시 각 orderId 마다 새 `refundId` 를 발행한다.
+> `totalOrderTickets` 자체완결 — payload 만으로 Payment 가 OrderRefund 원장 정확히 산정 (commerce 동기 호출 제거).
 
 ### RefundSagaStepEvent (Orchestrator ↔ 각 서비스 공용)
 

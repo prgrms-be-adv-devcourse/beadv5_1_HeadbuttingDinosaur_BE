@@ -76,7 +76,8 @@
 - **REST 호출**:
   - event: `forceCancel` (`PATCH /internal/events/{eventId}/force-cancel`) — 강제취소 시 `X-User-Id`, `X-User-Role` 헤더 전달
   - settlement: `runSettlement` ★, `getSettlements`
-  - member: `searchMembers`, `updateMemberStatus`, `updateMemberRole`, `getSellerApplications`, `decideSellerApplication`
+  - event: `getEvents` (관리자 이벤트 목록 조회 — `RestClientEventInternalClientImpl`)
+  - member: `getMembers`, `getMember`, `updateUserStatus`, `updateUserRole` (`RestClientMemberInternalClientImpl`)
   - 외부: OpenAI Embedding (TechStack 임베딩), Elasticsearch (TechStack 인덱싱) —
 - **Kafka 구독**: 없음
 

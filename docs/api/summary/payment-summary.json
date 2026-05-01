@@ -1,6 +1,6 @@
 {
   "module": "payment",
-  "endpointCount": 22,
+  "endpointCount": 19,
   "endpoints": [
     {
       "module": "payment",
@@ -157,24 +157,6 @@
     },
     {
       "module": "payment",
-      "controller": "MockCommerceController",
-      "method": "getOrderItemByTicketId",
-      "httpMethod": "GET",
-      "path": "/internal/order-items/by-ticket/{ticketId}",
-      "summary": "get order item by ticket id",
-      "source": "payment/src/main/java/com/devticket/payment/mock/MockCommerceController.java"
-    },
-    {
-      "module": "payment",
-      "controller": "MockCommerceController",
-      "method": "getOrderInfo",
-      "httpMethod": "GET",
-      "path": "/internal/orders/{orderId}",
-      "summary": "get order info",
-      "source": "payment/src/main/java/com/devticket/payment/mock/MockCommerceController.java"
-    },
-    {
-      "module": "payment",
       "controller": "PaymentInternalController",
       "method": "getPaymentByOrderId",
       "httpMethod": "GET",
@@ -190,15 +172,6 @@
       "path": "/internal/wallet/settlement-deposit",
       "summary": "deposit from settlement",
       "source": "payment/src/main/java/com/devticket/payment/wallet/presentation/controller/WalletInternalController.java"
-    },
-    {
-      "module": "payment",
-      "controller": "MockCommerceController",
-      "method": "mockCharge",
-      "httpMethod": "POST",
-      "path": "/mock/wallet/charge",
-      "summary": "mock charge",
-      "source": "payment/src/main/java/com/devticket/payment/mock/MockCommerceController.java"
     }
   ],
   "notes": []

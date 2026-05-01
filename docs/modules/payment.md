@@ -99,6 +99,7 @@
 
 - **REST 호출**:
   - commerce: `getOrderInfo` (`RefundSagaOrchestrator.lookupCommerceTotalTickets` — 구버전 페이로드 폴백 안전망)
+  - event: `getEventInfo`, `forceCancel` (Refund Saga 보상 흐름)
   - 외부: PG (Toss `pgPaymentClient`)
 - **Kafka 구독**: commerce 발행(`refund.completed`, `ticket.issue-failed`, `refund.requested`, `refund.order.done`/`failed`, `refund.ticket.done`/`failed`), event 발행(`event.force-cancelled`, `event.sale-stopped`, `refund.stock.done`/`failed`)
 
