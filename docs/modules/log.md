@@ -1,7 +1,8 @@
 # log
 
 > 본 페이지는 ServiceOverview.md §3 log 섹션의 확장판입니다.
-> ⚠ log 모듈은 **Java가 아닌 Fastify/TypeScript** 별도 스택 (`fastify-log/` 디렉토리). `service-status.md` / `dto-overview.md` 등 Java 자동 생성기 산출물은 정당 누락. 본 페이지는 Fastify 코드 직접 인용.
+> ★ = `requirements-check.md §1` 기능 요구사항 5건 (#3, #4, #7, #10, #11) + `§2` 기술스택 6건 매핑 항목
+> ⚠ log 모듈은 **Java가 아닌 Fastify/TypeScript** 별도 스택 (`fastify-log/` 디렉토리). 본 페이지는 Fastify 코드 직접 인용.
 
 ## 1. 모듈 책임
 
@@ -29,7 +30,7 @@ routes: `fastify-log/src/route/internal-log.route.ts`, `health.route.ts`.
 | 메서드 | 경로 | 핸들러 | 호출 주체 | 비고 |
 |---|---|---|---|---|
 | GET | `/health` | `healthRoutes` | 인프라 | health check |
-| GET | `/internal/logs/actions` ★신규 | `internalLogRoutes` (067984fd) | ai | recentVector 조회 — `userId`, `actionTypes`(comma-sep), `days`(1-30, 기본 7) querystring. 응답 상한 5000건 (`RECENT_LOGS_LIMIT`, [docs/kafka/actionLog.md §5.5](../kafka/actionLog.md)) |
+| GET | `/internal/logs/actions` ★ | `internalLogRoutes` | ai | (#9, #10, §2 AI 추천 입력) recentVector 조회 — `userId`, `actionTypes`(comma-sep), `days`(1-30, 기본 7) querystring. 응답 상한 5000건 (`RECENT_LOGS_LIMIT`, [docs/kafka/actionLog.md §5.5](../kafka/actionLog.md)) |
 
 **인증/권한**: `X-Internal-Service` 헤더 필수. `INTERNAL_SERVICE_ALLOWLIST = {'ai'}`만 통과 (그 외는 401/403).
 
@@ -48,10 +49,8 @@ groupId: `env.KAFKA_GROUP_ID`. consumer는 `autoCommit: false` + 메시지별 tr
 
 | 토픽 | 처리 메서드 | 처리 내용 | 멱등성 |
 |---|---|---|---|
-| `action.log` | `actionLogService.save` | `validateAndParse` → `toActionLog` → `insertActionLog` (append-only). userId/actionType/timestamp 필수, eventId/searchKeyword/stackFilter/dwellTimeSeconds/quantity/totalAmount 옵셔널 | 1-C fire-and-forget (acks=0). 멱등성 미보장 — 손실 허용 |
-| `payment.completed` ★ (1-B) | `paymentCompletedService.save` | 결제 완료 → PURCHASE 액션 1건 INSERT (1d65cc3a #455). fan-out INSERT 원자성 확보(f90b062d) | dedup ⚠ 확인 필요: 코드 측 dedup 구현 위치 확인 |
-
-> ⚠ 코드 변경: payment.completed fan-out INSERT의 원자성 보강 회귀 테스트 추가됨(fd3641e5 — `insertActionLogs` 경계 케이스 + 원자성).
+| `action.log` | `actionLogService.save` | (#9 AI 추천 입력) `validateAndParse` → `toActionLog` → `insertActionLog` (append-only). userId/actionType/timestamp 필수, eventId/searchKeyword/stackFilter/dwellTimeSeconds/quantity/totalAmount 옵셔널 | 1-C fire-and-forget (acks=0). 멱등성 미보장 — 손실 허용 |
+| `payment.completed` ★ | `paymentCompletedService.save` | (#4) 결제 완료 → PURCHASE 액션 1건 INSERT. fan-out INSERT 원자성 확보 | dedup ⚠ 확인 필요: 코드 측 dedup 구현 위치 확인 |
 
 ## 5. DTO / 모델
 
