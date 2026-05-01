@@ -150,10 +150,26 @@ public class Event extends BaseEntity {
         this.category = category;
     }
 
+    /**
+     * 판매 중지 (Action B) — status=CANCELLED 로 전이.
+     * 신규 판매만 차단하고 기존 구매자에게는 영향 없음 — 환불 트리거 X.
+     *
+     * <p>셀러가 "이벤트 수정" 화면에서 status 를 CANCELLED 로 명시 변경할 때만 호출됨
+     * ({@code EventService.updateEvent} 경로).
+     * 기존 구매자 환불을 동반하는 강제 취소는 {@link #forceCancel()} 사용.
+     */
     public void cancel() {
         this.status = EventStatus.CANCELLED;
     }
 
+    /**
+     * 강제 취소 (Action A) — status=FORCE_CANCELLED 로 전이.
+     * 환불 fan-out 을 트리거하므로 기존 구매자에게 환불 처리됨.
+     *
+     * <p>어드민 또는 셀러(본인 이벤트) 의 강제 취소 시 호출됨
+     * ({@code EventService.forceCancel} 경로).
+     * 단순 판매 중단은 {@link #cancel()} 사용.
+     */
     public void forceCancel() {
         if (!canBeCancelled()) {
             throw new BusinessException(EventErrorCode.CANNOT_CHANGE_STATUS);
