@@ -211,7 +211,6 @@ class EventServiceTest {
         // memberClient.getNickname() 은 기본 null 반환 — CI 환경에서 일부 응답 합성 경로가 null 을 허용하지 않을 수 있어
         // 명시적 stub 으로 NPE 재발 방지 (CI run 24766734663 재현 차단)
         when(memberClient.getNickname(sellerId)).thenReturn("tester");
-        when(eventViewRepository.findByEvent(event)).thenReturn(Optional.of(EventView.of(event)));
 
         // when
         EventDetailResponse response = eventService.getEvent(eventId);

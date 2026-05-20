@@ -61,6 +61,10 @@ dependencies {
     // Spring Retry — ES 동기화 실패 시 재시도
     implementation 'org.springframework.retry:spring-retry:2.0.11'
 
+    // Caffeine 캐시 — OpenAI Embedding 결과 캐싱으로 검색 p95 개선
+    implementation 'org.springframework.boot:spring-boot-starter-cache'
+    implementation 'com.github.ben-manes.caffeine:caffeine'
+
     // AWS S3
     implementation platform('software.amazon.awssdk:bom:2.26.12')
     implementation 'software.amazon.awssdk:s3'

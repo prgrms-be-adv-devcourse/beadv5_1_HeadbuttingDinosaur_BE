@@ -5,6 +5,7 @@ import com.devticket.event.infrastructure.client.dto.EmbeddingRequest;
 import com.devticket.event.infrastructure.client.dto.EmbeddingResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -26,6 +27,7 @@ public class OpenAiEmbeddingClient {
      * @param text 임베딩할 텍스트
      * @return 1536차원 float[] 벡터, 실패 시 null
      */
+    @Cacheable(cacheNames = "embeddings", key = "#text", unless = "#result == null")
     public float[] embed(String text) {
         // Feature toggle 확인
         if (!openAiProperties.isEnabled()) {

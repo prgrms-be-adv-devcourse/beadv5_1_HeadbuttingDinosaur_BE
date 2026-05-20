@@ -55,6 +55,7 @@ class EventInternalServiceConcurrencyTest {
 
     @MockitoBean private MemberClient memberClient;
     @MockitoBean private EventSearchRepository eventSearchRepository;
+    @MockitoBean private EventCacheEvictor eventCacheEvictor;
 
     @AfterEach
     void cleanup() {

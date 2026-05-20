@@ -47,6 +47,7 @@ public class EventInternalService {
     private final EventRepository eventRepository;
     private final EventSearchRepository eventSearchRepository;
     private final MemberClient memberClient;
+    private final EventCacheEvictor eventCacheEvictor;
 
     @Transactional(readOnly = true)
     public InternalPagedEventResponse searchEvents(
@@ -228,6 +229,7 @@ public class EventInternalService {
         }
 
         statusChangedIds.forEach(this::syncToElasticsearch);
+        eventCacheEvictor.evictEvents(uniqueSortedIds);
 
         return new InternalStockAdjustmentResponse(Arrays.asList(results));
     }

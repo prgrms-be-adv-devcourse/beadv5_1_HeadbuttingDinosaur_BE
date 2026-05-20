@@ -11,6 +11,11 @@ spring:
     multipart:
       max-file-size: 5MB
       max-request-size: 10MB
+  cache:
+    type: caffeine
+    cache-names: embeddings
+    caffeine:
+      spec: maximumSize=10000,expireAfterWrite=24h,recordStats
 
 server:
   port: 8082
@@ -25,7 +30,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health, prometheus
+        include: health, prometheus, caches
       base-path: /actuator
   endpoint:
     health:

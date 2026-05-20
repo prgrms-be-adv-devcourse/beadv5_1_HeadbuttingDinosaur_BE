@@ -27,6 +27,7 @@ public class EventController {
         @RequestHeader(value = "X-User-Id", required = false) UUID currentUserId,
         @PathVariable("eventId") UUID eventId) {
         EventDetailResponse response = eventService.getEvent(eventId);
+        eventService.recordView(eventId);
         eventService.logDetailView(currentUserId, eventId);
         return ResponseEntity.ok(SuccessResponse.success(response));
     }

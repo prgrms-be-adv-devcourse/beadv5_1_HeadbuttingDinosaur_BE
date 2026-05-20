@@ -23,6 +23,7 @@ public class StockRestoreService {
     private final EventRepository eventRepository;
     private final MessageDeduplicationService deduplicationService;
     private final ObjectMapper objectMapper;
+    private final EventCacheEvictor eventCacheEvictor;
 
     @Transactional
     public void restoreStockForPaymentFailed(UUID messageId, String topic, String payload) {
@@ -74,6 +75,7 @@ public class StockRestoreService {
 
         // Step 4. Dedup 기록 (같은 트랜잭션)
         deduplicationService.markProcessed(messageId, topic);
+        eventCacheEvictor.evictEvents(sortedEventIds);
     }
 
     private PaymentFailedEvent deserialize(String payload) {

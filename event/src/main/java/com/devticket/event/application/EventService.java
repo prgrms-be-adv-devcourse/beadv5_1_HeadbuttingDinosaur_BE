@@ -4,6 +4,7 @@ import co.elastic.clients.elasticsearch._types.FieldValue;
 import co.elastic.clients.elasticsearch._types.query_dsl.BoolQuery;
 import co.elastic.clients.elasticsearch._types.query_dsl.Query;
 import com.devticket.event.application.event.ActionLogDomainEvent;
+import com.devticket.event.common.config.CachingConfig;
 import com.devticket.event.common.exception.BusinessException;
 import com.devticket.event.common.messaging.KafkaTopics;
 import com.devticket.event.common.messaging.event.EventForceCancelledEvent;
@@ -44,6 +45,9 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -70,6 +74,7 @@ public class EventService {
     private final ApplicationEventPublisher eventPublisher;
     private final EventViewRepository eventViewRepository;
 
+    @CacheEvict(value = CachingConfig.EVENT_LIST, allEntries = true)
     @Transactional
     public SellerEventCreateResponse createEvent(UUID sellerId, SellerEventCreateRequest request) {
 
@@ -137,21 +142,25 @@ public class EventService {
             .collect(Collectors.toMap(TechStackItem::id, TechStackItem::name));
     }
 
-    @Transactional
+    @Cacheable(value = CachingConfig.EVENT_DETAIL, key = "#eventId")
+    @Transactional(readOnly = true)
     public EventDetailResponse getEvent(UUID eventId) {
 
         Event event = eventRepository.findWithDetailsByEventId(eventId)
             .orElseThrow(() -> new BusinessException(EventErrorCode.EVENT_NOT_FOUND));
 
-        // 1. 조회수 증가 : eventView 가져오기
-        EventView eventView = eventViewRepository.findByEvent(event)
-            .orElseGet(() -> eventViewRepository.save(EventView.of(event)));
-        // 2. 조회수 증가 : eventView 증가
-        eventView.increaseViewCount();
-
         String nickname = memberClient.getNickname(event.getSellerId());
 
         return EventDetailResponse.from(event, nickname);
+    }
+
+    @Transactional
+    public void recordView(UUID eventId) {
+        Event event = eventRepository.findByEventId(eventId)
+            .orElseThrow(() -> new BusinessException(EventErrorCode.EVENT_NOT_FOUND));
+        EventView eventView = eventViewRepository.findByEvent(event)
+            .orElseGet(() -> eventViewRepository.save(EventView.of(event)));
+        eventView.increaseViewCount();
     }
 
     public void logDetailView(UUID userId, UUID eventId) {
@@ -178,6 +187,10 @@ public class EventService {
             null, null, null, Instant.now()));
     }
 
+    @Cacheable(
+        value = CachingConfig.EVENT_LIST,
+        key = "#request.toString() + ':' + #pageable.pageNumber + ':' + #pageable.pageSize + ':' + #pageable.sort.toString() + ':' + (#currentUserId == null ? 'anon' : #currentUserId.toString())"
+    )
     @Transactional(readOnly = true)
     public EventListResponse getEventList(EventListRequest request, UUID currentUserId, Pageable pageable) {
 
@@ -323,6 +336,10 @@ public class EventService {
             status == EventStatus.DRAFT;
     }
 
+    @Caching(evict = {
+        @CacheEvict(value = CachingConfig.EVENT_LIST, allEntries = true),
+        @CacheEvict(value = CachingConfig.EVENT_DETAIL, key = "#eventId")
+    })
     @Transactional
     public SellerEventUpdateResponse updateEvent(UUID sellerId, UUID eventId,
         SellerEventUpdateRequest request) {
@@ -433,6 +450,10 @@ public class EventService {
      * <p><b>본 액션은 환불을 동반</b>한다. 단순 신규 판매 중단 (Action B — 기존 구매자 영향 없음)은
      * {@link #updateEvent} 의 {@code status=CANCELLED} 분기로 호출 (별개 흐름).
      */
+    @Caching(evict = {
+        @CacheEvict(value = CachingConfig.EVENT_LIST, allEntries = true),
+        @CacheEvict(value = CachingConfig.EVENT_DETAIL, key = "#eventId")
+    })
     @Transactional
     public void forceCancel(UUID userId, String userRole, UUID eventId, String reason) {
         Event event = eventRepository.findByEventIdWithLock(eventId)

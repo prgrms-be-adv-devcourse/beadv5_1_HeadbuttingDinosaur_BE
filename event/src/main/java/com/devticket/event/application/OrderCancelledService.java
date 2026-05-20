@@ -22,6 +22,7 @@ public class OrderCancelledService {
     private final EventRepository eventRepository;
     private final MessageDeduplicationService deduplicationService;
     private final ObjectMapper objectMapper;
+    private final EventCacheEvictor eventCacheEvictor;
 
     @Transactional
     public void restoreStockForOrderCancelled(UUID messageId, String topic, String payload) {
@@ -72,6 +73,7 @@ public class OrderCancelledService {
 
         // Step 4. Dedup 기록 (같은 트랜잭션)
         deduplicationService.markProcessed(messageId, topic);
+        eventCacheEvictor.evictEvents(sortedEventIds);
     }
 
     private OrderCancelledEvent deserializeOrderCancelled(String payload) {

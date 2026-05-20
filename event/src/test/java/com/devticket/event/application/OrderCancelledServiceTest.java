@@ -20,6 +20,7 @@ import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @DataJpaTest
@@ -30,6 +31,9 @@ class OrderCancelledServiceTest {
 
     @Autowired
     private OrderCancelledService orderCancelledService;
+
+    @MockitoBean
+    private EventCacheEvictor eventCacheEvictor;
 
     @Autowired
     private EventRepository eventRepository;
